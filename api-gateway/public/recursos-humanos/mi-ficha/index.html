@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Ficha — AutoFácil</title>
-  <!-- v1.7 — Ver documento: async onclick no cancelaba la navegacion al href con token vacio -->
+  <!-- v1.8 — foto real de Credenciales en el avatar del hero -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -115,9 +115,27 @@ const CONYUGE = [['conyuge_nombre','Nombre'],['conyuge_rut','RUT'],['conyuge_tel
 
 function fld(label, val){ return `<div class="fld"><label>${label}</label><div class="val">${val!=null&&val!==''?esc(val):'—'}</div></div>`; }
 
+/* Foto real (de Credenciales) en el avatar del hero. Misma fuente y caché
+   (sessionStorage af_mi_foto) que usa la barra superior en app-version.js. */
+async function fotoAvatar(){
+  try {
+    let foto = sessionStorage.getItem('af_mi_foto');
+    if (foto === null) {
+      const j = await (await fetch('/api/credenciales/mi-foto', { headers:H })).json().catch(()=>null);
+      foto = (j && j.success && j.data && j.data.foto) || '';
+      try { sessionStorage.setItem('af_mi_foto', foto); } catch(_){}
+    }
+    if (!foto) return;
+    const el = document.getElementById('hAvatar');
+    el.innerHTML = '<img src="'+foto+'" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">';
+    el.style.overflow = 'hidden'; el.style.padding = '0';
+  } catch(e){}
+}
+
 function render(){
   const u = DATA.usuario, f = DATA.ficha || {};
   document.getElementById('hAvatar').textContent = (u.nombre||'?')[0].toUpperCase();
+  fotoAvatar();  // foto real de Credenciales en vez de la inicial (si existe)
   document.getElementById('hNombre').textContent = [u.nombre,u.apellido,u.apellido_materno].filter(Boolean).join(' ');
   document.getElementById('hSub').textContent = [u.cargo, u.rut, u.email].filter(Boolean).join(' · ');
   document.getElementById('gLaboral').innerHTML =
