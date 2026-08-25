@@ -348,6 +348,27 @@ async function docTipos() {
   } catch { return ['CONTRATO', 'ANEXO', 'OTRO']; }
 }
 
+/* POST /api/rrhh/docs/tipos { nombre } — agrega un tipo de documento al catálogo
+   paramétrico (rh_config.doc_tipos). Solo RRHH/Admin (requireFunc rh_aprobar en la
+   ruta). El catálogo no admite comas (es CSV) ni duplicados. */
+const crearDocTipo = async (req, res) => {
+  try {
+    const nombre = String((req.body || {}).nombre || '').trim().toUpperCase().replace(/\s+/g, ' ');
+    if (!nombre) return fail(res, 'Indica el nombre del tipo de documento', 400);
+    if (nombre.includes(',')) return fail(res, 'El nombre no puede llevar comas', 400);
+    if (nombre.length > 60) return fail(res, 'Máximo 60 caracteres', 400);
+    const tipos = await docTipos();
+    if (!tipos.includes(nombre)) {
+      await pool.query(
+        "UPDATE rh_config SET valor=CONCAT(valor, ?, ?) WHERE clave='doc_tipos'", [',', nombre]);
+      auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'doc_tipo', entidad_id: nombre,
+        detalle: `Agregó el tipo de documento "${nombre}" al catálogo de la Carpeta Digital` });
+      tipos.push(nombre);
+    }
+    ok(res, { tipos });
+  } catch (e) { console.error('[rrhh crearDocTipo]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 /* POST /api/rrhh/docs/:idUsuario  { tipo, archivo_nombre, mime_type, archivo_data(base64) } — solo RRHH */
 const subirDoc = async (req, res) => {
   try {
@@ -422,4 +443,4 @@ require('../../../../shared/migrate').enFila('rrhh-directorio-config', async () 
   } catch (e) { console.error('[rrhh-directorio-config migration]', e.message); }
 });
 
-module.exports = { getFicha, putFicha, listarColaboradores, directorio, organigrama, directorioConfig, guardarDirectorioConfig, subirDoc, descargarDoc, eliminarDoc };
+module.exports = { getFicha, putFicha, listarColaboradores, directorio, organigrama, directorioConfig, guardarDirectorioConfig, subirDoc, descargarDoc, eliminarDoc, crearDocTipo };
