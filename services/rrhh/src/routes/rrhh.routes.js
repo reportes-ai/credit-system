@@ -217,6 +217,7 @@ router.put('/ficha/:id',           verifyToken, ficha.putFicha);
 router.get('/docs/archivo/:docId', verifyToken, ficha.descargarDoc);
 // ANTES de /docs/:idUsuario para que "tipos" no lo capture el patrón parametrizado.
 router.post('/docs/tipos',         verifyToken, requireFunc('rh_aprobar'), ficha.crearDocTipo);
+router.put('/docs/:docId/visible', verifyToken, requireFunc('rh_aprobar'), ficha.visibleDoc);
 router.post('/docs/:idUsuario',    verifyToken, requireFunc('rh_aprobar'), ficha.subirDoc);
 router.delete('/docs/:docId',      verifyToken, requireFunc('rh_aprobar'), ficha.eliminarDoc);
 

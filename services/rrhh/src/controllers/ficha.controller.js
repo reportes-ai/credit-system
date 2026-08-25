@@ -68,6 +68,8 @@ require('../../../../shared/migrate').enFila('rrhh-ficha', async () => {
     for (const ddl of [
       ...almacen.sqlColumnas('rh_documentos'),
       'ALTER TABLE rh_documentos MODIFY COLUMN archivo_data LONGBLOB NULL',
+      // Visible en Mi Ficha: por defecto sí; en 0 el colaborador no lo ve ni lo descarga.
+      "ALTER TABLE rh_documentos ADD COLUMN visible_colaborador TINYINT(1) NOT NULL DEFAULT 1",
     ]) { try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[rrhh docs almacen]', e.message); } }
 
     // ── Promover Recursos Humanos a MÓDULO propio del Home (antes vivía en Soporte) ──
@@ -165,7 +167,7 @@ const CAMPOS_LABORAL = ['tipo_contrato', 'jornada', 'afp', 'salud', 'plan_isapre
 // Identidad en usuarios que RRHH puede actualizar desde la ficha
 const CAMPOS_USUARIO = ['cargo', 'fecha_ingreso', 'fecha_nacimiento', 'sexo', 'telefono', 'centro_costo'];
 
-async function armarFicha(idUsuario, conSueldo) {
+async function armarFicha(idUsuario, conSueldo, soloVisibles) {
   const [[u]] = await pool.query(
     `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.apellido_materno, u.email, u.telefono,
             u.cargo, u.sexo, u.fecha_ingreso, u.fecha_nacimiento, u.centro_costo, u.estado,
@@ -179,8 +181,12 @@ async function armarFicha(idUsuario, conSueldo) {
   const [[f]] = await pool.query('SELECT * FROM rh_fichas WHERE id_usuario = ?', [idUsuario]);
   const ficha = f || {};
   if (!conSueldo) delete ficha.sueldo_base;
+  // soloVisibles: el colaborador ve únicamente lo marcado "Mostrar en Mi Ficha";
+  // RRHH ve todo con el flag para poder alternarlo.
   const [docs] = await pool.query(
-    'SELECT id, tipo, nombre_archivo, mime_type, subido_por, created_at FROM rh_documentos WHERE id_usuario=? ORDER BY created_at DESC', [idUsuario]);
+    `SELECT id, tipo, nombre_archivo, mime_type, subido_por, created_at, visible_colaborador
+       FROM rh_documentos WHERE id_usuario=? ${soloVisibles ? 'AND visible_colaborador=1' : ''}
+      ORDER BY created_at DESC`, [idUsuario]);
   const [hijos] = await pool.query(
     "SELECT id, nombre, rut, DATE_FORMAT(fecha_nacimiento,'%Y-%m-%d') fecha_nacimiento, es_carga FROM rh_hijos WHERE id_usuario=? ORDER BY fecha_nacimiento, id", [idUsuario]);
   return { usuario: u, ficha, documentos: docs, hijos };
@@ -198,7 +204,7 @@ const getFicha = async (req, res) => {
       objetivo = parseInt(req.params.id, 10);
     }
     // El propio colaborador SÍ ve su sueldo (como en Buk); terceros solo RRHH.
-    const data = await armarFicha(objetivo, true);
+    const data = await armarFicha(objetivo, true, !rrhh);
     if (!data) return fail(res, 'Colaborador no encontrado', 404);
     data.es_rrhh = rrhh;
     data.doc_tipos = await docTipos();
@@ -397,12 +403,32 @@ const descargarDoc = async (req, res) => {
     const u = req.usuario || {};
     const [[d]] = await pool.query('SELECT * FROM rh_documentos WHERE id=?', [req.params.docId]);
     if (!d) return fail(res, 'Documento no encontrado', 404);
-    if (String(d.id_usuario) !== String(u.id_usuario) && !(await esRRHH(u.id_usuario)))
+    if (String(d.id_usuario) !== String(u.id_usuario)) {
+      if (!(await esRRHH(u.id_usuario))) return fail(res, 'Sin permiso sobre este documento', 403);
+    } else if (Number(d.visible_colaborador ?? 1) !== 1 && !(await esRRHH(u.id_usuario))) {
+      // Oculto en Mi Ficha: el dueño no lo descarga (solo RRHH).
       return fail(res, 'Sin permiso sobre este documento', 403);
+    }
     res.setHeader('Content-Type', d.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(d.nombre_archivo)}"`);
     res.send(await almacen.obtener({ ruta: d.doc_ruta, blob: d.archivo_data }));
   } catch (e) { console.error('[rrhh descargarDoc]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* PUT /api/rrhh/docs/:docId/visible { visible: 0|1 } — solo RRHH.
+   En 0 el documento desaparece de Mi Ficha del colaborador y no puede descargarlo. */
+const visibleDoc = async (req, res) => {
+  try {
+    const u = req.usuario || {};
+    if (!(await esRRHH(u.id_usuario))) return fail(res, 'Solo RRHH cambia la visibilidad', 403);
+    const visible = Number((req.body || {}).visible) ? 1 : 0;
+    const [[d]] = await pool.query('SELECT id, id_usuario, tipo, nombre_archivo FROM rh_documentos WHERE id=?', [req.params.docId]);
+    if (!d) return fail(res, 'Documento no encontrado', 404);
+    await pool.query('UPDATE rh_documentos SET visible_colaborador=? WHERE id=?', [visible, d.id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'documento', entidad_id: d.id,
+      detalle: `${visible ? 'Mostró' : 'Ocultó'} en Mi Ficha el documento ${d.tipo} "${d.nombre_archivo}" del colaborador #${d.id_usuario}` });
+    ok(res, { id: d.id, visible });
+  } catch (e) { console.error('[rrhh visibleDoc]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
 /* DELETE /api/rrhh/docs/:docId — solo RRHH */
@@ -443,4 +469,4 @@ require('../../../../shared/migrate').enFila('rrhh-directorio-config', async () 
   } catch (e) { console.error('[rrhh-directorio-config migration]', e.message); }
 });
 
-module.exports = { getFicha, putFicha, listarColaboradores, directorio, organigrama, directorioConfig, guardarDirectorioConfig, subirDoc, descargarDoc, eliminarDoc, crearDocTipo };
+module.exports = { getFicha, putFicha, listarColaboradores, directorio, organigrama, directorioConfig, guardarDirectorioConfig, subirDoc, descargarDoc, eliminarDoc, crearDocTipo, visibleDoc };

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v1.7 — boton + para crear tipos de documento de la Carpeta Digital (catalogo parametrico) -->
+  <!-- v1.8 — checkbox Mostrar en Mi Ficha por documento (oculto = solo RRHH) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -195,11 +195,12 @@ async function abrir(id){
       <input type="file" id="docFile" style="font-size:.82rem">
       <button class="btn-ghost" onclick="subirDoc()"><i class="bi bi-upload me-1"></i>Subir</button>
     </div>
-    <table><thead><tr><th>Tipo</th><th>Documento</th><th>Subido por</th><th>Fecha</th><th></th></tr></thead>
+    <table><thead><tr><th>Tipo</th><th>Documento</th><th>Subido por</th><th>Fecha</th><th title="Marcado: el colaborador lo ve y descarga en Mi Ficha. Desmarcado: solo RRHH.">Mostrar en Mi Ficha</th><th></th></tr></thead>
       <tbody>${(FICHA.documentos||[]).map(d=>`<tr>
         <td><span class="tag">${esc(d.tipo)}</span></td><td>${esc(d.nombre_archivo)}</td><td>${esc(d.subido_por||'—')}</td><td>${fD(d.created_at)}</td>
+        <td style="text-align:center"><input type="checkbox" ${Number(d.visible_colaborador??1)?'checked':''} title="Mostrar en Mi Ficha del colaborador" onchange="visibleDoc(${d.id}, this)"></td>
         <td style="white-space:nowrap"><a href="#" onclick="return verDoc(${d.id})" style="font-weight:700;margin-right:8px"><i class="bi bi-download"></i></a>
-        <button class="btn-mini del" onclick="borrarDoc(${d.id})"><i class="bi bi-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Sin documentos.</td></tr>'}</tbody></table>`;
+        <button class="btn-mini del" onclick="borrarDoc(${d.id})"><i class="bi bi-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Sin documentos.</td></tr>'}</tbody></table>`;
   dlg.showModal();
   pintarHijos(FICHA.hijos || []);
 }
@@ -283,6 +284,14 @@ async function nuevoDocTipo(){
   sel.innerHTML = j.data.tipos.map(t=>`<option>${t}</option>`).join('');
   sel.value = nombre.trim().toUpperCase().replace(/\s+/g,' ');
   toast('✓ Tipo agregado al catálogo');
+}
+/* Mostrar/ocultar el documento en Mi Ficha del colaborador. */
+async function visibleDoc(id, chk){
+  const j = await (await fetch('/api/rrhh/docs/'+id+'/visible', { method:'PUT', headers:HJ,
+    body: JSON.stringify({ visible: chk.checked ? 1 : 0 }) })).json().catch(()=>null);
+  if (!j || !j.success) { chk.checked = !chk.checked; return alert((j && j.error) || 'No se pudo cambiar la visibilidad'); }
+  const d = (FICHA.documentos||[]).find(x=>x.id===id); if (d) d.visible_colaborador = chk.checked ? 1 : 0;
+  toast(chk.checked ? '✓ Visible en Mi Ficha' : 'Oculto para el colaborador');
 }
 async function verDoc(id){
   const r = await fetch('/api/rrhh/docs/archivo/'+id, { headers:H });
