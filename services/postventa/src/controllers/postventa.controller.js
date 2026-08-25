@@ -2519,11 +2519,24 @@ async function etapasPorTrack(ids, track, orden) {
 function joinEstadoActual(track, orden) {
   const ph = orden.map(() => '?').join(',');
   const t = track === 'SALDO' ? 'SALDO' : 'COMISION';   // constante interna, nunca del request
+  // `ex.fecha DESC` desempata cuando la misma etapa quedó registrada dos veces:
+  // sin eso el estado y su fecha podían salir de filas distintas.
+  const porAvance = `FIELD(ex.etapa,${ph}) DESC, ex.fecha DESC`;
   return `LEFT JOIN (
       SELECT ex.id_seguimiento,
-             SUBSTRING_INDEX(GROUP_CONCAT(ex.etapa ORDER BY FIELD(ex.etapa,${ph}) DESC SEPARATOR '||'), '||', 1) AS estado
+             SUBSTRING_INDEX(GROUP_CONCAT(ex.etapa ORDER BY ${porAvance} SEPARATOR '||'), '||', 1) AS estado,
+             SUBSTRING_INDEX(GROUP_CONCAT(ex.fecha ORDER BY ${porAvance} SEPARATOR '||'), '||', 1) AS fecha_estado
         FROM postventa_etapas ex WHERE ex.track='${t}' GROUP BY ex.id_seguimiento
     ) x ON x.id_seguimiento = s.id`;
+}
+/* Orden pedido por el usuario → expresión SQL, por lista blanca (el request nunca
+   entra crudo al ORDER BY). Por omisión, la fecha del estado más reciente arriba:
+   es lo que se acaba de mover y lo que hay que mirar. */
+function ordenSQL(req, mapa) {
+  const col = mapa[String(req.query.orden || '')] || mapa._def;
+  const dir = String(req.query.dir || '').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+  // Los NULL siempre al final, se ordene como se ordene.
+  return `(${col}) IS NULL, ${col} ${dir}, s.num_op DESC`;
 }
 const estadosPedidos = req => String(req.query.estados || '').split('|').map(s => s.trim()).filter(Boolean);
 
@@ -2561,8 +2574,14 @@ const consultaSaldos = async (req, res) => {
     const baseWhere = 'WHERE ' + NO_ANULADA + (filt.length ? ' AND ' + filt.join(' AND ') : '');
     const PAGADO = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='SALDO' AND e.etapa='SALDO PRECIO PAGADO'`;
     const SUB_ESTADO = joinEstadoActual('SALDO', ORDEN_SALDO);
-    const joinEstado = estadosSel.length ? SUB_ESTADO : '';
-    const fpEstado = estadosSel.length ? [...ORDEN_SALDO] : [];
+    // El JOIN va siempre: de él salen el filtro por etapa Y el orden por fecha del estado.
+    const fpEstado = [...ORDEN_SALDO, ...ORDEN_SALDO];   // dos GROUP_CONCAT, un juego cada uno
+    const ORDEN_COLS = {
+      _def: 'x.fecha_estado',
+      num_op: 's.num_op', dealer: 'nombre_dealer', ejecutivo: 's.ejecutivo',
+      parque: 'parque', financiera: 's.financiera', saldo: 's.saldo_precio',
+      otorgado: 's.fecha_otorgado', estado: 'x.fecha_estado', orden_pago: 'orden_pago',
+    };
     const tablaWhere = baseWhere
       + (pagados7 ? ' AND ' + PAGADO + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : '')
       + (estadosSel.length ? ` AND COALESCE(x.estado,'SIN ETAPAS') IN (?)` : '');
@@ -2575,9 +2594,9 @@ const consultaSaldos = async (req, res) => {
       FROM postventa_seguimiento s
       LEFT JOIN creditos cr ON cr.id = s.id_credito
       LEFT JOIN dealers  d  ON d.id_dealer = cr.id_dealer
-      ${joinEstado}
+      ${SUB_ESTADO}
       ${tablaWhere}
-      ORDER BY s.fecha_otorgado DESC, s.num_op DESC
+      ORDER BY ${ordenSQL(req, ORDEN_COLS)}
       LIMIT ?`, [...fpEstado, ...fp, ...(estadosSel.length ? [estadosSel] : []), limit]);
     const ids = rows.map(r => r.id);
     const etapas = await etapasPorTrack(ids, 'SALDO', ORDEN_SALDO);
@@ -2598,7 +2617,7 @@ const consultaSaldos = async (req, res) => {
       LEFT JOIN creditos cr ON cr.id = s.id_credito
       ${SUB_ESTADO}
       ${baseWhere}
-      GROUP BY COALESCE(x.estado,'SIN ETAPAS')`, [...ORDEN_SALDO, ...fp]);
+      GROUP BY COALESCE(x.estado,'SIN ETAPAS')`, [...fpEstado, ...fp]);
     res.json({ success: true, data, orden: ORDEN_SALDO, resumen, porEstado, error: null });
   } catch (e) { console.error('[consultaSaldos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -2629,8 +2648,15 @@ const consultaFacturas = async (req, res) => {
     const baseWhere = 'WHERE ' + NO_ANULADA + (filt.length ? ' AND ' + filt.join(' AND ') : '');
     const PAGADA = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='COMISION' AND e.etapa='COMISION PAGADA'`;
     const SUB_ESTADO = joinEstadoActual('COMISION', ORDEN_COMISION);
-    const joinEstado = estadosSel.length ? SUB_ESTADO : '';
-    const fpEstado = estadosSel.length ? [...ORDEN_COMISION] : [];
+    // El JOIN va siempre: de él salen el filtro por etapa Y el orden por fecha del estado.
+    const fpEstado = [...ORDEN_COMISION, ...ORDEN_COMISION];   // dos GROUP_CONCAT, un juego cada uno
+    const ORDEN_COLS = {
+      _def: 'x.fecha_estado',
+      num_op: 's.num_op', dealer: 'nombre_dealer', ejecutivo: 's.ejecutivo',
+      factura: 'f.numero_factura', mes_fact: 'mes_fact', fecha_factura: 'f.fecha_factura',
+      bruto: 'f.monto_bruto', liquido: 'f.monto_liquido', estado: 'x.fecha_estado',
+      orden_pago: 'orden_comision',
+    };
     const tablaWhere = baseWhere
       + (pagados7 ? ' AND ' + PAGADA + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : '')
       + (estadosSel.length ? ` AND COALESCE(x.estado,'SIN ETAPAS') IN (?)` : '');
@@ -2645,9 +2671,9 @@ const consultaFacturas = async (req, res) => {
       LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
       LEFT JOIN creditos cr ON cr.id = s.id_credito
       LEFT JOIN dealers  d  ON d.id_dealer = cr.id_dealer
-      ${joinEstado}
+      ${SUB_ESTADO}
       ${tablaWhere}
-      ORDER BY s.fecha_otorgado DESC, s.num_op DESC
+      ORDER BY ${ordenSQL(req, ORDEN_COLS)}
       LIMIT ?`, [...fpEstado, ...fp, ...(estadosSel.length ? [estadosSel] : []), limit]);
     const ids = rows.map(r => r.id);
     const etapas = await etapasPorTrack(ids, 'COMISION', ORDEN_COMISION);
@@ -2671,7 +2697,7 @@ const consultaFacturas = async (req, res) => {
       ${JOIN_CR}
       ${SUB_ESTADO}
       ${baseWhere}
-      GROUP BY COALESCE(x.estado,'SIN ETAPAS')`, [...ORDEN_COMISION, ...fp]);
+      GROUP BY COALESCE(x.estado,'SIN ETAPAS')`, [...fpEstado, ...fp]);
     res.json({ success: true, data, orden: ORDEN_COMISION, resumen, porEstado, error: null });
   } catch (e) { console.error('[consultaFacturas]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Consulta Estado Factura — AutoFácil</title>
-  <!-- v1.7 — botonera de estados del ciclo con cantidad y monto, filtro multiple -->
+  <!-- v1.8 — cabeceras ordenables (servidor); por defecto fecha del estado DESC -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -56,6 +56,10 @@
     .tl-done { color:#15803d; } .tl-pend { color:#cbd5e1; }
     .tl-fecha { color:#94a3b8; font-size:.72rem; margin-left:auto; white-space:nowrap; }
     .count { font-size:.8rem; color:#64748b; margin-bottom:10px; }
+    th.ord { cursor:pointer; user-select:none; }
+    th.ord:hover { color:#0141A2; }
+    th .fl { opacity:.3; margin-left:4px; font-size:.7rem; }
+    th.act { color:#0141A2; } th.act .fl { opacity:1; }
   </style>
 </head>
 <body>
@@ -85,10 +89,7 @@
     </div>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr>
-          <th>N° OP</th><th>Dealer</th><th>Ejecutivo</th><th>N° Factura</th><th>Mes Fact.</th><th>Fecha Fact.</th>
-          <th class="num">Monto Bruto</th><th class="num">Líquido</th><th>Estado comisión</th><th>Orden Pago</th>
-        </tr></thead>
+        <thead><tr id="thead"></tr></thead>
         <tbody id="body"><tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
       </table>
     </div>
@@ -106,6 +107,26 @@ const money = n => (n==null?'—':'$'+Number(n||0).toLocaleString('es-CL'));
 const fdate = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
 let ORDEN = [], DATA = [], soloPag7 = false;
 const ESTADOS_SEL = new Set();   // etapas marcadas en la botonera
+// Orden: se resuelve en el SERVIDOR. Ordenar acá solo alcanzaría a las 300 filas
+// traídas, y el orden se vería correcto siendo falso. Por defecto, el estado más
+// reciente arriba: es lo que se acaba de mover.
+let ORD = 'estado', DIR = 'desc';
+const COLS = [
+  ['num_op','N° OP',''], ['dealer','Dealer',''], ['ejecutivo','Ejecutivo',''],
+  ['factura','N° Factura',''], ['mes_fact','Mes Fact.',''], ['fecha_factura','Fecha Fact.',''],
+  ['bruto','Monto Bruto','num'], ['liquido','Líquido','num'],
+  ['estado','Estado comisión',''], ['orden_pago','Orden Pago',''],
+];
+function renderHead(){
+  document.getElementById('thead').innerHTML = COLS.map(([k,t,cls]) => {
+    const act = ORD===k;
+    return `<th class="ord ${cls} ${act?'act':''}" onclick="ordenar('${k}')">${t}<span class="fl">${act?(DIR==='desc'?'▼':'▲'):'⇅'}</span></th>`;
+  }).join('');
+}
+function ordenar(k){
+  if (ORD===k) DIR = DIR==='desc'?'asc':'desc'; else { ORD=k; DIR='desc'; }
+  buscar();
+}
 
 function pillClase(estado){ return estado==='COMISION PAGADA'?'pg':(estado==='SIN ETAPAS'?'ps':'pp'); }
 
@@ -116,11 +137,12 @@ async function buscar(){
   document.getElementById('count').textContent = 'Buscando…';
   document.getElementById('body').innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Buscando…</td></tr>';
   try{
-    const url = '/api/postventa/consulta-facturas?q='+encodeURIComponent(q)+'&mes='+encodeURIComponent(mes)+'&factura='+encodeURIComponent(factura)+(soloPag7?'&pagados7=1':'')+(ESTADOS_SEL.size?'&estados='+encodeURIComponent([...ESTADOS_SEL].join('|')):'');
+    const url = '/api/postventa/consulta-facturas?q='+encodeURIComponent(q)+'&mes='+encodeURIComponent(mes)+'&factura='+encodeURIComponent(factura)+(soloPag7?'&pagados7=1':'')+(ESTADOS_SEL.size?'&estados='+encodeURIComponent([...ESTADOS_SEL].join('|')):'')+'&orden='+ORD+'&dir='+DIR;
     const j = await (await fetch(url,{headers:H})).json();
     ORDEN = j.orden || []; DATA = j.data || [];
     renderResumen(j.resumen);
     renderEstados(j.porEstado || []);
+    renderHead();
     render();
   }catch(e){
     document.getElementById('count').textContent = 'Error al consultar.';
@@ -193,6 +215,7 @@ function toggle(i){ const d=document.getElementById('det'+i); if(d) d.style.disp
 document.getElementById('fq').addEventListener('keydown', e=>{ if(e.key==='Enter') buscar(); });
 document.getElementById('fFactura').addEventListener('keydown', e=>{ if(e.key==='Enter') buscar(); });
 document.getElementById('fMes').addEventListener('change', buscar);
+renderHead();
 buscar();
 </script>
 <script src="/js/topnav.js"></script>
