@@ -733,7 +733,17 @@ const bitacoraAtrasados = async (req, res) => {
         `SELECT id_credito, comentario, autor, created_at
            FROM fundantes_bitacora WHERE id_credito IN (?) ORDER BY created_at DESC`, [ids]);
       coms.forEach(cm => (comPorOp[cm.id_credito] = comPorOp[cm.id_credito] || []).push(
-        { comentario: cm.comentario, autor: cm.autor, fecha: cm.created_at }));
+        { tipo: 'comentario', comentario: cm.comentario, autor: cm.autor, fecha: cm.created_at }));
+      // Devoluciones de la financiera: la traza completa vive en la auditoría del
+      // módulo (una sola fuente — fundantes_seg solo guarda la ÚLTIMA devolución).
+      const [devs] = await pool.query(
+        `SELECT entidad_id AS id_credito, detalle, usuario, fecha FROM auditoria_movimientos
+          WHERE modulo='fundantes-seguimiento' AND entidad='credito'
+            AND accion='DEVOLVER_FUNDANTES' AND entidad_id IN (?)`,
+        [ids.map(String)]);
+      devs.forEach(d => (comPorOp[d.id_credito] = comPorOp[d.id_credito] || []).push(
+        { tipo: 'devolucion', comentario: d.detalle, autor: d.usuario, fecha: d.fecha }));
+      Object.values(comPorOp).forEach(a => a.sort((x, y) => new Date(y.fecha) - new Date(x.fecha)));
     }
     res.json({ success: true, data: ops.map(o => ({
       ...o, dias: Number(o.dias) || 0, comentarios: comPorOp[o.id_credito] || [],
