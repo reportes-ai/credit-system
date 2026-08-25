@@ -2510,6 +2510,22 @@ async function etapasPorTrack(ids, track, orden) {
   return map;
 }
 
+/* Etapa ACTUAL en SQL — el mismo criterio de etapasPorTrack (la de mayor índice
+   alcanzada), pero agregando en una sola pasada en vez de un subquery por fila.
+   Lo usan la botonera de estados y el filtro por etapa de las dos consultas.
+   Devuelve el JOIN; los parámetros son el arreglo `orden` completo, y van ANTES
+   que los del WHERE porque el JOIN aparece primero en la consulta. */
+function joinEstadoActual(track, orden) {
+  const ph = orden.map(() => '?').join(',');
+  const t = track === 'SALDO' ? 'SALDO' : 'COMISION';   // constante interna, nunca del request
+  return `LEFT JOIN (
+      SELECT ex.id_seguimiento,
+             SUBSTRING_INDEX(GROUP_CONCAT(ex.etapa ORDER BY FIELD(ex.etapa,${ph}) DESC SEPARATOR '||'), '||', 1) AS estado
+        FROM postventa_etapas ex WHERE ex.track='${t}' GROUP BY ex.id_seguimiento
+    ) x ON x.id_seguimiento = s.id`;
+}
+const estadosPedidos = req => String(req.query.estados || '').split('|').map(s => s.trim()).filter(Boolean);
+
 // Visibilidad por ejecutivo: regla central paramétrica (shared/visibilidad-ejecutivos),
 // por ámbito del perfil ('todos' | 'asignados', vía usuario_ejecutivos). Soporta varios
 // supervisores: el perfil supervisor se marca 'asignados' y se le asigna su equipo.
@@ -2520,11 +2536,12 @@ const consultaSaldos = async (req, res) => {
     const q = String(req.query.q || '').trim();
     const parque = String(req.query.parque || '').trim();
     const pagados7 = req.query.pagados7 === '1' || req.query.pagados7 === 'true';
+    const estadosSel = estadosPedidos(req);
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 300));
     const filt = []; const fp = [];
     const vis = await visibilidadEjecutivo(req);
     if (!vis.all) {
-      if (!vis.lista.length) return res.json({ success: true, data: [], orden: ORDEN_SALDO, resumen: { pendientes: 0, monto: 0 }, error: null });
+      if (!vis.lista.length) return res.json({ success: true, data: [], orden: ORDEN_SALDO, resumen: { pendientes: 0, monto: 0 }, porEstado: [], error: null });
       filt.push('s.ejecutivo IN (?)'); fp.push(vis.lista);
     }
     if (q) {
@@ -2534,7 +2551,12 @@ const consultaSaldos = async (req, res) => {
     if (parque) { filt.push(`(cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`); const lk = '%' + parque + '%'; fp.push(lk, lk); }
     const baseWhere = 'WHERE 1=1' + (filt.length ? ' AND ' + filt.join(' AND ') : '');
     const PAGADO = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='SALDO' AND e.etapa='SALDO PRECIO PAGADO'`;
-    const tablaWhere = baseWhere + (pagados7 ? ' AND ' + PAGADO + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : '');
+    const SUB_ESTADO = joinEstadoActual('SALDO', ORDEN_SALDO);
+    const joinEstado = estadosSel.length ? SUB_ESTADO : '';
+    const fpEstado = estadosSel.length ? [...ORDEN_SALDO] : [];
+    const tablaWhere = baseWhere
+      + (pagados7 ? ' AND ' + PAGADO + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : '')
+      + (estadosSel.length ? ` AND COALESCE(x.estado,'SIN ETAPAS') IN (?)` : '');
     const [rows] = await pool.query(`
       SELECT s.id, s.num_op, s.financiera, s.rut_dealer,
              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, NULLIF(cr.automotora,''), s.nombre_dealer) AS nombre_dealer,
@@ -2544,9 +2566,10 @@ const consultaSaldos = async (req, res) => {
       FROM postventa_seguimiento s
       LEFT JOIN creditos cr ON cr.id = s.id_credito
       LEFT JOIN dealers  d  ON d.id_dealer = cr.id_dealer
+      ${joinEstado}
       ${tablaWhere}
       ORDER BY s.fecha_otorgado DESC, s.num_op DESC
-      LIMIT ?`, [...fp, limit]);
+      LIMIT ?`, [...fpEstado, ...fp, ...(estadosSel.length ? [estadosSel] : []), limit]);
     const ids = rows.map(r => r.id);
     const etapas = await etapasPorTrack(ids, 'SALDO', ORDEN_SALDO);
     const data = rows.map(r => { const e = etapas[r.id] || {};
@@ -2558,7 +2581,16 @@ const consultaSaldos = async (req, res) => {
       FROM postventa_seguimiento s
       LEFT JOIN creditos cr ON cr.id = s.id_credito
       ${baseWhere} AND NOT ${PAGADO})`, fp);
-    res.json({ success: true, data, orden: ORDEN_SALDO, resumen, error: null });
+    // Botonera: cuántas operaciones y cuánta plata hay HOY en cada etapa del ciclo.
+    // Sin descontar los estados marcados, para que los botones no se apaguen al usarlos.
+    const [porEstado] = await pool.query(`
+      SELECT COALESCE(x.estado,'SIN ETAPAS') AS estado, COUNT(*) AS n, COALESCE(SUM(s.saldo_precio),0) AS monto
+      FROM postventa_seguimiento s
+      LEFT JOIN creditos cr ON cr.id = s.id_credito
+      ${SUB_ESTADO}
+      ${baseWhere}
+      GROUP BY COALESCE(x.estado,'SIN ETAPAS')`, [...ORDEN_SALDO, ...fp]);
+    res.json({ success: true, data, orden: ORDEN_SALDO, resumen, porEstado, error: null });
   } catch (e) { console.error('[consultaSaldos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
@@ -2569,7 +2601,7 @@ const consultaFacturas = async (req, res) => {
     const factura = String(req.query.factura || '').trim();
     const pagados7 = req.query.pagados7 === '1' || req.query.pagados7 === 'true';
     // Filtro por etapa ACTUAL del ciclo (la botonera de estados, con su q y $).
-    const estadosSel = String(req.query.estados || '').split('|').map(s => s.trim()).filter(Boolean);
+    const estadosSel = estadosPedidos(req);
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 300));
     const filt = []; const fp = [];
     const vis = await visibilidadEjecutivo(req);
@@ -2585,14 +2617,7 @@ const consultaFacturas = async (req, res) => {
     if (factura) { filt.push(`f.numero_factura LIKE ?`); fp.push('%' + factura + '%'); }
     const baseWhere = 'WHERE 1=1' + (filt.length ? ' AND ' + filt.join(' AND ') : '');
     const PAGADA = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='COMISION' AND e.etapa='COMISION PAGADA'`;
-    // Etapa actual = la de mayor índice alcanzada, el MISMO criterio de etapasPorTrack
-    // (allá en JS, acá en SQL para poder agrupar sin traerse todas las filas).
-    const ordenPH = ORDEN_COMISION.map(() => '?').join(',');
-    const SUB_ESTADO = `LEFT JOIN (
-        SELECT e3.id_seguimiento,
-               SUBSTRING_INDEX(GROUP_CONCAT(e3.etapa ORDER BY FIELD(e3.etapa,${ordenPH}) DESC SEPARATOR '||'), '||', 1) AS estado
-          FROM postventa_etapas e3 WHERE e3.track='COMISION' GROUP BY e3.id_seguimiento
-      ) x ON x.id_seguimiento = s.id`;
+    const SUB_ESTADO = joinEstadoActual('COMISION', ORDEN_COMISION);
     const joinEstado = estadosSel.length ? SUB_ESTADO : '';
     const fpEstado = estadosSel.length ? [...ORDEN_COMISION] : [];
     const tablaWhere = baseWhere

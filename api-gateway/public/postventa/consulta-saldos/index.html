@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Consulta Estado Saldos Precio — AutoFácil</title>
-  <!-- v1.4 — navbar migrada al componente topnav -->
+  <!-- v1.5 — botonera de estados del ciclo con cantidad y monto, filtro multiple -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -22,6 +22,18 @@
     input { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:9px 11px; font-size:.85rem; box-sizing:border-box; font-family:inherit; }
     input:focus { border-color:#0141A2; outline:none; }
     .filtros { display:grid; grid-template-columns:2fr 1fr auto auto auto; gap:10px; align-items:end; }
+    .estados { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .est { border:1.5px solid #e2e8f0; background:#fff; border-radius:10px; padding:7px 12px; cursor:pointer;
+           font-family:inherit; text-align:left; min-width:150px; flex:1 1 150px; transition:.12s; }
+    .est:hover { border-color:#94a3b8; }
+    .est .et { display:block; font-size:.63rem; font-weight:800; text-transform:uppercase; color:#64748b; letter-spacing:.3px; }
+    .est .ci { display:block; font-size:.86rem; font-weight:800; color:var(--navy); margin-top:2px; font-variant-numeric:tabular-nums; }
+    .est.on { border-color:#0141A2; background:#eff6ff; box-shadow:0 0 0 1px #0141A2 inset; }
+    .est.on .et { color:#0141A2; }
+    .est.pagada.on { border-color:#16a34a; background:#f0fdf4; box-shadow:0 0 0 1px #16a34a inset; }
+    .est.pagada.on .et { color:#15803d; }
+    .est.cero { opacity:.45; cursor:default; }
+    .est.cero:hover { border-color:#e2e8f0; }
     .btn-af { background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; border:none; border-radius:9px; padding:10px 18px; font-size:.85rem; font-weight:700; cursor:pointer; white-space:nowrap; }
     .btn-ghost { background:#fff; border:1.5px solid #cbd5e1; color:#475569; border-radius:9px; padding:9px 16px; font-size:.83rem; font-weight:700; cursor:pointer; white-space:nowrap; }
     .btn-tog { background:#fff; border:1.5px solid #16a34a; color:#16a34a; border-radius:9px; padding:9px 14px; font-size:.83rem; font-weight:700; cursor:pointer; white-space:nowrap; }
@@ -58,6 +70,9 @@
       <button class="btn-ghost" onclick="limpiar()">Limpiar</button>
       <button class="btn-tog" id="btnPag7" onclick="togglePag7()"><i class="bi bi-cash-coin me-1"></i>Pagados últimos 7 días</button>
     </div>
+    <!-- Botonera del ciclo: dónde está parado cada saldo, con cuántos y cuánta plata.
+         Se pueden marcar varias a la vez (ej: liberado a pago + orden emitida). -->
+    <div class="estados" id="estados"></div>
   </div>
 
   <div class="card-af">
@@ -87,6 +102,7 @@ const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 const money = n => '$'+Number(n||0).toLocaleString('es-CL');
 const fdate = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
 let ORDEN = [], DATA = [], soloPag7 = false;
+const ESTADOS_SEL = new Set();   // etapas marcadas en la botonera
 
 function pillClase(estado){ return estado==='SALDO PRECIO PAGADO'?'pg':(estado==='SIN ETAPAS'?'ps':'pp'); }
 
@@ -96,18 +112,40 @@ async function buscar(){
   document.getElementById('count').textContent = 'Buscando…';
   document.getElementById('body').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:24px">Buscando…</td></tr>';
   try{
-    const url = '/api/postventa/consulta-saldos?q='+encodeURIComponent(q)+'&parque='+encodeURIComponent(parque)+(soloPag7?'&pagados7=1':'');
+    const url = '/api/postventa/consulta-saldos?q='+encodeURIComponent(q)+'&parque='+encodeURIComponent(parque)+(soloPag7?'&pagados7=1':'')+(ESTADOS_SEL.size?'&estados='+encodeURIComponent([...ESTADOS_SEL].join('|')):'');
     const j = await (await fetch(url,{headers:H})).json();
     ORDEN = j.orden || []; DATA = j.data || [];
     renderResumen(j.resumen);
+    renderEstados(j.porEstado || []);
     render();
   }catch(e){
     document.getElementById('count').textContent = 'Error al consultar.';
     document.getElementById('body').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#b91c1c;padding:24px">Error al consultar.</td></tr>';
   }
 }
-function limpiar(){ document.getElementById('fq').value=''; document.getElementById('fParque').value=''; soloPag7=false; document.getElementById('btnPag7').classList.remove('on'); buscar(); }
+function limpiar(){ document.getElementById('fq').value=''; document.getElementById('fParque').value=''; soloPag7=false;
+  ESTADOS_SEL.clear(); document.getElementById('btnPag7').classList.remove('on'); buscar(); }
 function togglePag7(){ soloPag7=!soloPag7; document.getElementById('btnPag7').classList.toggle('on', soloPag7); buscar(); }
+// Un clic marca la etapa, otro la suelta. Varias a la vez se suman.
+function toggleEstado(et){
+  if (ESTADOS_SEL.has(et)) ESTADOS_SEL.delete(et); else ESTADOS_SEL.add(et);
+  buscar();
+}
+function renderEstados(rows){
+  const por = {}; rows.forEach(r => { por[r.estado] = r; });
+  const etapas = [...(ORDEN.length?ORDEN:[]), 'SIN ETAPAS'];
+  document.getElementById('estados').innerHTML = etapas.map(et => {
+    const r = por[et] || { n:0, monto:0 };
+    // SIN ETAPAS solo aparece si de verdad hay operaciones así.
+    if (et === 'SIN ETAPAS' && !r.n) return '';
+    const cls = ['est', et==='SALDO PRECIO PAGADO'?'pagada':'', r.n?'':'cero', ESTADOS_SEL.has(et)?'on':''].filter(Boolean).join(' ');
+    const click = r.n ? ` onclick="toggleEstado(${JSON.stringify(et).replace(/"/g,'&quot;')})"` : '';
+    return `<button class="${cls}"${click}>
+      <span class="et">${esc(et)}</span>
+      <span class="ci">${Number(r.n).toLocaleString('es-CL')} · ${money(r.monto)}</span>
+    </button>`;
+  }).join('');
+}
 function renderResumen(r){
   const el=document.getElementById('resumen');
   if(!r){ el.innerHTML=''; return; }
