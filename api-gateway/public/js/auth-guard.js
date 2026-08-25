@@ -13,7 +13,13 @@
   function redirigir() {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('usuario');
-    window.location.href = '/login.html';
+    /* Conservar el DESTINO: al llegar por un link (ej. desde un correo) sin
+       sesión, el login devuelve a esta misma página vía ?next= en vez del home.
+       Solo rutas locales (login.html ya valida que empiece con "/"). */
+    const next = location.pathname + location.search;
+    window.location.href = next && next !== '/' && !next.startsWith('/login')
+      ? '/login.html?next=' + encodeURIComponent(next)
+      : '/login.html';
   }
 
   if (!token || !usuario) { redirigir(); return; }
