@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Dealer a Pagar — AutoFácil</title>
-  <!-- v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -263,7 +263,7 @@ function colorearDias(){
 
 function visibles(){
   const q = (document.getElementById('buscar').value||'').toLowerCase();
-  return DATA.filter(r => !q || [r.num_op,r.nombre_dealer,r.rut_dealer,r.financiera,r.id_financiera].some(v => String(v||'').toLowerCase().includes(q)));
+  return DATA.filter(r => !q || [r.num_op,r.nombre_dealer,r.rut_dealer,r.financiera,r.id_financiera,r.numero_factura].some(v => String(v||'').toLowerCase().includes(q)));
 }
 
 function celdaAccion(r){
@@ -296,7 +296,7 @@ function render(){
       <td>${escH(r.nombre_dealer||'—')}</td>
       <td>${escH(r.num_cuenta||'—')}</td>
       <td>${escH(r.banco||'—')}</td>
-      <td>${fechaCL(r.fecha_factura)}</td>
+      <td>${r.numero_factura ? `<b>${r.es_boleta?'Boleta':'Factura'} N° ${escH(r.numero_factura)}</b><div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_factura)}</div>` : fechaCL(r.fecha_factura)}</td>
       <td style="text-align:center"><span class="dias-pill ${r.dcls}">${r.dias==null?'—':r.dias+' d'}</span></td>
       <td class="num">${fmt(r.comision)}</td>
       <td style="text-align:center">${celdaAccion(r)}</td>
