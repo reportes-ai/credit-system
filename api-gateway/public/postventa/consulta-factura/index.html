@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Consulta Estado Factura — AutoFácil</title>
-  <!-- v1.5 — toggle "Factura recibida, pendiente de pago" -->
+  <!-- v1.6 — dos toggles: "Factura recibida" y "Pendiente de pago", combinables -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -29,7 +29,7 @@
     .btn-tog { background:#fff; border:1.5px solid #16a34a; color:#16a34a; border-radius:9px; padding:9px 14px; font-size:.83rem; font-weight:700; cursor:pointer; white-space:nowrap; }
     .btn-tog.on { background:#16a34a; color:#fff; }
     /* Ámbar = pendiente, el mismo código de color del recuadro de resumen. */
-    .btn-tog.amb { border-color:#f59e0b; color:#b45309; width:100%; }
+    .btn-tog.amb { border-color:#f59e0b; color:#b45309; flex:1; }
     .btn-tog.amb.on { background:#f59e0b; color:#fff; }
     .resumen { display:inline-flex; gap:7px; align-items:center; background:#fff7ed; color:#b45309; border:1px solid #fed7aa; border-radius:9px; padding:7px 13px; font-size:.83rem; font-weight:600; }
     table { width:100%; border-collapse:collapse; font-size:.82rem; }
@@ -63,11 +63,17 @@
       <div><label>Mes facturación</label><input id="fMes" type="month"></div>
       <div><label>N° Factura</label><input id="fFactura" placeholder="N° factura"></div>
       <button class="btn-af" onclick="buscar()"><i class="bi bi-search me-1"></i>Buscar</button>
-      <!-- Los dos botones de abajo dejaban vacío el alto del label: ahí va el toggle nuevo. -->
+      <!-- Los dos botones de abajo dejaban vacío el alto del label: ahí van los toggles.
+           Son independientes y se combinan: juntos = factura en mano y plata pendiente. -->
       <div class="celda-doble">
-        <button class="btn-tog amb" id="btnFactRec" onclick="toggleFactRec()" title="Facturas ya recibidas cuya comisión todavía no se paga">
-          <i class="bi bi-receipt-cutoff me-1"></i>Factura recibida, pendiente de pago
-        </button>
+        <div class="fila-btns">
+          <button class="btn-tog amb" id="btnFactRec" onclick="toggleFactRec()" title="Operaciones con la factura del dealer ya recibida">
+            <i class="bi bi-receipt-cutoff me-1"></i>Factura recibida
+          </button>
+          <button class="btn-tog amb" id="btnPendPago" onclick="togglePendPago()" title="Comisiones que todavía no se pagan">
+            <i class="bi bi-hourglass-split me-1"></i>Pendiente de pago
+          </button>
+        </div>
         <div class="fila-btns">
           <button class="btn-ghost" onclick="limpiar()">Limpiar</button>
           <button class="btn-tog" id="btnPag7" onclick="togglePag7()"><i class="bi bi-cash-coin me-1"></i>Pagadas últimos 7 días</button>
@@ -102,7 +108,7 @@ const H = { Authorization:'Bearer '+token };
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const money = n => (n==null?'—':'$'+Number(n||0).toLocaleString('es-CL'));
 const fdate = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
-let ORDEN = [], DATA = [], soloPag7 = false, soloFactRec = false;
+let ORDEN = [], DATA = [], soloPag7 = false, soloFactRec = false, soloPendPago = false;
 
 function pillClase(estado){ return estado==='COMISION PAGADA'?'pg':(estado==='SIN ETAPAS'?'ps':'pp'); }
 
@@ -113,7 +119,7 @@ async function buscar(){
   document.getElementById('count').textContent = 'Buscando…';
   document.getElementById('body').innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Buscando…</td></tr>';
   try{
-    const url = '/api/postventa/consulta-facturas?q='+encodeURIComponent(q)+'&mes='+encodeURIComponent(mes)+'&factura='+encodeURIComponent(factura)+(soloPag7?'&pagados7=1':'')+(soloFactRec?'&factrec=1':'');
+    const url = '/api/postventa/consulta-facturas?q='+encodeURIComponent(q)+'&mes='+encodeURIComponent(mes)+'&factura='+encodeURIComponent(factura)+(soloPag7?'&pagados7=1':'')+(soloFactRec?'&factrec=1':'')+(soloPendPago?'&pendpago=1':'');
     const j = await (await fetch(url,{headers:H})).json();
     ORDEN = j.orden || []; DATA = j.data || [];
     renderResumen(j.resumen);
@@ -124,18 +130,22 @@ async function buscar(){
   }
 }
 function limpiar(){ document.getElementById('fq').value=''; document.getElementById('fMes').value=''; document.getElementById('fFactura').value='';
-  soloPag7=false; soloFactRec=false; pintarToggles(); buscar(); }
+  soloPag7=false; soloFactRec=false; soloPendPago=false; pintarToggles(); buscar(); }
 function pintarToggles(){
   document.getElementById('btnPag7').classList.toggle('on', soloPag7);
   document.getElementById('btnFactRec').classList.toggle('on', soloFactRec);
+  document.getElementById('btnPendPago').classList.toggle('on', soloPendPago);
 }
-// Los dos toggles se excluyen: "ya pagadas" y "pendientes de pago" no se cruzan.
-function togglePag7(){ soloPag7=!soloPag7; if(soloPag7) soloFactRec=false; pintarToggles(); buscar(); }
-function toggleFactRec(){ soloFactRec=!soloFactRec; if(soloFactRec) soloPag7=false; pintarToggles(); buscar(); }
+// Factura recibida y Pendiente de pago se combinan libremente. Lo único que no se
+// cruza es "ya pagadas" con "pendiente de pago": son conjuntos opuestos.
+function togglePag7(){ soloPag7=!soloPag7; if(soloPag7) soloPendPago=false; pintarToggles(); buscar(); }
+function toggleFactRec(){ soloFactRec=!soloFactRec; pintarToggles(); buscar(); }
+function togglePendPago(){ soloPendPago=!soloPendPago; if(soloPendPago) soloPag7=false; pintarToggles(); buscar(); }
 function renderResumen(r){
   const el=document.getElementById('resumen');
   if(!r){ el.innerHTML=''; return; }
-  el.innerHTML = '<i class="bi bi-hourglass-split"></i> Comisiones pendientes de pago: <b>'+Number(r.pendientes||0).toLocaleString('es-CL')+'</b> · <b>'+money(r.monto)+'</b>';
+  const rotulo = soloFactRec ? 'Pendientes de pago con factura recibida' : 'Comisiones pendientes de pago';
+  el.innerHTML = '<i class="bi bi-hourglass-split"></i> '+rotulo+': <b>'+Number(r.pendientes||0).toLocaleString('es-CL')+'</b> · <b>'+money(r.monto)+'</b>';
 }
 
 function render(){
