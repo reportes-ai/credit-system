@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Carga Trinidad — Carga Masiva AutoFácil</title><!-- v7.4 -->
+  <title>Carga Trinidad — Carga Masiva AutoFácil</title><!-- v7.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -373,8 +373,12 @@ function difActualizarBoton() {
   const btn = document.getElementById('btnDifAplicar');
   if (!btn) return;
   btn.disabled = n === 0;
-  document.getElementById('btnDifTxt').textContent = n ? `Aplicar ${n} elección(es)` : 'Aplicar elección';
-  document.getElementById('difResumenSel').textContent = n ? `${n} elegida(s); el resto queda pendiente` : 'Ninguna elegida todavía';
+  // Mientras el botón muestra el spinner (difAplicar) el span btnDifTxt no existe:
+  // escribirle sin guardia tumbaba el flujo de éxito con "Cannot set properties of null".
+  const txt = document.getElementById('btnDifTxt');
+  if (txt) txt.textContent = n ? `Aplicar ${n} elección(es)` : 'Aplicar elección';
+  const resumen = document.getElementById('difResumenSel');
+  if (resumen) resumen.textContent = n ? `${n} elegida(s); el resto queda pendiente` : 'Ninguna elegida todavía';
 }
 
 async function difAplicar() {
