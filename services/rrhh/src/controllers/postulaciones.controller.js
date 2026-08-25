@@ -293,9 +293,9 @@ const extraerCV = async (req, res) => {
  "habilidades": [string]
 }` + (textoDocx ? `\n\nCurrículum (texto extraído del Word):\n${textoDocx}` : ''),
       documentos: textoDocx ? [] : [{ tipo: esPdf ? 'pdf' : 'imagen', data: buf.toString('base64'), media_type: esPdf ? undefined : mime }],
-      json: true, max_tokens: 3000,
+      json: true, max_tokens: 8000,   // CVs largos: con 3000 la ficha JSON salía truncada y se perdía todo
     });
-    ok(res, { campos: datos || null });
+    ok(res, { campos: datos || null, motivo: datos ? undefined : 'error' });
   } catch (e) {
     console.error('[extraer cv]', e.message);
     ok(res, { campos: null, motivo: 'error' });   // la IA nunca bloquea la postulación
