@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Parques a Pagar — AutoFácil</title>
-  <!-- v1.5 — full width + fecha de emision bajo la Orden de Pago · v1.4 — popup de revisión pre-emisión (factura adjunta + totales) · v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
+  <!-- v1.6 — login conserva el destino (?next=). v1.5 — full width + fecha de emision bajo la Orden de Pago · v1.4 — popup de revisión pre-emisión (factura adjunta + totales) · v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -101,7 +101,7 @@
 
 <script>
 const token = sessionStorage.getItem('token');
-if (!token) location.href = '/login.html';
+if (!token) location.href='/login.html?next='+encodeURIComponent(location.pathname+location.search);
 const yo = JSON.parse(sessionStorage.getItem('usuario') || '{}');
 
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
