@@ -149,6 +149,20 @@ async function calcularOperacion(op) {
     arriendo_parque_calc = cd.arriendo;
   }
 
+  // La carta manda: si la operación tiene carta APROBADA con participación
+  // negociada (part_bruto), esa es la comisión dealer real — la cartola paga
+  // por la carta. Misma precedencia que el recálculo mensual: forzado a mano
+  // > carta vigente > cálculo (el forzado lo respetan los llamadores).
+  if (op.id_financiera) {
+    try {
+      const [cs] = await pool.query(
+        `SELECT part_bruto FROM cartas_aprobacion
+          WHERE status='APROBADA' AND COALESCE(part_bruto,0) > 0 AND id_financiera = ?
+          ORDER BY id DESC LIMIT 1`, [String(op.id_financiera)]);
+      if (cs[0]) comdea_real = Number(cs[0].part_bruto);
+    } catch (e) { /* sin tabla de cartas → queda el cálculo */ }
+  }
+
   // ── 4. Comisión ejecutivo — motor único ────────────────────────────
   comej = core.comisionEjecutivo({ montoFin: monto_fin, pctEj: (p.pct_ejecutivo_fin || 0) / 100 });
 

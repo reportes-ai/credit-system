@@ -175,9 +175,24 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
   const tol = opts.tol != null ? opts.tol : 1; // $ de tolerancia por redondeo
   const [p, parqMap, todasTasas, dealerMap] = await Promise.all([cargarParams(), cargarParques(), cargarTasas(), cargarDealers()]);
   const [ops] = await pool.query(
-    `SELECT id, financiera, parque, rut_dealer, saldo_precio, monto_financiado, monto_capitalizado, plazo, fecha_otorgado, tascli_real,
+    `SELECT id, id_financiera, financiera, parque, rut_dealer, saldo_precio, monto_financiado, monto_capitalizado, plazo, fecha_otorgado, tascli_real,
             monto_comision_fin, comdea_real, com_parque, campos_forzados
      FROM creditos WHERE id IN (?)`, [ids]);
+  // La carta manda: el valor esperado de comdea_real es el part_bruto de la carta
+  // APROBADA cuando existe (precedencia forzado > carta > cálculo). Sin esto, un
+  // valor que viene de la carta quedaría marcado como "forzado a mano" y un cambio
+  // posterior de la carta no lo actualizaría.
+  const partCartaDe = new Map();
+  const idsFin = [...new Set(ops.map(o => String(o.id_financiera || '')).filter(Boolean))];
+  if (idsFin.length) {
+    try {
+      const [cs] = await pool.query(
+        `SELECT id_financiera, part_bruto FROM cartas_aprobacion
+          WHERE status='APROBADA' AND COALESCE(part_bruto,0) > 0 AND id_financiera IN (?)
+          ORDER BY id ASC`, [idsFin]);
+      cs.forEach(c => partCartaDe.set(String(c.id_financiera), Number(c.part_bruto)));  // id mayor gana (vigente)
+    } catch (e) { /* sin tabla de cartas → se compara contra el cálculo */ }
+  }
   for (const op of ops) {
     const fin   = (op.financiera || '').toUpperCase();
     const esUAC = fin.includes('UNIDAD') || fin.includes('UAC');
@@ -188,7 +203,9 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
     for (const campo of campos) {
       // UAC: monto_comision_fin es dinámico (tier del mes), nunca se marca forzado.
       if (campo === 'monto_comision_fin' && esUAC) { forz.delete(campo); continue; }
-      const dif = Math.abs((parseFloat(op[campo]) || 0) - (parseFloat(calc[campo]) || 0)) > tol;
+      const partCarta = campo === 'comdea_real' ? partCartaDe.get(String(op.id_financiera || '')) : undefined;
+      const esperado  = partCarta != null ? partCarta : (parseFloat(calc[campo]) || 0);
+      const dif = Math.abs((parseFloat(op[campo]) || 0) - esperado) > tol;
       if (dif) forz.add(campo); else forz.delete(campo);
     }
     await pool.query('UPDATE creditos SET campos_forzados = ? WHERE id = ?',
