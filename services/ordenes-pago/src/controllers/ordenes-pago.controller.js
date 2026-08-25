@@ -11,6 +11,7 @@ const pool = require('../../../../shared/config/database');
 const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 const { auditar } = require('../../../../shared/audit');
 const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ordenes-pago');
+const AVISOS = require('../../../../shared/avisos');   // campanita al anular una orden
 const segregacion = require('../../../../shared/segregacion-pagos');   // quien emite no paga
 
 /* ── Migración: tablas + módulo/funcionalidades/permisos (idempotente) ──────── */
@@ -814,7 +815,7 @@ const cambiarEstadoOrden = async (req, res) => {
       return res.status(400).json({ success: false, data: null,
         error: 'El pago se registra desde la caja (Órdenes de Pago → Pagar), no cambiando el estado: así queda el egreso en el libro central y se respeta la segregación de funciones.' });
 
-    const [[o]] = await pool.query('SELECT numero, estado FROM ordenes_pago WHERE id=?', [id]);
+    const [[o]] = await pool.query('SELECT numero, estado, proveedor_nombre, monto, id_usuario FROM ordenes_pago WHERE id=?', [id]);
     if (!o) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
     // Orden ya pagada = EN DURO: no se puede modificar ni anular.
     if (o.estado === 'PAGADA')
@@ -827,6 +828,13 @@ const cambiarEstadoOrden = async (req, res) => {
         `UPDATE ordenes_pago SET estado='ANULADA', anulada_por=?, anulada_nombre=?, fecha_anulada=NOW() WHERE id=?`,
         [idU, quien, id]);
       await anularCorrelativo({ numero: o.numero, origen: 'GENERAL', origen_id: id, id_usuario: idU, usuario_nombre: quien });
+      // Campanita: al emisor de la orden + el pool del evento (sin config → Administradores).
+      AVISOS.avisar('odp_anulada', {
+        tipo: 'ordenes_pago', prioridad: 'alta',
+        titulo: '🚫 Orden de pago ANULADA — ' + (o.numero || id),
+        mensaje: `${quien} anuló la orden ${o.numero || id} de ${o.proveedor_nombre || 'proveedor'} por $${Number(o.monto || 0).toLocaleString('es-CL')}.`,
+        href: '/ordenes-pago/historial/',
+      }, { extra: o.id_usuario ? [o.id_usuario] : [], excluir: [idU] }).catch(() => {});
     } else {
       // Volver a EMITIDA: se limpia la fecha de pago porque la orden deja de estarlo.
       await pool.query(
@@ -1097,7 +1105,7 @@ const anularOrdenPostventa = async (req, res) => {
     if (motivo.length < 10)
       return res.status(400).json({ success: false, data: null, error: 'El motivo es obligatorio y debe explicar por qué se anula (mínimo 10 caracteres)' });
 
-    const [[oc]] = await pool.query('SELECT id, numero, origen, origen_id, monto, anulada, pagada FROM op_correlativos WHERE id=?', [id]);
+    const [[oc]] = await pool.query('SELECT id, numero, origen, origen_id, monto, anulada, pagada, id_usuario FROM op_correlativos WHERE id=?', [id]);
     if (!oc) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
     if (oc.origen === 'GENERAL')
       return res.status(400).json({ success: false, data: null, error: 'Esta es una orden de proveedores: se anula con el botón Anular del Historial' });
@@ -1146,6 +1154,16 @@ const anularOrdenPostventa = async (req, res) => {
     auditar({ req, accion: 'ANULAR', modulo: 'ordenes-pago', entidad: 'orden_pago_postventa', entidad_id: id,
       detalle: `Anuló ${oc.numero} (OP ${po.num_op}, $${Number(oc.monto || 0).toLocaleString('es-CL')})`
              + `${deshechas.length ? ' — se deshicieron las etapas: ' + deshechas.join(', ') : ''}. Motivo: ${motivo}` });
+
+    // Campanita: al emisor de la orden + el pool del evento (sin config → Administradores).
+    AVISOS.avisar('odp_anulada', {
+      tipo: 'ordenes_pago', prioridad: 'alta',
+      titulo: `🚫 Orden de pago ANULADA — ${oc.numero} (OP ${po.num_op})`,
+      mensaje: `${quien} anuló la orden ${oc.numero} de ${oc.origen === 'SALDO' ? 'saldo precio' : 'comisión'} de la OP ${po.num_op} `
+             + `por $${Number(oc.monto || 0).toLocaleString('es-CL')}. Motivo: ${motivo}.`
+             + `${deshechas.length ? ' Se deshicieron las etapas: ' + deshechas.join(', ') + ' — la operación volvió a Emisión Orden de Pago.' : ''}`,
+      href: '/ordenes-pago/historial/',
+    }, { extra: oc.id_usuario ? [oc.id_usuario] : [], excluir: [idU] }).catch(() => {});
 
     res.json({ success: true, data: { id, numero: oc.numero, num_op: po.num_op, etapas_deshechas: deshechas }, error: null });
   } catch (e) {
