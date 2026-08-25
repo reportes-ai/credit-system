@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Consulta Estado Saldos Precio — AutoFácil</title>
-  <!-- v1.6 — cabeceras ordenables (servidor); por defecto fecha del estado DESC -->
+  <!-- v1.7 — filtro de Parque como desplegable con los parques reales de las operaciones -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -19,8 +19,8 @@
     .head-row { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
     .head-row h5 { font-weight:800; color:var(--navy); margin:0; }
     label { font-size:.7rem; font-weight:800; text-transform:uppercase; color:#64748b; letter-spacing:.3px; display:block; margin:0 0 4px; }
-    input { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:9px 11px; font-size:.85rem; box-sizing:border-box; font-family:inherit; }
-    input:focus { border-color:#0141A2; outline:none; }
+    input, select { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:9px 11px; font-size:.85rem; box-sizing:border-box; font-family:inherit; background:#fff; }
+    input:focus, select:focus { border-color:#0141A2; outline:none; }
     .filtros { display:grid; grid-template-columns:2fr 1fr auto auto auto; gap:10px; align-items:end; }
     .estados { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
     .est { border:1.5px solid #e2e8f0; background:#fff; border-radius:10px; padding:7px 12px; cursor:pointer;
@@ -69,7 +69,9 @@
     <div class="head-row"><i class="bi bi-search" style="color:var(--blue);font-size:1.2rem"></i><h5>Consulta Estado Saldos Precio</h5></div>
     <div class="filtros">
       <div><label>Buscar (N° OP, RUT o nombre dealer, ejecutivo, parque)</label><input id="fq" placeholder="Ej: 12345, 76.xxx, Automotora, Juan Pérez…" autofocus></div>
-      <div><label>Parque</label><input id="fParque" placeholder="Filtrar por parque"></div>
+      <div><label>Parque</label>
+        <select id="fParque" onchange="buscar()"><option value="">Todos los parques</option></select>
+      </div>
       <button class="btn-af" onclick="buscar()"><i class="bi bi-search me-1"></i>Buscar</button>
       <button class="btn-ghost" onclick="limpiar()">Limpiar</button>
       <button class="btn-tog" id="btnPag7" onclick="togglePag7()"><i class="bi bi-cash-coin me-1"></i>Pagados últimos 7 días</button>
@@ -108,6 +110,16 @@ const ESTADOS_SEL = new Set();   // etapas marcadas en la botonera
 // traídas, y el orden se vería correcto siendo falso. Por defecto, el estado más
 // reciente arriba: es lo que se acaba de mover.
 let ORD = 'estado', DIR = 'desc';
+// La lista de parques se pide UNA vez (sale de un DISTINCT sobre las operaciones,
+// no del mantenedor: el parque de la operación viene del Excel de carga).
+let PARQUES_OK = false;
+function llenarParques(lista){
+  const sel = document.getElementById('fParque'), actual = sel.value;
+  sel.innerHTML = '<option value="">Todos los parques</option>'
+    + lista.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  sel.value = actual;          // no pierde lo elegido si algo la recarga
+  PARQUES_OK = true;
+}
 const COLS = [
   ['num_op','N° OP',''], ['dealer','Dealer',''], ['ejecutivo','Ejecutivo',''],
   ['parque','Parque',''], ['financiera','Financiera',''], ['saldo','Saldo Precio','num'],
@@ -132,8 +144,10 @@ async function buscar(){
   document.getElementById('count').textContent = 'Buscando…';
   document.getElementById('body').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:24px">Buscando…</td></tr>';
   try{
-    const url = '/api/postventa/consulta-saldos?q='+encodeURIComponent(q)+'&parque='+encodeURIComponent(parque)+(soloPag7?'&pagados7=1':'')+(ESTADOS_SEL.size?'&estados='+encodeURIComponent([...ESTADOS_SEL].join('|')):'')+'&orden='+ORD+'&dir='+DIR;
+    const url = '/api/postventa/consulta-saldos?q='+encodeURIComponent(q)+'&parque='+encodeURIComponent(parque)+(soloPag7?'&pagados7=1':'')+(ESTADOS_SEL.size?'&estados='+encodeURIComponent([...ESTADOS_SEL].join('|')):'')+'&orden='+ORD+'&dir='+DIR
+      +(PARQUES_OK?'':'&conparques=1');
     const j = await (await fetch(url,{headers:H})).json();
+    if (j.parques) llenarParques(j.parques);
     ORDEN = j.orden || []; DATA = j.data || [];
     renderResumen(j.resumen);
     renderEstados(j.porEstado || []);
@@ -203,7 +217,6 @@ function timeline(r){
 function toggle(i){ const d=document.getElementById('det'+i); if(d) d.style.display = d.style.display==='none'?'':'none'; }
 
 document.getElementById('fq').addEventListener('keydown', e=>{ if(e.key==='Enter') buscar(); });
-document.getElementById('fParque').addEventListener('keydown', e=>{ if(e.key==='Enter') buscar(); });
 renderHead();
 buscar();
 </script>

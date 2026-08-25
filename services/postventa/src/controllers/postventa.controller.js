@@ -2570,6 +2570,10 @@ const consultaSaldos = async (req, res) => {
       filt.push(`(s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`);
       const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk);
     }
+    // El WHERE sin el filtro de parque alimenta el desplegable: si se armara con
+    // el parque ya aplicado, la lista se reduciría a la opción elegida.
+    const whereSinParque = 'WHERE ' + NO_ANULADA + (filt.length ? ' AND ' + filt.join(' AND ') : '');
+    const fpSinParque = [...fp];
     if (parque) { filt.push(`(cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`); const lk = '%' + parque + '%'; fp.push(lk, lk); }
     const baseWhere = 'WHERE ' + NO_ANULADA + (filt.length ? ' AND ' + filt.join(' AND ') : '');
     const PAGADO = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='SALDO' AND e.etapa='SALDO PRECIO PAGADO'`;
@@ -2618,7 +2622,23 @@ const consultaSaldos = async (req, res) => {
       ${SUB_ESTADO}
       ${baseWhere}
       GROUP BY COALESCE(x.estado,'SIN ETAPAS')`, [...fpEstado, ...fp]);
-    res.json({ success: true, data, orden: ORDEN_SALDO, resumen, porEstado, error: null });
+    /* Lista para el desplegable de parques. Sale de las OPERACIONES, no del
+       mantenedor: el parque de la operación viene del Excel de carga, así que un
+       parque puede existir en los créditos y no estar en el mantenedor (y al revés).
+       Se pide una sola vez, al abrir la página, para no pagar el DISTINCT en cada
+       búsqueda — TiDB cobra por consulta. */
+    let parques;
+    if (req.query.conparques === '1') {
+      const [pq] = await pool.query(`
+        SELECT DISTINCT COALESCE(NULLIF(cr.parque,''), cr.nombre_parque_mgmt) AS parque
+        FROM postventa_seguimiento s
+        LEFT JOIN creditos cr ON cr.id = s.id_credito
+        ${whereSinParque}
+        HAVING parque IS NOT NULL AND parque <> ''
+        ORDER BY parque`, fpSinParque);
+      parques = pq.map(p => p.parque);
+    }
+    res.json({ success: true, data, orden: ORDEN_SALDO, resumen, porEstado, parques, error: null });
   } catch (e) { console.error('[consultaSaldos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
