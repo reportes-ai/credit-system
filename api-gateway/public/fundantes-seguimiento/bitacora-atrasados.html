@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bitácora Fundantes Atrasados — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <!-- v1.0 -->
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main { padding:26px 32px; max-width:1400px; margin:0 auto; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.2rem; opacity:.85; }
+    .banner h2 { font-weight:800; margin:0; font-size:1.25rem; }
+    .banner p { opacity:.85; margin:2px 0 0; font-size:.86rem; }
+    .toolbar { display:flex; gap:12px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+    .toolbar input { max-width:340px; }
+    .card-op { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:14px; overflow:hidden; }
+    .op-head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:13px 18px; border-bottom:1px solid #f1f5f9; }
+    .op-head b { font-size:.92rem; color:#0f172a; }
+    .sub { color:#94a3b8; font-size:.74rem; }
+    .dias { font-size:.72rem; font-weight:800; border-radius:8px; padding:2px 9px; background:#fee2e2; color:#991b1b; }
+    .dias.warn { background:#fef3c7; color:#92400e; }
+    .b { font-size:.68rem; font-weight:700; border-radius:6px; padding:2px 7px; }
+    .b-PENDIENTE { background:#fef3c7; color:#92400e; }
+    .b-RECHAZADO { background:#fee2e2; color:#991b1b; }
+    .coms { padding:8px 18px 12px; }
+    .com { border-left:3px solid var(--accent); background:#f8fafc; border-radius:0 8px 8px 0; padding:8px 12px; margin:7px 0; }
+    .com .texto { font-size:.82rem; color:#1f2937; }
+    .com .meta { color:#94a3b8; font-size:.7rem; margin-top:3px; }
+    .sincom { color:#b91c1c; font-size:.78rem; font-style:italic; padding:4px 0 8px; }
+    .empty { text-align:center; color:#9ca3af; padding:44px 0; background:#fff; border-radius:14px; }
+    .kpi { background:#fff; border-radius:12px; padding:10px 16px; font-size:.8rem; color:#374151; box-shadow:0 1px 4px rgba(0,0,0,.07); }
+    .kpi b { color:#0141A2; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>
+  window.AF_TOPNAV = { breadcrumb: [
+    { label:'Inicio', href:'/' },
+    { label:'Seguimiento Fundantes', href:'/fundantes/' },
+    { label:'Bitácora Fundantes Atrasados', icon:'bi-chat-left-text', current:true }
+  ] };
+</script>
+
+<div class="main">
+  <div class="banner">
+    <i class="bi bi-chat-left-text"></i>
+    <div><h2>Bitácora Fundantes Atrasados</h2>
+      <p>Operaciones con fundantes pendientes hace más de 7 días y los comentarios que dio cada ejecutivo (pop-up semanal y gestión manual): qué dijo, quién y cuándo.</p></div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="q" class="form-control form-control-sm" placeholder="Buscar por OP, ID Financiera o ejecutivo…" oninput="render()">
+    <select id="fEj" class="form-select form-select-sm" style="max-width:230px" onchange="render()"><option value="">Todos los ejecutivos</option></select>
+    <select id="fCom" class="form-select form-select-sm" style="max-width:220px" onchange="render()">
+      <option value="">Con y sin comentarios</option>
+      <option value="con">Solo con comentarios</option>
+      <option value="sin">Solo SIN comentarios</option>
+    </select>
+    <span id="cnt" class="kpi"></span>
+  </div>
+
+  <div id="lista"></div>
+  <div id="vacio" class="empty" style="display:none">No hay operaciones con fundantes atrasados. 🎉</div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fDT = s => s ? new Date(s).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+const fD  = s => s ? new Date(s+'T12:00:00').toLocaleDateString('es-CL') : '—';
+let DATA = [];
+
+async function cargar(){
+  const j = await fetch('/api/fundantes-seguimiento/bitacora-atrasados', { headers:H }).then(r=>r.json()).catch(()=>null);
+  DATA = (j && j.success) ? j.data : [];
+  const ejs = [...new Set(DATA.map(r=>r.ejecutivo).filter(Boolean))].sort();
+  document.getElementById('fEj').innerHTML = '<option value="">Todos los ejecutivos</option>' +
+    ejs.map(e=>`<option>${esc(e)}</option>`).join('');
+  render();
+}
+
+function render(){
+  const q   = document.getElementById('q').value.toLowerCase().trim();
+  const ej  = document.getElementById('fEj').value;
+  const fc  = document.getElementById('fCom').value;
+  let list = DATA;
+  if (q)  list = list.filter(r => [r.num_op, r.id_financiera, r.ejecutivo].some(v => String(v==null?'':v).toLowerCase().includes(q)));
+  if (ej) list = list.filter(r => r.ejecutivo === ej);
+  if (fc === 'con') list = list.filter(r => r.comentarios.length);
+  if (fc === 'sin') list = list.filter(r => !r.comentarios.length);
+  const sinCom = list.filter(r=>!r.comentarios.length).length;
+  document.getElementById('cnt').innerHTML = `<b>${list.length}</b> operación(es) atrasada(s) · <b>${sinCom}</b> sin ningún comentario`;
+  document.getElementById('vacio').style.display = list.length ? 'none' : '';
+  document.getElementById('lista').innerHTML = list.map(r => `
+    <div class="card-op">
+      <div class="op-head">
+        <b>OP ${esc(r.num_op)}</b>
+        <span class="sub">ID ${esc(r.id_financiera||'—')} · ${esc(r.financiera)}</span>
+        <span class="b b-${esc(r.estado)}">${esc(r.estado)}</span>
+        <span class="dias ${r.dias<=30?'warn':''}">${r.dias} d</span>
+        <span class="sub">otorgado ${fD(r.fecha_otorgado)}</span>
+        <span style="margin-left:auto;font-weight:700;font-size:.82rem;color:#0141A2"><i class="bi bi-person"></i> ${esc(r.ejecutivo||'—')}</span>
+      </div>
+      <div class="coms">
+        ${r.estado==='RECHAZADO' && r.comentario_rechazo ? `<div class="com" style="border-left-color:#dc2626"><div class="texto">${esc(r.comentario_rechazo)}</div><div class="meta">Rechazo de Operaciones</div></div>` : ''}
+        ${r.comentarios.length ? r.comentarios.map(c=>`
+          <div class="com">
+            <div class="texto">${esc(c.comentario)}</div>
+            <div class="meta"><i class="bi bi-person"></i> ${esc(c.autor||'—')} · ${fDT(c.fecha)}</div>
+          </div>`).join('')
+        : '<div class="sincom"><i class="bi bi-exclamation-triangle"></i> El ejecutivo aún no deja ningún comentario sobre este atraso.</div>'}
+      </div>
+    </div>`).join('');
+}
+
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

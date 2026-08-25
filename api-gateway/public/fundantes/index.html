@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Seguimiento Fundantes — AutoFácil</title>
+  <title>Seguimiento Fundantes — AutoFácil</title><!-- v1.1 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
@@ -70,6 +70,12 @@
       <p>Bitácora por operación: envíos, aprobaciones y rechazos con fechas y responsables.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i> Acceder</span>
     </a>
+    <a href="/fundantes-seguimiento/bitacora-atrasados" class="module-card" id="cardBitAtr" style="display:none">
+      <div class="card-icon"><i class="bi bi-chat-left-text"></i></div>
+      <h6>Bitácora Fundantes Atrasados</h6>
+      <p>Operaciones con fundantes pendientes hace más de 7 días y los comentarios del ejecutivo: qué dijo, quién y cuándo.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i> Acceder</span>
+    </a>
   </div>
   <div class="empty" id="vacio" style="display:none">No tienes acceso a submódulos de Seguimiento Fundantes.</div>
 </div>
@@ -92,6 +98,7 @@ if (!token || !yo) location.href = '/login.html';
   if (tiene('fundantes_operaciones') || tiene('fundantes_validar')) { document.getElementById('cardOps').style.display = ''; alguna = true; }
   if (tiene('fundantes_historial') || tiene('fundantes_operaciones') || tiene('fundantes_validar')) { document.getElementById('cardHist').style.display = ''; alguna = true; }
   if (tiene('fundantes_historial') || tiene('fundantes_operaciones') || tiene('fundantes_validar') || tiene('fundantes_seguimiento')) { document.getElementById('cardDev').style.display = ''; alguna = true; }
+  if (tiene('fundantes_bitacora_atrasados') || tiene('fundantes_operaciones') || tiene('fundantes_validar')) { document.getElementById('cardBitAtr').style.display = ''; alguna = true; }
   if (!alguna) document.getElementById('vacio').style.display = '';
 })();
 </script>

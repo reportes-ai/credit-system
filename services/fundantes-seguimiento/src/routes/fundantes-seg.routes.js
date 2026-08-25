@@ -17,6 +17,7 @@ router.get('/resumen',                  verifyToken, c.resumen);
 router.get('/devueltos',                verifyToken, c.devueltos);
 router.post('/:id/devolver',            verifyToken, requireFunc('fundantes_validar', 'fundantes_operaciones'), c.devolver);
 router.get('/historial',                verifyToken, requireFunc('fundantes_historial', 'fundantes_operaciones', 'fundantes_validar'), c.historial);
+router.get('/bitacora-atrasados',       verifyToken, requireFunc('fundantes_bitacora_atrasados', 'fundantes_operaciones', 'fundantes_validar'), c.bitacoraAtrasados);
 router.get('/popup',                    verifyToken, c.popup);
 router.post('/popup/:id/comentar',      verifyToken, c.popupComentar);
 router.get('/:id/bitacora',             verifyToken, c.bitacora);

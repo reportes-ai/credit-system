@@ -153,6 +153,7 @@ require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
       ['Seguimiento Fundantes - Operaciones', 'fundantes_operaciones', '/fundantes-operaciones/', 'bi-inboxes'],
       ['Validar Fundantes', 'fundantes_validar', null, 'bi-check2-circle'],
       ['Historial de Fundantes', 'fundantes_historial', '/fundantes-seguimiento/historial', 'bi-clock-history'],
+      ['Bitácora Fundantes Atrasados', 'fundantes_bitacora_atrasados', '/fundantes-seguimiento/bitacora-atrasados', 'bi-chat-left-text'],
       ['Documentos Fundantes (mantenedor)', 'fundantes_tipos', '/mantenedores/fundantes-tipos/', 'bi-sliders'],
     ];
     const idFunc = {};
@@ -173,12 +174,15 @@ require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
       const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idf]);
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
     }
-    // El Historial hereda el mismo acceso que Operaciones (además del Admin ya sembrado).
-    if (idFunc['fundantes_historial'] && idFunc['fundantes_operaciones']) {
-      await pool.query(
-        `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
-         SELECT id_perfil, ?, 1 FROM permisos_perfil WHERE id_funcionalidad=? AND habilitado=1`,
-        [idFunc['fundantes_historial'], idFunc['fundantes_operaciones']]);
+    // El Historial y la Bitácora de Atrasados heredan el mismo acceso que
+    // Operaciones (además del Admin ya sembrado): son vistas de supervisión.
+    for (const cod of ['fundantes_historial', 'fundantes_bitacora_atrasados']) {
+      if (idFunc[cod] && idFunc['fundantes_operaciones']) {
+        await pool.query(
+          `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+           SELECT id_perfil, ?, 1 FROM permisos_perfil WHERE id_funcionalidad=? AND habilitado=1`,
+          [idFunc[cod], idFunc['fundantes_operaciones']]);
+      }
     }
     console.log('[fundantes-seguimiento] módulo registrado');
   } catch (e) { console.error('[fundantes-seguimiento migration]', e.message); }
@@ -700,6 +704,43 @@ const popupComentar = async (req, res) => {
   } catch (e) { console.error('[fundantes popupComentar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* ─── GET /bitacora-atrasados ─────────────────────────────────────────────────
+   Bitácora de los créditos con fundantes ATRASADOS (pendientes/rechazados hace
+   más de 7 días — el mismo umbral verde de la matriz de antigüedad; ajustable
+   con ?dias=N): cada operación con TODOS sus comentarios de gestión (los del
+   pop-up semanal y los manuales), con autor y fecha. Para supervisar qué
+   explicación dio cada ejecutivo. */
+const bitacoraAtrasados = async (req, res) => {
+  try {
+    const minDias = Math.max(parseInt(req.query.dias) || 8, 1);
+    const [ops] = await pool.query(`
+      SELECT c.id AS id_credito, c.num_op, c.financiera, c.id_financiera, c.ejecutivo,
+             DATE_FORMAT(c.fecha_otorgado,'%Y-%m-%d') AS fecha_otorgado,
+             DATEDIFF(CURDATE(), c.fecha_otorgado) AS dias,
+             COALESCE(fs.estado,'PENDIENTE') AS estado, fs.comentario_rechazo
+      FROM creditos c LEFT JOIN fundantes_seg fs ON fs.id_credito = c.id
+      WHERE c.fecha_otorgado IS NOT NULL
+        AND UPPER(COALESCE(c.estado_credito,'')) = 'OTORGADO'
+        AND UPPER(c.financiera) IN (?)
+        AND COALESCE(fs.estado,'PENDIENTE') IN ('PENDIENTE','RECHAZADO')
+        AND DATEDIFF(CURDATE(), c.fecha_otorgado) >= ?
+      ORDER BY dias DESC, c.num_op DESC
+      LIMIT 500`, [FINANCIERAS, minDias]);
+    const ids = ops.map(o => o.id_credito);
+    const comPorOp = {};
+    if (ids.length) {
+      const [coms] = await pool.query(
+        `SELECT id_credito, comentario, autor, created_at
+           FROM fundantes_bitacora WHERE id_credito IN (?) ORDER BY created_at DESC`, [ids]);
+      coms.forEach(cm => (comPorOp[cm.id_credito] = comPorOp[cm.id_credito] || []).push(
+        { comentario: cm.comentario, autor: cm.autor, fecha: cm.created_at }));
+    }
+    res.json({ success: true, data: ops.map(o => ({
+      ...o, dias: Number(o.dias) || 0, comentarios: comPorOp[o.id_credito] || [],
+    })), error: null });
+  } catch (e) { console.error('[fundantes bitacoraAtrasados]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 /* ─── Bitácora de la operación ────────────────────────────────────────────────
    GET  /:id/bitacora  → línea de tiempo: lo que el sistema registró solo
         (auditoría del módulo, una sola fuente) + los comentarios de gestión.
@@ -1055,5 +1096,5 @@ const tiposEliminar = async (req, res) => {
   } catch (e) { console.error('[fundantes tipos eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
 };
 
-module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, marcarSinLimitacion, validar, historial, listarDocs, devolver, devueltos, bitacora, comentar, popup, popupComentar,
+module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, marcarSinLimitacion, validar, historial, listarDocs, devolver, devueltos, bitacora, bitacoraAtrasados, comentar, popup, popupComentar,
   tiposListar, tiposCrear, tiposActualizar, tiposEliminar };
