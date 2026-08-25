@@ -120,6 +120,14 @@ exports.resolver = async (req, res) => {
           detalle: `Diferencia con la carga resuelta en OP ${cr.num_op}: ${ETIQUETAS[dif.campo]} ${dif.valor_sistema} → ${valor} (${eleccion === 'ARCHIVO' ? 'valor del archivo' : 'valor digitado'})` });
       } else cerrados++;
 
+      /* Un campo puede volver a diferir en una carga posterior, pero la llave única
+         uk_dif (id_credito, campo, estado) solo admite UNA fila RESUELTA por campo:
+         sin este DELETE el UPDATE chocaba con la resolución vieja y el lote entero
+         moría en 500 a mitad de camino (op 26080622, 25-08-2026). Queda la última
+         resolución; el historial completo vive en audit_log (auditar de arriba). */
+      await pool.query(
+        "DELETE FROM carga_diferencias WHERE id_credito=? AND campo=? AND estado='RESUELTA' AND id<>?",
+        [dif.id_credito, dif.campo, dif.id]);
       await pool.query(
         `UPDATE carga_diferencias SET estado='RESUELTA', eleccion=?, valor_elegido=?, resuelto_por=?, resuelto_at=NOW() WHERE id=?`,
         [eleccion, eleccion === 'SISTEMA' ? dif.valor_sistema : String(valor), usuario, dif.id]);
