@@ -1680,8 +1680,9 @@ const setConfig = async (req, res) => {
 
 /* ── GET /api/postventa/saldos-a-pagar — ops liberadas a pago, no pagadas ── */
 const normRutSaldo = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
-const getSaldosAPagar = async (req, res) => {
-  try {
+/* Datos puros (sin HTTP): la cola de saldos a pagar con monto_pagar y dias_sla.
+   La usan el endpoint y el correo diario de ODPs pendientes (un solo motor). */
+async function datosSaldosAPagar() {
     const [rows] = await pool.query(`
       SELECT s.id, s.num_op, s.saldo_precio, s.financiera,
              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS nombre_dealer,
@@ -1756,6 +1757,11 @@ const getSaldosAPagar = async (req, res) => {
       // Días respecto del SLA: negativo = falta, 0 = vence hoy, positivo = vencido
       r.dias_sla = v ? Math.round((new Date(isoD(hoyCL)) - new Date(isoD(v.fecha))) / 86400000) : null;
     });
+    return { rows, fijos };
+}
+const getSaldosAPagar = async (req, res) => {
+  try {
+    const { rows, fijos } = await datosSaldosAPagar();
     res.json({ success: true, data: rows, fijos, error: null });
   } catch (e) {
     console.error('[postventa saldosAPagar]', e.message);
@@ -2162,9 +2168,10 @@ const updateFacturaComision = async (req, res) => {
 };
 
 /* ── GET /api/postventa/comisiones-a-pagar — ops con orden de pago de comisión emitida, no pagadas ── */
-const getComisionesAPagar = async (req, res) => {
-  try {
-    const [rows] = await pool.query(`
+/* Datos puros (sin HTTP): la cola de comisiones a pagar. La usan el endpoint
+   y el correo diario de ODPs pendientes (un solo motor). */
+async function datosComisionesAPagar() {
+  const [rows] = await pool.query(`
       SELECT s.id, s.num_op, s.comision, s.financiera, s.ejecutivo,
              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS nombre_dealer,
              c.id_financiera,
@@ -2206,7 +2213,11 @@ const getComisionesAPagar = async (req, res) => {
               AND DATE(ep.fecha) < CURDATE())
       ORDER BY COALESCE(fc.fecha_factura, DATE(efa.fecha)) ASC, s.num_op ASC
     `);
-    res.json({ success: true, data: rows, error: null });
+  return rows;
+}
+const getComisionesAPagar = async (req, res) => {
+  try {
+    res.json({ success: true, data: await datosComisionesAPagar(), error: null });
   } catch (e) {
     console.error('[postventa comisionesAPagar]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -2945,4 +2956,5 @@ module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico
   // hooks para otros módulos (ordenes-pago paga la ODP de comisión; anulación/prepago desactivan la comisión)
   notificarPagoComisionDealer, notificarPagoSaldoDealer, idsGrupoFactura, marcarComisionAPagar, probarCorreos,
   contabilizarSaldoPrecio, contabilizarComision,   // el pago desde la ODP también debe generar su asiento
-  getFijosAutoFin, esAutoFin, montoSaldoOrden };
+  getFijosAutoFin, esAutoFin, montoSaldoOrden,
+  datosSaldosAPagar, datosComisionesAPagar };   // colas de pago para el correo diario de ODPs pendientes

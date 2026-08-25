@@ -81,6 +81,17 @@ require('../../../../shared/migrate').enFila('correos', async () => {
       ['informe_salud_sistema', 'Informe de Salud del Sistema',
         'Chequeo semanal automatico: BD (ping, tamano, migraciones fallidas), frescura de indicadores (UF/tasas/dolar), correos programados con error y memoria del proceso. Incluye el recordatorio de la rutina manual (Render Metrics, TiDB SQL Statements, backups).',
         '08:00', '1', 'patricio.escobar@autofacilchile.cl']);
+    // Resumen diario de Órdenes de Pago pendientes de pagar (v217.34, pedido Pato 25-08-2026).
+    await pool.query(
+      `INSERT IGNORE INTO correos_programados (codigo, nombre, descripcion, hora, dias, destinatarios, activo, params)
+       VALUES (?,?,?,?,?,?,1,?)`,
+      ['odp_pendientes_diario', 'Resumen Diario de ODPs Pendientes de Pago',
+        'Todas las tardes de lunes a viernes: cuántas Órdenes de Pago siguen sin pagar y por cuánto, separadas en Saldo Precio, Comisiones, Comisiones Parque y Otras — cada grupo abierto en Fuera de Plazo / En Plazo (vence hoy) / Antes del Plazo. El plazo del saldo precio es el SLA por categoría del dealer; el de los demás grupos es el parámetro de abajo. Cada título lleva el link a su cola de pago.',
+        '17:30', '1,2,3,4,5',
+        'contabilidad@autofacilchile.cl, operaciones@autofacilchile.cl, patricio.escobar@autofacilchile.cl, leonardo.sevilla@autofacilchile.cl',
+        JSON.stringify({
+          plazo_otros_dias: { label: 'Plazo de pago (días) para Comisiones, Parques y Otras', valor: 5 },
+        })]);
     // Registrar el mantenedor en el menú (funcionalidad) si no existe
     const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_correos_programados' LIMIT 1");
     if (!ex) await pool.query(
@@ -695,7 +706,94 @@ async function buildSalud() {
   return { asunto: malos.length ? `⚠️ Salud del Sistema: ${malos.length} alerta(s)` : '💙 Salud del Sistema: todo en orden', html };
 }
 
+/* ── Reporte: Resumen Diario de ODPs Pendientes de Pago ──────────────────────
+   Cuatro colas, cada una clasificada Fuera de Plazo / En Plazo (vence hoy) /
+   Antes del Plazo:
+     1. Saldo Precio  → motor de la cola (postventa.datosSaldosAPagar) con su
+        dias_sla (SLA por categoría del dealer, shared/sla-saldo).
+     2. Comisiones    → postventa.datosComisionesAPagar; plazo = fecha de la
+        factura + N días (param plazo_otros_dias).
+     3. Comisiones Parque → parques_pagos_mes en OP_EMITIDA; plazo desde la emisión.
+     4. Otras (proveedores + cuotas) → ordenes_pago EMITIDA y ordenes_pago_cuotas
+        PENDIENTE; plazo desde la emisión/solicitud. */
+async function buildOdpPendientes() {
+  const [[cfg]] = await pool.query("SELECT params FROM correos_programados WHERE codigo='odp_pendientes_diario'");
+  let plazoOtros = 5;
+  try { const p = cfg && cfg.params ? (typeof cfg.params === 'string' ? JSON.parse(cfg.params) : cfg.params) : null;
+    if (p && Number(p.plazo_otros_dias?.valor) > 0) plazoOtros = Number(p.plazo_otros_dias.valor); } catch (_) {}
+
+  const nuevoGrupo = () => ({ fuera: { n: 0, m: 0 }, hoy: { n: 0, m: 0 }, antes: { n: 0, m: 0 } });
+  // dias: positivo = vencido, 0 = vence hoy, negativo = falta, null = sin fecha (antes)
+  const clasificar = (g, dias, monto) => {
+    const b = dias == null ? 'antes' : dias > 0 ? 'fuera' : dias === 0 ? 'hoy' : 'antes';
+    g[b].n++; g[b].m += Number(monto) || 0;
+  };
+
+  const pv = require('../../../postventa/src/controllers/postventa.controller');
+  const gSaldo = nuevoGrupo(), gCom = nuevoGrupo(), gParque = nuevoGrupo(), gOtras = nuevoGrupo();
+
+  const { rows: saldos } = await pv.datosSaldosAPagar();
+  saldos.filter(r => !Number(r.pagado_hoy)).forEach(r => clasificar(gSaldo, r.dias_sla, r.monto_pagar));
+
+  const coms = await pv.datosComisionesAPagar();
+  coms.filter(r => !Number(r.pagado_hoy)).forEach(r =>
+    clasificar(gCom, r.dias == null ? null : Number(r.dias) - plazoOtros, r.monto_liquido != null ? r.monto_liquido : r.comision));
+
+  const [parques] = await pool.query(
+    `SELECT arriendo, comision_creditos, DATEDIFF(CURDATE(), fecha_emitida) AS dias
+       FROM parques_pagos_mes WHERE etapa='OP_EMITIDA'`);
+  parques.forEach(r => clasificar(gParque, r.dias == null ? null : Number(r.dias) - plazoOtros,
+    Math.round(Number(r.arriendo) || 0) + Math.round(Number(r.comision_creditos) || 0)));
+
+  const [provs] = await pool.query(
+    `SELECT monto, DATEDIFF(CURDATE(), fecha_emision) AS dias FROM ordenes_pago WHERE estado='EMITIDA'`);
+  provs.forEach(r => clasificar(gOtras, r.dias == null ? null : Number(r.dias) - plazoOtros, r.monto));
+  try {
+    const [cuotas] = await pool.query(
+      `SELECT monto_total AS monto, DATEDIFF(CURDATE(), COALESCE(fecha_pago, DATE(created_at))) AS dias
+         FROM ordenes_pago_cuotas WHERE estado='PENDIENTE'`);
+    cuotas.forEach(r => clasificar(gOtras, r.dias == null ? null : Number(r.dias) - plazoOtros, r.monto));
+  } catch (_) { /* módulo de cuotas sin tabla aún → solo proveedores */ }
+
+  const tot = g => ({ n: g.fuera.n + g.hoy.n + g.antes.n, m: g.fuera.m + g.hoy.m + g.antes.m });
+  const totalN = [gSaldo, gCom, gParque, gOtras].reduce((s, g) => s + tot(g).n, 0);
+  const totalM = [gSaldo, gCom, gParque, gOtras].reduce((s, g) => s + tot(g).m, 0);
+
+  const linea = (letra, lbl, b, color) =>
+    `<tr><td style="padding:4px 12px;color:${color};font-weight:700;white-space:nowrap">${letra}) ${lbl}</td>
+     <td style="padding:4px 12px;text-align:right;font-weight:800;color:${b.n ? color : '#94a3b8'}">${b.n} x ${fmt(b.m)}</td></tr>`;
+  const seccion = (num, titulo, href, g) => {
+    const t = tot(g);
+    return `<div style="margin:14px 0 4px">
+      <a href="${APP_URL}${href}" style="color:#0141A2;font-weight:800;font-size:14px;text-decoration:none">${num}.- ${esc(titulo)} — ${t.n} x ${fmt(t.m)} →</a>
+      <table style="border-collapse:collapse;font-size:13px;margin-top:2px">
+        ${linea('a', 'Fuera de Plazo', g.fuera, '#b91c1c')}
+        ${linea('b', 'En Plazo (vence hoy)', g.hoy, '#15803d')}
+        ${linea('c', 'Antes del Plazo', g.antes, '#475569')}
+      </table></div>`;
+  };
+  const ch = chileParts();
+  const html = `<div style="font-family:Arial,sans-serif;background:#f0f4f8;padding:18px">
+    <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0">
+      <div style="background:#012d70;color:#fff;padding:16px 24px">
+        <div style="font-size:16px;font-weight:800">📋 Órdenes de Pago pendientes de pagar</div>
+        <div style="font-size:12px;opacity:.8">${ch.fecha} · ${totalN} orden(es) por ${fmt(totalM)} en total · pincha cada título para ir a su cola de pago</div>
+      </div>
+      <div style="padding:10px 24px 18px">
+        ${seccion(1, 'Órdenes de Pago Saldo Precio', '/postventa/saldos-a-pagar/', gSaldo)}
+        ${seccion(2, 'Órdenes de Pago Comisiones', '/postventa/comisiones-a-pagar/', gCom)}
+        ${seccion(3, 'Órdenes de Pago Comisiones Parque', '/postventa/comisiones-parques/', gParque)}
+        ${seccion(4, 'Otras Órdenes de Pago por pagar (proveedores y cuotas)', '/ordenes-pago/historial/', gOtras)}
+        <div style="margin-top:14px;font-size:11px;color:#94a3b8">Plazo del Saldo Precio: SLA por categoría del dealer (mantenedor Categoría y Potencial Dealer). Plazo de los demás grupos: ${plazoOtros} días (parámetro de este correo).</div>
+      </div>
+      <div style="padding:12px 24px;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:11px">Correo automático de AutoFácil · se configura en Mantenedores → Correos Programados.</div>
+    </div>
+  </div>`;
+  return { asunto: `📋 ODPs pendientes de pagar: ${totalN} x ${fmt(totalM)}${gSaldo.fuera.n + gCom.fuera.n + gParque.fuera.n + gOtras.fuera.n ? ' — ⚠ ' + (gSaldo.fuera.n + gCom.fuera.n + gParque.fuera.n + gOtras.fuera.n) + ' fuera de plazo' : ''}`, html };
+}
+
 const BUILDERS = { informe_ventas_diario: buildInformeVentas, resumen_ejecutivo_ia: buildResumenEjecutivo, alerta_penetracion_seguros: buildAlertaPenetracion, informe_salud_sistema: buildSalud,
+  odp_pendientes_diario: buildOdpPendientes,
   // El pop-up de fundantes NO envía correo: se muestra en pantalla (fundantes-seguimiento
   // lee esta fila). El builder existe solo para que el cron no lo acuse como error.
   popup_fundantes_pendientes: async () => ({ skip: true, estado: 'es un pop-up en pantalla, no un correo' }) };
