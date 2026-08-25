@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Documentos Firmados — RRHH</title>
-  <!-- v1.3 — navbar migrada al componente topnav -->
+  <!-- v1.4 — check Mostrar en Mi Ficha por documento escaneado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -37,8 +37,8 @@
   <div class="tabs" id="tabs"></div>
   <div class="card-box" id="secLista">
     <input class="buscador" id="q" placeholder="🔎 Buscar por empleado, tipo, fecha (aaaa-mm-dd), estado, glosa, firmante…" oninput="pintar()">
-    <table><thead><tr><th>Tipo</th><th>Documento</th><th>Empleado</th><th>Fecha</th><th>Estado</th><th>Firmas</th><th></th></tr></thead>
-    <tbody id="tb"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table>
+    <table><thead><tr><th>Tipo</th><th>Documento</th><th>Empleado</th><th>Fecha</th><th>Estado</th><th>Firmas</th><th title="Marcado: el colaborador lo ve y descarga en Mi Ficha. Desmarcado: solo RRHH.">Mi Ficha</th><th></th></tr></thead>
+    <tbody id="tb"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody></table>
   </div>
   <div class="card-box" id="secSubir" style="display:none">
     <h6 style="color:var(--navy)">Subir documento firmado (papel escaneado)</h6>
@@ -96,9 +96,17 @@ function pintar(){
     <td>${esc(d.empleado||'—')}</td><td>${fd(d.fecha)}</td>
     <td><span class="pill ${esc(d.estado)}">${esc(d.estado)}</span></td>
     <td>${(d.firmas||[]).map(f=>`<div class="firma-line">✍ <b>${esc(f.rol)}</b>${f.decision?' ('+esc(f.decision)+')':''}: ${esc(f.nombre)} · ${f.ff||f.fecha||''}</div>`).join('')||'<small style="color:#94a3b8">—</small>'}</td>
+    <td style="text-align:center">${d.doc_id?`<input type="checkbox" ${Number(d.visible_colaborador??1)?'checked':''} title="Mostrar en Mi Ficha del colaborador" onchange="visibleDoc(${d.doc_id}, this)">`:'<small style="color:#94a3b8" title="Documento FES nativo: se rige por su propio flujo">—</small>'}</td>
     <td>${d.doc_id?`<a class="btn-mini" href="#" onclick="return descargar(${d.doc_id})"><i class="bi bi-download"></i> Ver</a>`:''}</td></tr>`).join('')
-    ||'<tr><td colspan="7" class="empty">Sin documentos que calcen con la búsqueda.</td></tr>';
+    ||'<tr><td colspan="8" class="empty">Sin documentos que calcen con la búsqueda.</td></tr>';
 }
+/* Mostrar/ocultar el documento en Mi Ficha del colaborador (rh_documentos). */
+window.visibleDoc=async(id,chk)=>{
+  const j=await (await fetch('/api/rrhh/docs/'+id+'/visible',{method:'PUT',headers:HJ,
+    body:JSON.stringify({visible:chk.checked?1:0})})).json().catch(()=>null);
+  if(!j||!j.success){ chk.checked=!chk.checked; return alert((j&&j.error)||'No se pudo cambiar la visibilidad'); }
+  const d=DOCS.find(x=>x.doc_id===id); if(d) d.visible_colaborador=chk.checked?1:0;
+};
 window.descargar=async id=>{
   const r=await fetch('/api/rrhh/docs/archivo/'+id,{headers:H});
   if(!r.ok){ alert('No se pudo descargar'); return false; }

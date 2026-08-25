@@ -230,10 +230,11 @@ exports.repositorio = async (req, res) => {
     sols.forEach(s => docs.push({ tipo: 'SOLICITUD', id: s.id, empleado: s.nombre, glosa: `Solicitud ${s.tipo}`, fecha: s.fecha, estado: s.estado }));
     const [subs] = await pool.query(
       `SELECT d.id, d.tipo doc_tipo, d.nombre_archivo, DATE_FORMAT(d.fecha_firma,'%Y-%m-%d') fecha,
+              d.visible_colaborador,
               TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) empleado
          FROM rh_documentos d LEFT JOIN usuarios u ON u.id_usuario=d.id_usuario
         WHERE d.firmado_fes=1 LIMIT 1000`);
-    subs.forEach(s => docs.push({ tipo: s.doc_tipo || 'OTRO', id: s.id, empleado: s.empleado, glosa: s.nombre_archivo, fecha: s.fecha, estado: 'FIRMADO', doc_id: s.id }));
+    subs.forEach(s => docs.push({ tipo: s.doc_tipo || 'OTRO', id: s.id, empleado: s.empleado, glosa: s.nombre_archivo, fecha: s.fecha, estado: 'FIRMADO', doc_id: s.id, visible_colaborador: Number(s.visible_colaborador ?? 1) }));
     // firmas de todo
     const [fd] = await pool.query(`SELECT entidad, entidad_id, rol, nombre, cargo, DATE_FORMAT(created_at,'%d-%m-%Y %H:%i') ff FROM rh_firmas ORDER BY created_at`);
     const [fs] = await pool.query(`SELECT id_solicitud, rol, nombre, decision, DATE_FORMAT(created_at,'%d-%m-%Y %H:%i') ff FROM rh_sol_firmas ORDER BY created_at`);
