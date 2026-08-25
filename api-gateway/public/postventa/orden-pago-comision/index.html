@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.15 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
+  <!-- v2.16 — cuadratura de boleta repone el IVA (bruto boleta = neto factura) antes de comparar contra las comisiones brutas · v2.15 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -238,8 +238,12 @@ function docHTML(ops){
   const facturaNeto  = _dg ? _dg.base     : (Number(f0.monto_factura ?? f0.comision)||0);
   const facturaImp   = _dg ? _dg.impuesto : Number(f0.impuesto_monto);
   const facturaPagar = _dg ? _dg.liquido  : Number(f0.monto_liquido);
-  // Comisiones de las operaciones cargadas (de la carta) → son BRUTAS y deben sumar el bruto de la factura
-  const facturaBruto = esBoleta ? facturaNeto : facturaPagar;   // factura: bruto = neto+IVA = líquido; boleta: bruto = base
+  // Comisiones de las operaciones cargadas (de la carta) → son BRUTAS (IVA incluido) y
+  // deben sumar el bruto de la factura. La BOLETA va por el NETO de la factura
+  // equivalente (regla de negocio), así que para cuadrar contra las comisiones brutas
+  // hay que reponerle el IVA — comparar el bruto de la boleta directo acusaba una
+  // "diferencia" fantasma del 19% en toda boleta (op 88986, 25-08-2026).
+  const facturaBruto = esBoleta ? Math.round(facturaNeto * (1 + iva/100)) : facturaPagar;
   const sumComision = ops.reduce((s,o)=>s+(Number(o.comision)||0),0);
   const cuadra = Math.abs(sumComision - facturaBruto) <= 1;   // tolerancia de redondeo
   const fechaPago = fechaCL(new Date().toISOString());
