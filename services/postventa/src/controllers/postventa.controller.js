@@ -2,6 +2,7 @@
 const pool = require('../../../../shared/config/database');
 const { emitirCorrelativo, pagarCorrelativo, despagarCorrelativo } = require('../../../../shared/ordenes-pago');
 const { auditar } = require('../../../../shared/audit');
+const { ES_ETAPA } = require('../../../../shared/etapa-credito');
 /* Fundantes DEVUELTOS (rechazados por la financiera): al registrarlo se
    desmarcan FUNDANTES RECIBIDOS/ENVIADOS y queda la fecha y el motivo. */
 require('../../../../shared/migrate').enFila('postventa-fundantes-devueltos', async () => {
@@ -2526,6 +2527,14 @@ function joinEstadoActual(track, orden) {
 }
 const estadosPedidos = req => String(req.query.estados || '').split('|').map(s => s.trim()).filter(Boolean);
 
+/* Una operación ANULADA, para efectos comerciales, nunca ocurrió: no hay saldo
+   precio ni comisión que pagar. Se excluye de las dos consultas de estado — de
+   la tabla, del resumen y de la botonera — porque si no infla el pendiente
+   (medido el 24-08-2026: $87,3 MM de saldo y $5,4 MM de comisión).
+   La etapa se lee por el motor único (ES_ETAPA), nunca mirando una columna
+   suelta: la anulación escribe las TRES y el listado resuelve con `estado`. */
+const NO_ANULADA = 'NOT (' + ES_ETAPA('ANULADO', 'cr') + ')';
+
 // Visibilidad por ejecutivo: regla central paramétrica (shared/visibilidad-ejecutivos),
 // por ámbito del perfil ('todos' | 'asignados', vía usuario_ejecutivos). Soporta varios
 // supervisores: el perfil supervisor se marca 'asignados' y se le asigna su equipo.
@@ -2549,7 +2558,7 @@ const consultaSaldos = async (req, res) => {
       const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk);
     }
     if (parque) { filt.push(`(cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`); const lk = '%' + parque + '%'; fp.push(lk, lk); }
-    const baseWhere = 'WHERE 1=1' + (filt.length ? ' AND ' + filt.join(' AND ') : '');
+    const baseWhere = 'WHERE ' + NO_ANULADA + (filt.length ? ' AND ' + filt.join(' AND ') : '');
     const PAGADO = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='SALDO' AND e.etapa='SALDO PRECIO PAGADO'`;
     const SUB_ESTADO = joinEstadoActual('SALDO', ORDEN_SALDO);
     const joinEstado = estadosSel.length ? SUB_ESTADO : '';
@@ -2615,7 +2624,9 @@ const consultaFacturas = async (req, res) => {
     }
     if (mes)     { filt.push(`DATE_FORMAT(f.fecha_factura,'%Y-%m') = ?`); fp.push(mes); }
     if (factura) { filt.push(`f.numero_factura LIKE ?`); fp.push('%' + factura + '%'); }
-    const baseWhere = 'WHERE 1=1' + (filt.length ? ' AND ' + filt.join(' AND ') : '');
+    // El JOIN a creditos entra también en el resumen y la botonera: NO_ANULADA lo necesita.
+    const JOIN_CR = 'LEFT JOIN creditos cr ON cr.id = s.id_credito';
+    const baseWhere = 'WHERE ' + NO_ANULADA + (filt.length ? ' AND ' + filt.join(' AND ') : '');
     const PAGADA = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='COMISION' AND e.etapa='COMISION PAGADA'`;
     const SUB_ESTADO = joinEstadoActual('COMISION', ORDEN_COMISION);
     const joinEstado = estadosSel.length ? SUB_ESTADO : '';
@@ -2648,6 +2659,7 @@ const consultaFacturas = async (req, res) => {
       SELECT COUNT(*) AS pendientes, COALESCE(SUM(s.comision),0) AS monto
       FROM postventa_seguimiento s
       LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
+      ${JOIN_CR}
       ${baseWhere} AND NOT ${PAGADA})`, fp);
     // Botonera: cuántas operaciones y cuánta plata hay HOY en cada etapa del ciclo.
     // Se calcula sobre el filtro de búsqueda pero SIN los estados seleccionados, para
@@ -2656,6 +2668,7 @@ const consultaFacturas = async (req, res) => {
       SELECT COALESCE(x.estado,'SIN ETAPAS') AS estado, COUNT(*) AS n, COALESCE(SUM(s.comision),0) AS monto
       FROM postventa_seguimiento s
       LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
+      ${JOIN_CR}
       ${SUB_ESTADO}
       ${baseWhere}
       GROUP BY COALESCE(x.estado,'SIN ETAPAS')`, [...ORDEN_COMISION, ...fp]);
@@ -2680,7 +2693,9 @@ const consultaFundantes = async (req, res) => {
       const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk);
     }
     if (parque) { filt.push(`(cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`); const lk = '%' + parque + '%'; fp.push(lk, lk); }
-    const baseWhere = 'WHERE 1=1' + (filt.length ? ' AND ' + filt.join(' AND ') : '');
+    // Misma regla que las dos consultas de estado: a una operación anulada no se
+    // le piden fundantes, así que no aparece en la cola.
+    const baseWhere = 'WHERE ' + NO_ANULADA + (filt.length ? ' AND ' + filt.join(' AND ') : '');
     const RECIBIDO = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='SALDO' AND e.etapa='FUNDANTES RECIBIDOS'`;
     // Por defecto: fundantes pendientes (aún sin recibir). Toggle: recibidos en los últimos 7 días.
     const tablaWhere = baseWhere + (recibido7 ? ' AND ' + RECIBIDO + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : ' AND NOT ' + RECIBIDO + ')');
