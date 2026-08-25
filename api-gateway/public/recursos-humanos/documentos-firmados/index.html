@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Carpetas Digitales — RRHH</title>
-  <!-- v2.1 — full width. v2.0 — renombrado Carpetas Digitales: toda la carpeta, filtro por colaborador, crear tipo -->
+  <!-- v2.2 — tipo y documento en texto plano (sin pill ni negrita). v2.1 — full width. v2.0 — renombrado Carpetas Digitales: toda la carpeta, filtro por colaborador, crear tipo -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -18,8 +18,7 @@
     .buscador { width:100%; border:1.5px solid #cbd5e1; border-radius:10px; padding:11px 14px; font-size:.9rem; box-sizing:border-box; margin-bottom:14px; }
     table { width:100%; border-collapse:collapse; font-size:.84rem; } th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.68rem; text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb; } td { padding:9px 12px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
     .pill { border-radius:12px; padding:2px 9px; font-size:.68rem; font-weight:800; } .FIRMADO,.APROBADA { background:#dcfce7; color:#166534; } .EN_FIRMA,.PENDIENTE { background:#fef3c7; color:#92400e; } .RECHAZADA,.ANULADA { background:#fee2e2; color:#b91c1c; } .BORRADOR,.ARCHIVO { background:#f1f5f9; color:#64748b; }
-    .tp { border-radius:8px; padding:2px 8px; font-size:.66rem; font-weight:800; color:#fff; background:#64748b; }
-    .tp-CONTRATO { background:#0141A2; } .tp-FINIQUITO { background:#b91c1c; } .tp-VACACIONES { background:#0d9488; } .tp-SOLICITUD { background:#7c3aed; } .tp-ANEXO { background:#d97706; }
+    .tp { font-size:.78rem; color:#334155; }
     .firma-line { font-size:.74rem; color:#475569; }
     .btn-mini { border:1px solid #cbd5e1; background:#fff; border-radius:7px; padding:4px 10px; font-size:.76rem; cursor:pointer; font-weight:600; text-decoration:none; color:#0141A2; }
     .empty { text-align:center; color:#94a3b8; padding:30px 0; }
@@ -101,8 +100,8 @@ function pintar(){
     .filter(d=>!fEmp||d.empleado===fEmp)
     .filter(d=>!q||[d.tipo,d.glosa,d.empleado,d.fecha,fd(d.fecha),d.estado,...(d.firmas||[]).map(f=>f.nombre+' '+(f.rol||''))].join(' ').toLowerCase().includes(q));
   document.getElementById('tb').innerHTML=rows.map(d=>`<tr>
-    <td><span class="tp tp-${esc(d.tipo)}">${esc(d.tipo)}</span></td>
-    <td><b>${esc(d.glosa)}</b> <small style="color:#94a3b8">#${d.id}</small></td>
+    <td><span class="tp">${esc(d.tipo)}</span></td>
+    <td>${esc(d.glosa)} <small style="color:#94a3b8">#${d.id}</small></td>
     <td>${esc(d.empleado||'—')}</td><td>${fd(d.fecha)}</td>
     <td><span class="pill ${esc(d.estado)}">${esc(d.estado)}</span></td>
     <td>${(d.firmas||[]).map(f=>`<div class="firma-line">✍ <b>${esc(f.rol)}</b>${f.decision?' ('+esc(f.decision)+')':''}: ${esc(f.nombre)} · ${f.ff||f.fecha||''}</div>`).join('')||'<small style="color:#94a3b8">—</small>'}</td>
