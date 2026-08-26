@@ -285,6 +285,21 @@ Orden de pago N° {ODP} · confirmada por {QUIEN}.`,
     destinatario: 'Los perfiles marcados aquí abajo (equipo comercial interno)',
     variables: '{PARQUE} {PERIODO} {ARRIENDO} {COMISION} {OPS} {TOTAL} {ODP} {QUIEN}',
   },
+  {
+    codigo: 'cliente_comprobante_cuota',
+    ambito: 'Cobranza',
+    nombre: 'Comprobante de pago de cuotas → al CLIENTE',
+    descripcion: 'Se manda automáticamente al CLIENTE cuando se aprueba una ODP de Cuotas (Cobranza → Pago de Cuotas / Tesorería → ODP Cuotas). Sale desde la cuenta de Cobranza, con copia oculta (BCC) a quien solicitó la ODP. Después de este texto va SIEMPRE la tabla con el detalle de las cuotas pagadas (cuota, mora, gastos) y el total — esa parte es estructura fija.',
+    asunto: 'Comprobante de pago — Crédito N° {num_credito} ({trx})',
+    cuerpo: `Estimado(a) {cliente}:
+
+Confirmamos el pago registrado para su crédito N° {num_credito}.
+Comprobante {trx} · {fecha}.`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'El correo del CLIENTE (de su ficha en Clientes); BCC a quien solicitó la ODP',
+    variables: '{cliente} {num_credito} {trx} {fecha} {total} {origen} {n_cuotas}',
+  },
 ];
 
 require('./migrate').enFila('correos-plantillas', async () => {

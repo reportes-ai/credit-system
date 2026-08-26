@@ -132,8 +132,10 @@ function normalizarCuotas(arr) {
   }).filter(c => c.numero_cuota > 0);
 }
 
-// HTML del comprobante para el correo al cliente.
-function comprobanteEmailHTML({ credito, cuotas, trxNum, fechaPago, total, origen }) {
+// HTML del comprobante para el correo al cliente. El texto de arriba (intro) es
+// PARAMÉTRICO (plantilla cliente_comprobante_cuota en Correos del Sistema); la
+// tabla de cuotas y la caja del total son estructura fija.
+function comprobanteEmailHTML({ intro, credito, cuotas, trxNum, fechaPago, total, origen }) {
   const filas = cuotas.map(c => `
     <tr>
       <td style="padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:center">${c.numero_cuota}</td>
@@ -144,10 +146,10 @@ function comprobanteEmailHTML({ credito, cuotas, trxNum, fechaPago, total, orige
       <td style="padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:700">${clp(c.total_pagado)}</td>
     </tr>`).join('');
   const cuerpo = `
-    <p style="margin:0 0 14px">Estimado(a) <strong>${esc(credito.nombre_cliente || 'cliente')}</strong>,</p>
+    ${intro || `<p style="margin:0 0 14px">Estimado(a) <strong>${esc(credito.nombre_cliente || 'cliente')}</strong>,</p>
     <p style="margin:0 0 16px">Confirmamos el pago registrado para su crédito
        <strong>N° ${esc(credito.numero_credito || credito.id_credito)}</strong>.
-       Comprobante <strong>TRX-${String(trxNum).padStart(6,'0')}</strong> · ${fmtFecha(fechaPago)}.</p>
+       Comprobante <strong>TRX-${String(trxNum).padStart(6,'0')}</strong> · ${fmtFecha(fechaPago)}.</p>`}
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 14px">
       <thead>
         <tr style="background:#f1f5f9;color:#334155">
@@ -368,19 +370,39 @@ const aprobar = async (req, res) => {
     let correoMsg = null;
     const totalPagado = cuotas.reduce((s, c) => s + Math.round(parseFloat(c.total_pagado) || 0), 0);
     if (odp.email_cliente) {
-      const html = comprobanteEmailHTML({
-        credito: { id_credito: odp.id_credito, numero_credito: odp.numero_credito, nombre_cliente: odp.nombre_cliente },
-        cuotas, trxNum: numero_transaccion, fechaPago, total: totalPagado, origen: odp.origen_fondos,
-      });
-      const r = await enviarCorreo({
-        to:      odp.email_cliente,
-        bcc:     odp.solicitante_email || undefined,
-        from:    remitenteCobranza(),
-        subject: `Comprobante de pago — Crédito N° ${odp.numero_credito || odp.id_credito} (TRX-${String(numero_transaccion).padStart(6,'0')})`,
-        html,
-      });
-      correoMsg = r.ok ? 'enviado' : ('no enviado: ' + r.error);
-      if (r.ok) { try { await pool.query(`UPDATE ordenes_pago_cuotas SET correo_enviado=1 WHERE id_odp=?`, [odp.id_odp]); } catch (_) {} }
+      // Plantilla paramétrica (Correos del Sistema): asunto, texto, interruptor y CC.
+      const TPL = require('../../../../shared/plantillas-correo');
+      const p = await TPL.obtener('cliente_comprobante_cuota').catch(() => null);
+      if (p && !p.activo) {
+        correoMsg = 'no enviado: plantilla desactivada en Correos del Sistema';
+      } else {
+        const datos = {
+          cliente: odp.nombre_cliente || 'cliente',
+          num_credito: String(odp.numero_credito || odp.id_credito),
+          trx: 'TRX-' + String(numero_transaccion).padStart(6, '0'),
+          fecha: fmtFecha(fechaPago),
+          total: clp(totalPagado),
+          origen: odp.origen_fondos || '',
+          n_cuotas: cuotas.length,
+        };
+        const html = comprobanteEmailHTML({
+          intro: p ? TPL.aHTML(TPL.render(p.cuerpo, datos)) : null,
+          credito: { id_credito: odp.id_credito, numero_credito: odp.numero_credito, nombre_cliente: odp.nombre_cliente },
+          cuotas, trxNum: numero_transaccion, fechaPago, total: totalPagado, origen: odp.origen_fondos,
+        });
+        const ccTpl = p && p.cc ? String(p.cc).split(',').map(s => s.trim()).filter(Boolean) : [];
+        const r = await enviarCorreo({
+          to:      odp.email_cliente,
+          cc:      ccTpl.length ? ccTpl : undefined,
+          bcc:     odp.solicitante_email || undefined,
+          from:    remitenteCobranza(),
+          subject: p ? TPL.render(p.asunto, datos)
+                     : `Comprobante de pago — Crédito N° ${odp.numero_credito || odp.id_credito} (TRX-${String(numero_transaccion).padStart(6,'0')})`,
+          html,
+        });
+        correoMsg = r.ok ? 'enviado' : ('no enviado: ' + r.error);
+        if (r.ok) { try { await pool.query(`UPDATE ordenes_pago_cuotas SET correo_enviado=1 WHERE id_odp=?`, [odp.id_odp]); } catch (_) {} }
+      }
     } else {
       correoMsg = 'sin email del cliente';
     }
