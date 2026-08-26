@@ -151,6 +151,42 @@ function tieneDato(o){
   if(/sin registro/i.test(String(gp(o,'enc','glscod')||''))) return false;
   return Object.keys(o).some(k=>tieneDato(o[k]));
 }
+/* Boletín de Impagos (vigente/histórico): nodo PRODUCTO.detalle.d + resúmenes
+   total (por rubro) y totalano (por año). El histórico agrega fechaacl. */
+function tblImpagos(nodo, hist){
+  const p = gp(nodo,'PRODUCTO'); if(!p) return '<div class="rep-tree">'+renderTree(nodo)+'</div>';
+  const ds = arr(gp(p,'detalle','d')).filter(Boolean);
+  if(!ds.length) return '<div class="rep-tree">'+renderTree(p)+'</div>';
+  let html = '<table class="rep-tb"><thead><tr><th>Fecha</th>'+(hist?'<th>Aclarado</th>':'')+
+    '<th>Acreedor</th><th>Clasificación</th><th>Proceso</th><th>Causa</th><th style="text-align:right">Días mora</th></tr></thead><tbody>'+
+    ds.map(x=>'<tr><td>'+esc(x.fecha||'—')+'</td>'+(hist?'<td>'+esc(x.fechaacl||'—')+'</td>':'')+
+      '<td>'+esc(x.acreedor||'—')+'<div class="muted" style="font-size:.7rem">'+esc(x.glscodacteco||'')+'</div></td>'+
+      '<td>'+esc(x.clasificacion||'—')+'</td>'+
+      '<td>'+esc(x.proceso||'—')+'<div class="muted" style="font-size:.7rem">'+esc(x.fuente||'')+'</div></td>'+
+      '<td>'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.identificacion||'ver')+'</a>':esc(x.identificacion||'—'))+'</td>'+
+      '<td style="text-align:right">'+fmtMiles(x.diamora)+'</td></tr>').join('')+'</tbody></table>';
+  const tot = arr(gp(p,'total','d')).filter(Boolean), anos = arr(gp(p,'totalano','d')).filter(Boolean);
+  const res = [];
+  if(tot.length)  res.push('<b>Total por rubro:</b> '+tot.map(t=>esc(t['@_glosa'])+' ('+esc(t['@_c'])+')').join(' · '));
+  if(anos.length) res.push('<b>Por año:</b> '+anos.map(t=>esc(t['@_a'])+': '+esc(t['@_c'])).join(' · '));
+  if(res.length) html += '<div class="rep-kv" style="font-size:.76rem">'+res.join('<br>')+'</div>';
+  return html;
+}
+/* Boletín de Procesos Penales: PRODUCTO.detalle.d; clasificacion y fuente pueden
+   venir como objeto, arreglo o texto. */
+function tblPenal(nodo){
+  const p = gp(nodo,'PRODUCTO'); if(!p) return '<div class="rep-tree">'+renderTree(nodo)+'</div>';
+  const ds = arr(gp(p,'detalle','d')).filter(Boolean);
+  if(!ds.length) return '<div class="rep-tree">'+renderTree(p)+'</div>';
+  const flat = v => arr(v).map(x => x && typeof x==='object' ? (x.delito || Object.values(x).filter(y=>typeof y!=='object').join(' ')) : x).filter(Boolean);
+  return '<table class="rep-tb"><thead><tr><th>Fecha</th><th>Delito(s)</th><th>Forma</th><th>Fuente</th><th>Rol</th><th>Situación</th><th>Tipo</th></tr></thead><tbody>'+
+    ds.map(x=>'<tr><td>'+esc(x.fecha||'—')+'</td>'+
+      '<td>'+flat(x.clasificacion).map(esc).join('<br>')+'</td>'+
+      '<td>'+esc(x.forma||'—')+'</td>'+
+      '<td>'+flat(x.fuente).map(esc).join(' · ')+'</td>'+
+      '<td>'+esc(x.rol||'—')+'<div class="muted" style="font-size:.7rem">'+esc(x.identificacion||'')+'</div></td>'+
+      '<td>'+esc(x.situacion||'—')+'</td><td>'+esc(x.tipo||'—')+'</td></tr>').join('')+'</tbody></table>';
+}
 function secBoletines(causas){
   const B = [
     ['Boletín de Alertas','alert'],['Boletín de Impagos Vigente','bolvig'],
@@ -158,8 +194,12 @@ function secBoletines(causas){
     ['Boletín Laboral y Previsional Histórico','labhst'],['Boletín de Procesos Penales','penal'],
     ['Boletín Concursal','bolconc'],['Boletín de Arriendos','bolarrien'],
   ];
+  // Formato de tabla para los boletines con estructura conocida; el resto cae al árbol genérico
+  const REN = { bolvig: n=>tblImpagos(n,false), bolhst: n=>tblImpagos(n,true), penal: tblPenal };
   return B.map(([t,k])=>'<div class="rep-h">'+t+'</div>'+
-    (tieneDato(gp(causas,k)) ? '<div class="rep-tree">'+renderTree(gp(causas,k))+'</div>' : noinfo())).join('');
+    (tieneDato(gp(causas,k))
+      ? (REN[k] ? REN[k](gp(causas,k)) : '<div class="rep-tree">'+renderTree(gp(causas,k))+'</div>')
+      : noinfo())).join('');
 }
 function tblRelacionados(nodo){
   const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
