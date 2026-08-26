@@ -167,6 +167,9 @@ async function anotarDiferencias(idCredito, actual, archivo, origen) {
     id_financiera: actual.id_financiera || null,
     campo: c.col, etiqueta: c.etiqueta, tipo: c.tipo, grupo: c.grupo,
     valor_sistema: aTexto(c, actual[c.col]), valor_archivo: aTexto(c, archivo[c.col]),
+    // Contexto para la pantalla: en qué estado está la op en cada mundo
+    estado_bs: actual.estado_credito || null,
+    estado_tri: archivo.estado_autofin || archivo.estado_credito || null,
   }));
 }
 

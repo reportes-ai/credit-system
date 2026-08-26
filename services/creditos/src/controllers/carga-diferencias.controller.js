@@ -41,6 +41,7 @@ exports.lista = async (_req, res) => {
     const [rows] = await pool.query(`
       SELECT d.id, d.id_credito, d.campo, d.valor_sistema, d.valor_archivo, d.origen, d.created_at,
              c.num_op, c.id_financiera, c.financiera, c.ejecutivo, c.automotora,
+             c.estado_credito AS estado_bs, c.estado_autofin AS estado_tri,
              DATE_FORMAT(c.mes,'%Y-%m') AS mes, c.plazo, c.tascli_real, c.cuota,
              COALESCE(cl.nombre_completo,'') AS cliente
         FROM carga_diferencias d
@@ -54,6 +55,7 @@ exports.lista = async (_req, res) => {
         id_credito: r.id_credito, num_op: r.num_op, id_financiera: r.id_financiera,
         financiera: r.financiera, mes: r.mes, ejecutivo: r.ejecutivo, automotora: r.automotora,
         cliente: r.cliente, plazo: r.plazo, tasa: r.tascli_real, cuota: r.cuota,
+        estado_bs: r.estado_bs, estado_tri: r.estado_tri,
         origen: r.origen, detectado: r.created_at, campos: [],
       });
       ops.get(r.id_credito).campos.push({

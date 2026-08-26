@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — aviso de cuota incoherente al guardar · v1.0 — cola de diferencias entre la carga masiva y nuestros datos: elegir el nuestro, el del archivo o digitar un tercero -->
+<!-- v1.2 - chips con estado BS y estado Trinidad en cada operacion | v1.1 — aviso de cuota incoherente al guardar · v1.0 — cola de diferencias entre la carga masiva y nuestros datos: elegir el nuestro, el del archivo o digitar un tercero -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -109,6 +109,8 @@ async function cargar(){
         <span class="chip">${esc(o.financiera||'—')}</span>
         <span class="chip gris">ID Financiera ${esc(o.id_financiera||'—')}</span>
         <span class="chip gris">${esc(o.mes||'—')}</span>
+        <span class="chip" style="background:#dbeafe;color:#1d4ed8">BS: ${esc(o.estado_bs||'—')}</span>
+        <span class="chip" style="background:#fef3c7;color:#b45309">TRI: ${esc(o.estado_tri||'—')}</span>
         <span style="flex:1"></span>
         <span style="font-size:.8rem;color:var(--muted)">${esc(o.cliente||'')} · ${esc(o.automotora||'')}</span>
       </div>

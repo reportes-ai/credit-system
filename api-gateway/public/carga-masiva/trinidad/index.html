@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Carga Trinidad — Carga Masiva AutoFácil</title><!-- v7.5 -->
+  <title>Carga Trinidad — Carga Masiva AutoFácil</title><!-- v7.6 - cada diferencia muestra el estado BS y el estado Trinidad de la op | v7.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -308,7 +308,10 @@ function triPintarDiferencias(dif) {
         </tr></thead>
         <tbody>${g.filas.map(f => `
           <tr data-grupo="${esc(g.grupo)}">
-            <td><strong>${esc(f.num_op || f.id_financiera || '—')}</strong></td>
+            <td><strong>${esc(f.num_op || f.id_financiera || '—')}</strong>
+              ${(f.estado_bs || f.estado_tri) ? `<div style="font-size:.66rem;line-height:1.5;margin-top:2px">
+                <span style="color:#0141A2;font-weight:700">BS:</span> <span style="color:#475569">${esc(f.estado_bs || '—')}</span><br>
+                <span style="color:#b45309;font-weight:700">TRI:</span> <span style="color:#475569">${esc(f.estado_tri || '—')}</span></div>` : ''}</td>
             <td style="color:#6b7280">${esc(f.etiqueta)}</td>
             <td><label class="dif-opt" id="lbl_${f.id}_S">
               <input type="radio" name="dif_${f.id}" value="SISTEMA"
