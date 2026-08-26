@@ -112,7 +112,9 @@ async function enviarComprobantePago({ credito = {}, pagos = [], trxNum, fechaPa
       subject: p ? TPL.render(p.asunto, datos) : `Comprobante de pago — Crédito N° ${datos.num_credito} (${trx})`,
       html, attachments,
     });
-    return r.ok ? { ok: true, msg: 'enviado' } : { ok: false, msg: 'no enviado: ' + r.error };
+    return r.ok
+      ? { ok: true, msg: attachments ? 'enviado con PDF adjunto' : 'enviado SIN PDF (falló la generación — revisar logs)' }
+      : { ok: false, msg: 'no enviado: ' + r.error };
   } catch (e) {
     console.error('[comprobante-pago-correo]', e.message);
     return { ok: false, msg: e.message };

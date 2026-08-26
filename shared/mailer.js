@@ -129,17 +129,21 @@ function logCorreo(d) {
           message_id    VARCHAR(200) NULL,
           INDEX ix_correos_fecha (fecha),
           INDEX ix_correos_rem (remitente)
-        )`);
+        )`).then(() =>
+        // Qué adjuntos llevó cada correo (nombre + KB): sin esto no había cómo
+        // saber si un comprobante viajó con su PDF (caso 26-08-2026)
+        pool.query("ALTER TABLE correos_log ADD COLUMN IF NOT EXISTS adjuntos VARCHAR(500) NULL").catch(() => {}));
       await _logListo;
       const j = v => v == null ? null : (Array.isArray(v) ? v.join(', ') : String(v));
       let quien = null;
       try { quien = require('./middleware/auth').usuarioActual(); } catch (_) {}
       await pool.query(
-        `INSERT INTO correos_log (remitente, enviado_por, id_usuario, destinatarios, cc, bcc, asunto, html, ok, error, dev, message_id)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO correos_log (remitente, enviado_por, id_usuario, destinatarios, cc, bcc, asunto, html, ok, error, dev, message_id, adjuntos)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [String(d.from || '').slice(0, 160), (quien && quien.nombre) || 'Sistema', (quien && quien.id_usuario) || null,
          j(d.to), j(d.cc), j(d.bcc), String(d.subject || '').slice(0, 300), d.html || null,
-         d.ok ? 1 : 0, d.error ? String(d.error).slice(0, 400) : null, d.dev ? 1 : 0, d.messageId || null]);
+         d.ok ? 1 : 0, d.error ? String(d.error).slice(0, 400) : null, d.dev ? 1 : 0, d.messageId || null,
+         d.adjuntos ? String(d.adjuntos).slice(0, 500) : null]);
     } catch (e) { console.error('[mailer log]', e.message); }
   })();
 }
@@ -200,9 +204,13 @@ async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from, a
         return adj.length ? adj : undefined;
       })(),   // [{filename, content(Buffer)|path}]
     });
+    // Adjuntos REALES del correo (el logo cid de la firma no cuenta), para el log
+    const adjTxt = (attachments || []).filter(a => a && a.filename)
+      .map(a => `${a.filename}${a.content ? ` (${Math.max(1, Math.round(a.content.length / 1024))} KB)` : ''}`)
+      .join(', ') || null;
     // `to` = destinatario EFECTIVO (en Modo Desarrollo es el correo de prueba, no el original).
     logCorreo({ from: from || remitente(), to, cc, bcc, subject: subjectFinal, html: htmlFinal,
-                ok: true, dev: dev.activo, messageId: info.messageId });
+                ok: true, dev: dev.activo, messageId: info.messageId, adjuntos: adjTxt });
     return { ok: true, messageId: info.messageId, to: toFinal, dev: !!dev.activo };
   } catch (e) {
     console.error('[mailer]', e.message);
