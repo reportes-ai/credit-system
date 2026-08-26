@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v2.9 — navbar migrada al componente topnav · v2.7 — los montos seguidos salen como tabla en el correo · v2.6 — el cuerpo se envia con parrafos de verdad (bug: la prueba lo mandaba todo pegado) · v2.5 — cuerpos en texto plano legible (el motor los pasa a HTML) + cada correo dice a quien va dirigido · v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
+  <!-- v3.0 — correo ODP a Contabilidad: campo Con copia (CC) parametrico junto al destinatario · v2.9 — navbar migrada al componente topnav · v2.7 — los montos seguidos salen como tabla en el correo · v2.6 — el cuerpo se envia con parrafos de verdad (bug: la prueba lo mandaba todo pegado) · v2.5 — cuerpos en texto plano legible (el motor los pasa a HTML) + cada correo dice a quien va dirigido · v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -78,11 +78,17 @@
   <!-- Correo de Orden de Pago a Contabilidad -->
   <div class="card-af">
     <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-envelope-paper me-2"></i>Correo de Orden de Pago a Contabilidad</h5>
-    <p style="font-size:.8rem;color:#64748b">Texto del correo que se envía a Contabilidad al pulsar <b>Enviar Correo</b> en Emisión de Orden de Pago (Saldo Precio y Comisión). El correo sale desde la aplicación; el usuario que lo envía queda en <b>copia (CC)</b>.</p>
+    <p style="font-size:.8rem;color:#64748b">Texto del correo que se envía a Contabilidad al pulsar <b>Enviar Correo</b> en Emisión de Orden de Pago (Saldo Precio y Comisión). El correo sale desde la aplicación; además de las copias configuradas, el usuario que lo envía siempre queda en <b>copia (CC)</b>.</p>
 
-    <div class="fld" style="max-width:420px">
-      <label>Destinatario (grupo Contabilidad)</label>
-      <input id="cCont" placeholder="contabilidad@autofacilchile.cl">
+    <div style="display:flex;gap:14px;flex-wrap:wrap">
+      <div class="fld" style="flex:1;min-width:280px;max-width:420px">
+        <label>Destinatario — a quién va (Para)</label>
+        <input id="cCont" placeholder="contabilidad@autofacilchile.cl">
+      </div>
+      <div class="fld" style="flex:1;min-width:280px;max-width:420px">
+        <label>Con copia (CC) — separados por coma</label>
+        <input id="cContCc" placeholder="ej: operaciones@autofacilchile.cl, tesoreria@autofacilchile.cl">
+      </div>
     </div>
 
     <div class="correo-cols">
@@ -148,7 +154,7 @@
 
     <div class="footer-afecta">
       <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este recuadro</b><br>
-      • <b>Destinatario</b> → a quién llega el correo de la orden de pago (<a href="/postventa/orden-pago/">Emisión Orden de Pago Saldo Precio</a> y <a href="/postventa/orden-pago-comision/">Emisión Orden de Pago Comisión</a>).<br>
+      • <b>Destinatario (Para) y Con copia (CC)</b> → a quién va y quién queda copiado en el correo de la orden de pago (<a href="/postventa/orden-pago/">Emisión Orden de Pago Saldo Precio</a>, <a href="/postventa/orden-pago-comision/">Emisión Orden de Pago Comisión</a> y el envío manual desde <a href="/ordenes-pago/historial/">Órdenes de Pago → Historial</a>). El usuario que envía siempre se suma al CC.<br>
       • <b>Asunto / Cuerpo / Firma</b> → el texto del correo que arma cada página al pulsar «Enviar Correo». El cuadro de la orden se inserta automáticamente entre el cuerpo y la firma.<br>
       • <b>Cartola al dealer</b> → el correo automático (comisiones@, HTML + PDF adjunto, CC ejecutivos y Jefe Comercial) al pulsar «Enviar Cartola» en <a href="/aprobaciones/">Emisión de Cartolas</a> (pestaña Revisión Cartolas). El interruptor lo activa/desactiva.<br>
       • <b>Cartola al parque</b> → el correo con la cartola en PDF (detalle de operaciones + arriendo) al pulsar «Enviar cartola» en <a href="/postventa/cartolas-parque/">Emisión de Cartolas Parque</a>.<br>
@@ -192,6 +198,7 @@ const DEF_PAGO_SALDO = { activo:false, remitente:'', cc_operaciones:'operaciones
 
 function pintaCorreos(){
   document.getElementById('cCont').value = (typeof CFG.correo_contabilidad === 'string' ? CFG.correo_contabilidad : 'contabilidad@autofacilchile.cl');
+  document.getElementById('cContCc').value = (typeof CFG.correo_contabilidad_cc === 'string' ? CFG.correo_contabilidad_cc : '');
   const s = { ...DEF_SALDO_C, ...(CFG.correo_orden_saldo||{}) };
   const c = { ...DEF_COM_C,   ...(CFG.correo_orden_comision||{}) };
   document.getElementById('sAsunto').value = s.asunto; document.getElementById('sCuerpo').value = s.cuerpo; document.getElementById('sFirma').value = s.firma;
@@ -218,19 +225,21 @@ async function guardarCorreos(){
   const btn = document.getElementById('btn-correo'), msg = document.getElementById('msg-correo');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Guardando…'; msg.style.display='none';
   const cont = document.getElementById('cCont').value.trim() || 'contabilidad@autofacilchile.cl';
+  const contCc = document.getElementById('cContCc').value.trim();
   const saldo = { activo:document.getElementById('sActivo').checked, remitente:document.getElementById('sRemitente').value, asunto:document.getElementById('sAsunto').value, cuerpo:document.getElementById('sCuerpo').value, firma:document.getElementById('sFirma').value };
   const com   = { activo:document.getElementById('cActivo').checked, remitente:document.getElementById('cRemitente').value, asunto:document.getElementById('cAsunto').value, cuerpo:document.getElementById('cCuerpo').value, firma:document.getElementById('cFirma').value };
   const psal  = { activo:document.getElementById('psActivo').checked, remitente:document.getElementById('psRemitente').value, cc_operaciones:document.getElementById('psCcOps').value.trim(), asunto:document.getElementById('psAsunto').value, cuerpo:document.getElementById('psCuerpo').value, firma:document.getElementById('psFirma').value };
   try {
     const rs = await Promise.all([
       fetch('/api/postventa/config/correo_contabilidad',    { method:'PUT', headers:H, body: JSON.stringify({ valor: cont }) }),
+      fetch('/api/postventa/config/correo_contabilidad_cc', { method:'PUT', headers:H, body: JSON.stringify({ valor: contCc }) }),
       fetch('/api/postventa/config/correo_orden_saldo',     { method:'PUT', headers:H, body: JSON.stringify({ valor: saldo }) }),
       fetch('/api/postventa/config/correo_orden_comision',  { method:'PUT', headers:H, body: JSON.stringify({ valor: com }) }),
       fetch('/api/postventa/config/correo_pago_saldo',      { method:'PUT', headers:H, body: JSON.stringify({ valor: psal }) }),
     ]);
     const ok = (await Promise.all(rs.map(r=>r.json()))).every(j=>j.success);
     if (ok) {
-      CFG.correo_contabilidad = cont; CFG.correo_orden_saldo = saldo; CFG.correo_orden_comision = com;
+      CFG.correo_contabilidad = cont; CFG.correo_contabilidad_cc = contCc; CFG.correo_orden_saldo = saldo; CFG.correo_orden_comision = com;
       CFG.correo_pago_saldo = psal;
       msg.textContent = '✓ Guardado'; msg.style.cssText = 'display:inline;color:#15803d;font-weight:700;font-size:.83rem';
     } else { msg.textContent = 'Error al guardar'; msg.style.cssText = 'display:inline;color:#b91c1c;font-size:.83rem'; }

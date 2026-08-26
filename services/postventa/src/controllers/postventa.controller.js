@@ -2838,12 +2838,9 @@ const enviarCorreoOrden = async (req, res) => {
       if (pl) { const v = JSON.parse(pl.valor); if (v && v.activo === false)
         return res.status(422).json({ success: false, data: null, error: 'Este correo está desactivado en Post Venta → Mantenedores' }); }
     } catch (_) {}
-    let to = 'contabilidad@autofacilchile.cl';
-    try {
-      const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_contabilidad'");
-      if (row) { const v = JSON.parse(row.valor); if (v && String(v).trim()) to = String(v).trim(); }
-    } catch (_) {}
-    const cc = (req.usuario && req.usuario.email) || undefined;
+    // Para + CC del mantenedor (correo_contabilidad / correo_contabilidad_cc); quien envía siempre queda en CC
+    const { to, cc } = await require('../../../../shared/correo-contabilidad')
+      .destinatariosContabilidad((req.usuario && req.usuario.email) || []);
     const { enviarCorreo, remitentePorClave } = require('../../../../shared/mailer');
     // Remitente configurable por plantilla (mantenedor Post Venta); default sistema
     let from;

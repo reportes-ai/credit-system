@@ -893,12 +893,9 @@ const enviarCorreoOrden = async (req, res) => {
     const [[o]] = await pool.query('SELECT numero FROM ordenes_pago WHERE id=?', [id]);
     if (!o) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
 
-    let to = 'contabilidad@autofacilchile.cl';
-    try {
-      const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_contabilidad'");
-      if (row) { const v = JSON.parse(row.valor); if (v && String(v).trim()) to = String(v).trim(); }
-    } catch (_) {}
-    const cc = (req.usuario && req.usuario.email) || undefined;
+    // Para + CC del mantenedor (correo_contabilidad / correo_contabilidad_cc); quien envía siempre queda en CC
+    const { to, cc } = await require('../../../../shared/correo-contabilidad')
+      .destinatariosContabilidad((req.usuario && req.usuario.email) || []);
     const { enviarCorreo } = require('../../../../shared/mailer');
     // Documento de respaldo (factura/boleta subida a la orden): viaja adjunto
     let attachments;
