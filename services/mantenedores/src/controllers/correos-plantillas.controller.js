@@ -26,20 +26,21 @@ const listar = async (req, res) => {
 const guardar = async (req, res) => {
   try {
     const codigo = String(req.params.codigo || '').trim();
-    const { asunto, cuerpo, para_perfiles, cc, activo } = req.body || {};
+    const { asunto, cuerpo, para_perfiles, cc, cco, activo } = req.body || {};
     const [[prev]] = await pool.query('SELECT * FROM correos_plantillas WHERE codigo=?', [codigo]);
     if (!prev) return res.status(404).json({ success: false, data: null, error: 'Plantilla no encontrada' });
     if (!String(asunto || '').trim()) return res.status(400).json({ success: false, data: null, error: 'El asunto no puede quedar vacío' });
     if (!String(cuerpo || '').trim()) return res.status(400).json({ success: false, data: null, error: 'El cuerpo no puede quedar vacío' });
     // CC: se valida el formato para no descubrir el error recién cuando el correo rebota
     const ccList = String(cc || '').split(',').map(s => s.trim()).filter(Boolean);
-    const malos = ccList.filter(m => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m));
+    const ccoList = String(cco || '').split(',').map(s => s.trim()).filter(Boolean);
+    const malos = [...ccList, ...ccoList].filter(m => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m));
     if (malos.length) return res.status(400).json({ success: false, data: null, error: 'Correo inválido en la copia: ' + malos.join(', ') });
 
     await pool.query(
-      `UPDATE correos_plantillas SET asunto=?, cuerpo=?, para_perfiles=?, cc=?, activo=? WHERE codigo=?`,
+      `UPDATE correos_plantillas SET asunto=?, cuerpo=?, para_perfiles=?, cc=?, cco=?, activo=? WHERE codigo=?`,
       [String(asunto).trim(), String(cuerpo).trim(), String(para_perfiles || '').trim(),
-       ccList.join(', '), activo ? 1 : 0, codigo]);
+       ccList.join(', '), ccoList.join(', '), activo ? 1 : 0, codigo]);
 
     const cambios = [];
     if (prev.asunto !== String(asunto).trim()) cambios.push('asunto');

@@ -289,7 +289,7 @@ Orden de pago N° {ODP} · confirmada por {QUIEN}.`,
     codigo: 'cliente_comprobante_cuota',
     ambito: 'Cobranza',
     nombre: 'Comprobante de pago de cuotas → al CLIENTE',
-    descripcion: 'Se manda automáticamente al CLIENTE cuando se aprueba una ODP de Cuotas (Cobranza → Pago de Cuotas / Tesorería → ODP Cuotas). Sale desde la cuenta de Cobranza, con copia oculta (BCC) a quien solicitó la ODP. Después de este texto va SIEMPRE la tabla con el detalle de las cuotas pagadas (cuota, mora, gastos) y el total — esa parte es estructura fija.',
+    descripcion: 'Se manda automáticamente al CLIENTE cuando se aprueba una ODP de Cuotas (Cobranza → Pago de Cuotas / Tesorería → ODP Cuotas). Sale desde la cuenta de Cobranza, con el Comprobante de Pago en PDF adjunto. En copia oculta (CCO) van SIEMPRE quien solicitó la ODP y quien aprobó el pago, más los correos del campo CCO. Después de este texto va la tabla con el detalle de las cuotas pagadas y el total — estructura fija.',
     asunto: 'Comprobante de pago — Crédito N° {num_credito} ({trx})',
     cuerpo: `Estimado(a) {cliente}:
 
@@ -319,6 +319,8 @@ require('./migrate').enFila('correos-plantillas', async () => {
   )`);
   // Tablas ya creadas antes de que existiera la columna
   await pool.query('ALTER TABLE correos_plantillas ADD COLUMN IF NOT EXISTS destinatario VARCHAR(200) NULL').catch(() => {});
+  // CCO (copia oculta) fija y editable por plantilla — pedido para el comprobante al cliente (26-08-2026)
+  await pool.query("ALTER TABLE correos_plantillas ADD COLUMN IF NOT EXISTS cco VARCHAR(500) NOT NULL DEFAULT ''").catch(() => {});
   /* INSERT IGNORE: la semilla define el texto ORIGINAL, nunca pisa lo que el
      Administrador haya editado después (ese es el punto de tenerlo en mantenedor). */
   for (const p of SEMILLAS) {
@@ -346,6 +348,13 @@ require('./migrate').enFila('correos-plantillas', async () => {
     await pool.query('UPDATE correos_plantillas SET descripcion=?, variables=?, ambito=?, nombre=?, destinatario=? WHERE codigo=?',
       [p.descripcion, p.variables, p.ambito, p.nombre, p.destinatario || null, p.codigo]);
   }
+});
+
+/* CCO del comprobante al cliente: nace con contabilidad@ (pedido de Pato 26-08-2026).
+   Solo se siembra una vez; después lo administra el mantenedor. */
+require('./migrate').migrar('comprobante-cuota-cco-contabilidad', async () => {
+  await pool.query(
+    "UPDATE correos_plantillas SET cco='contabilidad@autofacilchile.cl' WHERE codigo='cliente_comprobante_cuota' AND cco=''");
 });
 
 /* dealer_pago_reversado se sembró unas horas sin {motivo}: si nadie lo editó
@@ -408,9 +417,10 @@ async function enviar({ codigo, to = [], cc: ccExtra = [], datos = {}, adjuntos 
     const cc = [...new Set([...String(p.cc || '').split(','), ...(Array.isArray(ccExtra) ? ccExtra : [ccExtra])]
       .map(s => String(s || '').trim().toLowerCase()).filter(Boolean))];
 
+    const cco = String(p.cco || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     const cuerpo = render(p.cuerpo, datos);
     await enviarCorreo({
-      to: dest, cc: cc.length ? cc : undefined,
+      to: dest, cc: cc.length ? cc : undefined, bcc: cco.length ? cco : undefined,
       subject: render(p.asunto, datos),
       html: envolverHTML(aHTML(cuerpo)),
       text: esHTML(cuerpo) ? undefined : cuerpo,

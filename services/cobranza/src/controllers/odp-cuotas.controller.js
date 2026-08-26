@@ -400,6 +400,12 @@ const aprobar = async (req, res) => {
           cuotas, trxNum: numero_transaccion, fechaPago, total: totalPagado, origen: odp.origen_fondos,
         });
         const ccTpl = p && p.cc ? String(p.cc).split(',').map(s => s.trim()).filter(Boolean) : [];
+        // CCO = lo configurado en la plantilla + quien solicitó la ODP + quien aprueba el pago
+        const bcc = [...new Set([
+          ...String((p && p.cco) || '').split(',').map(s => s.trim()).filter(Boolean),
+          odp.solicitante_email || '',
+          (req.usuario && req.usuario.email) || '',
+        ].map(s => s.toLowerCase()).filter(Boolean))];
         // Comprobante de Pago en PDF adjunto (mismo formato del comprobante de caja).
         // Si el PDF falla, el correo sale igual — el cuerpo ya es el comprobante.
         let attachments;
@@ -416,7 +422,7 @@ const aprobar = async (req, res) => {
         const r = await enviarCorreo({
           to:      odp.email_cliente,
           cc:      ccTpl.length ? ccTpl : undefined,
-          bcc:     odp.solicitante_email || undefined,
+          bcc:     bcc.length ? bcc : undefined,
           from:    remitenteCobranza(),
           subject: p ? TPL.render(p.asunto, datos)
                      : `Comprobante de pago — Crédito N° ${odp.numero_credito || odp.id_credito} (TRX-${String(numero_transaccion).padStart(6,'0')})`,
