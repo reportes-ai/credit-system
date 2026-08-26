@@ -400,6 +400,19 @@ const aprobar = async (req, res) => {
           cuotas, trxNum: numero_transaccion, fechaPago, total: totalPagado, origen: odp.origen_fondos,
         });
         const ccTpl = p && p.cc ? String(p.cc).split(',').map(s => s.trim()).filter(Boolean) : [];
+        // Comprobante de Pago en PDF adjunto (mismo formato del comprobante de caja).
+        // Si el PDF falla, el correo sale igual — el cuerpo ya es el comprobante.
+        let attachments;
+        try {
+          const { generarComprobantePDF } = require('../../../../shared/comprobante-pago-pdf');
+          const buf = await generarComprobantePDF({
+            credito: { numero_credito: odp.numero_credito || odp.id_credito, nombre_cliente: odp.nombre_cliente, rut_cliente: odp.rut_cliente },
+            pagos: cuotas.map(c => ({ ...c, fecha_pago: fechaPago })),
+            trxNum: numero_transaccion,
+            horaPago: new Date().toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour12: false }),
+          });
+          attachments = [{ filename: `Comprobante-${datos.trx}.pdf`, content: buf, contentType: 'application/pdf' }];
+        } catch (e) { console.error('[odp-cuotas comprobante pdf]', e.message); }
         const r = await enviarCorreo({
           to:      odp.email_cliente,
           cc:      ccTpl.length ? ccTpl : undefined,
@@ -407,7 +420,7 @@ const aprobar = async (req, res) => {
           from:    remitenteCobranza(),
           subject: p ? TPL.render(p.asunto, datos)
                      : `Comprobante de pago — Crédito N° ${odp.numero_credito || odp.id_credito} (TRX-${String(numero_transaccion).padStart(6,'0')})`,
-          html,
+          html, attachments,
         });
         correoMsg = r.ok ? 'enviado' : ('no enviado: ' + r.error);
         if (r.ok) { try { await pool.query(`UPDATE ordenes_pago_cuotas SET correo_enviado=1 WHERE id_odp=?`, [odp.id_odp]); } catch (_) {} }

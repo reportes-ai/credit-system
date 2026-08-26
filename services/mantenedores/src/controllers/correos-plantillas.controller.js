@@ -80,19 +80,27 @@ const prueba = async (req, res) => {
     /* Comprobante de cuotas: la tabla y la caja del total son estructura fija que
        se agrega DESPUÉS del texto en el envío real — la prueba la incluye con
        cuotas de ejemplo para ver el correo completo (mismo motor del envío). */
-    let extraHTML = '';
+    let extraHTML = '', adjuntosPrueba;
     if (codigo === 'cliente_comprobante_cuota') {
+      const CUOTAS_EJ = [
+        { numero_cuota: 7, fecha_vencimiento: '2026-07-05', fecha_pago: new Date().toISOString(), monto_cuota: 250000, interes_mora: 3450, gastos_cobranza: 12000, total_pagado: 265450 },
+        { numero_cuota: 8, fecha_vencimiento: '2026-08-05', fecha_pago: new Date().toISOString(), monto_cuota: 250000, interes_mora: 0, gastos_cobranza: 0, total_pagado: 250000 },
+      ];
       try {
         const { tablaComprobanteHTML } = require('../../../cobranza/src/controllers/odp-cuotas.controller');
-        extraHTML = tablaComprobanteHTML({
-          cuotas: [
-            { numero_cuota: 7, fecha_vencimiento: '2026-07-05', monto_cuota: 250000, interes_mora: 3450, gastos_cobranza: 12000, total_pagado: 265450 },
-            { numero_cuota: 8, fecha_vencimiento: '2026-08-05', monto_cuota: 250000, interes_mora: 0, gastos_cobranza: 0, total_pagado: 250000 },
-          ],
-          total: 515450, origen: 'Transferencia',
-        });
+        extraHTML = tablaComprobanteHTML({ cuotas: CUOTAS_EJ, total: 515450, origen: 'Transferencia' });
         EJEMPLO.total = '$515.450'; EJEMPLO.n_cuotas = 2;
       } catch (e) { console.error('[correos prueba tabla]', e.message); }
+      // El PDF adjunto de la prueba: mismo motor del envío real
+      try {
+        const { generarComprobantePDF } = require('../../../../shared/comprobante-pago-pdf');
+        const buf = await generarComprobantePDF({
+          credito: { numero_credito: EJEMPLO.num_credito, nombre_cliente: EJEMPLO.cliente, rut_cliente: '12.345.678-9' },
+          pagos: CUOTAS_EJ, trxNum: 123,
+          horaPago: new Date().toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour12: false }),
+        });
+        adjuntosPrueba = [{ filename: 'Comprobante-TRX-000123.pdf', content: buf, contentType: 'application/pdf' }];
+      } catch (e) { console.error('[correos prueba pdf]', e.message); }
     }
 
     const { enviarCorreo, mailConfigurado, envolverHTML } = require('../../../../shared/mailer');
@@ -106,6 +114,7 @@ const prueba = async (req, res) => {
         '<b>Correo de PRUEBA</b> — datos de ejemplo. El envío real usa los datos de la operación y va a sus destinatarios.</div>' +
         // aHTML: respeta los saltos de línea del texto plano, igual que el envío real
         plantillas.aHTML(plantillas.render(p.cuerpo, EJEMPLO)) + extraHTML),
+      attachments: adjuntosPrueba,
     });
     auditar({ req, accion: 'ENVIAR', modulo: 'mantenedores', entidad: 'correo_plantilla',
       detalle: `Envió prueba del correo "${p.nombre}" (${codigo}) a ${email}` });
