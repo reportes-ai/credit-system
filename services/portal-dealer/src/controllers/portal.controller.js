@@ -187,12 +187,18 @@ const bucketDeEtapa = etapa => {
   for (const [k, b] of Object.entries(BUCKETS_SALDO)) if (b.etapas.includes(e)) return k;
   return 'FP';   // otorgada sin seguimiento aún = fundantes pendientes en la práctica
 };
+/* La etapa que se muestra es la MÁS AVANZADA del flujo, no la de fecha más
+   reciente: una op pagada antes de que llegaran los fundantes (caso real op
+   89043) aparecía como "Fundantes recibidos" porque esa marca era la última. */
+const ORDEN_SALDO    = ['FUNDANTES PENDIENTES','FUNDANTES ENVIADOS','FUNDANTES RECIBIDOS','FONDOS RECIBIDOS','LIBERADO A PAGO','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'];
+const ORDEN_COMISION = ['COMISION PENDIENTE','COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA ENVIADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'];
+const _fieldSql = arr => arr.map(x => `'${x}'`).join(',');
 const ETAPA_SALDO_SQL = `(SELECT e.etapa FROM postventa_seguimiento s
      JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track = 'SALDO'
-    WHERE s.id_credito = ob.id ORDER BY e.fecha DESC, e.id DESC LIMIT 1)`;
+    WHERE s.id_credito = ob.id ORDER BY FIELD(e.etapa, ${_fieldSql(ORDEN_SALDO)}) DESC, e.fecha DESC, e.id DESC LIMIT 1)`;
 const ETAPA_COMISION_SQL = `(SELECT e.etapa FROM postventa_seguimiento s
      JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track = 'COMISION'
-    WHERE s.id_credito = ob.id ORDER BY e.fecha DESC, e.id DESC LIMIT 1)`;
+    WHERE s.id_credito = ob.id ORDER BY FIELD(e.etapa, ${_fieldSql(ORDEN_COMISION)}) DESC, e.fecha DESC, e.id DESC LIMIT 1)`;
 
 exports.resumen = async (req, res) => {
   try {
@@ -440,8 +446,14 @@ exports.pago = async (req, res) => {
     }
     const [et] = await pool.query(
       'SELECT track, etapa, fecha FROM postventa_etapas WHERE id_seguimiento = ? ORDER BY fecha DESC, id DESC', [seg.id]);
+    // Etapa MÁS AVANZADA por pista (no la más reciente): mismo criterio que las cards
     const ult = {};
-    for (const e of et) { if (!ult[e.track]) ult[e.track] = { etapa: e.etapa, fecha: e.fecha }; }
+    for (const e of et) {
+      const orden = e.track === 'SALDO' ? ORDEN_SALDO : ORDEN_COMISION;
+      const r = orden.indexOf(String(e.etapa || '').toUpperCase());
+      if (!ult[e.track] || r > ult[e.track]._r) ult[e.track] = { etapa: e.etapa, fecha: e.fecha, _r: r };
+    }
+    for (const k of Object.keys(ult)) delete ult[k]._r;
 
     /* Hitos del pago para el timeline del portal: fecha del PRIMER paso por cada
        etapa clave del track SALDO (et viene DESC → la última vista es la primera). */
@@ -639,9 +651,8 @@ async function datosDelDealer(req) {
   const RUTNORM = "REPLACE(REPLACE(REPLACE(UPPER(COALESCE(rut_dealer,'')),'.',''),'-',''),' ','')";
 
   // ── Post Venta: estado del saldo precio y de la comisión + fechas de pago + qué falta ──
-  // (scopeado por rut_dealer; sin datos del cliente). Se calcula la etapa MÁS AVANZADA por pista.
-  const ORDEN_SALDO    = ['FUNDANTES PENDIENTES','FUNDANTES ENVIADOS','FUNDANTES RECIBIDOS','FONDOS RECIBIDOS','LIBERADO A PAGO','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'];
-  const ORDEN_COMISION = ['COMISION PENDIENTE','COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA ENVIADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'];
+  // (scopeado por rut_dealer; sin datos del cliente). Se calcula la etapa MÁS AVANZADA por
+  // pista con los ORDEN_SALDO / ORDEN_COMISION del módulo.
   let postventa = [];
   try {
     const [pv] = await pool.query(
