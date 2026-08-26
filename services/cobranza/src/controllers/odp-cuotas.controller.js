@@ -160,10 +160,10 @@ function tablaComprobanteHTML({ cuotas, total, origen }) {
       </thead>
       <tbody>${filas}</tbody>
     </table>
-    <div style="background:#0141A2;color:#fff;border-radius:10px;padding:12px 18px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:13px;opacity:.85">TOTAL PAGADO${origen ? ' · ' + esc(origen) : ''}</span>
-      <span style="font-size:20px;font-weight:800">${clp(total)}</span>
-    </div>`;
+    <table style="width:100%;border-collapse:collapse;background:#0141A2;border-radius:10px"><tr>
+      <td style="padding:12px 18px;color:#fff;font-size:13px;opacity:.85">TOTAL PAGADO${origen ? ' · ' + esc(origen) : ''}</td>
+      <td style="padding:12px 18px;color:#fff;font-size:20px;font-weight:800;text-align:right">${clp(total)}</td>
+    </tr></table>`;
 }
 
 // HTML del comprobante para el correo al cliente. El texto de arriba (intro) es
