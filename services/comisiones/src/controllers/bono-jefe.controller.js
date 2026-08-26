@@ -150,18 +150,35 @@ function premioDe(score, cfg, mes) {
            total_variable: variable + semana, renta_total: cfg.sueldo_fijo + variable + semana };
 }
 
+/* ── Vigencia de la jefatura (v218.12): usuarios.jefatura_desde (YYYY-MM) marca
+   desde qué mes alguien es Jefe Comercial medible. En un mes ANTERIOR a esa fecha
+   no aparece como jefe y su gente cuenta para el jefe TITULAR (el de jefatura más
+   antigua o sin fecha). Caso real: Damaris asume en ago-2026 — la producción de
+   julio-2026 es completa de Álvaro y queda cerrada así (Pato 26-08-2026). */
+require('../../../../shared/migrate').enFila('bono-jefe-jefatura', async () => {
+  await pool.query("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS jefatura_desde CHAR(7) NULL");
+});
+require('../../../../shared/migrate').migrar('bono-jefe-jefatura-damaris-v1', async () => {
+  const [r] = await pool.query(
+    "UPDATE usuarios SET jefatura_desde='2026-08' WHERE nombre LIKE 'Damaris%' AND apellido LIKE 'Sanhueza%'");
+  console.log(`[bono-jefe] jefatura_desde de Damaris sellada 2026-08 (${r.affectedRows} fila)`);
+});
+
 /* ── Jefes Comerciales medibles: quien SUPERVISA (usuarios.id_supervisor) a al
    menos un Ejecutivo Comercial. Cada jefe se mide por SU gente a cargo; la
-   línea la define la ficha de Usuarios, no una lista escrita acá. ── */
-async function jefesComerciales() {
+   línea la define la ficha de Usuarios, no una lista escrita acá. Con `mes`,
+   excluye a quien aún no asumía la jefatura ese mes (jefatura_desde). ── */
+async function jefesComerciales(mes) {
+  const m = /^\d{4}-\d{2}$/.test(mes || '') ? mes : null;
   const [js] = await pool.query(
-    `SELECT j.id_usuario,
+    `SELECT j.id_usuario, j.jefatura_desde,
             TRIM(CONCAT(SUBSTRING_INDEX(TRIM(j.nombre),' ',1),' ',SUBSTRING_INDEX(TRIM(j.apellido),' ',1))) AS nombre
        FROM usuarios j
       WHERE j.estado='activo'
         AND EXISTS (SELECT 1 FROM usuarios e JOIN perfiles p ON p.id_perfil=e.id_perfil
                      WHERE e.id_supervisor = j.id_usuario AND p.nombre='Ejecutivo Comercial')
-      ORDER BY nombre`);
+        AND (? IS NULL OR j.jefatura_desde IS NULL OR j.jefatura_desde <= ?)
+      ORDER BY nombre`, [m, m]);
   return js;
 }
 
@@ -180,6 +197,25 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
     // nombre + apellido paterno). Vigencia por la ficha de Usuarios: ingresó a más
     // tardar el último día del mes y no estaba de baja antes de que el mes empezara
     // — así un mes histórico no se diluye con quienes aún no entraban (Pato 2026-08-11).
+    /* Jefatura con vigencia: la gente de un jefe que AÚN no asumía en el mes
+       evaluado (jefatura_desde posterior) cuenta para el jefe TITULAR de ese mes
+       (el de jefatura más antigua o sin fecha). Así julio-2026 queda completo en
+       Álvaro aunque hoy la ficha reparta el equipo con Damaris (asume ago-2026). */
+    let supervisores = idJefe ? [idJefe] : null;
+    if (idJefe) {
+      try {
+        const [todos] = await pool.query(
+          `SELECT j.id_usuario, j.jefatura_desde FROM usuarios j
+            WHERE EXISTS (SELECT 1 FROM usuarios e JOIN perfiles p ON p.id_perfil=e.id_perfil
+                           WHERE e.id_supervisor = j.id_usuario AND p.nombre='Ejecutivo Comercial')`);
+        const noVigentes = todos.filter(j => j.jefatura_desde && j.jefatura_desde > mes);
+        const vigentes   = todos.filter(j => !j.jefatura_desde || j.jefatura_desde <= mes);
+        const titular = vigentes.sort((a, b) => String(a.jefatura_desde || '').localeCompare(String(b.jefatura_desde || '')))[0];
+        if (noVigentes.length && titular && titular.id_usuario === idJefe)
+          supervisores = [idJefe, ...noVigentes.map(j => j.id_usuario)];
+      } catch (e) { /* sin columna aún → conducta anterior */ }
+    }
+    const supSql = supervisores ? `u.id_supervisor IN (${supervisores.map(() => '?').join(',')})` : '1=1';
     const [ejs] = await pool.query(
       `SELECT TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1),' ',SUBSTRING_INDEX(TRIM(u.apellido),' ',1))) AS ejecutivo
          FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
@@ -188,8 +224,8 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
           AND u.fecha_ingreso IS NOT NULL
           AND u.fecha_ingreso <= LAST_DAY(CONCAT(?,'-01'))
           AND (u.fecha_baja IS NULL OR u.fecha_baja >= CONCAT(?,'-01'))
-          AND (? IS NULL OR u.id_supervisor = ?)
-        ORDER BY ejecutivo`, [mes, mes, idJefe || null, idJefe || null]);
+          AND ${supSql}
+        ORDER BY ejecutivo`, [mes, mes, ...(supervisores || [])]);
 
     /* Mes de atribución (motor único shared/mes-atribucion.js): desde el corte
        manda la fecha de curse; antes, el mes contable ajustado. */
@@ -289,11 +325,14 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
    cada jefe se mide por su gente a cargo). `jefe=todos` evalúa el equipo completo. ── */
 const getBSC = async (req, res) => {
   try {
-    const jefes = await jefesComerciales();
+    const jefes = await jefesComerciales(req.query.mes);
     let idJefe = null;
     const q = String(req.query.jefe || '').trim();
     if (q && q !== 'todos') idJefe = parseInt(q, 10) || null;
     else if (!q && jefes.length) idJefe = jefes[0].id_usuario;
+    // Jefe pedido que NO era jefe ese mes (jefatura_desde posterior, ej. Damaris en
+    // julio-2026) → cae al titular del mes en vez de mostrar un equipo fantasma.
+    if (idJefe && jefes.length && !jefes.some(j => j.id_usuario === idJefe)) idJefe = jefes[0].id_usuario;
     const data = await calcularBSC(req.query.mes, null, idJefe);
     data.jefes = jefes;
     res.json({ success: true, data, error: null });
@@ -313,7 +352,7 @@ const enviarInforme = async (req, res) => {
 
     /* Un BLOQUE por Jefe Comercial: cada uno se mide por SU gente a cargo
        (ficha de Usuarios). Un solo correo con todos los jefes. */
-    const jefes = await jefesComerciales();
+    const jefes = await jefesComerciales(req.body && req.body.mes);
     if (!jefes.length) return res.status(400).json({ success: false, data: null, error: 'No hay Jefes Comerciales con equipo asignado en Usuarios' });
     const informes = [];
     for (const jf of jefes) informes.push(await calcularBSC(req.body && req.body.mes, null, jf.id_usuario));
