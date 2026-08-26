@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
+  <!-- v1.23 — multi-local: locales con tabla POR local en el modal Editar Dealer (solo lectura) y en la vista de ficha (LOCALES ADICIONALES) · v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -120,7 +120,8 @@
     <div style="margin-top:8px;border-top:1px solid #f1f5f9;padding-top:10px">
       <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px"><i class="bi bi-percent me-1"></i>Comisión pactada del dealer (solo lectura)</label>
       <div id="d_com_tabla"></div>
-      <div style="margin-top:8px;font-size:.76rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px"><i class="bi bi-lock me-1"></i>Las comisiones <b>no se editan aquí</b>. Para cambiarlas, crea una <b>ficha de Modificación</b> del dealer: pasa por la cadena de aprobación (y por Gerencia si supera la pizarra).</div>
+      <div id="d_locales" style="margin-top:8px"></div>
+      <div style="margin-top:8px;font-size:.76rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px"><i class="bi bi-lock me-1"></i>Las comisiones <b>no se editan aquí</b>. Para cambiarlas (incluidas las de cada local), crea una <b>ficha de Modificación</b> del dealer: pasa por la cadena de aprobación (y por Gerencia si supera la pizarra). Los locales también se administran en el mantenedor <a href="/mantenedores/dealers/" target="_blank">Dealers</a>.</div>
     </div>
   </div>
   <div class="dlg-foot"><button class="btn btn-light" onclick="dlgDealer.close()">Cancelar</button>
@@ -460,6 +461,15 @@ async function verFicha(id, revisar, historico){
 function abrirArchivo(id){ window.open('/api/dealer-incorporacion/fichas/'+id+'/archivo?token='+encodeURIComponent(token),'_blank'); }
 
 // La ficha con el MISMO formato del PDF que firma el dealer (tablas con cabecera azul).
+/* Parques ADICIONALES de la ficha (multi-local): la cadena de aprobación los ve
+   con su tabla en la misma sección de Comisión Pactada. */
+function localesExtraRows(f){
+  let ex = []; try{ ex = typeof f.locales_json==='string' ? JSON.parse(f.locales_json||'[]') : (f.locales_json||[]); }catch(_){}
+  if(!Array.isArray(ex) || !ex.length) return '';
+  const E = escH, pv = v => (v==null||v==='')?'—':E(v)+'%';
+  return `<tr><th colspan="5" style="font-size:.8em">LOCALES ADICIONALES EN OTROS PARQUES (comisión por local)</th></tr>`
+    + ex.map(l=>`<tr><td class="lbl">${E(l.ubicacion)}${l.direccion?' · '+E(l.direccion):''}</td><td>${pv(l.com_6_12)}</td><td>${pv(l.com_13_24)}</td><td>${pv(l.com_25_36)}</td><td>${pv(l.com_37)}</td></tr>`).join('');
+}
 function fichaDocHTML(f){
   const E = escH;
   const X = (v,t)=> (String(v||'').toUpperCase()===String(t).toUpperCase()) ? '✕' : '';
@@ -473,7 +483,8 @@ function fichaDocHTML(f){
   const comRows = esA
     ? `<tr><td class="lbl">Calle</td><td>${E(f.com_6_12)}%</td><td>${E(f.com_13_24)}%</td><td>${E(f.com_25_36)}%</td><td>${E(f.com_37)}%</td></tr>
        <tr><td class="lbl">Parque</td><td>${E(f.com_parque_6_12)}%</td><td>${E(f.com_parque_13_24)}%</td><td>${E(f.com_parque_25_36)}%</td><td>${E(f.com_parque_37)}%</td></tr>`
-    : `<tr><td class="lbl">Porcentaje de Comisión</td><td>${E(f.com_6_12)}%</td><td>${E(f.com_13_24)}%</td><td>${E(f.com_25_36)}%</td><td>${E(f.com_37)}%</td></tr>`;
+       + localesExtraRows(f)
+    : `<tr><td class="lbl">Porcentaje de Comisión</td><td>${E(f.com_6_12)}%</td><td>${E(f.com_13_24)}%</td><td>${E(f.com_25_36)}%</td><td>${E(f.com_37)}%</td></tr>` + localesExtraRows(f);
   let _socs = f.socios; if(typeof _socs==='string'){ try{ _socs=JSON.parse(_socs); }catch{ _socs=[]; } } if(!Array.isArray(_socs)) _socs=[];
   const sociosRows = _socs.length
     ? _socs.slice(0,3).map((s,i)=>`<tr><td class="lbl">Socio ${i+1}</td><td>${E(s.rut)}</td><td>${E([s.nombre,s.apellido_paterno,s.apellido_materno].filter(Boolean).join(' '))}</td></tr>`).join('')
@@ -594,8 +605,30 @@ function editarDealer(id){
     <thead><tr><th ${th}>6 a 12</th><th ${th}>13 a 24</th><th ${th}>25 a 36</th><th ${th}>37 y +</th></tr></thead>
     <tbody><tr><td ${td}><b>${pc(d.com_6_12)}</b></td><td ${td}><b>${pc(d.com_13_24)}</b></td><td ${td}><b>${pc(d.com_25_36)}</b></td><td ${td}><b>${pc(d.com_37)}</b></td></tr></tbody></table>`
     + (d.part_especial_por?`<div style="margin-top:6px;font-size:.78rem;color:#5b21b6"><i class="bi bi-patch-check-fill me-1"></i>Participación especial aprobada por <b>${escH(d.part_especial_por)}</b></div>`:'');
+  cargarLocalesDealerModal(d.id_dealer);
   bloquearCamposDealer();
   dlgDealer.showModal();
+}
+
+/* Multi-local (v218.9): locales del dealer con su tabla POR ubicación (solo lectura —
+   se cambian por ficha de Modificación o en el mantenedor Dealers, auditado). */
+async function cargarLocalesDealerModal(idDealer){
+  const cont = $('d_locales'); if(!cont) return;
+  cont.innerHTML = '';
+  try{
+    const j = await (await fetch('/api/dealers/'+idDealer+'/locales',{headers:H})).json();
+    const locs = ((j.data&&j.data.locales)||[]).filter(l=>l.activo);
+    if(locs.length < 2 && !locs.some(l=>l.comisiones)) return;   // sin multi-local ni tabla por local → nada que mostrar
+    const pc = v => (v==null||v==='')?'—':(Number(v)+'%');
+    cont.innerHTML = `<label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:4px"><i class="bi bi-geo-alt me-1"></i>Locales y comisión por local (solo lectura)</label>`
+      + locs.map(l=>{ const c=l.comisiones||{}; const esCalle=String(l.ubicacion).toUpperCase()==='CALLE';
+        return `<div style="border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;margin-bottom:5px;font-size:.8rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <i class="bi bi-${esCalle?'shop':'car-front'}" style="color:#0141A2"></i><b>${escH(l.ubicacion)}</b>
+          ${l.es_principal?'<span style="font-size:.62rem;background:#dbeafe;color:#1d4ed8;border-radius:10px;padding:1px 7px;font-weight:700">PRINCIPAL</span>':''}
+          <span style="color:#0141A2;font-weight:700;margin-left:auto">${pc(c.com_6_12)} · ${pc(c.com_13_24)} · ${pc(c.com_25_36)} · ${pc(c.com_37)}</span>
+          <span style="font-size:.66rem;color:#94a3b8">(6-12 · 13-24 · 25-36 · 37+${c.com_6_12==null&&c.com_13_24==null?' — pizarra':''})</span>
+        </div>`;}).join('');
+  }catch(_){}
 }
 
 /* Pinta en gris los campos que este perfil no puede editar (el candado real está
