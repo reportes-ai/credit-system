@@ -154,3 +154,4 @@ _fund_run.js
 
 # Respaldos frios de tablas bkp_ (contienen datos personales) — NUNCA al repo
 scripts/respaldo-bkp-*/
+__pycache__/
