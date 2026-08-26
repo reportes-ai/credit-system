@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.61 — cartola con SECCIONES por local (subtotal por parque/calle) cuando el dealer curso en mas de una ubicacion · v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3685,7 +3685,7 @@ function renderRevCartolas(){
     const prepago    = movs.filter(m=>m.movimiento==='PREPAGO' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
     const subTotal = comisiones - anulacion - prepago;
     const neto = Math.round(subTotal/IVA_FACTOR), iva = subTotal - neto;
-    const filas = movs.map(m=>`<tr>
+    const filaHTML = m=>`<tr>
       <td>${escH(m.num_op||'')}</td><td>${escH(m.nuestro_num_op||'—')}</td><td style="font-size:.74rem">${escH(m.movimiento)}</td>
       <td style="font-size:.74rem">${escH(m.ejecutivo||'')}</td>
       <td>${escH(toTitle(m.nombre_cliente||''))}</td><td>${fmtRUT(m.rut_cliente||'')}</td>
@@ -3693,7 +3693,24 @@ function renderRevCartolas(){
       <td style="text-align:right"><b>${m.movimiento!=='COMISION'?'−':''}${fmtCLP(m.comision)}</b></td>
       <td><span class="est-mini" style="background:${m.estado_comision==='A PAGAR'?'#dcfce7':m.estado_comision==='A DESCONTAR'?'#fee2e2':'#f1f5f9'};color:${m.estado_comision==='A PAGAR'?'#15803d':m.estado_comision==='A DESCONTAR'?'#b91c1c':'#64748b'}">${escH(m.estado_comision)}</span></td>
       <td style="font-size:.72rem">${escH(m.observaciones||'')}</td>
-    </tr>`).join('');
+    </tr>`;
+    /* Multi-local (v218.6): si el dealer cursó en más de un local (varios parques y/o
+       calle), la MISMA cartola se corta en secciones por ubicación, cada una con su
+       subtotal — así el dealer ve por qué la op de calle paga un % distinto. Con un
+       solo local, la cartola se ve exactamente igual que siempre. */
+    const ubicDe = m => String(m.ubicacion||'').toUpperCase().trim() || 'SIN UBICACIÓN';
+    const ubicsU = [...new Set(movs.map(ubicDe))];
+    let filas;
+    if (ubicsU.length > 1) {
+      const orden = ubicsU.sort((a,b)=> (a==='SIN UBICACIÓN')-(b==='SIN UBICACIÓN') || (a==='CALLE')-(b==='CALLE') || a.localeCompare(b));
+      filas = orden.map(u=>{
+        const ms = movs.filter(m=>ubicDe(m)===u);
+        const st = ms.filter(m=>m.movimiento==='COMISION' && m.estado_comision==='A PAGAR').reduce((s,m)=>s+(+m.comision||0),0)
+                 - ms.filter(m=>m.movimiento!=='COMISION' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
+        return `<tr style="background:#eff6ff"><td colspan="7" style="font-weight:800;color:#0141A2;font-size:.76rem"><i class="bi bi-${u==='CALLE'?'shop':'car-front'}"></i> ${escH(u)} — ${ms.length} oper.</td><td style="text-align:right;font-weight:800;color:#0141A2">${fmtCLP(st)}</td><td colspan="2" style="font-size:.7rem;color:#64748b">subtotal local</td></tr>`
+          + ms.map(filaHTML).join('');
+      }).join('');
+    } else filas = movs.map(filaHTML).join('');
     return `<div class="card-af" style="margin-bottom:18px;padding:0;overflow:hidden" id="bloqueCta${gi}">
       <div style="background:linear-gradient(90deg,#012d70,#0255c5);color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <div>

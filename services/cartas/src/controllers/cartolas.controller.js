@@ -164,7 +164,17 @@ const getMovimientos = async (req, res) => {
     // num_op guardado = id_financiera (N° de la financiera). JOIN al crédito enlazado
     // para exponer NUESTRO N° de operación real (creditos.num_op).
     const [rows] = await pool.query(
-      `SELECT m.*, m.rut_dealer AS rut_conc, m.nombre_dealer AS concesionario, cr.num_op AS nuestro_num_op, ca.ejecutivo_mail AS ejecutivo_mail
+      `SELECT m.*, m.rut_dealer AS rut_conc, m.nombre_dealer AS concesionario, cr.num_op AS nuestro_num_op, ca.ejecutivo_mail AS ejecutivo_mail,
+              /* Ubicación del movimiento (multi-local v218.6): el LOCAL donde cursó la op.
+                 Fuente única = el crédito (parque histórico de ESA operación), con la carta
+                 como fallback. Los placeholders viejos ('PARQUE'/'NO APLICA'/'S/I') no son
+                 un nombre de local y se saltan. La cartola agrupa por esto sus secciones. */
+              COALESCE(
+                NULLIF(NULLIF(NULLIF(NULLIF(UPPER(TRIM(cr.parque)),''),'NO APLICA'),'S/I'),'PARQUE'),
+                NULLIF(UPPER(TRIM(cr.nombre_parque_mgmt)),''),
+                NULLIF(NULLIF(UPPER(TRIM(ca.parque)),''),'NO APLICA'),
+                CASE WHEN UPPER(COALESCE(cr.tipo_ubicacion,''))='CALLE' OR UPPER(COALESCE(ca.tipo,'')) LIKE '%CALLE%' THEN 'CALLE' END
+              ) AS ubicacion
        FROM cartolas_movimientos m
        LEFT JOIN cartas_aprobacion ca ON ca.id = m.id_carta
        LEFT JOIN creditos cr ON cr.id = ca.id_credito_creado
