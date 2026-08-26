@@ -151,12 +151,29 @@ function tieneDato(o){
   if(/sin registro/i.test(String(gp(o,'enc','glscod')||''))) return false;
   return Object.keys(o).some(k=>tieneDato(o[k]));
 }
+/* Amarre del fallback (definido con Pato 26-08-2026): cuando una sección CON DATOS
+   cae al árbol genérico, el informe lo dice en una nota visible y se avisa al
+   backend (campanita a Administradores, una vez por sección) para construirle
+   formato. Así un cambio de estructura de DealerNET nunca pasa piola. */
+let _rutInforme = '';
+const _fallbackAvisadas = {};
+function repFallback(seccion){
+  try {
+    if(!_fallbackAvisadas[seccion]){
+      _fallbackAvisadas[seccion] = 1;
+      fetch('/api/dealernet/informes/render-fallback', { method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+(sessionStorage.getItem('token')||'') },
+        body: JSON.stringify({ seccion, rut: _rutInforme }) }).catch(()=>{});
+    }
+  } catch(_){}
+  return '<div class="rep-note"><i class="bi bi-exclamation-triangle"></i> Sección con estructura nueva: se muestra el detalle bruto para no ocultar información. TI ya fue notificado para darle formato.</div>';
+}
 /* Boletín de Impagos (vigente/histórico): nodo PRODUCTO.detalle.d + resúmenes
    total (por rubro) y totalano (por año). El histórico agrega fechaacl. */
-function tblImpagos(nodo, hist){
-  const p = gp(nodo,'PRODUCTO'); if(!p) return '<div class="rep-tree">'+renderTree(nodo)+'</div>';
+function tblImpagos(nodo, hist, titulo){
+  const p = gp(nodo,'PRODUCTO'); if(!p) return repFallback(titulo)+'<div class="rep-tree">'+renderTree(nodo)+'</div>';
   const ds = arr(gp(p,'detalle','d')).filter(Boolean);
-  if(!ds.length) return '<div class="rep-tree">'+renderTree(p)+'</div>';
+  if(!ds.length) return repFallback(titulo)+'<div class="rep-tree">'+renderTree(p)+'</div>';
   let html = '<table class="rep-tb"><thead><tr><th>Fecha</th>'+(hist?'<th>Aclarado</th>':'')+
     '<th>Acreedor</th><th>Clasificación</th><th>Proceso</th><th>Causa</th><th style="text-align:right">Días mora</th></tr></thead><tbody>'+
     ds.map(x=>'<tr><td>'+esc(x.fecha||'—')+'</td>'+(hist?'<td>'+esc(x.fechaacl||'—')+'</td>':'')+
@@ -174,10 +191,10 @@ function tblImpagos(nodo, hist){
 }
 /* Boletín de Procesos Penales: PRODUCTO.detalle.d; clasificacion y fuente pueden
    venir como objeto, arreglo o texto. */
-function tblPenal(nodo){
-  const p = gp(nodo,'PRODUCTO'); if(!p) return '<div class="rep-tree">'+renderTree(nodo)+'</div>';
+function tblPenal(nodo, titulo){
+  const p = gp(nodo,'PRODUCTO'); if(!p) return repFallback(titulo)+'<div class="rep-tree">'+renderTree(nodo)+'</div>';
   const ds = arr(gp(p,'detalle','d')).filter(Boolean);
-  if(!ds.length) return '<div class="rep-tree">'+renderTree(p)+'</div>';
+  if(!ds.length) return repFallback(titulo)+'<div class="rep-tree">'+renderTree(p)+'</div>';
   const flat = v => arr(v).map(x => x && typeof x==='object' ? (x.delito || Object.values(x).filter(y=>typeof y!=='object').join(' ')) : x).filter(Boolean);
   return '<table class="rep-tb"><thead><tr><th>Fecha</th><th>Delito(s)</th><th>Forma</th><th>Fuente</th><th>Rol</th><th>Situación</th><th>Tipo</th></tr></thead><tbody>'+
     ds.map(x=>'<tr><td>'+esc(x.fecha||'—')+'</td>'+
@@ -194,11 +211,12 @@ function secBoletines(causas){
     ['Boletín Laboral y Previsional Histórico','labhst'],['Boletín de Procesos Penales','penal'],
     ['Boletín Concursal','bolconc'],['Boletín de Arriendos','bolarrien'],
   ];
-  // Formato de tabla para los boletines con estructura conocida; el resto cae al árbol genérico
-  const REN = { bolvig: n=>tblImpagos(n,false), bolhst: n=>tblImpagos(n,true), penal: tblPenal };
+  // Formato de tabla para los boletines con estructura conocida; el resto cae al
+  // árbol genérico CON aviso (repFallback) para que se le construya formato
+  const REN = { bolvig: (n,t)=>tblImpagos(n,false,t), bolhst: (n,t)=>tblImpagos(n,true,t), penal: tblPenal };
   return B.map(([t,k])=>'<div class="rep-h">'+t+'</div>'+
     (tieneDato(gp(causas,k))
-      ? (REN[k] ? REN[k](gp(causas,k)) : '<div class="rep-tree">'+renderTree(gp(causas,k))+'</div>')
+      ? (REN[k] ? REN[k](gp(causas,k), t) : repFallback(t)+'<div class="rep-tree">'+renderTree(gp(causas,k))+'</div>')
       : noinfo())).join('');
 }
 function tblRelacionados(nodo){
@@ -400,7 +418,7 @@ function bodyBoletinSimple(prd){
   const dnode = gp(body,'ROOT','D');
   const hasDetail = dnode && Object.keys(dnode).some(k=>!k.startsWith('@_') && k!=='param');
   if(!hasDetail) return noinfo();
-  return '<div class="rep-tree">'+renderTree(body)+'</div>';
+  return repFallback('Boletín '+String(wsTag||''))+'<div class="rep-tree">'+renderTree(body)+'</div>';
 }
 // Boletín Impagos Vigentes (3425): Resumen (tipo acreedor × año) + Detalle de causas.
 /* ── Boletín Impagos CCS (cód. 3901) ──────────────────────────────────────
@@ -523,6 +541,7 @@ function bodyBoletinImpagos(prd){
 }
 
 function renderInforme(d){
+  _rutInforme = (d && d.rut != null) ? String(d.rut) + (d.dv ? '-' + d.dv : '') : '';
   let cont = d.contenido; if(typeof cont==='string'){ try{cont=JSON.parse(cont);}catch(_){ } }
   const prd = cont || {};
   const cod = String(d.codigo_producto);
@@ -534,7 +553,7 @@ function renderInforme(d){
   else if(cod==='3435') body = bodyPerfilComercial(prd);
   else if(cod==='3425') body = bodyBoletinImpagos(prd);
   else if(cod==='3901') body = bodyBoletinCcs(prd);
-  else body = '<div class="rep-note">Datos recibidos del Web Service:</div><div class="rep-tree">'+renderTree(prd)+'</div>';
+  else body = repFallback('Producto '+cod+' — '+String(d.nombre_producto||''))+'<div class="rep-tree">'+renderTree(prd)+'</div>';
   const f = new Date(d.created_at);
   const meta = `<div class="rep-meta">
     <span><b>Gestor:</b> ${esc(d.usuario_nombre||'—')}</span>

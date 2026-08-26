@@ -1251,6 +1251,31 @@ require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
   } catch (e) { console.error('[dealernet-repositorio migration]', e.message); }
 });
 
+/* POST /api/dealernet/informes/render-fallback { seccion, rut } — amarre del render:
+   el frontend avisa cuando una sección CON DATOS cayó al árbol genérico (estructura
+   sin formato propio en dealernet-informe.js). Campanita a Administradores — una vez
+   por sección mientras el aviso siga sin leer — para construirle tabla antes de que
+   siga saliendo el volcado bruto en los informes. Nunca falla hacia el informe. */
+const renderFallback = async (req, res) => {
+  try {
+    const seccion = String((req.body || {}).seccion || '').slice(0, 80).trim();
+    const rut = String((req.body || {}).rut || '').slice(0, 15);
+    if (seccion) {
+      const clave = 'dnfallback:' + seccion;
+      const [[ya]] = await pool.query('SELECT 1 x FROM notificaciones WHERE clave=? AND leida=0 LIMIT 1', [clave]);
+      if (!ya) {
+        await require('../../../../shared/avisos').avisar('dealernet_render_fallback', {
+          tipo: 'dealernet', prioridad: 'normal', clave,
+          titulo: '📄 Informe DealerNet: sección sin formato — ' + seccion,
+          mensaje: `La sección "${seccion}" del informe trae datos con una estructura sin formato propio y se está mostrando como detalle bruto (RUT ${rut || '—'}). Hay que construirle tabla en dealernet-informe.js.`,
+          href: '/dealernet-informes/',
+        });
+      }
+    }
+  } catch (e) { console.error('[dealernet renderFallback]', e.message); }
+  res.json({ success: true, data: null, error: null });
+};
+
 module.exports = { getProductos, fichaInformes, asegurarInformes, analizarInforme, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
   verificarRepositorio, solicitarInformes, productosActivos, historicos, verInforme, descargarPdf, getConfigEndpoint, updateConfigEndpoint,
-  clasificarRut, auditoria, getCostos, updateCostos, facturacion, guardarFacturacion, historialFacturacion, repositorio };
+  clasificarRut, auditoria, getCostos, updateCostos, facturacion, guardarFacturacion, historialFacturacion, repositorio, renderFallback };
