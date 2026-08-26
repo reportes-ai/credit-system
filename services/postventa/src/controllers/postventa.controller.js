@@ -2218,6 +2218,12 @@ const updateFacturaComision = async (req, res) => {
     const dup = await facturaDuplicadaEnOtraOp(Number(req.params.id), f);
     if (dup) return res.status(409).json({ success: false, data: null, error: dup });
     await guardarFacturaComision(req.params.id, f, usuario);
+    // Re-replicar al editar: una hermana cuya cartola se ENVIÓ después de recibida la
+    // factura quedaba sin réplica para siempre (caso Osorio 88967/89047, 26-08-2026) —
+    // la réplica solo corría al MARCAR la etapa, nunca al editar la titular.
+    const n = await replicarFacturaComision(Number(req.params.id), usuario)
+      .catch(e => { console.error('[postventa replicar factura (edición)]', e.message); return 0; });
+    if (n) console.log(`[postventa] factura replicada a ${n} operación(es) al editar`);
     res.json({ success: true, data: { id: Number(req.params.id) }, error: null });
   } catch (e) {
     console.error('[postventa updateFacturaComision]', e.message);
