@@ -132,52 +132,8 @@ function normalizarCuotas(arr) {
   }).filter(c => c.numero_cuota > 0);
 }
 
-// HTML del comprobante para el correo al cliente. El texto de arriba (intro) es
-// PARAMÉTRICO (plantilla cliente_comprobante_cuota en Correos del Sistema); la
-// tabla de cuotas y la caja del total son estructura fija.
-/* Tabla de cuotas + caja del total (estructura fija del comprobante). La usan el
-   envío real y la Prueba del mantenedor de correos (un solo motor). */
-function tablaComprobanteHTML({ cuotas, total, origen }) {
-  const filas = cuotas.map(c => `
-    <tr>
-      <td style="padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:center">${c.numero_cuota}</td>
-      <td style="padding:6px 8px;border-bottom:1px solid #eef2f7">${fmtFecha(c.fecha_vencimiento)}</td>
-      <td style="padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:right">${clp(c.monto_cuota)}</td>
-      <td style="padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:right">${clp(c.interes_mora)}</td>
-      <td style="padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:right">${clp(c.gastos_cobranza)}</td>
-      <td style="padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:700">${clp(c.total_pagado)}</td>
-    </tr>`).join('');
-  return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 14px">
-      <thead>
-        <tr style="background:#f1f5f9;color:#334155">
-          <th style="padding:7px 8px;text-align:center">N°</th>
-          <th style="padding:7px 8px;text-align:left">Vencimiento</th>
-          <th style="padding:7px 8px;text-align:right">Cuota</th>
-          <th style="padding:7px 8px;text-align:right">Int. Mora</th>
-          <th style="padding:7px 8px;text-align:right">Gtos. Cobr.</th>
-          <th style="padding:7px 8px;text-align:right">Total</th>
-        </tr>
-      </thead>
-      <tbody>${filas}</tbody>
-    </table>
-    <table style="width:100%;border-collapse:collapse;background:#0141A2;border-radius:10px"><tr>
-      <td style="padding:12px 18px;color:#fff;font-size:13px;opacity:.85">TOTAL PAGADO${origen ? ' · ' + esc(origen) : ''}</td>
-      <td style="padding:12px 18px;color:#fff;font-size:20px;font-weight:800;text-align:right">${clp(total)}</td>
-    </tr></table>`;
-}
-
-// HTML del comprobante para el correo al cliente. El texto de arriba (intro) es
-// PARAMÉTRICO (plantilla cliente_comprobante_cuota en Correos del Sistema); la
-// tabla de cuotas y la caja del total son estructura fija.
-function comprobanteEmailHTML({ intro, credito, cuotas, trxNum, fechaPago, total, origen }) {
-  const cuerpo = `
-    ${intro || `<p style="margin:0 0 14px">Estimado(a) <strong>${esc(credito.nombre_cliente || 'cliente')}</strong>,</p>
-    <p style="margin:0 0 16px">Confirmamos el pago registrado para su crédito
-       <strong>N° ${esc(credito.numero_credito || credito.id_credito)}</strong>.
-       Comprobante <strong>TRX-${String(trxNum).padStart(6,'0')}</strong> · ${fmtFecha(fechaPago)}.</p>`}
-    ${tablaComprobanteHTML({ cuotas, total, origen })}`;
-  return envolverHTML(cuerpo);
-}
+/* El HTML/PDF del comprobante vive en shared/comprobante-pago-correo.js
+   (motor único, compartido con el pago en caja). */
 
 /* ─── Carga datos de cabecera del crédito (cliente, número, email) ──────────── */
 async function ctxCredito(idCredito) {
@@ -379,58 +335,18 @@ const aprobar = async (req, res) => {
     let correoMsg = null;
     const totalPagado = cuotas.reduce((s, c) => s + Math.round(parseFloat(c.total_pagado) || 0), 0);
     if (odp.email_cliente) {
-      // Plantilla paramétrica (Correos del Sistema): asunto, texto, interruptor y CC.
-      const TPL = require('../../../../shared/plantillas-correo');
-      const p = await TPL.obtener('cliente_comprobante_cuota').catch(() => null);
-      if (p && !p.activo) {
-        correoMsg = 'no enviado: plantilla desactivada en Correos del Sistema';
-      } else {
-        const datos = {
-          cliente: odp.nombre_cliente || 'cliente',
-          num_credito: String(odp.numero_credito || odp.id_credito),
-          trx: 'TRX-' + String(numero_transaccion).padStart(6, '0'),
-          fecha: fmtFecha(fechaPago),
-          total: clp(totalPagado),
-          origen: odp.origen_fondos || '',
-          n_cuotas: cuotas.length,
-        };
-        const html = comprobanteEmailHTML({
-          intro: p ? TPL.aHTML(TPL.render(p.cuerpo, datos)) : null,
-          credito: { id_credito: odp.id_credito, numero_credito: odp.numero_credito, nombre_cliente: odp.nombre_cliente },
-          cuotas, trxNum: numero_transaccion, fechaPago, total: totalPagado, origen: odp.origen_fondos,
-        });
-        const ccTpl = p && p.cc ? String(p.cc).split(',').map(s => s.trim()).filter(Boolean) : [];
-        // CCO = lo configurado en la plantilla + quien solicitó la ODP + quien aprueba el pago
-        const bcc = [...new Set([
-          ...String((p && p.cco) || '').split(',').map(s => s.trim()).filter(Boolean),
-          odp.solicitante_email || '',
-          (req.usuario && req.usuario.email) || '',
-        ].map(s => s.toLowerCase()).filter(Boolean))];
-        // Comprobante de Pago en PDF adjunto (mismo formato del comprobante de caja).
-        // Si el PDF falla, el correo sale igual — el cuerpo ya es el comprobante.
-        let attachments;
-        try {
-          const { generarComprobantePDF } = require('../../../../shared/comprobante-pago-pdf');
-          const buf = await generarComprobantePDF({
-            credito: { numero_credito: odp.numero_credito || odp.id_credito, nombre_cliente: odp.nombre_cliente, rut_cliente: odp.rut_cliente },
-            pagos: cuotas.map(c => ({ ...c, fecha_pago: fechaPago })),
-            trxNum: numero_transaccion,
-            horaPago: new Date().toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour12: false }),
-          });
-          attachments = [{ filename: `Comprobante-${datos.trx}.pdf`, content: buf, contentType: 'application/pdf' }];
-        } catch (e) { console.error('[odp-cuotas comprobante pdf]', e.message); }
-        const r = await enviarCorreo({
-          to:      odp.email_cliente,
-          cc:      ccTpl.length ? ccTpl : undefined,
-          bcc:     bcc.length ? bcc : undefined,
-          from:    remitenteCobranza(),
-          subject: p ? TPL.render(p.asunto, datos)
-                     : `Comprobante de pago — Crédito N° ${odp.numero_credito || odp.id_credito} (TRX-${String(numero_transaccion).padStart(6,'0')})`,
-          html, attachments,
-        });
-        correoMsg = r.ok ? 'enviado' : ('no enviado: ' + r.error);
-        if (r.ok) { try { await pool.query(`UPDATE ordenes_pago_cuotas SET correo_enviado=1 WHERE id_odp=?`, [odp.id_odp]); } catch (_) {} }
-      }
+      // Motor único del comprobante (shared/comprobante-pago-correo): plantilla
+      // paramétrica + PDF adjunto + CC/CCO del mantenedor. El mismo del pago en caja.
+      const { enviarComprobantePago } = require('../../../../shared/comprobante-pago-correo');
+      const r = await enviarComprobantePago({
+        credito: { id_credito: odp.id_credito, numero_credito: odp.numero_credito,
+                   nombre_cliente: odp.nombre_cliente, rut_cliente: odp.rut_cliente, email_cliente: odp.email_cliente },
+        pagos: cuotas.map(c => ({ ...c, fecha_pago: fechaPago })),
+        trxNum: numero_transaccion, fechaPago, origen: odp.origen_fondos,
+        bccExtra: [odp.solicitante_email, (req.usuario && req.usuario.email)],
+      });
+      correoMsg = r.msg;
+      if (r.ok) { try { await pool.query(`UPDATE ordenes_pago_cuotas SET correo_enviado=1 WHERE id_odp=?`, [odp.id_odp]); } catch (_) {} }
     } else {
       correoMsg = 'sin email del cliente';
     }
@@ -490,4 +406,4 @@ const anular = async (req, res) => {
   } catch (e) { console.error('[odp anular]', e.message); bad(res, 'Error interno del servidor', 500); }
 };
 
-module.exports = { emitir, listar, mias, getById, aprobar, rechazar, anular, tablaComprobanteHTML };
+module.exports = { emitir, listar, mias, getById, aprobar, rechazar, anular };

@@ -88,7 +88,7 @@ const prueba = async (req, res) => {
         { numero_cuota: 8, fecha_vencimiento: '2026-08-05', fecha_pago: new Date().toISOString(), monto_cuota: 250000, interes_mora: 0, gastos_cobranza: 0, total_pagado: 250000 },
       ];
       try {
-        const { tablaComprobanteHTML } = require('../../../cobranza/src/controllers/odp-cuotas.controller');
+        const { tablaComprobanteHTML } = require('../../../../shared/comprobante-pago-correo');
         extraHTML = tablaComprobanteHTML({ cuotas: CUOTAS_EJ, total: 515450, origen: 'Transferencia' });
         EJEMPLO.total = '$515.450'; EJEMPLO.n_cuotas = 2;
       } catch (e) { console.error('[correos prueba tabla]', e.message); }

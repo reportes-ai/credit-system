@@ -129,6 +129,19 @@ function generarComprobantePDF({ credito = {}, pagos = [], trxNum, cajaNombre, h
     }
     doc.y += 6;
 
+    /* ── Condonación otorgada (si vienen los montos full antes de condonar) ── */
+    const sumK = k => pagos.reduce((s, p) => s + (Number(p[k]) || 0), 0);
+    const condMora = Math.max(0, Math.round(pagos.reduce((s, p) =>
+      s + (Number(p.interes_mora_total != null ? p.interes_mora_total : p.interes_mora) || 0), 0) - sumK('interes_mora')));
+    const condGastos = Math.max(0, Math.round(pagos.reduce((s, p) =>
+      s + (Number(p.gastos_cobranza_total != null ? p.gastos_cobranza_total : p.gastos_cobranza) || 0), 0) - sumK('gastos_cobranza')));
+    if (condMora + condGastos > 0) {
+      hr(); secTitle('Condonación Otorgada', '#15803d');
+      if (condGastos > 0) row('Gastos de cobranza condonados', '-' + clp(condGastos), '#15803d');
+      if (condMora > 0) row('Intereses por mora condonados', '-' + clp(condMora), '#15803d');
+      doc.y += 4;
+    }
+
     /* ── Total ── */
     doc.roundedRect(X, doc.y, W, 40, 8).fillColor(AZUL).fill();
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#ffffff')

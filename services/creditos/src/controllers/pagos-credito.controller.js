@@ -485,6 +485,43 @@ const createBatch = async (req, res) => {
       }).catch(() => {});
     } catch (_) {}
 
+    /* Comprobante de Pago al CLIENTE por correo — motor único compartido con la
+       ODP de Cuotas (shared/comprobante-pago-correo: plantilla paramétrica,
+       PDF adjunto, CC/CCO del mantenedor). Fire & forget: jamás frena el pago. */
+    (async () => {
+      try {
+        const [[cd]] = await pool.query(
+          `SELECT COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito, c.plazo,
+                  COALESCE(cl.rut,'') AS rut_cliente, COALESCE(cl.nombre_completo,'') AS nombre_cliente,
+                  cl.email AS email_cliente
+             FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+            WHERE c.id_credito = ?`, [id_credito]);
+        let cajaNombre = null;
+        try { const [[cj]] = await pool.query('SELECT nombre FROM cajas WHERE id_caja=?', [idCajaInt]); cajaNombre = cj && cj.nombre; } catch (_) {}
+        const pagosMail = pagos.map(p => {
+          const f = fullMap.get(Number(p.numero_cuota));
+          return {
+            numero_cuota: p.numero_cuota, fecha_vencimiento: p.fecha_vencimiento,
+            fecha_pago: fecha_pago || new Date().toISOString().slice(0, 10),
+            monto_cuota: parseFloat(p.monto_cuota) || 0,
+            interes_mora: parseFloat(p.interes_mora) || 0,
+            gastos_cobranza: parseFloat(p.gastos_cobranza) || 0,
+            total_pagado: parseFloat(p.total_pagado) ||
+              ((parseFloat(p.monto_cuota) || 0) + (parseFloat(p.interes_mora) || 0) + (parseFloat(p.gastos_cobranza) || 0)),
+            interes_mora_total: (f && f.mora != null) ? f.mora : p.interes_mora_total,
+            gastos_cobranza_total: (f && f.gastos != null) ? f.gastos : p.gastos_cobranza_total,
+          };
+        });
+        const r = await require('../../../../shared/comprobante-pago-correo').enviarComprobantePago({
+          credito: { ...(cd || {}), id_credito },
+          pagos: pagosMail, trxNum: numero_transaccion, fechaPago: fecha_pago,
+          cajaNombre, origen: origen_fondos || (cajaNombre ? 'Pago en ' + cajaNombre : ''),
+          bccExtra: [u.email],
+        });
+        console.log('[pago caja] comprobante al cliente:', r.msg);
+      } catch (e) { console.error('[pago caja comprobante]', e.message); }
+    })();
+
     // Auditoría (fuera de la transacción, no crítica)
     try {
       audit.registrar({
