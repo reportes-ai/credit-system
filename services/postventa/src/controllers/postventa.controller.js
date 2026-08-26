@@ -128,11 +128,16 @@ async function adjuntosFactura(origen, refIds) {
     const [rows] = await pool.query(
       'SELECT nombre, mime, archivo, doc_ruta FROM postventa_factura_docs WHERE origen=? AND ref_id IN (?) ORDER BY id', [origen, refIds]);
     const alm = require('../../../../shared/almacen-docs');
+    const crypto = require('crypto');
     const out = [];
+    const vistos = new Set();   // dedupe por CONTENIDO: la misma factura subida en dos ops del grupo va UNA vez
     let total = 0;
     for (const f of rows) {
       const buf = await alm.obtener({ ruta: f.doc_ruta, blob: f.archivo }).catch(() => null);
       if (!buf) continue;
+      const hash = crypto.createHash('sha256').update(buf).digest('hex');
+      if (vistos.has(hash)) continue;   // caso Osorio: factura 40 adjunta en 88967 y 89047 → salía doble en la ODP
+      vistos.add(hash);
       total += buf.length;
       if (total > 20 * 1024 * 1024) break;   // techo del correo
       out.push({ filename: f.nombre, content: buf, contentType: f.mime || undefined });
