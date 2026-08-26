@@ -49,7 +49,9 @@ exports.tabla = async (req, res) => {
       calle:  factor(t.plazo, false),
     }));
 
-    return res.json({ success: true, data: { tabla, tiene_tabla_propia: !!dealerTabla, ubicaciones: (dealerUbics || []).map(u => u.ubicacion) }, error: null });
+    // tiene_tabla_propia también cuando SOLO existe tabla por ubicación (multi-local):
+    // sin esto la carta descartaba el resultado y caía a la pizarra.
+    return res.json({ success: true, data: { tabla, tiene_tabla_propia: !!dealerTabla || !!(dealerUbics && dealerUbics.length), ubicaciones: (dealerUbics || []).map(u => u.ubicacion) }, error: null });
   } catch (e) {
     console.error('[comision-dealer tabla]', e.message);
     return res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });

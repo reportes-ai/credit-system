@@ -241,6 +241,16 @@ const getDealers = async (req, res) => {
       [...params, parseInt(limit), offset]);
     const body = r => { const s = String(r || '').toUpperCase().replace(/[.\-\s]/g, ''); return s.slice(0, -1); };
     rows.forEach(r => { r.tiene_reporte_ia = rutsIA.has(body(r.rut)) ? 1 : 0; });
+    // Locales activos (multi-parque + calle): la carta los usa para ofrecer al dealer
+    // en CADA parque donde tenga local y en calle (v218.4).
+    try {
+      const ids = rows.map(r => r.id_dealer);
+      if (ids.length) {
+        const [ls] = await pool.query('SELECT id_dealer, ubicacion FROM dealer_locales WHERE activo=1 AND id_dealer IN (?)', [ids]);
+        const de = {}; ls.forEach(l => (de[l.id_dealer] = de[l.id_dealer] || []).push(l.ubicacion));
+        rows.forEach(r => { r.locales = de[r.id_dealer] || []; });
+      }
+    } catch (_) { /* tabla aún no creada */ }
     return res.json({ success: true, data: { rows, total, page: parseInt(page) }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };

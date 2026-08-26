@@ -2689,14 +2689,20 @@ function genCorrelativo(){
 // La carta ya no hardcodea su % de participación: cuando el dealer tiene tabla
 // pactada propia, se consume /api/comision-dealer/tabla (que corre el MISMO motor
 // que guardar/recalcular) para no divergir. Sin tabla propia → cae a la pizarra.
-const DEALER_TABLAS = {};   // rutNorm -> tabla[{desde,hasta,parque,calle}] | false (consultado, sin tabla propia)
+const DEALER_TABLAS = {};   // 'rutNorm|ubicacion' -> tabla[{desde,hasta,parque,calle}] | false (consultado, sin tabla propia)
 function normRutKey(r){ return String(r||'').replace(/[.\-\s]/g,'').toUpperCase(); }
+// Multi-local (v218.4): la tabla pactada puede diferir por PARQUE, así que la caché
+// y la consulta llevan la ubicación elegida en la carta (fParque; vacío en calle).
+function ubicCartaActual(){ return (((document.getElementById('fParque')||{}).value)||'').trim().toUpperCase(); }
 async function ensureTablaDealer(rut){
-  const k = normRutKey(rut);
+  const ubic = ubicCartaActual();
+  const k0 = normRutKey(rut);
+  const k = k0 ? (k0 + '|' + ubic) : '';
   if(!k || (k in DEALER_TABLAS)) return;   // vacío o ya consultado → no refetch
   DEALER_TABLAS[k] = false;                 // marca en curso (evita fetch en paralelo)
   try{
-    const r = await fetch('/api/comision-dealer/tabla?rut_dealer=' + encodeURIComponent(rut),
+    const r = await fetch('/api/comision-dealer/tabla?rut_dealer=' + encodeURIComponent(rut)
+        + (ubic ? '&ubicacion=' + encodeURIComponent(ubic) : ''),
       { headers:{ 'Authorization':'Bearer '+sessionStorage.getItem('token') } });
     const j = await r.json();
     if(j && j.success && j.data && j.data.tiene_tabla_propia && Array.isArray(j.data.tabla)){
@@ -2707,8 +2713,8 @@ async function ensureTablaDealer(rut){
 
 function getComisionFactor(plazo, tipo, rut){
   const p = parseInt(plazo);
-  // 1) Tabla pactada del dealer (motor único) si está cargada para este RUT.
-  const dt = rut ? DEALER_TABLAS[normRutKey(rut)] : null;
+  // 1) Tabla pactada del dealer (motor único) si está cargada para este RUT + ubicación.
+  const dt = rut ? DEALER_TABLAS[normRutKey(rut) + '|' + ubicCartaActual()] : null;
   if(dt && (tipo==='DEALER PARQUE' || tipo==='DEALER CALLE')){
     for(const c of dt){
       if(p >= c.desde && p <= c.hasta) return tipo==='DEALER PARQUE' ? c.parque : c.calle;
@@ -2901,11 +2907,17 @@ async function initApp(){
           jDlr.data.rows.forEach(d => {
             const ccs = (d.ccs_parque || '').trim().toUpperCase();
             const esParque = ccs && ccs !== 'PARTICULAR';
+            // Multi-local (v218.4): d.locales trae TODAS las ubicaciones del dealer
+            // ('CALLE' y/o nombres de parque) — puede aparecer en varios parques y en calle.
+            const locs = Array.isArray(d.locales) ? d.locales.map(x => String(x||'').trim().toUpperCase()).filter(Boolean) : [];
+            const parques = locs.filter(x => x !== 'CALLE');
             DB_DEALERS.push({
               nombre: d.nombre_indexa || d.nombre_razon || '',
               rut:    d.rut || '',
               parque: esParque ? ccs : '',
-              tipo:   esParque ? 'PARQUE' : 'PARTICULAR'
+              tipo:   esParque ? 'PARQUE' : 'PARTICULAR',
+              parques: parques.length ? parques : (esParque && ccs !== 'CALLE' ? [ccs] : []),
+              tieneCalle: locs.length ? locs.includes('CALLE') : !esParque
             });
           });
           console.log(`✓ Dealers cargados: ${DB_DEALERS.length}`);
@@ -3697,11 +3709,12 @@ function getConcPool(){
   const isParque = selectedTipoCarta.includes('PARQUE');
   if(isParque){
     const parque = ((document.getElementById('fParque') || {}).value || '').trim().toUpperCase();
-    if(parque) return DB_DEALERS.filter(d => d.parque === parque);
-    return DB_DEALERS.filter(d => d.tipo === 'PARQUE');
+    // Multi-local: el dealer aparece en CADA parque donde tenga local (d.parques)
+    if(parque) return DB_DEALERS.filter(d => (d.parques||[]).includes(parque) || d.parque === parque);
+    return DB_DEALERS.filter(d => d.tipo === 'PARQUE' || (d.parques||[]).length);
   }
-  // Calle = PARTICULAR (sinónimos)
-  return DB_DEALERS.filter(d => d.tipo === 'PARTICULAR');
+  // Calle = PARTICULAR + dealers de parque CON local calle (multi-local)
+  return DB_DEALERS.filter(d => d.tipo === 'PARTICULAR' || d.tieneCalle);
 }
 
 function filterConc(){

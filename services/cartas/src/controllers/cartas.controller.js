@@ -96,6 +96,31 @@ async function tipoVsFichaDealer(tipo, rutDealer, parqueCarta) {
     `SELECT nombre_razon, ccs_parque FROM dealers
       WHERE REPLACE(UPPER(rut),'.','') = ? LIMIT 1`, [rut]).catch(() => [[null]]);
   if (!f) return null;
+  /* Multi-local (v218.4): si el dealer tiene LOCALES registrados, mandan sobre
+     ccs_parque — puede operar en varios parques y en calle a la vez, y la carta
+     es válida en cualquiera de sus locales vigentes. */
+  try {
+    const [ls] = await pool.query(
+      `SELECT dl.ubicacion FROM dealer_locales dl
+        JOIN dealers d2 ON d2.id_dealer = dl.id_dealer
+       WHERE dl.activo = 1 AND REPLACE(UPPER(d2.rut),'.','') = ?`, [rut]);
+    if (ls.length) {
+      const locs = ls.map(x => String(x.ubicacion || '').trim().toUpperCase());
+      const parques = locs.filter(x => x && x !== 'CALLE');
+      if (t.includes('CALLE'))
+        return locs.includes('CALLE') ? null
+          : `${f.nombre_razon} no tiene local de calle según sus locales (${parques.join(', ')}): la carta no puede ser DEALER CALLE (pagaría la comisión equivocada). Si ahora también vende en calle, agrega primero el local CALLE en su ficha de Dealers.`;
+      if (t.includes('PARQUE')) {
+        if (!parques.length)
+          return `${f.nombre_razon} no tiene local en ningún parque según sus locales: la carta no puede ser DEALER PARQUE. Emítela como DEALER CALLE, o agrega primero el local del parque en su ficha de Dealers.`;
+        const pc = String(parqueCarta || '').trim().toUpperCase();
+        if (pc && !parques.includes(pc))
+          return `La carta dice ${pc} pero ${f.nombre_razon} no tiene local en ese parque (sus locales: ${parques.join(', ')}${locs.includes('CALLE') ? ', CALLE' : ''}). Si abrió un local ahí, agrégalo primero en su ficha de Dealers.`;
+        return null;
+      }
+      return null;
+    }
+  } catch (e) { /* tabla aún no creada → regla histórica por ccs_parque */ }
   const p = String(f.ccs_parque || '').trim().toUpperCase();
   const fichaEsParque = !!p && p !== 'CALLE' && p !== 'PARTICULAR';
   if (fichaEsParque && t.includes('CALLE'))
@@ -217,19 +242,34 @@ async function crearCreditoDesdeCartas(c) {
   ]);
     return rIns;
   });
-  // Parque/Calle desde el mantenedor de dealers (por RUT): la carta no lo trae y
-  // dejaba el campo vacío en la cola de digitación (mismo criterio de dealerBuscar).
+  // Parque/Calle: el LOCAL DE LA CARTA manda (multi-local v218.4) — la carta trae el
+  // NOMBRE del parque donde cursó, y ese nombre es el que atribuye la comisión del
+  // dealer y del parque (cartola del parque correcto). La ficha del dealer queda solo
+  // como fallback: es su ubicación de HOY y antes escribía el literal 'PARQUE'/'CALLE'
+  // que dejaba la op fuera de toda cartola de parque.
   try {
-    const rutD = (c.rut_conc || c.rutConc || '').trim();
-    if (rutD) {
-      const rd = rutD.replace(/\D/g, '');
-      const [[dl]] = await pool.query(
-        `SELECT ccs_parque FROM dealers WHERE REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','') = ? LIMIT 1`, [rd]);
-      if (dl && dl.ccs_parque) {
-        const t = String(dl.ccs_parque).toUpperCase();
-        const tipoU = t.includes('PARQUE') ? 'PARQUE' : 'CALLE';
-        await pool.query('UPDATE creditos SET tipo_ubicacion=?, parque=COALESCE(NULLIF(parque,\'\'), ?) WHERE id=?',
-          [tipoU, tipoU, r.insertId]);
+    // El placeholder viejo ('PARQUE'/'CALLE'/'NO APLICA'/'S/I') se considera vacío.
+    const SET_PARQUE = `UPDATE creditos SET tipo_ubicacion=?, parque = CASE
+        WHEN parque IS NULL OR TRIM(parque)='' OR UPPER(TRIM(parque)) IN ('NO APLICA','S/I','PARQUE','CALLE') THEN ?
+        ELSE parque END WHERE id=?`;
+    const parqueCarta = String(c.parque || '').trim().toUpperCase();
+    const tipoCarta   = String(c.tipo || c.tipoCarta || '').toUpperCase();
+    if (parqueCarta && !['CALLE', 'PARTICULAR', 'NO APLICA', 'S/I'].includes(parqueCarta)) {
+      await pool.query(SET_PARQUE, ['PARQUE', parqueCarta, r.insertId]);
+    } else if (tipoCarta.includes('CALLE')) {
+      await pool.query(SET_PARQUE, ['CALLE', 'CALLE', r.insertId]);
+    } else {
+      const rutD = (c.rut_conc || c.rutConc || '').trim();
+      if (rutD) {
+        const rd = rutD.replace(/\D/g, '');
+        const [[dl]] = await pool.query(
+          `SELECT ccs_parque FROM dealers WHERE REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','') = ? LIMIT 1`, [rd]);
+        if (dl && dl.ccs_parque) {
+          const t = String(dl.ccs_parque).toUpperCase();
+          const esP = t.includes('PARQUE');
+          // Con nombre real de parque en la ficha se hereda EL NOMBRE, no el literal.
+          await pool.query(SET_PARQUE, [esP ? 'PARQUE' : 'CALLE', esP ? t : 'CALLE', r.insertId]);
+        }
       }
     }
   } catch (e) { console.error('[carta→parque]', e.message); }
