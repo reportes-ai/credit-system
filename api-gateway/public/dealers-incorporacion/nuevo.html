@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.36 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
+  <!-- v2.0 — multi-local: locales en OTROS parques con tabla de comision POR local (locales_json; al cerrar sella dealer_locales/dealer_comisiones) · v1.36 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -197,6 +197,12 @@
       <div class="fld full" id="fldDirParque"><label>Dirección de Parque</label><input id="direccion_parque"></div>
       <div class="fld" id="fldComParque"><label>Comuna de Parque</label>
         <input id="comuna_parque" list="comunasList" placeholder="Escribe o elige la comuna…"></div>
+      <div class="fld full" style="border-top:1px dashed #e2e8f0;padding-top:12px;margin-top:4px">
+        <label>Locales en OTROS parques (opcional)</label>
+        <div id="parquesExtra"></div>
+        <button type="button" onclick="agregarParqueExtra()" style="border:1px solid #16a34a;color:#16a34a;background:#f0fdf4;border-radius:8px;padding:6px 14px;font-size:.85rem;cursor:pointer"><i class="bi bi-plus-lg"></i> Agregar otro parque</button>
+        <small class="hint">Un dealer puede operar en varios parques a la vez. Cada local lleva su propia tabla de comisión (%): la comisión de cada crédito se calcula con la tabla del parque donde cursó. Tramos vacíos usan la pizarra.</small>
+      </div>
     </div>
     <p class="hint">Nombre y dirección física del parque automotriz donde el concesionario opera (se usa para los créditos hechos en parque).</p>
   </div>
@@ -911,7 +917,44 @@ function recolectar(){
     o.com_parque_6_12 = val('com_parque_6_12'); o.com_parque_13_24 = val('com_parque_13_24');
     o.com_parque_25_36 = val('com_parque_25_36'); o.com_parque_37 = val('com_parque_37');
   }
+  // Parques ADICIONALES (multi-local): cada local con su tabla de comisión.
+  if (t==='PARQUE' || t==='AMBOS') o.locales_json = JSON.stringify(recolectarParquesExtra());
   return o;
+}
+
+/* ── Parques adicionales (multi-local v218.8): filas dinámicas con tabla propia ── */
+function agregarParqueExtra(data){
+  const d = data || {};
+  const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const row = document.createElement('div');
+  row.className = 'pex-row';
+  row.style.cssText = 'border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fbfdff';
+  row.innerHTML = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <div style="flex:2;min-width:200px"><label style="font-size:.75rem">Parque</label>
+        <input class="pex-nombre" list="parquesList" placeholder="Elige el parque…" value="${E(d.ubicacion)}"></div>
+      <div style="flex:2;min-width:180px"><label style="font-size:.75rem">Dirección</label>
+        <input class="pex-dir" value="${E(d.direccion)}"></div>
+      <div style="flex:1;min-width:130px"><label style="font-size:.75rem">Comuna</label>
+        <input class="pex-comuna" list="comunasList" value="${E(d.comuna)}"></div>
+      <button type="button" title="Quitar este local" onclick="this.closest('.pex-row').remove()"
+        style="border:1px solid #fca5a5;color:#b91c1c;background:#fef2f2;border-radius:8px;padding:6px 10px;cursor:pointer"><i class="bi bi-trash"></i></button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:6px;align-items:end">
+      <span style="font-size:.72rem;font-weight:700;color:#0141A2;align-self:center">Comisión % :</span>
+      ${['com_6_12|6-12','com_13_24|13-24','com_25_36|25-36','com_37|37+'].map(x=>{const [k,l]=x.split('|');
+        return `<div style="flex:1"><label style="font-size:.68rem">${l}</label>
+          <input class="pex-${k}" type="number" step="0.1" min="0" max="99" value="${d[k]!=null?E(d[k]):''}"></div>`;}).join('')}
+    </div>`;
+  $('parquesExtra').appendChild(row);
+}
+function recolectarParquesExtra(){
+  const gv = (r,c) => (r.querySelector('.'+c)?.value || '').trim();
+  return [...document.querySelectorAll('#parquesExtra .pex-row')].map(r=>({
+    ubicacion: gv(r,'pex-nombre').toUpperCase(), direccion: gv(r,'pex-dir'), comuna: gv(r,'pex-comuna'),
+    com_6_12: gv(r,'pex-com_6_12'), com_13_24: gv(r,'pex-com_13_24'),
+    com_25_36: gv(r,'pex-com_25_36'), com_37: gv(r,'pex-com_37'),
+  })).filter(l=>l.ubicacion);
 }
 
 async function guardar(silent){
@@ -957,6 +1000,18 @@ function validarEnvio(){
   if(t==='AMBOS'){
     for(const [id,lbl] of [['com_parque_6_12','Comisión Parque 6-12'],['com_parque_13_24','Comisión Parque 13-24'],['com_parque_25_36','Comisión Parque 25-36'],['com_parque_37','Comisión Parque 37+']])
       if(!val(id)) errs.push('Falta: '+lbl);
+  }
+  // Parques adicionales (multi-local): deben ser parques del mantenedor y distintos al principal
+  if(t==='PARQUE'||t==='AMBOS'){
+    const registrados = [...document.querySelectorAll('#parquesList option')].map(o=>o.value.toUpperCase().trim());
+    const principal = val('nombre_parque').toUpperCase().trim();
+    const vistos = new Set();
+    for(const l of recolectarParquesExtra()){
+      if(l.ubicacion===principal) errs.push(`Local adicional "${l.ubicacion}" repite el parque principal`);
+      else if(registrados.length && !registrados.includes(l.ubicacion)) errs.push(`"${l.ubicacion}" no es un parque del mantenedor Arriendos y Comisiones`);
+      if(vistos.has(l.ubicacion)) errs.push(`Local adicional "${l.ubicacion}" está repetido`);
+      vistos.add(l.ubicacion);
+    }
   }
   if(!getRadio('tipo_documento')) errs.push('Falta: Tipo de documento');
   if(!calcCuentaTipo())           errs.push('Falta: RUT de la cuenta (define Empresa/Persona)');
@@ -1043,6 +1098,9 @@ async function cargar(){
     // Socios guardados
     let _socs = f.socios; if(typeof _socs==='string'){ try{ _socs=JSON.parse(_socs); }catch{ _socs=[]; } }
     (Array.isArray(_socs)?_socs:[]).slice(0,3).forEach((s,idx)=>{ setVal('socio_rut_'+(idx+1), s&&s.rut); setVal('socio_nombre_'+(idx+1), s&&s.nombre); });
+    // Parques adicionales guardados (multi-local)
+    try{ const _pl = typeof f.locales_json==='string' ? JSON.parse(f.locales_json||'[]') : (f.locales_json||[]);
+      $('parquesExtra').innerHTML=''; (Array.isArray(_pl)?_pl:[]).forEach(l=>agregarParqueExtra(l)); }catch(_){}
     // La píldora vive en el topnav (componente): puede no existir aún → se recuerda el estado
     window._pillEstado = f.estado;
     const pill = $('estadoPill'); if (pill){ pill.textContent = f.estado.replace('_',' '); pill.className = 'estado-pill e-'+f.estado; }
@@ -1105,10 +1163,14 @@ function imprimir(){
   const sociosRows = (o.socios && o.socios.length)
     ? o.socios.slice(0,3).map((s,i)=>`<tr><td class="lbl">Socio ${i+1}</td><td>${E(s.rut)}</td><td>${E(s.nombre)}</td></tr>`).join('')
     : `<tr><td class="lbl">Socio 1</td><td></td><td></td></tr>`;
+  // Parques ADICIONALES (multi-local): la cadena de aprobación debe VER cada local y su tabla.
+  let extras = []; try{ extras = typeof o.locales_json==='string' ? JSON.parse(o.locales_json||'[]') : (o.locales_json||[]); }catch(_){}
+  const extrasRows = (Array.isArray(extras)?extras:[]).map(l=>
+    `<tr><td class="lbl">${E(l.ubicacion)}${l.direccion?' · '+E(l.direccion):''}</td><td>${E(l.com_6_12??'—')}%</td><td>${E(l.com_13_24??'—')}%</td><td>${E(l.com_25_36??'—')}%</td><td>${E(l.com_37??'—')}%</td></tr>`).join('');
   const comTable = esParque ? '' : `
     <table class="p"><tr><th colspan="5">COMISIÓN PACTADA${esA?' (Calle / Parque)':''}</th></tr>
       <tr><td class="lbl">Cantidad de Cuotas</td><td>6 a 12</td><td>13 a 24</td><td>25 a 36</td><td>37 y Más</td></tr>
-      ${comRows}</table>`;
+      ${comRows}${extrasRows?`<tr><th colspan="5" style="font-size:.8em">LOCALES ADICIONALES EN OTROS PARQUES (comisión por local)</th></tr>${extrasRows}`:''}</table>`;
   printHTML(`${LOGO_PRINT}
     <h1${subt?'':' class="solo"'}>FICHA DE INCORPORACIÓN DE ${esParque?'PARQUE AUTOMOTRIZ':'CONCESIONARIO'}</h1>${subt?`<div class="subt">${subt}</div>`:''}
     <table class="p"><tr><th colspan="2">EJECUTIVO COMERCIAL</th></tr>

@@ -133,6 +133,10 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS com_parque_37    DECIMAL(5,2) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS nombre_parque    VARCHAR(150) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS direccion_parque VARCHAR(300) NULL`);
+    // Multi-local (v218.8): parques ADICIONALES de la ficha, cada uno con su tabla —
+    // JSON [{ubicacion, direccion, comuna, com_6_12..com_37}]. El principal sigue
+    // en nombre_parque/com_* para no tocar nada de lo existente.
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS locales_json TEXT NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS comuna_parque    VARCHAR(120) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS provincia_parque VARCHAR(120) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS region_parque    VARCHAR(120) NULL`);
@@ -480,6 +484,7 @@ const CAMPOS = ['entidad','tipo','ejecutivo_nombre','fecha_solicitud','rut','nom
   'rep_legal_origen','rl_nombre','rl_telefono','rl_email',
   'com_6_12','com_13_24','com_25_36','com_37',
   'com_parque_6_12','com_parque_13_24','com_parque_25_36','com_parque_37',
+  'locales_json',
   'tipo_documento','cuenta_tipo','tipo_cuenta','nombre_cuenta','banco',
   'rut_cuenta','num_cuenta','correo_confirmacion','observaciones'];
 
@@ -521,6 +526,19 @@ function armarValores(body) {
     else if (k === 'tipo') { const t = norm(body[k]).toUpperCase(); v[k] = (t === 'PARQUE' || t === 'AMBOS') ? t : 'GENERAL'; }
     else if (k === 'entidad') v[k] = norm(body[k]).toUpperCase() === 'PARQUE' ? 'PARQUE' : 'DEALER';
     else if (k === 'fecha_solicitud') v[k] = body[k] || null;
+    else if (k === 'locales_json') {
+      // Parques ADICIONALES (multi-local): se sanea acá para que a cerrar()
+      // llegue siempre un JSON válido con nombres en MAYÚSCULAS.
+      let arr = body[k]; if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch { arr = []; } }
+      arr = (Array.isArray(arr) ? arr : []).map(l => ({
+        ubicacion: String((l && l.ubicacion) || '').trim().toUpperCase(),
+        direccion: String((l && l.direccion) || '').trim() || null,
+        comuna:    String((l && l.comuna) || '').trim() || null,
+        com_6_12: num(l && l.com_6_12), com_13_24: num(l && l.com_13_24),
+        com_25_36: num(l && l.com_25_36), com_37: num(l && l.com_37),
+      })).filter(l => l.ubicacion);
+      v[k] = arr.length ? JSON.stringify(arr) : null;
+    }
     else v[k] = norm(body[k]) || null;
   }
   return v;
@@ -577,6 +595,7 @@ const obtener = async (req, res) => {
               rep_legal_origen, rl_nombre, rl_telefono, rl_email,
               com_6_12, com_13_24, com_25_36, com_37,
               com_parque_6_12, com_parque_13_24, com_parque_25_36, com_parque_37,
+              locales_json,
               tipo_documento, cuenta_tipo, tipo_cuenta, nombre_cuenta, banco,
               rut_cuenta, num_cuenta, correo_confirmacion, observaciones,
               excepciones, excepciones_comentarios, diferencias, firma_sospecha, firma_detalle, ficha_faltantes,
@@ -1132,6 +1151,55 @@ function ensureDealersCols() {
   return _dealersColsReady;
 }
 
+/* La ficha aprobada SELLA los locales del dealer (multi-local v218.8):
+   dealer_locales + dealer_comisiones por ubicación — el local principal según el
+   tipo de la ficha (GENERAL=CALLE, PARQUE/AMBOS=nombre_parque) más los parques
+   ADICIONALES de locales_json, cada uno con su tabla. Best-effort: nunca frena
+   el cierre (las columnas legacy de dealers ya quedaron escritas igual). */
+async function sincronizarLocalesDesdeFicha(f, idDealer) {
+  try {
+    let idParqueDe = new Map();
+    try {
+      const [ps] = await pool.query('SELECT id, UPPER(TRIM(nombre)) nom FROM parques_comisiones');
+      idParqueDe = new Map(ps.map(p => [p.nom, p.id]));
+    } catch (_) {}
+    const T = ['com_6_12', 'com_13_24', 'com_25_36', 'com_37'];
+    const upsertLocal = async (ubic, dir, com, esPrincipal, tabla) => {
+      ubic = String(ubic || '').trim().toUpperCase();
+      if (!ubic) return;
+      await pool.query(
+        `INSERT INTO dealer_locales (id_dealer, ubicacion, id_parque, direccion, comuna, es_principal, activo)
+         VALUES (?,?,?,?,?,?,1)
+         ON DUPLICATE KEY UPDATE id_parque=VALUES(id_parque),
+           direccion=COALESCE(VALUES(direccion), direccion), comuna=COALESCE(VALUES(comuna), comuna),
+           es_principal=VALUES(es_principal), activo=1`,
+        [idDealer, ubic, ubic === 'CALLE' ? null : (idParqueDe.get(ubic) || null),
+         dir || null, com || null, esPrincipal ? 1 : 0]);
+      if (tabla && T.some(k => tabla[k] != null && tabla[k] !== ''))
+        await pool.query(
+          `INSERT INTO dealer_comisiones (id_dealer, ubicacion, com_6_12, com_13_24, com_25_36, com_37)
+           VALUES (?,?,?,?,?,?)
+           ON DUPLICATE KEY UPDATE com_6_12=VALUES(com_6_12), com_13_24=VALUES(com_13_24),
+             com_25_36=VALUES(com_25_36), com_37=VALUES(com_37)`,
+          [idDealer, ubic, tabla.com_6_12 ?? null, tabla.com_13_24 ?? null, tabla.com_25_36 ?? null, tabla.com_37 ?? null]);
+    };
+    const t = String(f.tipo || '').toUpperCase();
+    const tCalle = { com_6_12: f.com_6_12, com_13_24: f.com_13_24, com_25_36: f.com_25_36, com_37: f.com_37 };
+    // Tipo PARQUE: la tabla única de la ficha ES la del parque; AMBOS trae las dos.
+    const tParque = t === 'AMBOS'
+      ? { com_6_12: f.com_parque_6_12, com_13_24: f.com_parque_13_24, com_25_36: f.com_parque_25_36, com_37: f.com_parque_37 }
+      : tCalle;
+    if (t === 'GENERAL' || t === 'AMBOS') await upsertLocal('CALLE', f.direccion, f.comuna, t === 'GENERAL', tCalle);
+    if ((t === 'PARQUE' || t === 'AMBOS') && f.nombre_parque)
+      await upsertLocal(f.nombre_parque, f.direccion_parque || f.direccion, f.comuna_parque || f.comuna, true, tParque);
+    let extras = [];
+    try { extras = JSON.parse(f.locales_json || '[]'); } catch (_) {}
+    for (const l of (Array.isArray(extras) ? extras : []))
+      if (String((l && l.ubicacion) || '').trim().toUpperCase() !== String(f.nombre_parque || '').trim().toUpperCase())
+        await upsertLocal(l.ubicacion, l.direccion, l.comuna, false, l);
+  } catch (e) { console.error('[ficha→locales]', e.message); }
+}
+
 /* Crea (o ACTUALIZA si es modificación) el dealer a partir de la ficha aprobada.
    Copia el sello de participación especial (part_especial_por/fecha) al dealer.
    Devuelve {idDealer, numero, esMod}. */
@@ -1176,6 +1244,7 @@ async function finalizarDealer(f) {
          f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones, partPor, partFecha, dl.id_dealer]);
       // Un dealer que vuelve por ficha nueva queda operativo (antes seguía apagado y no aparecía)
       if (dlExistente && !dlExistente.activo) await pool.query('UPDATE dealers SET activo=1 WHERE id_dealer=?', [dl.id_dealer]);
+      await sincronizarLocalesDesdeFicha(f, dl.id_dealer);
       return { idDealer: dl.id_dealer, numero: dl.numero, esMod: true };
     }
   }
@@ -1199,6 +1268,7 @@ async function finalizarDealer(f) {
      f.direccion_parque || null, f.comuna_parque || null,
      f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, RUT.normalizar(f.rut_cuenta) || f.rut_cuenta,
      f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones, partPor, partFecha]);
+  await sincronizarLocalesDesdeFicha(f, d.insertId);
   return { idDealer: d.insertId, numero: maxN, esMod: false };
 }
 
