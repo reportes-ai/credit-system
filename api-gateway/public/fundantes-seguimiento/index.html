@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Fundantes — AutoFácil</title>
-  <!-- v2.1 — texto del popup Sin Limitacion: casos excepcionales + prenda hasta la inscripcion. v2.0 — SIN LIMITACION: casillero en Sol. Limitacion (AUTOFIN) con popup de confirmacion; deja enviar sin ese documento y la ODP del saldo excluye el concepto -->
+  <!-- v2.2 — fecha y hora del envio bajo la pill Enviado (columna ENVIO). v2.1 — texto del popup Sin Limitacion: casos excepcionales + prenda hasta la inscripcion. v2.0 — SIN LIMITACION: casillero en Sol. Limitacion (AUTOFIN) con popup de confirmacion; deja enviar sin ese documento y la ODP del saldo excluye el concepto -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; --amber:#b45309; }
@@ -245,7 +245,16 @@ function celdaDoc(row, codigo){
 
 function celdaEnvio(row){
   // El ejecutivo sólo envía; aprobar/rechazar es exclusivo de la card de Operaciones.
-  if (row.estado==='ENVIADO') return `<td><span class="pill p-ENVIADO">Enviado</span></td>`;
+  if (row.estado==='ENVIADO') {
+    // Fecha y hora del envío en chiquitito bajo la pill (pedido Pato 26-08-2026)
+    let ft = '';
+    if (row.fecha_envio) {
+      const f = new Date(row.fecha_envio);
+      ft = f.toLocaleDateString('es-CL', { timeZone:'America/Santiago' }) + ' ' +
+           f.toLocaleTimeString('es-CL', { timeZone:'America/Santiago', hour:'2-digit', minute:'2-digit' });
+    }
+    return `<td><span class="pill p-ENVIADO">Enviado</span>${ft?`<div style="font-size:.66rem;color:#94a3b8;margin-top:2px;white-space:nowrap">${ft}</div>`:''}</td>`;
+  }
   if (row.estado==='CERRADO') return `<td><span class="pill p-CERRADO"><i class="bi bi-lock-fill"></i> Cerrado</span></td>`;
   if (row.puede_enviar) return `<td><button class="btn-env" onclick="enviar(${row.id_credito})"><i class="bi bi-send"></i> Enviar</button></td>`;
   return `<td><span class="muted">Faltan ${row.faltan}</span></td>`;
