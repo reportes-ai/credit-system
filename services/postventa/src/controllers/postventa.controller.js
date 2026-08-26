@@ -2789,7 +2789,11 @@ const consultaFacturas = async (req, res) => {
              s.ejecutivo, s.comision,
              f.fecha_factura, f.numero_factura, f.monto_bruto, f.monto_liquido, f.es_terceros, f.es_boleta,
              DATE_FORMAT(f.fecha_factura,'%Y-%m') AS mes_fact,
-             (SELECT oc.num_orden FROM postventa_ordenes_comision oc WHERE oc.id_seguimiento = s.id ORDER BY oc.fecha DESC LIMIT 1) AS orden_comision
+             /* La ODP vive en la TITULAR del grupo de la factura: una réplica
+                (misma factura, otra op) mostraba "—" aunque su orden existiera. */
+             (SELECT oc.num_orden FROM postventa_ordenes_comision oc
+               WHERE oc.id_seguimiento = COALESCE(CASE WHEN f.es_replica=1 THEN f.id_titular END, s.id)
+               ORDER BY oc.fecha DESC LIMIT 1) AS orden_comision
       FROM postventa_seguimiento s
       LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
       LEFT JOIN creditos cr ON cr.id = s.id_credito
