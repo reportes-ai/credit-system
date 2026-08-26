@@ -233,13 +233,31 @@ const log = (evento, ref, estado, detalle, id_comprobante = null) =>
    El libro mayor muestra la glosa del movimiento, no la del comprobante, así que
    sin esto las líneas salían genéricas ("Saldo precio por pagar al dealer") y no
    se podía saber a qué orden ni a qué dealer correspondía cada monto. */
-async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = null, rut = null, detalle = null }) {
+/* `reemplazos` (opcional): { cuentaDeLaRegla: cuentaReal }. Permite que un evento
+   con banco genérico en la regla asiente contra el banco REAL de la operación
+   (ej: pago en caja depositado al Banco de Chile → 1101040 en vez del 1101090
+   de la regla). La cuenta destino debe existir en el plan; si no, se conserva la
+   de la regla y queda anotado en el log — nunca un asiento a una cuenta fantasma. */
+async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = null, rut = null, detalle = null, reemplazos = null }) {
   try {
     const [[regla]] = await pool.query('SELECT * FROM ctb_reglas WHERE evento=?', [evento]);
     if (!regla) { await log(evento, ref, 'SIN_REGLA', 'Evento sin regla configurada'); return null; }
     if (!regla.activa) { await log(evento, ref, 'DESACTIVADA', 'Regla desactivada en el mantenedor'); return null; }
     const [lineas] = await pool.query('SELECT * FROM ctb_reglas_lineas WHERE evento=? ORDER BY id', [evento]);
     if (!lineas.length) { await log(evento, ref, 'SIN_REGLA', 'Regla sin líneas'); return null; }
+
+    // Sustitución de cuentas: solo hacia cuentas que EXISTEN en el plan
+    if (reemplazos && typeof reemplazos === 'object') {
+      for (const [desde, hacia] of Object.entries(reemplazos)) {
+        if (!hacia || hacia === desde) continue;
+        const [[existe]] = await pool.query('SELECT codigo FROM ctb_cuentas WHERE codigo=?', [hacia]);
+        if (!existe) {
+          await log(evento, ref, 'ERROR', `Reemplazo de cuenta ${desde}→${hacia} ignorado: ${hacia} no existe en el plan de cuentas`);
+          continue;
+        }
+        for (const l of lineas) if (l.cuenta === desde) l.cuenta = hacia;
+      }
+    }
 
     // Idempotencia por origen+ref
     if (ref) {

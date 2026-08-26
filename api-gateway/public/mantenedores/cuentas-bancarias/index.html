@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cuentas Bancarias — AutoFácil</title>
+  <title>Cuentas Bancarias — AutoFácil</title><!-- v2.0 - cuenta contable por cuenta bancaria: el asiento del pago va al banco real -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -123,12 +123,13 @@
           <th>N° CUENTA</th>
           <th>BANCO</th>
           <th>TIPO</th>
+          <th>CTA. CONTABLE</th>
           <th>ACTIVO</th>
           <th>ACCIONES</th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr><td colspan="9" class="text-center text-muted py-5">Cargando…</td></tr>
+        <tr><td colspan="10" class="text-center text-muted py-5">Cargando…</td></tr>
       </tbody>
     </table>
     <div class="pag-row">
@@ -138,6 +139,12 @@
         <button class="btn btn-outline-secondary btn-sm" id="btnNext" onclick="cambiarPag(1)"><i class="bi bi-chevron-right"></i></button>
       </div>
     </div>
+  </div>
+
+  <div style="background:#f8fafc;border-left:4px solid #0141A2;border-radius:8px;padding:12px 14px;font-size:.8rem;color:#475569;line-height:1.7;margin-top:16px">
+    <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b><br>
+    • <b>Cuentas bancarias (activo)</b> → las cuentas ofrecidas como destino de transferencia/depósito al registrar pagos en <a href="/creditos/pagar-cuotas">Pago de Cuotas (Caja)</a> y en las ODP de Cuotas.<br>
+    • <b>Cuenta contable</b> → a qué cuenta del <a href="/contabilidad/plan-cuentas/">plan de cuentas</a> asienta el motor contable los pagos recibidos en esa cuenta bancaria (reemplaza al banco genérico de la regla PAGO_CAJA en <a href="/contabilidad/reglas/">Reglas de Centralización</a>). Vacío = queda el banco de la regla.
   </div>
 </div>
 
@@ -209,6 +216,12 @@
               <option value="0">NO</option>
             </select>
           </div>
+          <div class="col-md-9">
+            <label class="form-label">Cuenta contable (plan de cuentas)</label>
+            <input class="form-control form-control-sm" id="fCuentaContable" list="dlCuentasCtb" placeholder="ej: 1101040">
+            <datalist id="dlCuentasCtb"></datalist>
+            <div style="font-size:.72rem;color:#94a3b8;margin-top:3px">Los pagos recibidos en esta cuenta bancaria asientan contra esta cuenta del plan. Vacío = el asiento usa el banco genérico de la regla.</div>
+          </div>
         </div>
       </div>
       <div class="modal-footer" style="border-top:1px solid #f1f5f9">
@@ -236,6 +249,14 @@ let modalBS;
 
 function debounceCargar() { clearTimeout(debTimer); debTimer = setTimeout(cargar, 300); }
 function cambiarPag(d) { pag += d; renderTabla(); }
+
+(async () => {
+  try {
+    const j = await (await fetch('/api/contabilidad/cuentas', { headers: H })).json();
+    if (j.success) document.getElementById('dlCuentasCtb').innerHTML =
+      (j.data || []).map(c => `<option value="${esc(c.codigo)}">${esc(c.codigo)} — ${esc(c.nombre)}</option>`).join('');
+  } catch (_) {}
+})();
 
 async function cargar() {
   pag = 1;
@@ -275,7 +296,7 @@ function renderTabla() {
 
   const tb = document.getElementById('tbody');
   if (!pagina.length) {
-    tb.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5">Sin resultados</td></tr>';
+    tb.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-5">Sin resultados</td></tr>';
     return;
   }
 
@@ -288,6 +309,7 @@ function renderTabla() {
       <td class="td-cuenta">${esc(r.numero_cuenta)}</td>
       <td class="td-banco">${esc(r.banco) || '—'}</td>
       <td style="font-size:0.82rem;color:#6b7280">${esc(r.tipo_cuenta) || '—'}</td>
+      <td style="font-size:0.8rem;font-family:monospace;color:#0141A2">${esc(r.cuenta_contable) || '—'}</td>
       <td>${r.activo ? '<span class="activo-si">✓ SI</span>' : '<span class="activo-no">✗ NO</span>'}</td>
       <td>
         ${esAdmin ? `
@@ -319,6 +341,7 @@ function abrirNuevo() {
   document.getElementById('fBanco').value        = '';
   document.getElementById('fTipoCuenta').value   = '';
   document.getElementById('fActivo').value       = '1';
+  document.getElementById('fCuentaContable').value = '';
   getModal().show();
 }
 
@@ -334,6 +357,7 @@ function abrirEditar(id) {
   document.getElementById('fBanco').value        = r.banco || '';
   document.getElementById('fTipoCuenta').value   = r.tipo_cuenta || '';
   document.getElementById('fActivo').value       = r.activo ? '1' : '0';
+  document.getElementById('fCuentaContable').value = r.cuenta_contable || '';
   getModal().show();
 }
 
@@ -346,13 +370,14 @@ async function guardar() {
   const banco        = document.getElementById('fBanco').value.trim();
   const tipo_cuenta  = document.getElementById('fTipoCuenta').value;
   const activo       = parseInt(document.getElementById('fActivo').value);
+  const cuenta_contable = document.getElementById('fCuentaContable').value.trim().split(' ')[0];
 
   if (!razon_social || !rut || !nombre || !numero_cuenta) {
     alert('Razón social, RUT, nombre y número de cuenta son requeridos.');
     return;
   }
 
-  const body = JSON.stringify({ razon_social, rut, nombre, numero_cuenta, banco: banco||null, tipo_cuenta: tipo_cuenta||null, activo });
+  const body = JSON.stringify({ razon_social, rut, nombre, numero_cuenta, banco: banco||null, tipo_cuenta: tipo_cuenta||null, activo, cuenta_contable: cuenta_contable||null });
   const url    = id ? `/api/cuentas-bancarias/${id}` : '/api/cuentas-bancarias';
   const method = id ? 'PUT' : 'POST';
 

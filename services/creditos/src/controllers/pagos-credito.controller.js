@@ -491,14 +491,25 @@ const createBatch = async (req, res) => {
     try {
       const sum = k => pagos.reduce((s, p) => s + (parseFloat(p[k]) || 0), 0);
       const mCuota = sum('monto_cuota'), mMora = sum('interes_mora'), mGastos = sum('gastos_cobranza');
+      /* El banco del asiento es el REAL del depósito: si el pago entró a una
+         cuenta bancaria con cuenta contable asignada (mantenedor Cuentas
+         Bancarias), esa reemplaza al banco genérico de la regla PAGO_CAJA.
+         Efectivo/tarjeta/cheque (sin cuenta) quedan con el default de la regla. */
+      let reemplazos = null, bancoTxt = null;
+      if (idCuentaInt) {
+        try {
+          const [[cb]] = await pool.query('SELECT banco, cuenta_contable FROM cuentas_bancarias WHERE id_cuenta=?', [idCuentaInt]);
+          if (cb && cb.cuenta_contable) { reemplazos = { '1101090': cb.cuenta_contable }; bancoTxt = cb.banco; }
+        } catch (_) {}
+      }
       require('../../../contabilidad/src/motor-asientos').contabilizar({
         evento: 'PAGO_CAJA', fecha: fecha_pago || undefined,
         glosa: `Pago en ${cajaNombre || 'caja'} — ${pagos.length} cuota(s) · OP ${numOpTxt}`,
         ref: `TRX-${String(numero_transaccion).padStart(6, '0')}`,
         montos: { total: mCuota + mMora + mGastos, cuota: mCuota, mora: mMora, gastos: mGastos },
-        num_op: numOpTxt,
-        // Va a la glosa de CADA línea: "Recaudación caja · Caja 2 · OP 68520"
-        detalle: [cajaNombre, 'OP ' + numOpTxt].filter(Boolean).join(' · '),
+        num_op: numOpTxt, reemplazos,
+        // Va a la glosa de CADA línea: "Recaudación caja · Caja 2 · OP 68520 · Banco de Chile"
+        detalle: [cajaNombre, 'OP ' + numOpTxt, bancoTxt].filter(Boolean).join(' · '),
       }).catch(() => {});
     } catch (_) {}
 
