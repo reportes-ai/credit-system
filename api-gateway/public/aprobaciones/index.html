@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.61 — cartola con SECCIONES por local (subtotal por parque/calle) cuando el dealer curso en mas de una ubicacion · v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.62 — participacion sugerida desde la TABLA PACTADA del local (motor /api/comision-dealer/tabla); la excepcion compara contra lo pactado · v4.61 — cartola con SECCIONES por local (subtotal por parque/calle) cuando el dealer curso en mas de una ubicacion · v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -1508,6 +1508,7 @@ function onConcesionario(){
   const opt = sel.options[sel.selectedIndex];
   document.getElementById('cRutConc').value = opt?.dataset?.rut || '';
   cargarVendedores(opt?.dataset?.rut || '');
+  recalcParticipacion();   // multi-local: carga/refresca la tabla pactada del dealer elegido
 }
 
 /* ── Vendedores por dealer (base vendedores_dealer) ── */
@@ -1658,7 +1659,15 @@ function tope2(n){ return (n==null || isNaN(n)) ? n : Math.floor(n*100 + 1e-6)/1
 function getFactor(plazo, tipo){
   const p = parseInt(plazo)||0;
   if (!p) return 0;
-  // Dealer Parque/Calle: desde mantenedor Fórmulas Comisiones Financieras
+  // 1) Tabla PACTADA del dealer para el LOCAL de la carta (multi-local v218.7):
+  //    viene del motor único /api/comision-dealer/tabla y MANDA sobre la pizarra.
+  //    Con esto la excepción PARTICIPACION_SOBRE_PIZARRA compara contra lo pactado.
+  if (DEALER_TAB && (tipo==='DEALER PARQUE' || tipo==='DEALER CALLE')) {
+    for (const t of DEALER_TAB) {
+      if (p >= t.desde && p <= t.hasta) return tipo==='DEALER PARQUE' ? t.parque : t.calle;
+    }
+  }
+  // 2) Pizarra: desde mantenedor Fórmulas Comisiones Financieras
   // (claves dealer_pct_* y dealer_calle_pct_* en parametros_credito, valores en %)
   if (PARAMS_CRED && (tipo==='DEALER PARQUE' || tipo==='DEALER CALLE')) {
     const tramo = p<=6?'6' : p<=12?'12' : p<=24?'24' : p<=36?'36' : '99';
@@ -1677,15 +1686,42 @@ function getFactor(plazo, tipo){
   }
   return 0;
 }
+/* ── Tabla pactada del dealer para el LOCAL de la carta (multi-local v218.7) ──
+   Motor único /api/comision-dealer/tabla (?ubicacion= el parque elegido; calle sin
+   parámetro). Solo se guarda si el dealer tiene tabla propia (por local o legacy);
+   sin tabla → null y getFactor sigue con la pizarra, igual que siempre. La caché
+   se llavea rut|ubicacion y se refresca sola al cambiar dealer/parque/tipo. */
+let DEALER_TAB = null, DEALER_TAB_KEY = '';
+async function cargarTablaDealer(){
+  const rut  = ((document.getElementById('cRutConc')||{}).value||'').replace(/[.\-\s]/g,'').toUpperCase();
+  const tipo = (document.getElementById('cTipo')||{}).value || '';
+  const ubic = tipo.includes('PARQUE') ? (((document.getElementById('cParque')||{}).value)||'').trim().toUpperCase() : '';
+  const key = rut ? rut + '|' + ubic : '';
+  if (key === DEALER_TAB_KEY) return;
+  DEALER_TAB_KEY = key; DEALER_TAB = null;
+  if (!rut) return;
+  try {
+    const j = await fetch('/api/comision-dealer/tabla?rut_dealer=' + encodeURIComponent(rut)
+        + (ubic ? '&ubicacion=' + encodeURIComponent(ubic) : ''), { headers: hdr() }).then(r=>r.json());
+    if (j.success && j.data && j.data.tiene_tabla_propia && Array.isArray(j.data.tabla) && key === DEALER_TAB_KEY) {
+      DEALER_TAB = j.data.tabla;
+      recalcParticipacion();   // repintar con la pactada recién cargada
+    }
+  } catch(e){ /* sin red → pizarra */ }
+}
 function recalcParticipacion(){
+  cargarTablaDealer();   // dedupe por llave: solo consulta si cambió dealer/parque/tipo
   const tipo = document.getElementById('cTipo').value;
   const plazo = document.getElementById('cPlazo').value;
   const saldo = rawMoney('cSaldo');
   const factor = getFactor(plazo, tipo);
   const lbl = document.getElementById('comisionPizarra');
+  const fuente = (DEALER_TAB && (tipo==='DEALER PARQUE' || tipo==='DEALER CALLE'))
+    ? 'Tabla pactada del dealer' + (tipo.includes('PARQUE') ? ' — ' + (((document.getElementById('cParque')||{}).value)||'parque') : ' — calle')
+    : `Pizarra ${tipo.includes('PARQUE')?'parque':'calle'}`;
   lbl.textContent = (factor && saldo)
-    ? `Pizarra ${tipo.includes('PARQUE')?'parque':'calle'} ${plazo} cuotas: ${(factor*100).toFixed(2).replace('.',',')}% = ${fmtCLP(Math.round(saldo*factor))}`
-    : (factor ? `Pizarra: ${(factor*100).toFixed(2).replace('.',',')}%` : '');
+    ? `${fuente} ${plazo} cuotas: ${(factor*100).toFixed(2).replace('.',',')}% = ${fmtCLP(Math.round(saldo*factor))}`
+    : (factor ? `${fuente}: ${(factor*100).toFixed(2).replace('.',',')}%` : '');
   if (!document.getElementById('chkCambioPart').checked) {
     const bruto = Math.round(saldo * factor);
     setMoney('cPartBruto', bruto);
@@ -1734,7 +1770,7 @@ function avisoParticipacion(){
   const bruto = rawMoney('cPartBruto');
   if (brutoPiz > 0 && bruto > brutoPiz) {
     msg.style.color = '#d97706';
-    msg.innerHTML = `<i class="bi bi-exclamation-triangle"></i> Sobre pizarra (${fmtCLP(brutoPiz)}) — REQUIERE EXCEPCIÓN`;
+    msg.innerHTML = `<i class="bi bi-exclamation-triangle"></i> Sobre ${DEALER_TAB?'lo pactado':'pizarra'} (${fmtCLP(brutoPiz)}) — REQUIERE EXCEPCIÓN`;
   } else {
     msg.textContent = '';
   }
@@ -1996,7 +2032,7 @@ async function guardarCarta(){
   const brutoPizarra = Math.round(rawMoney('cSaldo') * factorPiz);
   if (brutoPizarra > 0 && rawMoney('cPartBruto') > brutoPizarra) {
     excList.push({ cod:'PARTICIPACION_SOBRE_PIZARRA',
-      detalle:`Participación ${fmtCLP(rawMoney('cPartBruto'))} sobre la pizarra (${fmtCLP(brutoPizarra)})` });
+      detalle:`Participación ${fmtCLP(rawMoney('cPartBruto'))} sobre ${DEALER_TAB?'lo pactado del local':'la pizarra'} (${fmtCLP(brutoPizarra)})` });
   }
   /* Financiera menos conveniente. Manda la RENTABILIDAD, no el cuadro:
        · misma financiera que la conveniente → no es excepción
