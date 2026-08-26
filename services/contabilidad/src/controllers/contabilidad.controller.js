@@ -318,7 +318,7 @@ exports.libroDiario = async (req, res) => {
          JOIN ctb_movimientos m ON m.id_comprobante=c.id
          LEFT JOIN ctb_cuentas k ON k.codigo=m.cuenta
         WHERE c.estado='CONTABILIZADO' AND c.fecha BETWEEN ? AND ?
-        ORDER BY c.fecha, c.id, m.id LIMIT 5000`, [r.desde, r.hasta]);
+        ORDER BY c.fecha DESC, c.id DESC, m.id LIMIT 5000`, [r.desde, r.hasta]);
     ok(res, rows.map(x => ({ ...x, num: fmtNum(x) })));
   } catch (e) { fail(res, e.message); }
 };

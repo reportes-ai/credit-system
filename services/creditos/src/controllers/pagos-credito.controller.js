@@ -473,15 +473,32 @@ const createBatch = async (req, res) => {
 
     await conn.commit();
 
+    // Contexto del crédito y la caja: lo usan la glosa contable y el correo al cliente
+    let cd = null, cajaNombre = null;
+    try {
+      [[cd]] = await pool.query(
+        `SELECT COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito, c.plazo,
+                COALESCE(cl.rut,'') AS rut_cliente, COALESCE(cl.nombre_completo,'') AS nombre_cliente,
+                cl.email AS email_cliente
+           FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+          WHERE c.id = ?`, [id_credito]);
+      const [[cj]] = await pool.query('SELECT nombre FROM cajas WHERE id_caja=?', [idCajaInt]);
+      cajaNombre = cj && cj.nombre;
+    } catch (_) {}
+    const numOpTxt = (cd && cd.numero_credito) || id_credito;
+
     // Centralización contable: un asiento por transacción de caja (nunca bloquea el pago)
     try {
       const sum = k => pagos.reduce((s, p) => s + (parseFloat(p[k]) || 0), 0);
       const mCuota = sum('monto_cuota'), mMora = sum('interes_mora'), mGastos = sum('gastos_cobranza');
       require('../../../contabilidad/src/motor-asientos').contabilizar({
         evento: 'PAGO_CAJA', fecha: fecha_pago || undefined,
-        glosa: `Pago en caja ${pagos.length} cuota(s) crédito ${id_credito}`,
+        glosa: `Pago en ${cajaNombre || 'caja'} — ${pagos.length} cuota(s) · OP ${numOpTxt}`,
         ref: `TRX-${String(numero_transaccion).padStart(6, '0')}`,
         montos: { total: mCuota + mMora + mGastos, cuota: mCuota, mora: mMora, gastos: mGastos },
+        num_op: numOpTxt,
+        // Va a la glosa de CADA línea: "Recaudación caja · Caja 2 · OP 68520"
+        detalle: [cajaNombre, 'OP ' + numOpTxt].filter(Boolean).join(' · '),
       }).catch(() => {});
     } catch (_) {}
 
@@ -490,14 +507,6 @@ const createBatch = async (req, res) => {
        PDF adjunto, CC/CCO del mantenedor). Fire & forget: jamás frena el pago. */
     (async () => {
       try {
-        const [[cd]] = await pool.query(
-          `SELECT COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito, c.plazo,
-                  COALESCE(cl.rut,'') AS rut_cliente, COALESCE(cl.nombre_completo,'') AS nombre_cliente,
-                  cl.email AS email_cliente
-             FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
-            WHERE c.id = ?`, [id_credito]);
-        let cajaNombre = null;
-        try { const [[cj]] = await pool.query('SELECT nombre FROM cajas WHERE id_caja=?', [idCajaInt]); cajaNombre = cj && cj.nombre; } catch (_) {}
         const pagosMail = pagos.map(p => {
           const f = fullMap.get(Number(p.numero_cuota));
           return {
