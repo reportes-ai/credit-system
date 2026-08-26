@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -37,6 +37,7 @@
     .tipo-COMISION { background:#ede9fe; color:#6d28d9; }
     .tipo-SALDO { background:#cffafe; color:#0e7490; }
     .tipo-GENERAL { background:#f1f5f9; color:#475569; }
+    .tipo-PARQUE { background:#dcfce7; color:#15803d; }
     .icon-btn { background:none; border:none; cursor:pointer; font-size:.95rem; padding:3px 6px; border-radius:6px; color:#475569; }
     .icon-btn:hover { background:#eff6ff; }
     .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
@@ -94,6 +95,7 @@
       <button class="ofilt on" data-o="" onclick="setOrigen(this)">Todas</button>
       <button class="ofilt" data-o="COMISION" onclick="setOrigen(this)">Comisiones</button>
       <button class="ofilt" data-o="SALDO" onclick="setOrigen(this)">Saldos Precio</button>
+      <button class="ofilt" data-o="PARQUE" onclick="setOrigen(this)">Parques</button>
       <button class="ofilt" data-o="GENERAL" onclick="setOrigen(this)">Otros</button>
     </div>
   </div>
@@ -158,7 +160,7 @@ let DATA = [], PUEDE = (yo.perfil==='Administrador'), ORIGEN='', MICAJA=null, PA
    y no tenga que buscar su orden entre todas. */
 (function(){
   const o = (new URLSearchParams(location.search).get('origen')||'').toUpperCase();
-  if (!['SALDO','COMISION','GENERAL'].includes(o)) return;
+  if (!['SALDO','COMISION','GENERAL','PARQUE'].includes(o)) return;
   ORIGEN = o;
   addEventListener('DOMContentLoaded', () => document.querySelectorAll('.ofilt')
     .forEach(b => b.classList.toggle('on', (b.dataset.o||'') === o)));

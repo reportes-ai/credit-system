@@ -284,7 +284,7 @@ const listarOrdenes = async (req, res) => {
     const where = ['1=1'];
     const args = [];
     const origen = norm(req.query.origen).toUpperCase();
-    if (['SALDO', 'COMISION', 'GENERAL'].includes(origen)) { where.push('oc.origen = ?'); args.push(origen); }
+    if (['SALDO', 'COMISION', 'GENERAL', 'PARQUE'].includes(origen)) { where.push('oc.origen = ?'); args.push(origen); }
     const desde = fdate(req.query.desde), hasta = fdate(req.query.hasta);
     if (desde) { where.push('DATE(oc.created_at) >= ?'); args.push(desde); }
     if (hasta) { where.push('DATE(oc.created_at) <= ?'); args.push(hasta); }
@@ -312,7 +312,7 @@ const listarOrdenes = async (req, res) => {
       WHERE ${where.join(' AND ')}
       ORDER BY oc.created_at DESC, oc.id DESC LIMIT 1000`, args);
 
-    const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
+    const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros', PARQUE: 'Parque' };
     const estFiltro = norm(req.query.estado).toUpperCase();
     // Segregación de funciones: las que emitió el propio usuario no las puede pagar él.
     // Se marca acá para que el botón lo diga en pantalla y no falle recién al apretarlo.
@@ -371,7 +371,7 @@ const getOrden = async (req, res) => {
   }
 };
 
-const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
+const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros', PARQUE: 'Parque' };
 // Versión del esquema del documento congelado. Subir cuando cambie la lógica de armado
 // (fechas, desglose IVA, datos bancarios, etc.) para forzar el re-congelado idempotente.
 // v6 (31-07-2026): datos de transferencia estructurados también en las órdenes generales.
