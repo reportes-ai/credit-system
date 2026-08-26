@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v2.13 — linea Limitacion al Dominio excluida (SIN LIMITACION) cuando el ejecutivo lo declaro en Fundantes · v2.12 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.11 — sin boton Enviar Correo (emitir ya lo manda solo); el texto ya no dice "adjunto" · v2.10 — navbar migrada al componente topnav · v2.8 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.7 — emitir manda el correo a Contabilidad automaticamente (eran dos botones y se emitia sin avisar) · v2.6 — boton Enviar Correo respeta el check Activo del mantenedor · v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
+  <!-- v2.2 — la vista previa ya NO reserva el N° de ODP (POR ASIGNAR hasta emitir) · v2.13 — linea Limitacion al Dominio excluida (SIN LIMITACION) cuando el ejecutivo lo declaro en Fundantes · v2.12 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.11 — sin boton Enviar Correo (emitir ya lo manda solo); el texto ya no dice "adjunto" · v2.10 — navbar migrada al componente topnav · v2.8 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.7 — emitir manda el correo a Contabilidad automaticamente (eran dos botones y se emitia sin avisar) · v2.6 — boton Enviar Correo respeta el check Activo del mantenedor · v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -258,13 +258,14 @@ function emailHTML(r){
 async function verOrden(id){
   actual = DATA.find(r => r.id === id);
   if (!actual) return;
-  // Asignar/obtener el correlativo de la orden (una por operación) antes de mostrar
+  // Solo lectura: el N° se ASIGNA al emitir. Sin número aún, el borrador muestra
+  // "POR ASIGNAR" y emitir() lo reemplaza por el real antes del correo.
   if (!actual.num_orden){
     try {
       const r = await fetch('/api/postventa/orden-pago/'+id+'/correlativo', { headers: hdr() });
       const j = await r.json();
-      if (j.success) actual.num_orden = j.data.num_orden;
-    } catch(e){}
+      actual.num_orden = (j.success && j.data.num_orden) || 'POR ASIGNAR';
+    } catch(e){ actual.num_orden = actual.num_orden || 'POR ASIGNAR'; }
   }
   // PRE-EMISIÓN: hacer notar los datos que faltan antes de emitir (motor AF_ODP_PRE)
   document.getElementById('preAvisos').innerHTML = AF_ODP_PRE.render(AF_ODP_PRE.check([
@@ -286,11 +287,13 @@ async function emitir(){
   /* El correo se captura ANTES de emitir (cerrar() vacía el modal) y sale
      AUTOMÁTICO con la emisión: eran dos botones separados y el 12-08-2026 se
      emitieron dos órdenes sin apretar "Enviar Correo" — Contabilidad nunca supo. */
-  const op = actual, htmlDoc = document.getElementById('docWrap').innerHTML, asu = asuntoDe(actual);
+  const op = actual; let htmlDoc = document.getElementById('docWrap').innerHTML, asu = asuntoDe(actual);
   try {
     const r = await fetch('/api/postventa/orden-pago/emitir', { method:'POST', headers:hdr(), body:JSON.stringify({ ids:[actual.id] }) });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
+    // El N° real nace al emitir: reemplazar el borrador en el correo
+    if (j.data && j.data.num_orden) { htmlDoc = htmlDoc.split('POR ASIGNAR').join(j.data.num_orden); asu = asu.split('POR ASIGNAR').join(j.data.num_orden); }
     DATA = DATA.filter(x => x.id !== op.id);
     cerrar(); render();
     let notaCorreo = '';

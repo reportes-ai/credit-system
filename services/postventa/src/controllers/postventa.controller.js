@@ -1914,14 +1914,17 @@ async function asegurarOrdenSaldo(id, reqUsuario) {
   return numero;
 }
 
-/* ── GET /api/postventa/orden-pago/:id/correlativo — crea o devuelve el N° de orden ── */
+/* ── GET /api/postventa/orden-pago/:id/correlativo — SOLO LECTURA: devuelve el N°
+   si ya existe, null si no. Antes ASIGNABA el correlativo al abrir la vista
+   previa: quedaban órdenes "fantasma" en el historial (emitidas para el libro,
+   FACTURA RECIBIDA para el flujo) sin que nadie pulsara Emitir. El número se
+   asigna únicamente al EMITIR (asegurarOrdenSaldo dentro de emitirOrdenPago). ── */
 const correlativoOrden = async (req, res) => {
   const id = Number(req.params.id);
   try {
     if (!id) return res.status(400).json({ success: false, data: null, error: 'id inválido' });
-    const num = await asegurarOrdenSaldo(id, req.usuario);
-    if (!num) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
-    res.json({ success: true, data: { num_orden: num }, error: null });
+    const [[po]] = await pool.query('SELECT num_orden FROM postventa_ordenes WHERE id_seguimiento=?', [id]);
+    res.json({ success: true, data: { num_orden: (po && po.num_orden) || null }, error: null });
   } catch (e) {
     console.error('[postventa correlativoOrden]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -1936,9 +1939,10 @@ const emitirOrdenPago = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
     const usuario = loginDe(req.usuario);
     // Marca ORDEN DE PAGO EMITIDA (y FONDOS RECIBIDOS por si faltara, para mantener secuencia)
-    const vals = [];
+    const vals = []; let numOrden = null;
     for (const id of ids) {
-      await asegurarOrdenSaldo(id, req.usuario);   // crea orden + correlativo si falta → aparece en módulo Órdenes de Pago
+      const n = await asegurarOrdenSaldo(id, req.usuario);   // crea orden + correlativo si falta → aparece en módulo Órdenes de Pago
+      if (!numOrden) numOrden = n;
       vals.push([id, 'SALDO', 'FONDOS RECIBIDOS', usuario]);
       vals.push([id, 'SALDO', 'ORDEN DE PAGO EMITIDA', usuario]);
     }
@@ -1952,7 +1956,7 @@ const emitirOrdenPago = async (req, res) => {
     }
     auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'orden_pago_saldo', entidad_id: ids[0],
       detalle: `Emitió Orden de Pago de saldo precio — op ${await opsTxt(ids)}` });
-    res.json({ success: true, data: { emitidas: ids.length }, error: null });
+    res.json({ success: true, data: { emitidas: ids.length, num_orden: numOrden }, error: null });
   } catch (e) {
     console.error('[postventa emitirOrdenPago]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -2365,13 +2369,18 @@ async function asegurarOrdenComision(idPedido, reqUsuario) {
 }
 
 /* ── GET /api/postventa/orden-pago-comision/:id/correlativo ── */
+/* SOLO LECTURA (mismo fix que el de saldo): la vista previa ya no asigna el
+   correlativo — devuelve el existente (resuelto vía titular del grupo) o null.
+   El número se asigna únicamente al EMITIR. */
 const correlativoOrdenComision = async (req, res) => {
   const id = Number(req.params.id);
   try {
     if (!id) return res.status(400).json({ success: false, data: null, error: 'id inválido' });
-    const num = await asegurarOrdenComision(id, req.usuario);
-    if (!num) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
-    res.json({ success: true, data: { num_orden: num }, error: null });
+    const [[fr]] = await pool.query(
+      'SELECT es_replica, id_titular FROM postventa_facturas_comision WHERE id_seguimiento=?', [id]);
+    const titular = (fr && fr.es_replica && fr.id_titular) ? Number(fr.id_titular) : id;
+    const [[po]] = await pool.query('SELECT num_orden FROM postventa_ordenes_comision WHERE id_seguimiento=?', [titular]);
+    res.json({ success: true, data: { num_orden: (po && po.num_orden) || null }, error: null });
   } catch (e) {
     console.error('[postventa correlativoOrdenComision]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -2385,9 +2394,10 @@ const emitirOrdenPagoComision = async (req, res) => {
     if (!Array.isArray(ids) || !ids.length)
       return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
     const usuario = loginDe(req.usuario);
-    const vals = [];
+    const vals = []; let numOrden = null;
     for (const id of ids) {
-      await asegurarOrdenComision(id, req.usuario);   // crea orden + correlativo si falta → aparece en módulo Órdenes de Pago
+      const n = await asegurarOrdenComision(id, req.usuario);   // crea orden + correlativo si falta → aparece en módulo Órdenes de Pago
+      if (!numOrden) numOrden = n;
       // La ODP de la titular cubre TODA la cartola: la etapa avanza también en las réplicas
       for (const gid of await idsGrupoFactura(id)) {
         vals.push([gid, 'COMISION', 'FACTURA RECIBIDA', usuario]);
@@ -2401,7 +2411,7 @@ const emitirOrdenPagoComision = async (req, res) => {
     }
     auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'orden_pago_comision', entidad_id: ids[0],
       detalle: `Emitió Orden de Pago de comisión — op ${await opsTxt(ids)}` });
-    res.json({ success: true, data: { emitidas: ids.length }, error: null });
+    res.json({ success: true, data: { emitidas: ids.length, num_orden: numOrden }, error: null });
   } catch (e) {
     console.error('[postventa emitirOrdenPagoComision]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });

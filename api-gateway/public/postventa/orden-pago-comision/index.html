@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.17 — resumen narrado desde el neto (+IVA / −retención / emisor retiene) con referencia bruta · v2.16 — cuadratura de boleta repone el IVA (bruto boleta = neto factura) antes de comparar contra las comisiones brutas · v2.15 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
+  <!-- v2.18 — la vista previa ya NO reserva el N° de ODP (POR ASIGNAR hasta emitir; el correo sale con el real) · v2.17 — resumen narrado desde el neto (+IVA / −retención / emisor retiene) con referencia bruta · v2.16 — cuadratura de boleta repone el IVA (bruto boleta = neto factura) antes de comparar contra las comisiones brutas · v2.15 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -324,11 +324,13 @@ async function verOrden(gi){
   if (!actual || !actual.length) return;
   const f0 = actual[0];
   if (!f0.num_orden){
+    // Solo lectura: el N° se ASIGNA al emitir. Sin número aún, el borrador
+    // muestra "POR ASIGNAR" y emitir() lo reemplaza por el real antes del correo.
     try {
       const r = await fetch('/api/postventa/orden-pago-comision/'+f0.id+'/correlativo', { headers: hdr() });
       const j = await r.json();
-      if (j.success) actual.forEach(o => o.num_orden = j.data.num_orden);
-    } catch(e){}
+      actual.forEach(o => o.num_orden = (j.success && j.data.num_orden) || 'POR ASIGNAR');
+    } catch(e){ actual.forEach(o => o.num_orden = o.num_orden || 'POR ASIGNAR'); }
   }
   // PRE-EMISIÓN: hacer notar los datos que faltan antes de emitir (motor AF_ODP_PRE)
   let facturaAdj = '';
@@ -361,11 +363,13 @@ async function emitir(){
   if (!confirm(`¿Emitir la orden de pago de comisión de la${ids.length>1?'s':''} OP ${nums}? Pasará${ids.length>1?'n':''} a Comisiones a Pagar y el correo saldrá a Contabilidad.`)) return;
   // Correo AUTOMÁTICO con la emisión (mismo fix que la orden de saldo: eran dos
   // botones y las órdenes salían emitidas sin que Contabilidad se enterara).
-  const htmlDoc = document.getElementById('docWrap').innerHTML, asu = asuntoDe(actual);
+  let htmlDoc = document.getElementById('docWrap').innerHTML, asu = asuntoDe(actual);
   try {
     const r = await fetch('/api/postventa/orden-pago-comision/emitir', { method:'POST', headers:hdr(), body:JSON.stringify({ ids }) });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
+    // El N° real nace al emitir: reemplazar el borrador en el correo
+    if (j.data && j.data.num_orden) { htmlDoc = htmlDoc.split('POR ASIGNAR').join(j.data.num_orden); asu = asu.split('POR ASIGNAR').join(j.data.num_orden); }
     DATA = DATA.filter(x => !ids.includes(x.id));
     cerrar(); render();
     let notaCorreo = '';
