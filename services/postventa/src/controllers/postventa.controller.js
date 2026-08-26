@@ -532,10 +532,57 @@ const cajaActivaDe = async (id_usuario) => {
   catch { return null; }
 };
 
+/* ── Anti-duplicación de documento (caso real ODP2610819/820, factura 40 Osorio):
+   la MISMA factura registrada como titular en dos operaciones genera DOS ODP,
+   cada una por el TOTAL del documento. Si el mismo (rut dealer + número + tipo)
+   ya está registrado en otra operación fuera del grupo, se rechaza con guía.
+   Devuelve el mensaje de error o null si no hay conflicto. ── */
+async function facturaDuplicadaEnOtraOp(idSeguimiento, f) {
+  const num = String((f || {}).numero_factura || '').trim();
+  const rut = String((f || {}).rut_dealer || '').toUpperCase().replace(/[.\-\s]/g, '');
+  if (!num || !rut) return null;
+  const [rows] = await pool.query(
+    `SELECT fc.id_seguimiento, fc.num_op, fc.id_titular
+       FROM postventa_facturas_comision fc
+      WHERE fc.numero_factura = ? AND COALESCE(fc.es_boleta,0) = ?
+        AND REPLACE(REPLACE(REPLACE(UPPER(COALESCE(fc.rut_dealer,'')),'.',''),'-',''),' ','') = ?
+        AND fc.id_seguimiento <> ?`,
+    [num, f.es_boleta ? 1 : 0, rut, Number(idSeguimiento)]);
+  // Las réplicas de ESTA operación (id_titular = idSeguimiento) son el grupo propio: no chocan.
+  const ajenas = rows.filter(r => Number(r.id_titular || 0) !== Number(idSeguimiento));
+  if (!ajenas.length) return null;
+  const ops = [...new Set(ajenas.map(r => r.num_op).filter(Boolean))].join(', ');
+  const doc = f.es_boleta ? 'boleta' : 'factura';
+  return `La ${doc} N° ${num} de este dealer ya está registrada en la operación ${ops}. ` +
+    `Una factura = UNA orden de pago por su total: registrada dos veces genera dos ODP por el mismo monto. ` +
+    `Si este documento cubre también esta operación, desmarca acá la etapa FACTURA RECIBIDA y vuelve a guardar la ${doc} en la operación ${ops}: el sistema la replicará al grupo.`;
+}
+
 // Guarda los datos de la factura/boleta de comisión con el desglose CONGELADO
 // (monto, impuesto y líquido a pagar tal como se registraron; la orden no recalcula).
 const _intOrNull = v => (v != null && v !== '') ? Math.round(Number(v)) : null;
 async function guardarFacturaComision(idSeguimiento, f, usuario) {
+  /* Si cambia el DOCUMENTO registrado (otro número u otro tipo), los PDF adjuntos
+     antiguos ya no lo respaldan — y viajarían igual en el correo de la ODP (caso
+     real: BOLETA 105.pdf ajena adjunta en la ODP de la factura 40). Se eliminan
+     con auditoría. Regla del almacén: capturar doc_ruta ANTES del DELETE. */
+  try {
+    const [[prev]] = await pool.query(
+      'SELECT numero_factura, es_boleta FROM postventa_facturas_comision WHERE id_seguimiento=?', [idSeguimiento]);
+    const cambia = prev && (String(prev.numero_factura ?? '') !== String(f.numero_factura ?? '')
+      || !!prev.es_boleta !== !!f.es_boleta);
+    if (cambia) {
+      const [docs] = await pool.query(
+        "SELECT id, nombre, doc_ruta FROM postventa_factura_docs WHERE origen='COMISION' AND ref_id=?", [idSeguimiento]);
+      if (docs.length) {
+        await pool.query('DELETE FROM postventa_factura_docs WHERE id IN (?)', [docs.map(d => d.id)]);
+        const alm = require('../../../../shared/almacen-docs');
+        for (const d of docs) if (d.doc_ruta) await alm.borrar(d.doc_ruta).catch(() => {});
+        auditar({ accion: 'ELIMINAR', modulo: 'postventa', entidad: 'factura_doc', entidad_id: idSeguimiento,
+          detalle: `Documento re-registrado (${prev.es_boleta ? 'boleta' : 'factura'} ${prev.numero_factura || '—'} → ${f.es_boleta ? 'boleta' : 'factura'} ${f.numero_factura || '—'}): se eliminaron ${docs.length} adjunto(s) del documento anterior (${docs.map(d => d.nombre).join(', ')}) — registrado por ${usuario}` });
+      }
+    }
+  } catch (e) { console.error('[guardarFacturaComision limpieza adjuntos]', e.message); }
   return pool.query(
     `INSERT INTO postventa_facturas_comision
        (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura, monto_bruto,
@@ -1367,6 +1414,11 @@ const setEtapa = async (req, res) => {
         if (sg && sg.fecha_otorgado && new Date(sg.fecha_otorgado) >= new Date(ini.toISOString().slice(0, 10)))
           return res.status(400).json({ success: false, data: null, error: 'La cartola incluye operaciones hasta el último día del mes anterior — esta operación se otorgó este mes y entra en la cartola siguiente' });
       }
+      // Anti-duplicación: el mismo documento registrado en otra operación (otro grupo) se rechaza
+      if (track === 'COMISION' && etapa === 'FACTURA RECIBIDA' && req.body.factura) {
+        const dup = await facturaDuplicadaEnOtraOp(Number(req.params.id), req.body.factura);
+        if (dup) return res.status(409).json({ success: false, data: null, error: dup });
+      }
       await pool.query(
         `INSERT INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?,?,?,?)
          ON DUPLICATE KEY UPDATE usuario = VALUES(usuario), fecha = NOW()`,
@@ -2159,6 +2211,8 @@ const updateFacturaComision = async (req, res) => {
       `SELECT 1 ok FROM postventa_etapas WHERE id_seguimiento=? AND track='COMISION' AND etapa='FACTURA RECIBIDA' LIMIT 1`,
       [req.params.id]);
     if (!ex) return res.status(400).json({ success: false, data: null, error: 'La etapa FACTURA RECIBIDA no está marcada' });
+    const dup = await facturaDuplicadaEnOtraOp(Number(req.params.id), f);
+    if (dup) return res.status(409).json({ success: false, data: null, error: dup });
     await guardarFacturaComision(req.params.id, f, usuario);
     res.json({ success: true, data: { id: Number(req.params.id) }, error: null });
   } catch (e) {
