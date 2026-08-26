@@ -21,7 +21,8 @@
       '.af-cr-runner{transition:left 1.6s cubic-bezier(.25,.9,.35,1)}';
     document.head.appendChild(css);
 
-    const corredores = (d.corredores || []).slice(0, 12);
+    // TODOS los carriles (antes se recortaba a 12 y Hans/Sebastián quedaban fuera)
+    const corredores = (d.corredores || []).slice(0, 20);
     const meta = Math.max(1, Number(d.meta) || 1);
     const laneColors = ['#c2410c', '#b45309']; // tartán alternado
     const carril = (c, i) => {

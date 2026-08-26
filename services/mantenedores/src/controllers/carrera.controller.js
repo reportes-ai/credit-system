@@ -91,6 +91,13 @@ const popup = async (req, res) => {
         WHERE estado_credito='OTORGADO' AND DATE_FORMAT(fecha_otorgado,'%Y-%m')=? AND ejecutivo<>'' GROUP BY ejecutivo`, [mesStr]);
     const mapOps = new Map(ops.map(r => [keyEj(r.ejecutivo), { n: Number(r.n), monto: Number(r.monto) }]));
     const meta = Math.max(1, parseInt(cfg.meta_ops || '15', 10));
+    /* Carriles = Ejecutivos Comerciales activos + CUALQUIERA con otorgados del mes
+       aunque tenga otro perfil (caso Damaris, Jefe Comercial con colocaciones):
+       si colocó, corre. */
+    const vistos = new Set(usr.map(u => keyEj(u.nombre)));
+    for (const r of ops) if (r.ejecutivo && !vistos.has(keyEj(r.ejecutivo))) {
+      usr.push({ nombre: r.ejecutivo }); vistos.add(keyEj(r.ejecutivo));
+    }
     const corredores = usr.map(u => {
       const o = mapOps.get(keyEj(u.nombre)) || { n: 0, monto: 0 };
       return { nombre: titulo(u.nombre), ops: o.n, monto: o.monto };
