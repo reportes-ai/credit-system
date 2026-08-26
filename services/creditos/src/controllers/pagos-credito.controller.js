@@ -443,7 +443,7 @@ const createBatch = async (req, res) => {
         `SELECT COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito, COALESCE(cl.rut,'') AS rut_cliente,
                 COALESCE(cl.nombre_completo,'') AS nombre_cliente
          FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
-         WHERE c.id_credito = ?`,
+         WHERE c.id = ?`,
         [id_credito]
       );
       const [trIns] = await conn.query(
@@ -495,7 +495,7 @@ const createBatch = async (req, res) => {
                   COALESCE(cl.rut,'') AS rut_cliente, COALESCE(cl.nombre_completo,'') AS nombre_cliente,
                   cl.email AS email_cliente
              FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
-            WHERE c.id_credito = ?`, [id_credito]);
+            WHERE c.id = ?`, [id_credito]);
         let cajaNombre = null;
         try { const [[cj]] = await pool.query('SELECT nombre FROM cajas WHERE id_caja=?', [idCajaInt]); cajaNombre = cj && cj.nombre; } catch (_) {}
         const pagosMail = pagos.map(p => {
@@ -793,7 +793,7 @@ const reversar = async (req, res) => {
         const [[cred]] = await conn.query(
           `SELECT COALESCE(cl.rut,'') AS rut_cliente, COALESCE(cl.nombre_completo,'') AS nombre_cliente
            FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
-           WHERE c.id_credito = ?`,
+           WHERE c.id = ?`,
           [pago.id_credito]
         );
         const [trIns] = await conn.query(
@@ -865,7 +865,7 @@ const enviarComprobanteTrx = async (req, res) => {
               COALESCE(cl.rut,'') AS rut_cliente, COALESCE(cl.nombre_completo,'') AS nombre_cliente,
               cl.email AS email_cliente
          FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
-        WHERE c.id_credito = ?`, [idCred]);
+        WHERE c.id = ?`, [idCred]);
     let cajaNombre = null;
     try { const [[cj]] = await pool.query('SELECT nombre FROM cajas WHERE id_caja=?', [pagos[0].id_caja]); cajaNombre = cj && cj.nombre; } catch (_) {}
     const r = await require('../../../../shared/comprobante-pago-correo').enviarComprobantePago({
