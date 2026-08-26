@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Diario y Mayor — AutoFácil</title>
-  <!-- v1.1 — pestana Mayor Completo: TODAS las cuentas con saldo inicial, movimientos y saldo final, exportable -->
+  <!-- v1.2 - filtro por defecto: ultimos 3 dias | v1.1 — pestana Mayor Completo: TODAS las cuentas con saldo inicial, movimientos y saldo final, exportable -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -72,7 +72,9 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 const fmt = n => Number(n||0).toLocaleString('es-CL');
 let MODO = 'D';
 const hoy = new Date(); const pad = n=>String(n).padStart(2,'0');
-fDesde.value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-01`;
+// Default: los ÚLTIMOS 3 DÍAS (pedido de Pato 26-08-2026) — lo recién contabilizado a la vista
+const hace3 = new Date(hoy); hace3.setDate(hoy.getDate() - 3);
+fDesde.value = `${hace3.getFullYear()}-${pad(hace3.getMonth()+1)}-${pad(hace3.getDate())}`;
 fHasta.value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-${pad(hoy.getDate())}`;
 
 function tab(m){ MODO=m;
