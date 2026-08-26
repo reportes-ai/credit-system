@@ -135,7 +135,9 @@ function normalizarCuotas(arr) {
 // HTML del comprobante para el correo al cliente. El texto de arriba (intro) es
 // PARAMÉTRICO (plantilla cliente_comprobante_cuota en Correos del Sistema); la
 // tabla de cuotas y la caja del total son estructura fija.
-function comprobanteEmailHTML({ intro, credito, cuotas, trxNum, fechaPago, total, origen }) {
+/* Tabla de cuotas + caja del total (estructura fija del comprobante). La usan el
+   envío real y la Prueba del mantenedor de correos (un solo motor). */
+function tablaComprobanteHTML({ cuotas, total, origen }) {
   const filas = cuotas.map(c => `
     <tr>
       <td style="padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:center">${c.numero_cuota}</td>
@@ -145,12 +147,7 @@ function comprobanteEmailHTML({ intro, credito, cuotas, trxNum, fechaPago, total
       <td style="padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:right">${clp(c.gastos_cobranza)}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:700">${clp(c.total_pagado)}</td>
     </tr>`).join('');
-  const cuerpo = `
-    ${intro || `<p style="margin:0 0 14px">Estimado(a) <strong>${esc(credito.nombre_cliente || 'cliente')}</strong>,</p>
-    <p style="margin:0 0 16px">Confirmamos el pago registrado para su crédito
-       <strong>N° ${esc(credito.numero_credito || credito.id_credito)}</strong>.
-       Comprobante <strong>TRX-${String(trxNum).padStart(6,'0')}</strong> · ${fmtFecha(fechaPago)}.</p>`}
-    <table style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 14px">
+  return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 14px">
       <thead>
         <tr style="background:#f1f5f9;color:#334155">
           <th style="padding:7px 8px;text-align:center">N°</th>
@@ -167,6 +164,18 @@ function comprobanteEmailHTML({ intro, credito, cuotas, trxNum, fechaPago, total
       <span style="font-size:13px;opacity:.85">TOTAL PAGADO${origen ? ' · ' + esc(origen) : ''}</span>
       <span style="font-size:20px;font-weight:800">${clp(total)}</span>
     </div>`;
+}
+
+// HTML del comprobante para el correo al cliente. El texto de arriba (intro) es
+// PARAMÉTRICO (plantilla cliente_comprobante_cuota en Correos del Sistema); la
+// tabla de cuotas y la caja del total son estructura fija.
+function comprobanteEmailHTML({ intro, credito, cuotas, trxNum, fechaPago, total, origen }) {
+  const cuerpo = `
+    ${intro || `<p style="margin:0 0 14px">Estimado(a) <strong>${esc(credito.nombre_cliente || 'cliente')}</strong>,</p>
+    <p style="margin:0 0 16px">Confirmamos el pago registrado para su crédito
+       <strong>N° ${esc(credito.numero_credito || credito.id_credito)}</strong>.
+       Comprobante <strong>TRX-${String(trxNum).padStart(6,'0')}</strong> · ${fmtFecha(fechaPago)}.</p>`}
+    ${tablaComprobanteHTML({ cuotas, total, origen })}`;
   return envolverHTML(cuerpo);
 }
 
@@ -462,4 +471,4 @@ const anular = async (req, res) => {
   } catch (e) { console.error('[odp anular]', e.message); bad(res, 'Error interno del servidor', 500); }
 };
 
-module.exports = { emitir, listar, mias, getById, aprobar, rechazar, anular };
+module.exports = { emitir, listar, mias, getById, aprobar, rechazar, anular, tablaComprobanteHTML };

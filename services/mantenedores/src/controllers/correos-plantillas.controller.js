@@ -72,7 +72,28 @@ const prueba = async (req, res) => {
       QUIEN: req.usuario ? [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') : 'Sistema',
       dealer: 'AUTOMOTORA DE PRUEBA SPA', mes: 'julio 2026', total: '$1.234.567',
       doc: 'factura', numero_factura: '12345', tipo_cuenta: 'cuenta corriente',
-      num_cuenta: '00-123-45678-9', banco: 'BANCO DE CHILE', ops: '26080001, 26080002' };
+      num_cuenta: '00-123-45678-9', banco: 'BANCO DE CHILE', ops: '26080001, 26080002',
+      // Comprobante de cuotas al cliente
+      cliente: 'CLIENTE DE PRUEBA GONZÁLEZ', num_credito: '26080001', trx: 'TRX-000123',
+      fecha: new Date().toLocaleDateString('es-CL'), origen: 'Transferencia', n_cuotas: 2 };
+
+    /* Comprobante de cuotas: la tabla y la caja del total son estructura fija que
+       se agrega DESPUÉS del texto en el envío real — la prueba la incluye con
+       cuotas de ejemplo para ver el correo completo (mismo motor del envío). */
+    let extraHTML = '';
+    if (codigo === 'cliente_comprobante_cuota') {
+      try {
+        const { tablaComprobanteHTML } = require('../../../cobranza/src/controllers/odp-cuotas.controller');
+        extraHTML = tablaComprobanteHTML({
+          cuotas: [
+            { numero_cuota: 7, fecha_vencimiento: '2026-07-05', monto_cuota: 250000, interes_mora: 3450, gastos_cobranza: 12000, total_pagado: 265450 },
+            { numero_cuota: 8, fecha_vencimiento: '2026-08-05', monto_cuota: 250000, interes_mora: 0, gastos_cobranza: 0, total_pagado: 250000 },
+          ],
+          total: 515450, origen: 'Transferencia',
+        });
+        EJEMPLO.total = '$515.450'; EJEMPLO.n_cuotas = 2;
+      } catch (e) { console.error('[correos prueba tabla]', e.message); }
+    }
 
     const { enviarCorreo, mailConfigurado, envolverHTML } = require('../../../../shared/mailer');
     if (!mailConfigurado()) return res.status(400).json({ success: false, data: null, error: 'El correo del sistema no está configurado' });
@@ -84,7 +105,7 @@ const prueba = async (req, res) => {
         '<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px;margin-bottom:14px;font-size:.85rem;color:#9a3412">' +
         '<b>Correo de PRUEBA</b> — datos de ejemplo. El envío real usa los datos de la operación y va a sus destinatarios.</div>' +
         // aHTML: respeta los saltos de línea del texto plano, igual que el envío real
-        plantillas.aHTML(plantillas.render(p.cuerpo, EJEMPLO))),
+        plantillas.aHTML(plantillas.render(p.cuerpo, EJEMPLO)) + extraHTML),
     });
     auditar({ req, accion: 'ENVIAR', modulo: 'mantenedores', entidad: 'correo_plantilla',
       detalle: `Envió prueba del correo "${p.nombre}" (${codigo}) a ${email}` });
