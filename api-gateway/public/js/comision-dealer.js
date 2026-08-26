@@ -43,9 +43,27 @@
     return v('dealer_calle_pct_99', (p.dealer_pct_99 || 0) + (p.patio_pct || 0));
   }
 
-  // Tabla pactada del dealer (su % por tramo). Manda sobre la pizarra. Si la op es en
-  // PARQUE y el dealer tiene tabla parque (com_parque_*), usa esa; si no, la de CALLE.
-  function dealerTablePct(d, plazo, esParque) {
+  const normUbic = u => String(u || '').toUpperCase().trim();
+
+  // Tabla pactada POR UBICACIÓN (dealer_comisiones): un dealer puede tener local en
+  // varios parques + calle, cada uno con su tabla. Se elige la fila del local donde
+  // cursó ESA operación ('CALLE' o el nombre del parque de la op). Sin fila → se cae
+  // a las columnas legacy de `dealers` (com_*/com_parque_*) y de ahí a la pizarra.
+  function tablaDeUbicacion(tablas, ubicacion, esParque) {
+    if (!Array.isArray(tablas) || !tablas.length) return null;
+    const key = esParque ? normUbic(ubicacion) : 'CALLE';
+    if (!key) return null;
+    return tablas.find(t => normUbic(t.ubicacion) === key) || null;
+  }
+
+  // Tabla pactada del dealer (su % por tramo). Manda sobre la pizarra. Precedencia:
+  // fila de la UBICACIÓN (dealer_comisiones) > legacy com_parque_* (si es parque) >
+  // legacy com_* (calle) > null (pizarra).
+  function dealerTablePct(d, plazo, esParque, ubicRow) {
+    if (ubicRow) {
+      const uv = plazo <= 12 ? ubicRow.com_6_12 : plazo <= 24 ? ubicRow.com_13_24 : plazo <= 36 ? ubicRow.com_25_36 : ubicRow.com_37;
+      if (uv != null && uv !== '') return Number(uv) / 100;
+    }
     if (!d) return null;
     if (esParque) {
       const pv = plazo <= 12 ? d.com_parque_6_12 : plazo <= 24 ? d.com_parque_13_24 : plazo <= 36 ? d.com_parque_25_36 : d.com_parque_37;
@@ -56,18 +74,21 @@
   }
 
   /**
-   * comisionDealer({ saldo, plazo, esParque }, { dealerTabla, parqData, pizarra })
-   *   dealerTabla = fila de `dealers` del dealer (o null) — su tabla pactada
-   *   parqData    = fila de `parques_comisiones` del parque (o null) — comision_pct + arriendo
-   *   pizarra     = objeto parametros_credito
+   * comisionDealer({ saldo, plazo, esParque, ubicacion }, { dealerTabla, dealerUbicaciones, parqData, pizarra })
+   *   ubicacion         = local donde cursó la op: nombre del parque o 'CALLE' (opcional)
+   *   dealerTabla       = fila de `dealers` del dealer (o null) — su tabla pactada legacy
+   *   dealerUbicaciones = filas de `dealer_comisiones` del dealer (o null) — tabla por local
+   *   parqData          = fila de `parques_comisiones` del parque (o null) — comision_pct + arriendo
+   *   pizarra           = objeto parametros_credito
    * → { comdea_real, com_parque, arriendo, base_pct }
    */
-  function comisionDealer({ saldo, plazo, esParque }, { dealerTabla, parqData, pizarra }) {
+  function comisionDealer({ saldo, plazo, esParque, ubicacion }, { dealerTabla, dealerUbicaciones, parqData, pizarra }) {
     const s  = parseFloat(saldo) || 0;
     const pl = parseInt(plazo)   || 0;
     let comdea_real = 0, com_parque = 0, arriendo = 0, base_pct = 0;
     if (s > 0 && pl > 0) {
-      const dPct = dealerTablePct(dealerTabla, pl, esParque);
+      const ubicRow = tablaDeUbicacion(dealerUbicaciones, ubicacion, esParque);
+      const dPct = dealerTablePct(dealerTabla, pl, esParque, ubicRow);
       base_pct = esParque
         ? (dPct != null ? dPct : pizarraParque(pl, pizarra))
         : (dPct != null ? dPct : pizarraCalle(pl, pizarra));
@@ -84,5 +105,5 @@
     return { comdea_real, com_parque, arriendo, base_pct };
   }
 
-  return { comisionDealer, dealerTablePct, normRutD, pizarraParque, pizarraCalle };
+  return { comisionDealer, dealerTablePct, tablaDeUbicacion, normRutD, pizarraParque, pizarraCalle };
 });

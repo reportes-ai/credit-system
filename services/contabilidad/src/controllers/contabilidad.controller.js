@@ -13,7 +13,7 @@
 const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
-const { hoyISO, isoDe } = require('../../../../shared/fecha-chile');
+const { hoyISO, isoDe, desdeISO } = require('../../../../shared/fecha-chile');
 require('../motor-asientos'); // Fase 2: carga el motor (migra reglas + log al boot)
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
@@ -2987,13 +2987,14 @@ exports.dashboardCtb = async (req, res) => {
       const r2 = { status() { return this; }, json(j) { j.success ? resolve(j.data) : reject(new Error(j.error)); } };
       fn({ query, params: {}, body: {}, user: req.user }, r2).catch(reject);
     });
-    const hoyISO = new Date().toISOString().slice(0, 10);
+    const hoyStr = hoyISO();   // día de Chile, no UTC (guard fecha-chile)
     const iniMes = mesActual + '-01', iniAnio = mesActual.slice(0, 4) + '-01-01';
-    const finMesAnt = new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().slice(0, 10);
+    const dFin = desdeISO(iniMes); dFin.setDate(0);   // último día del mes anterior
+    const finMesAnt = isoDe(dFin);
     const [bal, eerrMes, eerrAnio, eerrMesAnt] = await Promise.all([
-      interno(exports.balanceGeneral, { hasta: hoyISO }),
-      interno(exports.estadoResultados, { desde: iniMes, hasta: hoyISO }),
-      interno(exports.estadoResultados, { desde: iniAnio, hasta: hoyISO }),
+      interno(exports.balanceGeneral, { hasta: hoyStr }),
+      interno(exports.estadoResultados, { desde: iniMes, hasta: hoyStr }),
+      interno(exports.estadoResultados, { desde: iniAnio, hasta: hoyStr }),
       interno(exports.estadoResultados, { desde: mesAnt + '-01', hasta: finMesAnt }),
     ]);
     // Caja y bancos = cuentas de disponible (grupo 1101 del plan AVSOFT)
@@ -3006,7 +3007,7 @@ exports.dashboardCtb = async (req, res) => {
       caja_bancos: { total: disponibles.reduce((s, x) => s + Number(x.saldo), 0),
         cuentas: disponibles.sort((a, b) => b.saldo - a.saldo).slice(0, 8) },
       balance: { activo: bal.tot.activo, pasivo: bal.tot.pasivo, patrimonio: bal.tot.patrimonio,
-        resultado_ejercicio: bal.resultado_ejercicio, cuadre: bal.cuadre, al: hoyISO },
+        resultado_ejercicio: bal.resultado_ejercicio, cuadre: bal.cuadre, al: hoyStr },
       indices: {
         razon_corriente: pcirc ? +(acirc / pcirc).toFixed(2) : null,
         capital_trabajo: acirc - pcirc,

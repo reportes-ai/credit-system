@@ -19,7 +19,7 @@ exports.tabla = async (req, res) => {
     const [pr] = await pool.query('SELECT clave, valor FROM parametros_credito');
     const pizarra = {}; pr.forEach(r => pizarra[r.clave] = parseFloat(r.valor));
 
-    let dealerTabla = null;
+    let dealerTabla = null, dealerUbics = null;
     if (rut) {
       try {
         const [dr] = await pool.query(
@@ -27,10 +27,20 @@ exports.tabla = async (req, res) => {
           [normRutD(rut)]);
         dealerTabla = dr[0] || null;
       } catch (e) { dealerTabla = null; }
+      // Tablas POR UBICACIÓN (multi-parque + calle): con ?ubicacion= la columna
+      // "parque" del resultado usa la tabla de ESE local; sin el parámetro, legacy.
+      try {
+        [dealerUbics] = await pool.query(
+          `SELECT dc.ubicacion, dc.com_6_12, dc.com_13_24, dc.com_25_36, dc.com_37
+             FROM dealer_comisiones dc JOIN dealers d ON d.id_dealer = dc.id_dealer
+            WHERE UPPER(REPLACE(REPLACE(REPLACE(d.rut,'.',''),'-',''),' ','')) = ?`, [normRutD(rut)]);
+      } catch (e) { dealerUbics = null; }
     }
 
+    const ubic = String(req.query.ubicacion || '').toUpperCase().trim();
     const factor = (plazo, esParque) =>
-      comisionDealer({ saldo: 1, plazo, esParque }, { dealerTabla, parqData: null, pizarra }).base_pct;
+      comisionDealer({ saldo: 1, plazo, esParque, ubicacion: esParque ? ubic : 'CALLE' },
+        { dealerTabla, dealerUbicaciones: dealerUbics, parqData: null, pizarra }).base_pct;
 
     const tabla = TRAMOS.map(t => ({
       desde:  t.desde,
@@ -39,7 +49,7 @@ exports.tabla = async (req, res) => {
       calle:  factor(t.plazo, false),
     }));
 
-    return res.json({ success: true, data: { tabla, tiene_tabla_propia: !!dealerTabla }, error: null });
+    return res.json({ success: true, data: { tabla, tiene_tabla_propia: !!dealerTabla, ubicaciones: (dealerUbics || []).map(u => u.ubicacion) }, error: null });
   } catch (e) {
     console.error('[comision-dealer tabla]', e.message);
     return res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });

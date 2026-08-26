@@ -70,6 +70,20 @@ async function calcularOperacion(op) {
     } catch (e) { dealerCom = null; }   // columnas aún no creadas → cae a la pizarra
   }
 
+  // Tablas POR UBICACIÓN (dealer_comisiones): un dealer puede tener local en varios
+  // parques + calle, cada uno con su % pactado. La fila del local de la op manda;
+  // sin fila se cae a la tabla legacy de arriba y de ahí a la pizarra.
+  let dealerUbics = null;
+  if (op.rut_dealer) {
+    try {
+      [dealerUbics] = await pool.query(
+        `SELECT dc.ubicacion, dc.com_6_12, dc.com_13_24, dc.com_25_36, dc.com_37
+           FROM dealer_comisiones dc JOIN dealers d ON d.id_dealer = dc.id_dealer
+          WHERE UPPER(REPLACE(REPLACE(REPLACE(d.rut,'.',''),'-',''),' ','')) = ?`,
+        [normRutD(op.rut_dealer)]);
+    } catch (e) { dealerUbics = null; }  // tabla aún no creada → legacy
+  }
+
   const saldo_precio  = parseFloat(op.saldo_precio)    || 0;
   const monto_fin     = parseFloat(op.monto_financiado)   || 0;
   const monto_cap     = parseFloat(op.monto_capitalizado) || monto_fin; // AutoFin usa capitalizado
@@ -143,7 +157,8 @@ async function calcularOperacion(op) {
         parqData = pr[0] || null;
       } catch (e) { /* sin tabla → el motor cae a patio_pct */ }
     }
-    const cd = comisionDealer({ saldo: saldo_precio, plazo, esParque }, { dealerTabla: dealerCom, parqData, pizarra: p });
+    const cd = comisionDealer({ saldo: saldo_precio, plazo, esParque, ubicacion: parqueVal },
+      { dealerTabla: dealerCom, dealerUbicaciones: dealerUbics, parqData, pizarra: p });
     comdea_real          = cd.comdea_real;
     com_parque_calc      = cd.com_parque;
     arriendo_parque_calc = cd.arriendo;

@@ -43,6 +43,88 @@ require('../../../../shared/migrate').enFila('dealers', async () => {
   for (const c of cols) { try { await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS ${c} NULL`); } catch (e) {} }
 });
 
+/* ── Locales del dealer: multi-parque + calle (v218.0) ────────────────────────
+   Un dealer (identidad única = RUT) puede operar en VARIOS locales: N parques y/o
+   calle. Decisión Pato 26-08-2026: las comisiones se pactan POR UBICACIÓN
+   (cada parque su tabla + calle la suya) y la cartola sigue siendo UNA por dealer.
+   - dealer_locales    : catálogo de locales (ubicacion = 'CALLE' o nombre del parque)
+   - dealer_comisiones : tabla pactada por (id_dealer, ubicacion) — la lee el MOTOR
+     comision-dealer.js con fallback a las columnas legacy com_ / com_parque_ de dealers.
+   Las columnas históricas de `dealers` (ccs_parque, direccion y comisiones) quedan como
+   ESPEJO del local principal (espejarDealerDesdeLocales) mientras las pantallas que
+   las leen se migran — el espejo mantiene cartas/mapa/visitas funcionando igual. */
+require('../../../../shared/migrate').enFila('dealer-locales', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS dealer_locales (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id_dealer INT NOT NULL,
+    ubicacion VARCHAR(150) NOT NULL,
+    id_parque INT NULL,
+    direccion VARCHAR(300) NULL,
+    comuna VARCHAR(120) NULL,
+    lat DECIMAL(10,7) NULL, lng DECIMAL(10,7) NULL,
+    es_principal TINYINT(1) DEFAULT 0,
+    activo TINYINT(1) DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_dealer_ubic (id_dealer, ubicacion),
+    KEY idx_dealer (id_dealer)
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS dealer_comisiones (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id_dealer BIGINT NOT NULL,
+    ubicacion VARCHAR(150) NOT NULL,
+    com_6_12 DECIMAL(5,2) NULL, com_13_24 DECIMAL(5,2) NULL,
+    com_25_36 DECIMAL(5,2) NULL, com_37 DECIMAL(5,2) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_dealer_ubic (id_dealer, ubicacion),
+    KEY idx_id_dealer (id_dealer)
+  )`);
+});
+// Seed una-vez desde las columnas planas de dealers (fiel a scripts/migracion-dealer-comisiones.js):
+// ccs_parque → local PARQUE (con dirección/coords de parque) · calle → local CALLE ·
+// com_* → tabla 'CALLE' · com_parque_* → tabla del parque de la ficha.
+require('../../../../shared/migrate').migrar('dealer-locales-seed-v1', async () => {
+  let idParque = new Map();
+  try {
+    const [parqs] = await pool.query('SELECT id, UPPER(TRIM(nombre)) nom FROM parques_comisiones');
+    idParque = new Map(parqs.map(p => [p.nom, p.id]));
+  } catch (e) { /* sin mantenedor de parques aún */ }
+  const [ds] = await pool.query(
+    `SELECT id_dealer, ccs_parque, tipo_ficha, direccion, comuna, lat, lng,
+            direccion_parque, comuna_parque, lat_parque, lng_parque,
+            com_6_12, com_13_24, com_25_36, com_37,
+            com_parque_6_12, com_parque_13_24, com_parque_25_36, com_parque_37
+       FROM dealers`);
+  const hay = a => a.some(v => v != null && v !== '');
+  for (const d of ds) {
+    const ccs = String(d.ccs_parque || '').toUpperCase().trim();
+    const esParque = !!ccs && ccs !== 'CALLE' && ccs !== 'PARTICULAR';
+    if (esParque)
+      await pool.query(
+        `INSERT IGNORE INTO dealer_locales (id_dealer, ubicacion, id_parque, direccion, comuna, lat, lng, es_principal)
+         VALUES (?,?,?,?,?,?,?,1)`,
+        [d.id_dealer, ccs, idParque.get(ccs) || null, d.direccion_parque, d.comuna_parque, d.lat_parque, d.lng_parque]);
+    const esAmbos = String(d.tipo_ficha || '').toUpperCase() === 'AMBOS';
+    if (!esParque || esAmbos)
+      await pool.query(
+        `INSERT IGNORE INTO dealer_locales (id_dealer, ubicacion, direccion, comuna, lat, lng, es_principal)
+         VALUES (?,?,?,?,?,?,?)`,
+        [d.id_dealer, 'CALLE', d.direccion, d.comuna, d.lat, d.lng, esParque ? 0 : 1]);
+    if (hay([d.com_6_12, d.com_13_24, d.com_25_36, d.com_37]))
+      await pool.query(
+        `INSERT IGNORE INTO dealer_comisiones (id_dealer, ubicacion, com_6_12, com_13_24, com_25_36, com_37)
+         VALUES (?,'CALLE',?,?,?,?)`,
+        [d.id_dealer, d.com_6_12, d.com_13_24, d.com_25_36, d.com_37]);
+    if (hay([d.com_parque_6_12, d.com_parque_13_24, d.com_parque_25_36, d.com_parque_37]))
+      await pool.query(
+        `INSERT IGNORE INTO dealer_comisiones (id_dealer, ubicacion, com_6_12, com_13_24, com_25_36, com_37)
+         VALUES (?,?,?,?,?,?)`,
+        [d.id_dealer, esParque ? ccs : 'PARQUE', d.com_parque_6_12, d.com_parque_13_24, d.com_parque_25_36, d.com_parque_37]);
+  }
+  console.log(`[dealer-locales] seed: ${ds.length} dealers procesados`);
+});
+
 /* ── Permisos por pestaña del módulo Dealers (v216.7) ─────────────────────────
    Hasta acá "entrar a Dealers" (mantenedores_dealers) daba las tres pestañas
    completas. Ahora cada una tiene su par ver/editar, para poder abrir la Base a
@@ -417,4 +499,108 @@ const setDireccion = async (req, res) => {
   } catch (e) { console.error('[setDireccion]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getDealers, getDealer, getCcsList, importar, createDealer, updateDealer, deleteDealer, getMapa, geocodificar, getDirecciones, setDireccion };
+/* ── Locales y comisiones por ubicación (v218.0) ─────────────────────────────
+   Fuente única nueva: dealer_locales + dealer_comisiones. Las columnas planas de
+   `dealers` se mantienen como ESPEJO del local principal para las pantallas legacy. */
+const normUbicSrv = u => String(u || '').toUpperCase().trim();
+
+async function espejarDealerDesdeLocales(idDealer) {
+  const [locs] = await pool.query('SELECT * FROM dealer_locales WHERE id_dealer=? AND activo=1', [idDealer]);
+  const parques = locs.filter(l => normUbicSrv(l.ubicacion) !== 'CALLE');
+  const calle   = locs.find(l => normUbicSrv(l.ubicacion) === 'CALLE') || null;
+  const prin    = parques.find(l => l.es_principal) || parques[0] || null;
+  const sets = [], vals = [];
+  if (prin) {
+    sets.push('ccs_parque=?', 'direccion_parque=?', 'comuna_parque=?', 'lat_parque=?', 'lng_parque=?');
+    vals.push(prin.ubicacion, prin.direccion, prin.comuna, prin.lat, prin.lng);
+  } else if (calle) { sets.push('ccs_parque=?'); vals.push('CALLE'); }
+  if (calle && calle.direccion) {
+    sets.push('direccion=?', 'comuna=?'); vals.push(calle.direccion, calle.comuna);
+    if (calle.lat != null) { sets.push('lat=?', 'lng=?'); vals.push(calle.lat, calle.lng); }
+  }
+  // AMBOS solo se afirma (parque+calle); con un solo tipo se respeta lo que diga la ficha.
+  if (prin && calle) sets.push("tipo_ficha='AMBOS'");
+  const [coms] = await pool.query('SELECT * FROM dealer_comisiones WHERE id_dealer=?', [idDealer]);
+  const cCalle = coms.find(c => normUbicSrv(c.ubicacion) === 'CALLE');
+  const cPrin  = prin ? coms.find(c => normUbicSrv(c.ubicacion) === normUbicSrv(prin.ubicacion)) : null;
+  if (cCalle) { sets.push('com_6_12=?', 'com_13_24=?', 'com_25_36=?', 'com_37=?'); vals.push(cCalle.com_6_12, cCalle.com_13_24, cCalle.com_25_36, cCalle.com_37); }
+  if (cPrin)  { sets.push('com_parque_6_12=?', 'com_parque_13_24=?', 'com_parque_25_36=?', 'com_parque_37=?'); vals.push(cPrin.com_6_12, cPrin.com_13_24, cPrin.com_25_36, cPrin.com_37); }
+  if (sets.length) await pool.query(`UPDATE dealers SET ${sets.join(', ')} WHERE id_dealer=?`, [...vals, idDealer]);
+}
+
+// GET /api/dealers/:id/locales → locales + su tabla pactada por ubicación
+const getLocales = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const [locs] = await pool.query(
+      'SELECT * FROM dealer_locales WHERE id_dealer=? ORDER BY activo DESC, es_principal DESC, ubicacion', [id]);
+    const [coms] = await pool.query(
+      'SELECT ubicacion, com_6_12, com_13_24, com_25_36, com_37 FROM dealer_comisiones WHERE id_dealer=?', [id]);
+    const comDe = {}; coms.forEach(c => { comDe[normUbicSrv(c.ubicacion)] = c; });
+    locs.forEach(l => { l.comisiones = comDe[normUbicSrv(l.ubicacion)] || null; });
+    // Tablas pactadas sin local asociado (ej. fila genérica 'PARQUE' del seed): visibles igual
+    const sinLocal = coms.filter(c => !locs.some(l => normUbicSrv(l.ubicacion) === normUbicSrv(c.ubicacion)));
+    res.json({ success: true, data: { locales: locs, comisiones_sin_local: sinLocal }, error: null });
+  } catch (e) { console.error('[getLocales]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+// POST /api/dealers/:id/locales — crea/actualiza el local (llave id_dealer+ubicacion)
+// y su tabla de comisión. body: { ubicacion, direccion, comuna, es_principal, activo, com_6_12..com_37 }
+const saveLocal = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const b = req.body || {};
+    const ubic = normUbicSrv(b.ubicacion);
+    if (!id || !ubic) return res.status(400).json({ success: false, data: null, error: 'Falta la ubicación del local' });
+    let idParque = null;
+    if (ubic !== 'CALLE') {
+      // La ubicación parque debe existir en el mantenedor (llave de facto contra creditos.parque)
+      const [[pq]] = await pool.query('SELECT id FROM parques_comisiones WHERE UPPER(TRIM(nombre))=? LIMIT 1', [ubic]);
+      if (!pq) return res.status(400).json({ success: false, data: null, error: `"${ubic}" no es un parque del mantenedor Arriendos y Comisiones (o escribe CALLE)` });
+      idParque = pq.id;
+    }
+    const [[dl]] = await pool.query('SELECT id_dealer, nombre_razon, nombre_indexa, rut FROM dealers WHERE id_dealer=?', [id]);
+    if (!dl) return res.status(404).json({ success: false, data: null, error: 'Dealer no encontrado' });
+    await pool.query(
+      `INSERT INTO dealer_locales (id_dealer, ubicacion, id_parque, direccion, comuna, es_principal, activo)
+       VALUES (?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE id_parque=VALUES(id_parque), direccion=VALUES(direccion), comuna=VALUES(comuna),
+         es_principal=VALUES(es_principal), activo=VALUES(activo)`,
+      [id, ubic, idParque, String(b.direccion || '').trim() || null, String(b.comuna || '').trim() || null,
+       b.es_principal ? 1 : 0, b.activo === 0 || b.activo === false ? 0 : 1]);
+    // Un solo principal entre los locales PARQUE (es el que se espeja a ccs_parque)
+    if (b.es_principal && ubic !== 'CALLE')
+      await pool.query("UPDATE dealer_locales SET es_principal=0 WHERE id_dealer=? AND ubicacion<>? AND UPPER(ubicacion)<>'CALLE'", [id, ubic]);
+    // Tabla pactada de la ubicación (si el cuerpo trae algún tramo, se escriben los 4 tal cual)
+    const T = ['com_6_12', 'com_13_24', 'com_25_36', 'com_37'];
+    if (T.some(k => b[k] !== undefined)) {
+      const pct = k => { const v = b[k]; return (v === '' || v == null) ? null : Number(v); };
+      if (T.some(k => pct(k) != null && (isNaN(pct(k)) || pct(k) < 0 || pct(k) > 99)))
+        return res.status(400).json({ success: false, data: null, error: 'Comisión inválida: cada tramo debe ser un % entre 0 y 99' });
+      await pool.query(
+        `INSERT INTO dealer_comisiones (id_dealer, ubicacion, com_6_12, com_13_24, com_25_36, com_37)
+         VALUES (?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE com_6_12=VALUES(com_6_12), com_13_24=VALUES(com_13_24), com_25_36=VALUES(com_25_36), com_37=VALUES(com_37)`,
+        [id, ubic, pct('com_6_12'), pct('com_13_24'), pct('com_25_36'), pct('com_37')]);
+    }
+    await espejarDealerDesdeLocales(id);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: id, rut: dl.rut,
+      detalle: `Guardó el local ${ubic} del dealer ${dl.nombre_razon || dl.nombre_indexa || '#' + id}${T.some(k => b[k] !== undefined) ? ' (incluye tabla de comisión)' : ''}`, meta: b });
+    res.json({ success: true, data: { id_dealer: id, ubicacion: ubic }, error: null });
+  } catch (e) { console.error('[saveLocal]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+// DELETE /api/dealers/:id/locales/:idLocal — desactiva (nunca borra: las ops históricas lo referencian)
+const deleteLocal = async (req, res) => {
+  try {
+    const { id, idLocal } = req.params;
+    const [[l]] = await pool.query('SELECT ubicacion FROM dealer_locales WHERE id=? AND id_dealer=?', [idLocal, id]);
+    if (!l) return res.status(404).json({ success: false, data: null, error: 'Local no encontrado' });
+    await pool.query('UPDATE dealer_locales SET activo=0, es_principal=0 WHERE id=?', [idLocal]);
+    await espejarDealerDesdeLocales(parseInt(id));
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: id, detalle: `Desactivó el local ${l.ubicacion} del dealer #${id}` });
+    res.json({ success: true, data: { ubicacion: l.ubicacion }, error: null });
+  } catch (e) { console.error('[deleteLocal]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getDealers, getDealer, getCcsList, importar, createDealer, updateDealer, deleteDealer, getMapa, geocodificar, getDirecciones, setDireccion, getLocales, saveLocal, deleteLocal };

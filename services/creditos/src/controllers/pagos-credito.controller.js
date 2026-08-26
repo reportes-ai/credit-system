@@ -522,7 +522,7 @@ const createBatch = async (req, res) => {
           const f = fullMap.get(Number(p.numero_cuota));
           return {
             numero_cuota: p.numero_cuota, fecha_vencimiento: p.fecha_vencimiento,
-            fecha_pago: fecha_pago || new Date().toISOString().slice(0, 10),
+            fecha_pago: fecha_pago || hoyChile(),   // día de Chile, no UTC (guard fecha-chile)
             monto_cuota: parseFloat(p.monto_cuota) || 0,
             interes_mora: parseFloat(p.interes_mora) || 0,
             gastos_cobranza: parseFloat(p.gastos_cobranza) || 0,

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v1.2 — permisos por pestana: ver/editar independientes para Base, Categoria y Potencial -->
+  <!-- v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -313,7 +313,8 @@
   <div style="font-weight:700;color:#0141A2;margin-bottom:8px"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
   <ul style="margin:0;padding-left:20px;font-size:0.88rem;color:#475569;line-height:1.9">
     <li><b>Datos del dealer</b> (nombre, RUT, dirección, contacto, cuenta bancaria) → es la <b>fuente única</b>: los lee la carta de aprobación, la cartola de comisiones, la orden de pago al dealer y el <a href="/mantenedores/dealers-mapa/">Mapa de Dealers</a>.</li>
-    <li><b>Comisión pactada</b> (calle y parque) → alimenta el cálculo de comisión de cada operación. Solo se cambia por <a href="/dealers-incorporacion/">ficha aprobada</a>, nunca a mano acá.</li>
+    <li><b>Comisión pactada</b> (calle y parque) → alimenta el cálculo de comisión de cada operación. La tabla base se fija por <a href="/dealers-incorporacion/">ficha aprobada</a>.</li>
+    <li><b>Locales del dealer</b> (multi-parque + calle) → cada local tiene su tabla de comisión propia (<code>dealer_comisiones</code>); el motor cobra por el local donde cursó <b>cada operación</b> (columna PARQUE de la op). Afecta el cálculo de comisión dealer al guardar y en el <b>recálculo mensual</b>, la comisión sugerida de la <a href="/cartas-aprobacion/">carta de aprobación</a> y la <a href="/postventa/cartolas-parque/">cartola del parque</a> correspondiente. Calle no paga parque (por eso su % es más alto).</li>
     <li><b>Activo / Inactivo</b> → marca al dealer sin ventas hace 3 meses. <b>No bloquea</b> cursar operaciones: es un indicador comercial.</li>
     <li><b>Categoría asignada</b> → define la pizarra de comisión por defecto y los informes comerciales. Rangos y colores en <a href="/mantenedores/dealer-categorias/">Variables de categorías</a>.</li>
     <li><b>Posiciones y ventas mensuales</b> (pestaña Potencial) → alimentan el <b>potencial de crecimiento</b> por parque y dealer. Factor y rangos de diagnóstico en <a href="/mantenedores/potencial-dealer/">Variables del cálculo</a>.</li>
@@ -422,6 +423,35 @@
     </div>
   </div>
 </div>
+
+<!-- DIALOG LOCAL (multi-parque + calle) -->
+<dialog id="dlgLocal" style="border:none;border-radius:14px;padding:0;width:min(480px,94vw);box-shadow:0 10px 40px rgba(2,6,23,.25)">
+  <div style="background:#0141A2;color:#fff;padding:12px 18px;font-weight:700"><i class="bi bi-geo-alt me-2"></i><span id="locTitulo">Local</span></div>
+  <div style="padding:16px 18px">
+    <label class="form-label" style="font-size:.8rem">Ubicación (CALLE o parque del mantenedor)</label>
+    <select class="form-select form-select-sm" id="locUbic"></select>
+    <div class="row g-2" style="margin-top:2px">
+      <div class="col-8"><label class="form-label" style="font-size:.8rem">Dirección</label><input class="form-control form-control-sm" id="locDir"></div>
+      <div class="col-4"><label class="form-label" style="font-size:.8rem">Comuna</label><input class="form-control form-control-sm" id="locComuna"></div>
+    </div>
+    <div style="display:flex;gap:18px;margin-top:10px;font-size:.82rem">
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="locPrincipal"> Local principal</label>
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="locActivo"> Activo</label>
+    </div>
+    <div style="font-weight:700;font-size:.74rem;color:#0141A2;text-transform:uppercase;letter-spacing:.4px;margin:14px 0 4px">Comisión pactada de este local (%)</div>
+    <div class="row g-2">
+      <div class="col-3"><label class="form-label" style="font-size:.72rem">6–12</label><input type="number" step="0.01" min="0" max="99" class="form-control form-control-sm" id="loc_com_6_12"></div>
+      <div class="col-3"><label class="form-label" style="font-size:.72rem">13–24</label><input type="number" step="0.01" min="0" max="99" class="form-control form-control-sm" id="loc_com_13_24"></div>
+      <div class="col-3"><label class="form-label" style="font-size:.72rem">25–36</label><input type="number" step="0.01" min="0" max="99" class="form-control form-control-sm" id="loc_com_25_36"></div>
+      <div class="col-3"><label class="form-label" style="font-size:.72rem">37 y +</label><input type="number" step="0.01" min="0" max="99" class="form-control form-control-sm" id="loc_com_37"></div>
+    </div>
+    <div style="font-size:.7rem;color:#64748b;margin-top:6px">Vacío = sin tabla propia en ese tramo (usa la pizarra por defecto). Cambios auditados.</div>
+  </div>
+  <div style="padding:10px 18px;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('dlgLocal').close()">Cancelar</button>
+    <button class="btn btn-sm btn-primary" id="btnLocGuardar" onclick="guardarLocal()"><i class="bi bi-floppy me-1"></i>Guardar local</button>
+  </div>
+</dialog>
 
 <!-- MODAL IMPORTAR -->
 <div class="modal fade" id="modalImportar" tabindex="-1">
@@ -942,14 +972,104 @@ function verDealer(d) {
     ['Banco',             fmt(d.banco)],
     ['Cuenta',            [d.cuenta_tipo, d.tipo_cuenta, d.nombre_cuenta].filter(Boolean).map(fmt).join(' · ') || '—'],
     ['Comisión pactada',  comTablaDealer(d)],
+    ['Locales y comisión por local', '<div id="detLocales" style="color:#94a3b8;font-size:.85rem"><i class="bi bi-hourglass-split me-1"></i>Cargando locales…</div>'],
     ['Activo Último Año', d.activo ? 'SI' : 'NO'],
     ['¿Tiene Factura?',   d.tiene_factura ? 'SI' : 'NO'],
     ['Observaciones',     fmt(d.observaciones)],
   ].map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
   const be = document.getElementById('btnDetEditar'); if (be) be.style.display = puedeEditarDealer ? '' : 'none';
   document.getElementById('detFicha').innerHTML = '<div style="color:#94a3b8;font-size:.85rem"><i class="bi bi-hourglass-split me-1"></i>Cargando ficha de incorporación…</div>';
+  cargarLocales(d.id_dealer);
   cargarFichaDealer(d.id_dealer);
   new bootstrap.Modal(document.getElementById('modalDetalle')).show();
+}
+
+// ---- LOCALES DEL DEALER (multi-parque + calle, v2.0) ----
+// Un dealer puede tener local en varios parques + calle; cada local con su tabla
+// pactada (dealer_comisiones). El motor cobra por el local donde cursó CADA op.
+let LOCALES_DEALER = [], PARQUES_ACTIVOS = null;
+async function cargarParquesActivos(){
+  if (PARQUES_ACTIVOS) return PARQUES_ACTIVOS;
+  try { const j = await (await fetch('/api/parques-comisiones?activos=1', { headers:H })).json();
+    const arr = Array.isArray(j.data) ? j.data : (j.data && j.data.rows) || [];
+    PARQUES_ACTIVOS = arr.map(p => String(p.nombre||'').toUpperCase().trim()).filter(Boolean);
+  } catch(e){ PARQUES_ACTIVOS = []; }
+  return PARQUES_ACTIVOS;
+}
+async function cargarLocales(idDealer){
+  const cont = document.getElementById('detLocales'); if(!cont) return;
+  try {
+    const j = await (await fetch(`/api/dealers/${idDealer}/locales`, { headers:H })).json();
+    if(!j.success) throw new Error(j.error||'error');
+    LOCALES_DEALER = j.data.locales || [];
+    const pc = v => (v==null||v==='')?'—':(Number(v).toLocaleString('es-CL',{maximumFractionDigits:2})+'%');
+    const filaCom = c => c ? `<span style="font-size:.78rem;color:#0141A2;font-weight:700">${pc(c.com_6_12)} · ${pc(c.com_13_24)} · ${pc(c.com_25_36)} · ${pc(c.com_37)}</span> <span style="font-size:.66rem;color:#94a3b8">(6-12 · 13-24 · 25-36 · 37+)</span>`
+                        : '<span style="font-size:.78rem;color:#94a3b8">sin tabla propia — usa la pizarra</span>';
+    let h = LOCALES_DEALER.map(l => {
+      const esCalle = String(l.ubicacion).toUpperCase()==='CALLE';
+      return `<div style="border:1px solid ${l.activo? '#e3e8ef':'#fecaca'};border-radius:10px;padding:8px 12px;margin-bottom:6px;background:${l.activo?'#fbfdff':'#fef2f2'}">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <i class="bi bi-${esCalle?'shop':'car-front'}" style="color:${esCalle?'#0141A2':'#0369a1'}"></i>
+          <b style="font-size:.85rem">${esc(l.ubicacion)}</b>
+          ${l.es_principal? '<span style="font-size:.62rem;background:#dbeafe;color:#1d4ed8;border-radius:10px;padding:1px 8px;font-weight:700">PRINCIPAL</span>':''}
+          ${l.activo? '' : '<span style="font-size:.62rem;background:#fee2e2;color:#b91c1c;border-radius:10px;padding:1px 8px;font-weight:700">INACTIVO</span>'}
+          ${puedeEditarDealer? `<span style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn btn-sm btn-outline-primary" style="font-size:.7rem;padding:1px 8px" onclick="abrirLocal(${l.id})">Editar</button>
+            ${l.activo? `<button class="btn btn-sm btn-outline-danger" style="font-size:.7rem;padding:1px 8px" onclick="desactivarLocal(${l.id})">Desactivar</button>`:''}</span>`:''}
+        </div>
+        <div style="font-size:.76rem;color:#64748b;margin-top:2px">${esc(l.direccion||'sin dirección')}${l.comuna? ' · '+esc(l.comuna):''}</div>
+        <div style="margin-top:3px">${filaCom(l.comisiones)}</div>
+      </div>`;
+    }).join('');
+    if(!h) h = '<div style="color:#94a3b8;font-size:.85rem">Sin locales registrados.</div>';
+    if(puedeEditarDealer) h += `<button class="btn btn-sm btn-outline-success" style="font-size:.74rem" onclick="abrirLocal(null)"><i class="bi bi-plus-lg me-1"></i>Agregar local</button>`;
+    h += '<div style="margin-top:6px;font-size:.7rem;color:#64748b"><i class="bi bi-info-circle me-1"></i>La comisión de cada operación se calcula con la tabla del local donde cursó (columna PARQUE de la op). Calle no paga comisión de parque.</div>';
+    cont.innerHTML = h;
+  } catch(e){ cont.innerHTML = '<div style="color:#b91c1c;font-size:.82rem">No se pudieron cargar los locales.</div>'; }
+}
+async function abrirLocal(idLocal){
+  const l = LOCALES_DEALER.find(x => x.id === idLocal) || null;
+  const parqs = await cargarParquesActivos();
+  const sel = document.getElementById('locUbic');
+  sel.innerHTML = '<option value="CALLE">CALLE</option>' + parqs.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  // Local existente: la ubicación es su llave — no se cambia (se crea otro local)
+  if (l && ![...sel.options].some(o=>o.value===String(l.ubicacion).toUpperCase())) sel.insertAdjacentHTML('beforeend', `<option value="${esc(l.ubicacion)}">${esc(l.ubicacion)}</option>`);
+  sel.value = l ? String(l.ubicacion).toUpperCase() : 'CALLE';
+  sel.disabled = !!l;
+  document.getElementById('locTitulo').textContent = l ? ('Local '+l.ubicacion) : 'Nuevo local';
+  document.getElementById('locDir').value = l?.direccion || '';
+  document.getElementById('locComuna').value = l?.comuna || '';
+  document.getElementById('locPrincipal').checked = !!l?.es_principal;
+  document.getElementById('locActivo').checked = l ? !!l.activo : true;
+  const c = l?.comisiones || {};
+  for (const k of ['com_6_12','com_13_24','com_25_36','com_37'])
+    document.getElementById('loc_'+k).value = (c[k]==null? '' : c[k]);
+  document.getElementById('dlgLocal').showModal();
+}
+async function guardarLocal(){
+  const btn = document.getElementById('btnLocGuardar'); btn.disabled = true;
+  try {
+    const v = id => document.getElementById(id).value.trim();
+    const body = {
+      ubicacion: document.getElementById('locUbic').value,
+      direccion: v('locDir'), comuna: v('locComuna'),
+      es_principal: document.getElementById('locPrincipal').checked ? 1 : 0,
+      activo: document.getElementById('locActivo').checked ? 1 : 0,
+      com_6_12: v('loc_com_6_12'), com_13_24: v('loc_com_13_24'),
+      com_25_36: v('loc_com_25_36'), com_37: v('loc_com_37'),
+    };
+    const j = await (await fetch(`/api/dealers/${dealerActual.id_dealer}/locales`, { method:'POST', headers:H, body: JSON.stringify(body) })).json();
+    if(!j.success) { alert(j.error || 'No se pudo guardar el local'); return; }
+    document.getElementById('dlgLocal').close();
+    cargarLocales(dealerActual.id_dealer);
+  } finally { btn.disabled = false; }
+}
+async function desactivarLocal(idLocal){
+  const l = LOCALES_DEALER.find(x => x.id === idLocal);
+  if(!l || !confirm(`¿Desactivar el local ${l.ubicacion}? Las operaciones históricas no se tocan.`)) return;
+  const j = await (await fetch(`/api/dealers/${dealerActual.id_dealer}/locales/${idLocal}`, { method:'DELETE', headers:H })).json();
+  if(!j.success) { alert(j.error || 'No se pudo desactivar'); return; }
+  cargarLocales(dealerActual.id_dealer);
 }
 
 // Última ficha APROBADA del dealer: firma + timbre APROBADO (fecha/hora) + quién autorizó cada etapa.

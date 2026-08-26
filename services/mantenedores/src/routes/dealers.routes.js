@@ -14,6 +14,11 @@ router.get('/direcciones',        verifyToken, requireFunc('mantenedores_dealers
 router.post('/:id/direccion',     verifyToken, requireFunc('mantenedores_dealers', 'dealer_ficha_revisar'), ctrl.setDireccion);
 router.get('/',          verifyToken, ctrl.getDealers);
 router.get('/:id',       verifyToken, ctrl.getDealer);
+// Locales del dealer (multi-parque + calle) y tabla de comisión por ubicación (v218.0).
+// Editar exige el mismo permiso que editar la base del dealer; queda auditado.
+router.get('/:id/locales',              verifyToken, ctrl.getLocales);
+router.post('/:id/locales',             verifyToken, requireFunc('dealer_ficha_revisar', 'dealers_base_editar'), ctrl.saveLocal);
+router.delete('/:id/locales/:idLocal',  verifyToken, requireFunc('dealer_ficha_revisar', 'dealers_base_editar'), ctrl.deleteLocal);
 router.post('/',         verifyToken, requireFunc('mantenedores_dealers', 'dealer_mantener'), ctrl.createDealer);
 // Editar dealer: solo Analista de Operaciones (dealer_ficha_revisar) + Admin (bypass). Las
 // comisiones pactadas NO se editan aquí — solo vía ficha aprobada o BD. (Crear = solo vía ficha.)

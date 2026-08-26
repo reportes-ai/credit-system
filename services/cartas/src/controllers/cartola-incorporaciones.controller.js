@@ -89,7 +89,7 @@ require('../../../../shared/migrate').enFila('cartola-incorporaciones', async ()
 });
 
 /* ── Comisión que CORRESPONDE, por el motor único ─────────────────────────── */
-async function comisionMotor({ rut_dealer, es_parque, saldo_precio, plazo, nombre_dealer }) {
+async function comisionMotor({ rut_dealer, es_parque, saldo_precio, plazo, nombre_dealer, ubicacion }) {
   try {
     // parametros_credito es CLAVE/VALOR (no columnas): se arma el mapa igual que
     // calcular-operacion.js, si no la pizarra llega vacía y el % queda en 0.
@@ -106,6 +106,16 @@ async function comisionMotor({ rut_dealer, es_parque, saldo_precio, plazo, nombr
         .catch(() => [[]]);
       dealerTabla = (dr && dr[0]) || null;
     }
+    // Tablas POR UBICACIÓN (multi-parque + calle): la fila del local de la op manda.
+    let dealerUbics = null;
+    if (rutNorm) {
+      const [du] = await pool.query(
+        `SELECT dc.ubicacion, dc.com_6_12, dc.com_13_24, dc.com_25_36, dc.com_37
+           FROM dealer_comisiones dc JOIN dealers d ON d.id_dealer = dc.id_dealer
+          WHERE UPPER(REPLACE(REPLACE(REPLACE(d.rut,'.',''),'-',''),' ','')) = ?`, [rutNorm])
+        .catch(() => [null]);
+      dealerUbics = du || null;
+    }
     let parqData = null;
     if (es_parque && nombre_dealer) {
       const [pr] = await pool.query(
@@ -114,8 +124,8 @@ async function comisionMotor({ rut_dealer, es_parque, saldo_precio, plazo, nombr
       parqData = pr[0] || null;
     }
     const cd = COM.comisionDealer(
-      { saldo: saldo_precio, plazo, esParque: !!es_parque },
-      { dealerTabla, parqData, pizarra });
+      { saldo: saldo_precio, plazo, esParque: !!es_parque, ubicacion },
+      { dealerTabla, dealerUbicaciones: dealerUbics, parqData, pizarra });
     return cd ? cd.comdea_real : null;
   } catch (e) { console.error('[comisionMotor]', e.message); return null; }
 }
@@ -144,7 +154,8 @@ const sinCarta = async (req, res) => {
     const condMes = mes ? "AND DATE_FORMAT(c.fecha_otorgado, '%Y-%m') = ?" : '';
     const [rows] = await pool.query(`
       SELECT c.id AS id_credito, c.num_op, c.id_financiera, c.automotora AS nombre_dealer, c.rut_dealer,
-             c.tipo_ubicacion, c.saldo_precio, c.plazo, c.comdea_real AS comision, c.ejecutivo, c.financiera,
+             c.tipo_ubicacion, COALESCE(NULLIF(c.parque,''), c.nombre_parque_mgmt) AS parque_op,
+             c.saldo_precio, c.plazo, c.comdea_real AS comision, c.ejecutivo, c.financiera,
              DATE_FORMAT(c.fecha_otorgado, '%Y-%m') AS mes_otorgado,
              (SELECT COUNT(*) FROM cartola_incorporaciones i WHERE i.id_credito = c.id AND i.estado <> 'RECHAZADA') AS ya_solicitada
         FROM creditos c
@@ -171,7 +182,7 @@ const sinCarta = async (req, res) => {
       r.es_parque   = fichaParque != null ? fichaParque : credParque;
       r.origen_ubic = fichaParque != null ? 'ficha del dealer' : (r.tipo_ubicacion ? 'carga masiva' : 'sin dato');
       r.ubic_discrepa = (fichaParque != null && fichaParque !== credParque) ? 1 : 0;
-      r.comision_motor = await comisionMotor(r);
+      r.comision_motor = await comisionMotor({ ...r, ubicacion: r.parque_op });
     }
     res.json({ success: true, data: { mes, items: rows }, error: null });
   } catch (e) { console.error('[cartolas sinCarta]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -183,7 +194,7 @@ const comisionQueCorresponde = async (req, res) => {
   try {
     const q = req.query;
     const monto = await comisionMotor({
-      rut_dealer: q.rut_dealer, nombre_dealer: q.nombre_dealer,
+      rut_dealer: q.rut_dealer, nombre_dealer: q.nombre_dealer, ubicacion: q.ubicacion,
       es_parque: q.es_parque === '1' || q.es_parque === 'true',
       saldo_precio: Number(q.saldo_precio) || 0, plazo: Number(q.plazo) || 0,
     });

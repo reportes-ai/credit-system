@@ -102,6 +102,18 @@ async function cargarDealers() {
       [rows] = await pool.query('SELECT rut, com_6_12, com_13_24, com_25_36, com_37 FROM dealers WHERE rut IS NOT NULL');
     }
     rows.forEach(d => { map[normRutD(d.rut)] = d; });
+    // Tablas POR UBICACIÓN (dealer_comisiones): se cuelgan del mismo mapa en _ubics
+    // para que calcularValoresOp elija la fila del local donde cursó cada op.
+    try {
+      const [ub] = await pool.query(
+        `SELECT d.rut, dc.ubicacion, dc.com_6_12, dc.com_13_24, dc.com_25_36, dc.com_37
+           FROM dealer_comisiones dc JOIN dealers d ON d.id_dealer = dc.id_dealer
+          WHERE d.rut IS NOT NULL`);
+      ub.forEach(u => {
+        const k = normRutD(u.rut);
+        if (map[k]) (map[k]._ubics = map[k]._ubics || []).push(u);
+      });
+    } catch (e) { /* tabla aún no creada → legacy */ }
   } catch (e) { /* sin tabla/columnas → todo cae a la pizarra */ }
   return map;
 }
@@ -153,10 +165,12 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
     }
   }
 
-  // Comisión dealer y parque — motor único comision-dealer.js (tabla del dealer manda).
+  // Comisión dealer y parque — motor único comision-dealer.js (tabla del dealer manda;
+  // con dealer_comisiones, la fila del LOCAL de la op manda sobre la tabla legacy).
+  const dTab = (dealerMap || {})[normRutD(op.rut_dealer)];
   const { comdea_real, com_parque, arriendo } = comisionDealer(
-    { saldo, plazo, esParque },
-    { dealerTabla: (dealerMap || {})[normRutD(op.rut_dealer)], parqData: parqMap[parqKey], pizarra: p }
+    { saldo, plazo, esParque, ubicacion: parqKey },
+    { dealerTabla: dTab, dealerUbicaciones: dTab && dTab._ubics, parqData: parqMap[parqKey], pizarra: p }
   );
   return { monto_comision_fin, comdea_real, com_parque, arriendo };
 }
