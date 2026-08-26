@@ -850,4 +850,38 @@ const reversar = async (req, res) => {
 };
 
 // cobranzaFullMap exportado: motor único de mora+gastos por cuota (lo usa también el Portal del Cliente)
-module.exports = { getByCredito, getCalendario, getById, create, createBatch, remove, reversar, prepagoInfo, prepagar, cobranzaFullMap };
+/* ─── POST /trx/:numero/enviar-comprobante — (re)envía el Comprobante de Pago
+   de una transacción al correo del cliente. Motor único (comprobante-pago-correo);
+   sirve para reenviar comprobantes o despachar pagos anteriores al correo. ─── */
+const enviarComprobanteTrx = async (req, res) => {
+  try {
+    const trx = parseInt(req.params.numero);
+    if (!trx) return res.status(400).json({ success: false, data: null, error: 'TRX inválida' });
+    const [pagos] = await pool.query('SELECT * FROM pagos_credito WHERE numero_transaccion=? ORDER BY numero_cuota', [trx]);
+    if (!pagos.length) return res.status(404).json({ success: false, data: null, error: 'No hay pagos con esa transacción' });
+    const idCred = pagos[0].id_credito;
+    const [[cd]] = await pool.query(
+      `SELECT COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito, c.plazo,
+              COALESCE(cl.rut,'') AS rut_cliente, COALESCE(cl.nombre_completo,'') AS nombre_cliente,
+              cl.email AS email_cliente
+         FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+        WHERE c.id_credito = ?`, [idCred]);
+    let cajaNombre = null;
+    try { const [[cj]] = await pool.query('SELECT nombre FROM cajas WHERE id_caja=?', [pagos[0].id_caja]); cajaNombre = cj && cj.nombre; } catch (_) {}
+    const r = await require('../../../../shared/comprobante-pago-correo').enviarComprobantePago({
+      credito: { ...(cd || {}), id_credito: idCred },
+      pagos, trxNum: trx, fechaPago: pagos[0].fecha_pago, cajaNombre,
+      origen: pagos[0].origen_fondos || (cajaNombre ? 'Pago en ' + cajaNombre : ''),
+      bccExtra: [(req.usuario && req.usuario.email)],
+    });
+    auditar({ req, accion: 'ENVIAR', modulo: 'pagos', entidad: 'pago', entidad_id: trx,
+      detalle: `Envió el Comprobante de Pago TRX-${String(trx).padStart(6, '0')} al cliente (${(cd && cd.email_cliente) || 'sin email'}): ${r.msg}` });
+    if (!r.ok) return res.status(422).json({ success: false, data: null, error: r.msg });
+    res.json({ success: true, data: { email: cd && cd.email_cliente }, error: null });
+  } catch (e) {
+    console.error('[enviarComprobanteTrx]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getByCredito, getCalendario, getById, create, createBatch, remove, reversar, prepagoInfo, prepagar, cobranzaFullMap, enviarComprobanteTrx };

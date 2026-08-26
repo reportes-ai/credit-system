@@ -190,7 +190,7 @@
         S.host.innerHTML = `<div style="text-align:center;padding:48px;color:#991b1b"><i class="bi bi-exclamation-triangle" style="font-size:1.6rem"></i><div style="margin-top:8px">${esc(e.message)}</div></div>`;
       }
     },
-    toggle, limpiarSeleccion, abrirDetalle, cerrarDetalle, confirmar, verComprobante, cerrarComp,
+    toggle, limpiarSeleccion, abrirDetalle, cerrarDetalle, confirmar, verComprobante, cerrarComp, enviarComp,
     onMonto, onBreakdown,
   };
 
@@ -306,6 +306,7 @@
     ov.innerHTML = `<div class="pcp-mbox"><div id="pcpCompBody" style="padding:18px"></div>
       <div style="padding:12px 18px;border-top:1px solid #e5e7eb;background:#f8fafc;display:flex;justify-content:flex-end;gap:8px">
         <button class="pcp-btn sec" onclick="PagoCuotas.cerrarComp()">Cerrar</button>
+        <button class="pcp-btn go" id="pcpCompMail" style="background:#0a7c42" onclick="PagoCuotas.enviarComp()"><i class="bi bi-envelope"></i> Enviar por correo</button>
         <button class="pcp-btn go" style="background:#0f2d6b" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button></div></div>`;
     ov.addEventListener('click', e => { if (e.target === ov) PagoCuotas.cerrarComp(); });
     document.body.appendChild(ov);
@@ -543,7 +544,25 @@
     try { html = (typeof buildRecibo === 'function') ? buildRecibo({ credito: S.credito, pagos: grupo, cajaNombre: S.miCaja?.nombre_caja || null, trxNum: trx, idPago: ref.id_pago }) : reciboSimple(grupo, trx); }
     catch (_) { html = reciboSimple(grupo, trx); }
     document.getElementById('pcpCompBody').innerHTML = html;
+    S._compTrx = trx;
+    const bm = document.getElementById('pcpCompMail');
+    if (bm) bm.style.display = trx ? '' : 'none';   // sin TRX (pagos antiguos) no hay reenvío
     document.getElementById('pcpCompOv').classList.add('open');
+  }
+  // (Re)envía el comprobante de la TRX abierta al correo del cliente — motor único del servidor
+  async function enviarComp() {
+    if (!S._compTrx) return;
+    const btn = document.getElementById('pcpCompMail');
+    btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Enviando…';
+    try {
+      const j = await (await API('/api/pagos-credito/trx/' + S._compTrx + '/enviar-comprobante', { method: 'POST' })).json();
+      if (!j.success) throw new Error(j.error || 'No se pudo enviar');
+      btn.innerHTML = '<i class="bi bi-check2"></i> Enviado a ' + ((j.data && j.data.email) || 'cliente');
+      setTimeout(() => { btn.disabled = false; btn.innerHTML = '<i class="bi bi-envelope"></i> Enviar por correo'; }, 4000);
+    } catch (e) {
+      alert('No se pudo enviar: ' + e.message);
+      btn.disabled = false; btn.innerHTML = '<i class="bi bi-envelope"></i> Enviar por correo';
+    }
   }
   function reciboSimple(grupo, trx) {
     const filas = grupo.map(p => `<tr><td style="padding:4px 8px">N°${p.numero_cuota}</td><td style="padding:4px 8px;text-align:right">${clp(p.total_pagado)}</td></tr>`).join('');

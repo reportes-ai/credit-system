@@ -5,6 +5,8 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 
 // Específicas antes de la genérica /:id_credito
 router.get('/pago/:id_pago',          verifyToken, ctrl.getById);
+// Reenviar el Comprobante de Pago de una TRX al correo del cliente (motor único)
+router.post('/trx/:numero/enviar-comprobante', verifyToken, requireFunc('creditos_pagar_cuotas'), ctrl.enviarComprobanteTrx);
 router.post('/batch',                 verifyToken, requireFunc('creditos_pagar_cuotas'), ctrl.createBatch);
 router.post('/reversar/:id_pago',     verifyToken, requireFunc('creditos_reversar_pagos'), ctrl.reversar);
 router.get('/prepago/:num_op',        verifyToken, ctrl.prepagoInfo);
