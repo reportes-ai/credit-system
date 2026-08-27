@@ -135,6 +135,21 @@ async function revisar() {
       AND COALESCE(mes,fecha_otorgado) >= DATE_SUB(CURDATE(), INTERVAL ? MONTH) LIMIT 20`, [desde]);
   if (montoMalo.length) criticos.push(`${montoMalo.length} op(s) con monto financiado MENOR O IGUAL al saldo precio (el capital del pagaré siempre es mayor: trae impuestos, primas y gastos — probable lectura del saldo como monto): ${montoMalo.map(r => `${r.num_op} (${r.m}: saldo $${Number(r.saldo_precio).toLocaleString('es-CL')} vs financiado $${Number(r.monto_financiado).toLocaleString('es-CL')})`).join(' · ')}`);
 
+  // 7. Numeración (regla 27-08-2026): la OP nueva es AAMM#### de 8 dígitos y
+  //    numero_credito la ESPEJA. Un crédito nuevo con OP de 7 dígitos (serie
+  //    corta muerta — cae en el rango 1M–20M de los IDs Trinidad) o con
+  //    numero_credito distinto de su OP significa que algún camino de inserción
+  //    quedó fuera del motor único shared/num-op.js.
+  const [numMalo] = await pool.query(`
+    SELECT num_op, numero_credito, DATE(created_at) f
+      FROM creditos
+     WHERE created_at >= '2026-08-28'
+       AND ( (num_op BETWEEN 1000000 AND 19999999 AND financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO')
+              AND (id_financiera IS NULL OR id_financiera = '' OR id_financiera = CAST(num_op AS CHAR)))
+          OR (numero_credito IS NOT NULL AND num_op IS NOT NULL AND numero_credito <> CAST(num_op AS CHAR)) )
+     LIMIT 20`);
+  if (numMalo.length) criticos.push(`${numMalo.length} crédito(s) nuevos con numeración fuera del motor único (la OP es AAMM#### de 8 dígitos y numero_credito la espeja — hay un camino de inserción saltándose shared/num-op.js): ${numMalo.map(r => `OP ${r.num_op} / n°cred ${r.numero_credito} (${r.f})`).join(' · ')}`);
+
   return { criticos, avisos };
 }
 

@@ -141,3 +141,46 @@ test('el número siempre trae 3 dígitos de secuencia', async () => {
   const db = { async query() { return [[{ mx: 2605008 }]]; } };
   assert.equal((await N.numeroCreditoCarta('2026-05', db)).length, 7);
 });
+
+/* ── Tripwire de la regla 27-08-2026: un crédito tiene SOLO N° OP e id ────────
+   numero_credito debe ESPEJAR la OP y la OP solo puede nacer del motor único
+   (siguienteNumOpAF / conNumOpAF, AAMM#### de 8 dígitos). La serie corta
+   YYMM### (numeroCreditoCarta) queda para documentos históricos; si un camino
+   de inserción vuelve a usarla como OP o como numero_credito de un crédito
+   nuevo, estas pruebas lo delatan en el mismo commit (el caso real: crear
+   crédito derivaba num_op = parseInt(numero_credito) → OP de 7 dígitos en el
+   rango de los IDs Trinidad). */
+const fs = require('node:fs');
+const path = require('node:path');
+
+test('ningún controller deriva la OP de la serie corta (parseInt(numero_credito))', () => {
+  const raiz = path.join(__dirname, '..', 'services');
+  const malos = [];
+  (function rec(dir) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) rec(p);
+      else if (e.name.endsWith('.js') && /parseInt\(\s*numero_credito\s*\)/.test(fs.readFileSync(p, 'utf8')))
+        malos.push(p);
+    }
+  })(raiz);
+  assert.deepEqual(malos, [], 'la OP nunca se deriva de numero_credito: usar shared/num-op.js');
+});
+
+test('la serie corta ya no alimenta el numero_credito de créditos nuevos', () => {
+  // Único uso permitido: el fallback documentado de operaciones.controller
+  // (solo cuando la op nace sin OP, cosa que no debería pasar).
+  const usos = [];
+  const raiz = path.join(__dirname, '..', 'services');
+  (function rec(dir) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) rec(p);
+      else if (e.name.endsWith('.js')) {
+        const src = fs.readFileSync(p, 'utf8');
+        if (/numero_credito\s*=\s*(await\s+)?(generarNumero|numeroCreditoCarta)/.test(src)) usos.push(path.basename(p));
+      }
+    }
+  })(raiz);
+  assert.deepEqual(usos, [], 'numero_credito debe espejar la OP (regla 27-08-2026), no la serie YYMM###');
+});
