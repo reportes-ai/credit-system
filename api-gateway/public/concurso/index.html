@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 — tema musical propio estilo game-show (apertura + fanfarria final) · v1.2 — fondo estudio del concurso -->
+<!-- v1.4 — fiesta al completar el tablero adivinando (serpentinas + globos + fanfarria) · v1.3 — tema musical propio estilo game-show (apertura + fanfarria final) · v1.2 — fondo estudio del concurso -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -51,6 +51,8 @@
   .acciones { display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
   .acciones button { background:none; border:1.5px solid #4a7ae0; color:#bcd2ff; border-radius:10px; padding:8px 16px; cursor:pointer; font-size:.85rem; font-weight:700; }
   .acciones button:hover { border-color:var(--oro); color:var(--oro); }
+  @keyframes caeSerp { to { transform:translate(var(--vaiven,0), 110vh) rotate(var(--giro,720deg)); opacity:.85; } }
+  @keyframes subeGlobo { to { transform:translateY(-118vh) rotate(8deg); } }
   .flash { position:fixed; inset:0; display:none; align-items:center; justify-content:center; font-size:9rem; font-weight:900; color:#ff3b3b; text-shadow:0 0 60px rgba(255,0,0,.8); pointer-events:none; z-index:99; }
   .fin { text-align:center; padding:26px; }
   .fin .total { font-size:3.4rem; font-weight:900; color:var(--oro); font-family:Consolas,monospace; }
@@ -217,7 +219,37 @@ function revelar(i, manual) {
   if (manual) chequearRonda();
 }
 function chequearRonda() {
-  if (Q.respuestas.every(r => r._rev)) setTimeout(() => { dingg(1320); }, 300);
+  // ¡Tablero completo ADIVINANDO (sin rendirse)! → escándalo: serpentinas,
+  // globos y fanfarria. Revelar todo con el botón de animador no lo gatilla.
+  if (Q.respuestas.every(r => r._rev)) setTimeout(fiesta, 300);
+}
+
+function fiesta() {
+  temaConcurso(true);
+  const cont = document.createElement('div');
+  cont.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:98;overflow:hidden';
+  document.body.appendChild(cont);
+  const COLORES = ['#ffd23e','#ff4d6d','#19b8ff','#3ddc84','#c77dff','#ff9f1c','#fff'];
+  // Serpentinas: tiras que caen girando desde arriba
+  for (let i = 0; i < 120; i++) {
+    const s = document.createElement('div');
+    const c = COLORES[i % COLORES.length], x = Math.random() * 100, dur = 2.4 + Math.random() * 2.2, del = Math.random() * .9;
+    s.style.cssText = `position:absolute;top:-30px;left:${x}vw;width:${6+Math.random()*6}px;height:${14+Math.random()*18}px;background:${c};opacity:.95;border-radius:2px;animation:caeSerp ${dur}s ${del}s ease-in forwards`;
+    s.style.setProperty('--giro', (Math.random() * 1080 - 540) + 'deg');
+    s.style.setProperty('--vaiven', (Math.random() * 16 - 8) + 'vw');
+    cont.appendChild(s);
+  }
+  // Globos: suben desde abajo con hilito
+  for (let i = 0; i < 16; i++) {
+    const g = document.createElement('div');
+    const c = COLORES[(i + 2) % COLORES.length], x = 4 + Math.random() * 92, dur = 3.2 + Math.random() * 2.4, del = Math.random() * 1.2, sz = 38 + Math.random() * 26;
+    g.style.cssText = `position:absolute;bottom:-90px;left:${x}vw;width:${sz}px;height:${sz*1.18}px;background:radial-gradient(circle at 32% 28%, #ffffffaa, ${c} 55%);border-radius:50% 50% 50% 50%/55% 55% 45% 45%;animation:subeGlobo ${dur}s ${del}s ease-out forwards`;
+    const hilo = document.createElement('div');
+    hilo.style.cssText = `position:absolute;top:100%;left:50%;width:1.5px;height:${sz*.9}px;background:#ffffff88`;
+    g.appendChild(hilo);
+    cont.appendChild(g);
+  }
+  setTimeout(() => cont.remove(), 7000);
 }
 function strike() {
   STRIKES++; pintarMarcador(); dingg(140, 'sawtooth');
