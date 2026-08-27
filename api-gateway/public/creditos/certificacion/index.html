@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — formato pesos en vivo, documentos de la financiera (ver originales + subir carta AutoFin actualizada) · v1.1 — guardianes en el detalle (monto ≤ saldo, pie+saldo ≠ vehiculo) · v1.0 — Certificación de Operaciones: revisión manual de valores vs carta (AUTOFIN: + Trinidad), reporte mensual y asignación paramétrica -->
+<!-- v1.3 — subir carta actualizada abajo del detalle, para toda op con carta · v1.2 — formato pesos en vivo, documentos de la financiera (ver originales + subir carta AutoFin actualizada) · v1.1 — guardianes en el detalle (monto ≤ saldo, pie+saldo ≠ vehiculo) · v1.0 — Certificación de Operaciones: revisión manual de valores vs carta (AUTOFIN: + Trinidad), reporte mensual y asignación paramétrica -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -193,12 +193,6 @@ async function abrir(id){
     html += `<div style="margin-bottom:12px;font-size:.8rem"><b><i class="bi bi-file-earmark-pdf"></i> Documentos de la financiera:</b> ` +
       d.documentos.map(x => `<button class="btnx" style="background:${x.tipo==='CARTA_FINANCIERA_ACTUALIZADA'?'#ea580c':'#334155'};margin:2px 4px 2px 0;padding:4px 10px;font-size:.74rem" onclick="verDoc(${x.id})" title="${x.nombre}">${DOC_LBL[x.tipo]||x.tipo}${x.tipo==='CARTA_FINANCIERA_ACTUALIZADA'?' ('+String(x.created_at||'').slice(0,10)+')':''}</button>`).join('') + '</div>';
   }
-  if (d.es_autofin && d.id_carta && !yaCert) {
-    html += `<div style="margin-bottom:12px;font-size:.78rem;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:9px;padding:9px 12px">
-      <b>Carta AutoFin actualizada:</b> AutoFin deja bajar su carta días antes de otorgar y los valores cambian — si tienes la versión final, súbela aquí (el original se conserva).
-      <input type="file" id="cartaNueva" accept="application/pdf,image/*" style="font-size:.75rem;margin-left:8px">
-      <button class="btnx" style="padding:4px 10px;font-size:.74rem" onclick="subirCarta(${d.id})">Subir</button> <span id="cartaMsg" style="color:#166534"></span></div>`;
-  }
   const esPlano = c => c === 'plazo' || c === 'tascli_real';
   html += `<table><thead><tr><th>Campo</th><th class="num">Sistema</th><th class="num">Carta ${d.op_carta||''}</th><th class="num">${yaCert?'':'Valor certificado'}</th></tr></thead><tbody>` +
     d.campos.map(c => {
@@ -219,6 +213,10 @@ async function abrir(id){
       (cs.length ? '<br>Correcciones: ' + cs.map(c=>`${c.label||c.campo} ${fmt(c.antes)} → <b>${fmt(c.despues)}</b>`).join(' · ') : ' Sin correcciones.') +
       (d.certificacion.observaciones ? `<br>Obs: ${d.certificacion.observaciones}` : '') + '</div>';
   } else {
+    if (d.id_carta) html += `<div style="margin-top:14px;font-size:.78rem;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:9px;padding:10px 12px">
+      <b><i class="bi bi-file-earmark-arrow-up"></i> Subir carta actualizada de la financiera</b>${d.es_autofin ? ' — AutoFin deja bajar su carta días antes de otorgar y los valores cambian; sube aquí la versión final' : ''} (el original se conserva).<br>
+      <input type="file" id="cartaNueva" accept="application/pdf,image/*" style="font-size:.75rem;margin-top:6px">
+      <button class="btnx" style="padding:5px 12px;font-size:.76rem" onclick="subirCarta(${d.id})"><i class="bi bi-upload"></i> Subir</button> <span id="cartaMsg" style="color:#166534"></span></div>`;
     html += `<div style="margin-top:14px">
       <textarea id="obs" rows="2" style="width:100%" placeholder="Observaciones (opcional)"></textarea>
       <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
