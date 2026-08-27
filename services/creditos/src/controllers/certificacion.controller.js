@@ -140,12 +140,24 @@ exports.detalle = async (req, res) => {
     // Diferencias que la carga masiva dejó pendientes para esta op (contexto Trinidad)
     const [difs] = await pool.query(
       "SELECT campo, valor_sistema, valor_archivo, estado FROM carga_diferencias WHERE id_credito = ? AND estado = 'PENDIENTE' LIMIT 20", [id]);
+
+    /* Guardianes de coherencia interna (misma regla 6 del guardián de
+       consistencia — caso 26081174): el monto del crédito SIEMPRE es mayor al
+       saldo precio porque suma primas, impuestos y gastos. Si son iguales, lo
+       más probable es que la carta se emitió con el saldo como monto. */
+    const alertas = [];
+    const monto = Number(row.monto_financiado || 0), saldo = Number(row.saldo_precio || 0);
+    const primas = Number(row.seguro_rdh || 0) + Number(row.seguro_cesantia || 0) + Number(row.seguro_rep_menor || 0);
+    if (monto > 0 && saldo > 0 && monto <= saldo)
+      alertas.push(`El monto del crédito ($${monto.toLocaleString('es-CL')}) es igual o menor al saldo precio ($${saldo.toLocaleString('es-CL')}). El capital del pagaré siempre es mayor: suma primas${primas ? ` (acá hay $${primas.toLocaleString('es-CL')} en seguros)` : ''}, impuestos y gastos. Revisa el pagaré antes de certificar.`);
+    if (Number(row.valor_vehiculo || 0) > 0 && Number(row.pie || 0) + saldo !== Number(row.valor_vehiculo))
+      alertas.push(`Pie + saldo precio no suman el valor del vehículo (${Number(row.pie||0).toLocaleString('es-CL')} + ${saldo.toLocaleString('es-CL')} ≠ ${Number(row.valor_vehiculo).toLocaleString('es-CL')}).`);
     return res.json({ success: true, data: {
       id: row.id, num_op: row.num_op, fecha_otorgado: row.fecha_otorgado,
       financiera: row.financiera, producto: row.producto, automotora: row.automotora,
       cliente: row.cliente, rut: row.rut, op_carta: row.op_carta,
       es_autofin: /AUTOFIN/i.test(row.financiera || ''),
-      campos, diferencias_carga: difs,
+      campos, diferencias_carga: difs, alertas,
       certificacion: row.id_cert ? { por: row.certificado_nombre, fecha: row.fecha_cert, cambios: row.cambios, observaciones: row.observaciones } : null,
     }, error: null });
   } catch (e) {

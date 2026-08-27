@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — Certificación de Operaciones: revisión manual de valores vs carta (AUTOFIN: + Trinidad), reporte mensual y asignación paramétrica -->
+<!-- v1.1 — guardianes en el detalle (monto ≤ saldo, pie+saldo ≠ vehiculo) · v1.0 — Certificación de Operaciones: revisión manual de valores vs carta (AUTOFIN: + Trinidad), reporte mensual y asignación paramétrica -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -187,6 +187,7 @@ async function abrir(id){
   if (d.es_autofin) html += `<div class="aviso-tri"><b><i class="bi bi-exclamation-triangle"></i> Operación AUTOFIN:</b> además de la carta, valida estos valores contra <b>Trinidad</b> antes de certificar.</div>`;
   if (!d.op_carta) html += `<div class="aviso-tri" style="border-color:#b91c1c;color:#7f1d1d;background:#fef2f2"><b>Sin carta vinculada:</b> esta operación no tiene carta de aprobación asociada — certifica contra los documentos fundantes.</div>`;
   if (d.diferencias_carga.length) html += `<div class="aviso-tri"><b>Diferencias abiertas con la carga:</b> ${d.diferencias_carga.map(x=>`${x.campo} (sistema ${fmt(x.valor_sistema)} / archivo ${fmt(x.valor_archivo)})`).join(' · ')}</div>`;
+  (d.alertas||[]).forEach(a => { html += `<div class="aviso-tri" style="border-color:#b91c1c;color:#7f1d1d;background:#fef2f2"><b><i class="bi bi-shield-exclamation"></i> Guardián:</b> ${a}</div>`; });
   html += `<table><thead><tr><th>Campo</th><th class="num">Sistema</th><th class="num">Carta ${d.op_carta||''}</th><th class="num">${yaCert?'':'Valor certificado'}</th></tr></thead><tbody>` +
     d.campos.map(c => {
       const dif = c.carta != null && c.sistema != null && Number(c.sistema) !== Number(c.carta);
