@@ -2411,6 +2411,21 @@ const emitirOrdenPagoComision = async (req, res) => {
     const { ids } = req.body;
     if (!Array.isArray(ids) || !ids.length)
       return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
+    // CANDADO dealer consistente (caso 88986, 27-08-2026): si el RUT del dealer del
+    // crédito no calza con la ficha vinculada (id_dealer), la ODP leería la CUENTA
+    // DE DEPÓSITO de OTRO dealer. No se emite hasta corregir el vínculo.
+    const normR = v => String(v || '').replace(/[.\-\s]/g, '').toUpperCase();
+    for (const id of ids) {
+      const [[chk]] = await pool.query(
+        `SELECT s.num_op, c.rut_dealer, d.rut AS rut_ficha, d.nombre_razon
+           FROM postventa_seguimiento s
+           JOIN creditos c ON c.id = s.id_credito
+           LEFT JOIN dealers d ON d.id_dealer = c.id_dealer
+          WHERE s.id = ?`, [id]);
+      if (chk && chk.rut_dealer && chk.rut_ficha && normR(chk.rut_dealer) !== normR(chk.rut_ficha))
+        return res.status(409).json({ success: false, data: null,
+          error: `OP ${chk.num_op}: el dealer del crédito (RUT ${chk.rut_dealer}) no calza con la ficha vinculada (${chk.nombre_razon || ''} ${chk.rut_ficha}) — la plata iría a la cuenta de otro dealer. Corrige el dealer de la operación antes de emitir la orden.` });
+    }
     const usuario = loginDe(req.usuario);
     const vals = []; let numOrden = null;
     for (const id of ids) {
