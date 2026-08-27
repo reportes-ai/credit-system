@@ -989,6 +989,57 @@ async function estadoHorarioPago() {
   } catch (e) { return { restringido: false, abierta: true }; }
 }
 
+/* ── Centralización del pago de una ODP GENERAL (cierra el pendiente 2.1b, 27-08-2026) ──
+   El DEVENGO de estas obligaciones ya vive en la contabilidad:
+   · Factura de proveedor → auxiliar de compras (HABER en su cuenta_cxp — AVSOFT/RCV
+     usan cuentas POR AÑO tipo 2102024, no la 2102010 genérica de la regla)
+   · Finiquito → FINIQUITO_EMITIDO deja el pasivo en 2106070 al guardarse
+   · Anticipo / Préstamo al personal → NO hay devengo: el desembolso ES el hecho
+     (nace la cuenta por cobrar al personal)
+   El pago solo rebaja ese pasivo (o crea la CxC) contra banco. Los `reemplazos`
+   ajustan la regla paramétrica al caso real: el banco de la cuenta de cargo y la
+   CxP donde de verdad se devengó la factura. Nunca bloquea el pago. */
+async function contabilizarPagoGeneral(oc, fechaPago, ctaBancaria) {
+  try {
+    const [[op]] = await pool.query('SELECT * FROM ordenes_pago WHERE id=?', [oc.origen_id]);
+    if (!op) return;
+    const monto = Math.round(Number(op.monto) || 0);
+    if (!monto) return;
+    const cpto = String(op.concepto || '');
+    let evento = 'ODP_PAGADA';
+    if (/^anticipo de sueldo/i.test(cpto)) evento = 'ANTICIPO_PERSONAL';
+    else if (/^pr[ée]stamo al personal/i.test(cpto)) evento = 'PRESTAMO_PERSONAL';
+    else if (/^finiquito/i.test(cpto)) evento = 'FINIQUITO_PAGADO';
+    const reemplazos = {};
+    if (ctaBancaria && ctaBancaria.cuenta_contable) reemplazos['1101090'] = ctaBancaria.cuenta_contable;
+    if (evento === 'ODP_PAGADA' && op.proveedor_rut) {
+      // La CxP real del devengo: la factura del proveedor en el auxiliar de compras
+      // (por folio si la orden lo trae; si no, por RUT + monto exacto, la más reciente).
+      try {
+        const rut = String(op.proveedor_rut).replace(/[.\s]/g, '');
+        let fila = null;
+        if (op.numero_documento)
+          [[fila]] = await pool.query(
+            "SELECT cuenta_cxp FROM ctb_compras_aux WHERE REPLACE(rut,'.','')=? AND num_doc=? AND cuenta_cxp IS NOT NULL ORDER BY id DESC LIMIT 1",
+            [rut, String(op.numero_documento)]);
+        if (!fila)
+          [[fila]] = await pool.query(
+            "SELECT cuenta_cxp FROM ctb_compras_aux WHERE REPLACE(rut,'.','')=? AND total=? AND cuenta_cxp IS NOT NULL ORDER BY fecha_doc DESC, id DESC LIMIT 1",
+            [rut, monto]);
+        if (fila && fila.cuenta_cxp) reemplazos['2102010'] = fila.cuenta_cxp;
+      } catch (_) {}
+    }
+    await require('../../../contabilidad/src/motor-asientos').contabilizar({
+      evento, fecha: fechaPago,
+      glosa: `${cpto || 'Orden de pago'} — ${op.proveedor_nombre || ''} (${oc.numero || op.numero || ''})`.slice(0, 300),
+      ref: `ODP-${oc.numero || op.numero || oc.id}`,
+      montos: { monto }, rut: op.proveedor_rut || null,
+      reemplazos: Object.keys(reemplazos).length ? reemplazos : null,
+      detalle: [oc.numero || op.numero, ctaBancaria && ctaBancaria.nombre].filter(Boolean).join(' · ') || null,
+    });
+  } catch (e) { console.error('[ordenes-pago contab general]', e.message); }
+}
+
 // POST /api/ordenes-pago/ordenes/:id/pagar  (:id = op_correlativos.id) — registra el pago/egreso.
 // Solo usuarios con Caja Activa. Marca el pago en el libro central y cierra la etapa en su módulo.
 const pagarOrden = async (req, res) => {
@@ -1035,6 +1086,9 @@ const pagarOrden = async (req, res) => {
     if (oc.origen === 'GENERAL') {
       await pool.query(`UPDATE ordenes_pago SET estado='PAGADA', fecha_pago=?, metodo_pago=COALESCE(?, metodo_pago) WHERE id=?`,
         [fechaPago, metodo, oc.origen_id]);
+      // Máxima 4 (pendiente 2.1b): el egreso genera su asiento — proveedor, anticipo,
+      // préstamo o finiquito según el concepto; idempotente por ref, nunca rompe el pago.
+      await contabilizarPagoGeneral(oc, fechaPago, ctaBancaria);
       // Hook Plan Liquidez: si la ODP corresponde a una liquidación, postea el abono y baja/sube la deuda.
       // Aislado en try/catch: nunca debe romper el pago.
       try {
