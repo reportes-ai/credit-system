@@ -123,6 +123,11 @@ require('../../../../shared/migrate').enFila('usuarios', async () => {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN sexo CHAR(1) NULL DEFAULT NULL`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration sexo]', e.message); }
   try {
+    // Bono Jefe Comercial: mes (YYYY-MM) desde el que rige la jefatura; antes de esa
+    // fecha su gente cuenta para el jefe titular del mes (la crea también bono-jefe.controller)
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN jefatura_desde CHAR(7) NULL DEFAULT NULL`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration jefatura_desde]', e.message); }
+  try {
     /* EXTERNO (Pato, 19-08-2026): usuario de fuera de la organización (directores,
        asesores). NO se considera en: avisos/correos por perfil o funcionalidad,
        escalamientos de workflows, suplencias, directorio ni organigrama. Sí puede
@@ -309,7 +314,7 @@ const getAllUsuarios = async (req, res) => {
     if (otorgables !== null) wProt += " AND p.nombre <> 'Administrador'";
     const [usuarios] = await pool.query(
       `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.apellido_materno, u.centro_costo, u.email, u.telefono,
-              u.cargo, u.fecha_ingreso, u.fecha_nacimiento, u.sexo,
+              u.cargo, u.fecha_ingreso, u.fecha_nacimiento, u.sexo, u.jefatura_desde,
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
               CONCAT(s.nombre, ' ', s.apellido) AS supervisor_nombre,
               u.estado, u.ultimo_acceso, u.fecha_creacion, u.bloqueado, u.intentos_fallidos,
@@ -334,7 +339,7 @@ const getUsuarioById = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.apellido_materno, u.centro_costo, u.email, u.telefono,
-              u.cargo, u.fecha_ingreso, u.fecha_nacimiento, u.sexo,
+              u.cargo, u.fecha_ingreso, u.fecha_nacimiento, u.sexo, u.jefatura_desde,
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
               CONCAT(s.nombre, ' ', s.apellido) AS supervisor_nombre,
               u.estado, u.ultimo_acceso, u.fecha_creacion, COALESCE(u.externo, 0) AS externo
@@ -425,10 +430,16 @@ const updateUsuario = async (req, res) => {
       if (ap) perfilFinal = ap;
     }
 
+    // jefatura_desde (Bono Jefe Comercial): si el form no la envía (undefined) se
+    // preserva; enviada vacía se limpia; enviada YYYY-MM se escribe.
+    const jdSet = req.body.jefatura_desde !== undefined ? 1 : null;
+    const jdRaw = String(req.body.jefatura_desde || '').trim();
+    const jdVal = /^\d{4}-\d{2}$/.test(jdRaw) ? jdRaw : null;
+
     await pool.query(
       // COALESCE: si el form no envía los campos RRHH (undefined), se preservan los existentes
-      'UPDATE usuarios SET nombre = ?, apellido = ?, apellido_materno = ?, centro_costo = ?, email = ?, id_perfil = ?, id_supervisor = ?, estado = ?, telefono = ?, fecha_ingreso = COALESCE(?, fecha_ingreso), fecha_nacimiento = COALESCE(?, fecha_nacimiento), cargo = COALESCE(?, cargo), sexo = COALESCE(?, sexo), externo = COALESCE(?, externo) WHERE id_usuario = ?',
-      [nombre, apellido, apellido_materno || null, centro_costo || null, email, perfilFinal, id_supervisor || null, estadoFinal, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, req.body.externo === undefined ? null : (req.body.externo ? 1 : 0), id]
+      'UPDATE usuarios SET nombre = ?, apellido = ?, apellido_materno = ?, centro_costo = ?, email = ?, id_perfil = ?, id_supervisor = ?, estado = ?, telefono = ?, fecha_ingreso = COALESCE(?, fecha_ingreso), fecha_nacimiento = COALESCE(?, fecha_nacimiento), cargo = COALESCE(?, cargo), sexo = COALESCE(?, sexo), externo = COALESCE(?, externo), jefatura_desde = CASE WHEN ? IS NULL THEN jefatura_desde ELSE ? END WHERE id_usuario = ?',
+      [nombre, apellido, apellido_materno || null, centro_costo || null, email, perfilFinal, id_supervisor || null, estadoFinal, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, req.body.externo === undefined ? null : (req.body.externo ? 1 : 0), jdSet, jdVal, id]
     );
 
     // Trazabilidad de la suspensión también cuando el cambio de estado viene del form de edición

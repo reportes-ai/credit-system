@@ -133,7 +133,7 @@
 </head>
 <body>
 
-  <!-- TOPNAV (componente) — v116.19: menu Perfiles sticky + Guardar Permisos flotante -->
+  <!-- TOPNAV (componente) — v116.20: campo Jefatura desde (Bono Jefe Comercial) en la ficha -->
   <div id="af-topnav"></div>
   <script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Usuarios',icon:'bi-people-fill',current:true}]};</script>
 
@@ -783,6 +783,10 @@
                 <option value="">Sin supervisor</option>
               </select>
             </div>
+            <div class="col-md-6">
+              <label class="form-label">Jefatura desde <i class="bi bi-diagram-3" title="Bono Jefe Comercial: mes desde el que rige su jefatura. Los meses ANTERIORES su gente cuenta para el jefe titular de ese mes. Vacío = jefatura histórica (desde siempre). Solo aplica a quienes supervisan Ejecutivos Comerciales."></i></label>
+              <input type="month" id="uJefaturaDesde" class="form-control">
+            </div>
             <div class="col-md-6" id="campoEstado" style="display:none">
               <label class="form-label">Estado</label>
               <select id="uEstado" class="form-select">
@@ -1197,6 +1201,7 @@
           document.getElementById('uFechaNacimiento').value = u.fecha_nacimiento ? String(u.fecha_nacimiento).slice(0,10) : '';
           document.getElementById('uPerfil').value = u.id_perfil;
           document.getElementById('uSupervisor').value = u.id_supervisor || '';
+          document.getElementById('uJefaturaDesde').value = u.jefatura_desde || '';
           document.getElementById('uEstado').value = u.estado;
           actualizarSupervisorVisibilidad();
         }
@@ -1216,6 +1221,7 @@
         document.getElementById('uExterno').checked = false;
         document.getElementById('uPerfil').value = '';
         document.getElementById('uSupervisor').value = '';
+        document.getElementById('uJefaturaDesde').value = '';
         actualizarSupervisorVisibilidad();
       }
 
@@ -1246,6 +1252,7 @@
         externo: document.getElementById('uExterno').checked ? 1 : 0,
         id_perfil: document.getElementById('uPerfil').value,
         id_supervisor: document.getElementById('uSupervisor').value || null,
+        jefatura_desde: document.getElementById('uJefaturaDesde').value || '',
         estado: document.getElementById('uEstado').value || 'activo'
       };
 
