@@ -8,6 +8,7 @@ const ctrl = require('../controllers/certificacion.controller');
 router.get ('/pendientes',       verifyToken, requireFunc('certificacion_ops'), ctrl.pendientes);
 router.get ('/detalle/:id',      verifyToken, requireFunc('certificacion_ops'), ctrl.detalle);
 router.post('/:id/certificar',   verifyToken, requireFunc('certificacion_certificar'), ctrl.certificar);
+router.post('/:id/carta-actualizada', verifyToken, requireFunc('certificacion_certificar'), ctrl.subirCartaActualizada);
 router.get ('/reporte',          verifyToken, requireFunc('certificacion_ops'), ctrl.reporte);
 router.get ('/asignados',        verifyToken, requireFunc('certificacion_admin'), ctrl.asignados);
 router.put ('/asignados/:idUsuario', verifyToken, requireFunc('certificacion_admin'), ctrl.setAsignado);

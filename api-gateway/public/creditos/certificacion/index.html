@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — guardianes en el detalle (monto ≤ saldo, pie+saldo ≠ vehiculo) · v1.0 — Certificación de Operaciones: revisión manual de valores vs carta (AUTOFIN: + Trinidad), reporte mensual y asignación paramétrica -->
+<!-- v1.2 — formato pesos en vivo, documentos de la financiera (ver originales + subir carta AutoFin actualizada) · v1.1 — guardianes en el detalle (monto ≤ saldo, pie+saldo ≠ vehiculo) · v1.0 — Certificación de Operaciones: revisión manual de valores vs carta (AUTOFIN: + Trinidad), reporte mensual y asignación paramétrica -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -188,14 +188,29 @@ async function abrir(id){
   if (!d.op_carta) html += `<div class="aviso-tri" style="border-color:#b91c1c;color:#7f1d1d;background:#fef2f2"><b>Sin carta vinculada:</b> esta operación no tiene carta de aprobación asociada — certifica contra los documentos fundantes.</div>`;
   if (d.diferencias_carga.length) html += `<div class="aviso-tri"><b>Diferencias abiertas con la carga:</b> ${d.diferencias_carga.map(x=>`${x.campo} (sistema ${fmt(x.valor_sistema)} / archivo ${fmt(x.valor_archivo)})`).join(' · ')}</div>`;
   (d.alertas||[]).forEach(a => { html += `<div class="aviso-tri" style="border-color:#b91c1c;color:#7f1d1d;background:#fef2f2"><b><i class="bi bi-shield-exclamation"></i> Guardián:</b> ${a}</div>`; });
+  // Documentos de la financiera: originales + versiones actualizadas
+  if (d.documentos && d.documentos.length) {
+    html += `<div style="margin-bottom:12px;font-size:.8rem"><b><i class="bi bi-file-earmark-pdf"></i> Documentos de la financiera:</b> ` +
+      d.documentos.map(x => `<button class="btnx" style="background:${x.tipo==='CARTA_FINANCIERA_ACTUALIZADA'?'#ea580c':'#334155'};margin:2px 4px 2px 0;padding:4px 10px;font-size:.74rem" onclick="verDoc(${x.id})" title="${x.nombre}">${DOC_LBL[x.tipo]||x.tipo}${x.tipo==='CARTA_FINANCIERA_ACTUALIZADA'?' ('+String(x.created_at||'').slice(0,10)+')':''}</button>`).join('') + '</div>';
+  }
+  if (d.es_autofin && d.id_carta && !yaCert) {
+    html += `<div style="margin-bottom:12px;font-size:.78rem;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:9px;padding:9px 12px">
+      <b>Carta AutoFin actualizada:</b> AutoFin deja bajar su carta días antes de otorgar y los valores cambian — si tienes la versión final, súbela aquí (el original se conserva).
+      <input type="file" id="cartaNueva" accept="application/pdf,image/*" style="font-size:.75rem;margin-left:8px">
+      <button class="btnx" style="padding:4px 10px;font-size:.74rem" onclick="subirCarta(${d.id})">Subir</button> <span id="cartaMsg" style="color:#166534"></span></div>`;
+  }
+  const esPlano = c => c === 'plazo' || c === 'tascli_real';
   html += `<table><thead><tr><th>Campo</th><th class="num">Sistema</th><th class="num">Carta ${d.op_carta||''}</th><th class="num">${yaCert?'':'Valor certificado'}</th></tr></thead><tbody>` +
     d.campos.map(c => {
       const dif = c.carta != null && c.sistema != null && Number(c.sistema) !== Number(c.carta);
+      const f = esPlano(c.campo) ? (v => v==null?'—':Number(v).toLocaleString('es-CL')) : (v => v==null?'—':'$'+Math.round(Number(v)).toLocaleString('es-CL'));
       return `<tr${dif?' class="dif-row"':''}>
         <td>${c.label}${dif?' <span class="est est-DIF">≠</span>':''}</td>
-        <td class="num">${fmt(c.sistema)}</td>
-        <td class="num">${c.carta==null?'—':fmt(c.carta)}</td>
-        <td class="num">${yaCert?'':`<input type="number" step="any" class="campo-in" data-campo="${c.campo}" data-orig="${c.sistema==null?'':c.sistema}" value="${c.sistema==null?'':c.sistema}" oninput="this.classList.toggle('cambiado', this.value !== this.dataset.orig)">`}</td>
+        <td class="num">${f(c.sistema)}</td>
+        <td class="num">${c.carta==null?'—':f(c.carta)}</td>
+        <td class="num">${yaCert?'':(esPlano(c.campo)
+          ? `<input type="number" step="any" class="campo-in" data-campo="${c.campo}" data-orig="${c.sistema==null?'':Number(c.sistema)}" value="${c.sistema==null?'':Number(c.sistema)}" oninput="this.classList.toggle('cambiado', this.value !== this.dataset.orig)">`
+          : `<input type="text" inputmode="numeric" class="campo-in" data-campo="${c.campo}" data-orig="${c.sistema==null?'':Math.round(Number(c.sistema))}" value="${c.sistema==null?'':'$'+Math.round(Number(c.sistema)).toLocaleString('es-CL')}" oninput="fmtPesosInput(this)">`)}</td>
       </tr>`;
     }).join('') + '</tbody></table>';
   if (yaCert) {
@@ -215,10 +230,41 @@ async function abrir(id){
   dlg.showModal();
 }
 
+// Formato de pesos EN VIVO en los inputs (es-CL): se digita 7990000 y queda $7.990.000.
+// El valor numérico real viaja en valorPlano() al certificar.
+function fmtPesosInput(el){
+  const digs = el.value.replace(/\D/g, '');
+  el.value = digs ? '$' + Number(digs).toLocaleString('es-CL') : '';
+  el.classList.toggle('cambiado', digs !== el.dataset.orig);
+}
+const valorPlano = i => i.type === 'number' ? i.value : i.value.replace(/\D/g, '');
+
+const DOC_LBL = { CARTA_AUTOFIN:'Carta AutoFin (original)', COTIZACION_UNIDAD:'Cotización Unidad', COMPROMISO_UNIDAD:'Compromiso Unidad', PANTALLAZO_AUTOFIN:'Pantallazo AutoFin', CHECKLIST_REVISOR:'Checklist Revisor', CARTA_FINANCIERA_ACTUALIZADA:'Carta actualizada' };
+
+// Los PDFs exigen el token en el header → se bajan por fetch y se abren como blob
+async function verDoc(idDoc){
+  try {
+    const r = await fetch('/api/cartas/documentos/'+idDoc, { headers:{ Authorization:'Bearer '+token } });
+    if (!r.ok) { alert('No se pudo abrir el documento'); return; }
+    window.open(URL.createObjectURL(await r.blob()), '_blank');
+  } catch(e){ alert('No se pudo abrir el documento'); }
+}
+
+async function subirCarta(id){
+  const f = $('cartaNueva').files[0];
+  if (!f) { alert('Elige el archivo primero'); return; }
+  const b64 = await new Promise((ok,ko)=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.onerror=ko; fr.readAsDataURL(f); });
+  const j = await (await fetch(`/api/certificacion/${id}/carta-actualizada`, { method:'POST', headers:H,
+    body: JSON.stringify({ nombre: f.name, mime: f.type, data_base64: b64 }) })).json();
+  if (!j.success) { alert(j.error); return; }
+  $('cartaMsg').textContent = '✓ Subida';
+  abrir(id);   // refresca el detalle con el documento nuevo listado
+}
+
 async function certificar(id){
   const cambios = [...document.querySelectorAll('#dlgBody .campo-in')]
-    .filter(i => i.value !== i.dataset.orig && i.value !== '')
-    .map(i => ({ campo: i.dataset.campo, valor: i.value }));
+    .filter(i => valorPlano(i) !== i.dataset.orig && valorPlano(i) !== '')
+    .map(i => ({ campo: i.dataset.campo, valor: valorPlano(i) }));
   if (cambios.length && !confirm(`Vas a certificar con ${cambios.length} corrección(es) que modificarán el crédito. ¿Continuar?`)) return;
   const j = await (await fetch(`/api/certificacion/${id}/certificar`, { method:'POST', headers:H,
     body: JSON.stringify({ cambios, observaciones: $('obs').value }) })).json();

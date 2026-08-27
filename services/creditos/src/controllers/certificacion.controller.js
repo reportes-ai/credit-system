@@ -124,7 +124,7 @@ exports.detalle = async (req, res) => {
     const [[row]] = await pool.query(`
       SELECT c.id, c.num_op, c.fecha_otorgado, c.financiera, c.producto, c.automotora,
              COALESCE(cl.nombre_completo, cl.nombre, cl.nombres, '') AS cliente, cl.rut,
-             ${credCols}, ca.op_carta, ${cartaCols},
+             ${credCols}, ca.op_carta, ca.id AS id_carta, ${cartaCols},
              ce.id AS id_cert, ce.certificado_nombre, ce.created_at AS fecha_cert,
              ce.cambios, ce.observaciones
         FROM creditos c
@@ -152,10 +152,20 @@ exports.detalle = async (req, res) => {
       alertas.push(`El monto del crédito ($${monto.toLocaleString('es-CL')}) es igual o menor al saldo precio ($${saldo.toLocaleString('es-CL')}). El capital del pagaré siempre es mayor: suma primas${primas ? ` (acá hay $${primas.toLocaleString('es-CL')} en seguros)` : ''}, impuestos y gastos. Revisa el pagaré antes de certificar.`);
     if (Number(row.valor_vehiculo || 0) > 0 && Number(row.pie || 0) + saldo !== Number(row.valor_vehiculo))
       alertas.push(`Pie + saldo precio no suman el valor del vehículo (${Number(row.pie||0).toLocaleString('es-CL')} + ${saldo.toLocaleString('es-CL')} ≠ ${Number(row.valor_vehiculo).toLocaleString('es-CL')}).`);
+    /* Documentos de la carta: los ORIGINALES de la financiera (carta AutoFin /
+       cotización y compromiso Unidad) + las versiones ACTUALIZADAS subidas desde
+       este módulo. AutoFin permite bajar su carta días antes de otorgar y los
+       valores cambian; Unidad entrega la suya ya cursado el crédito. */
+    let documentos = [];
+    if (row.id_carta) {
+      const [docs] = await pool.query(
+        'SELECT id, tipo, nombre, created_at FROM cartas_documentos WHERE id_carta = ? ORDER BY created_at', [row.id_carta]);
+      documentos = docs;
+    }
     return res.json({ success: true, data: {
       id: row.id, num_op: row.num_op, fecha_otorgado: row.fecha_otorgado,
       financiera: row.financiera, producto: row.producto, automotora: row.automotora,
-      cliente: row.cliente, rut: row.rut, op_carta: row.op_carta,
+      cliente: row.cliente, rut: row.rut, op_carta: row.op_carta, id_carta: row.id_carta, documentos,
       es_autofin: /AUTOFIN/i.test(row.financiera || ''),
       campos, diferencias_carga: difs, alertas,
       certificacion: row.id_cert ? { por: row.certificado_nombre, fecha: row.fecha_cert, cambios: row.cambios, observaciones: row.observaciones } : null,
@@ -292,6 +302,40 @@ exports.mias = async (req, res) => {
     return res.json({ success: true, data: { asignado: true, mes, pendientes: Number(tot.pendientes || 0) }, error: null });
   } catch (e) {
     console.error('[certificacion mias]', e.message);
+    return res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* POST /api/certificacion/:id/carta-actualizada  {nombre, mime, data_base64}
+   Sube la carta ACTUALIZADA de la financiera (AutoFin la deja bajar días antes
+   de otorgar y los valores cambian). Se AGREGA como versión nueva en
+   cartas_documentos (tipo CARTA_FINANCIERA_ACTUALIZADA) — el original NUNCA se
+   reemplaza: el contraste original vs actualizada es justamente la evidencia. */
+exports.subirCartaActualizada = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'id inválido' });
+    const [[cr]] = await pool.query(
+      'SELECT c.num_op, ca.id AS id_carta FROM creditos c LEFT JOIN cartas_aprobacion ca ON ca.id_credito_creado = c.id WHERE c.id = ? LIMIT 1', [id]);
+    if (!cr) return res.status(404).json({ success: false, data: null, error: 'Crédito no encontrado' });
+    if (!cr.id_carta) return res.status(409).json({ success: false, data: null, error: 'La operación no tiene carta vinculada' });
+    const { nombre, mime, data_base64 } = req.body || {};
+    if (!data_base64) return res.status(400).json({ success: false, data: null, error: 'Archivo requerido' });
+    const buf = Buffer.from(String(data_base64).replace(/^data:[^;]+;base64,/, ''), 'base64');
+    if (!buf.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
+    if (buf.length > 12 * 1024 * 1024) return res.status(413).json({ success: false, data: null, error: 'Máximo 12 MB por archivo' });
+    const almacen = require('../../../../shared/almacen-docs');
+    const d = await almacen.colocar({ ambito: 'cartas', clave: cr.id_carta, buffer: buf, mime, nombre: nombre || 'carta-actualizada.pdf' });
+    const [r] = await pool.query(
+      `INSERT INTO cartas_documentos (id_carta, tipo, nombre, mime, tamano, data, doc_storage, doc_ruta, doc_bytes, subido_por, id_subido_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [cr.id_carta, 'CARTA_FINANCIERA_ACTUALIZADA', nombre || 'carta-actualizada.pdf', mime || 'application/pdf',
+       buf.length, d.blob, d.storage, d.ruta, d.bytes, req.user?.email || null, req.user?.id_usuario || null]);
+    auditar({ req, modulo: 'creditos', accion: 'SUBIR_CARTA_ACTUALIZADA', entidad: 'credito', entidad_id: String(cr.num_op),
+      detalle: `Subió carta actualizada de la financiera para la OP ${cr.num_op} (certificación)` });
+    return res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) {
+    console.error('[certificacion carta-actualizada]', e.message);
     return res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
