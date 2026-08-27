@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — fondo estudio del concurso -->
+<!-- v1.3 — tema musical propio estilo game-show (apertura + fanfarria final) · v1.2 — fondo estudio del concurso -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -172,6 +172,7 @@ function volverLobby() { pintarLobby(); }
 
 /* ── partida ── */
 function jugar(cat) {
+  temaConcurso();   // tema de apertura al entrar a la categoría
   CAT = cat; PTS = 0;
   COLA = DATA.filter(p => p.categoria === cat).sort(() => Math.random() - .5);
   siguiente(true);
@@ -227,6 +228,7 @@ function strike() {
 function rendirse() { Q.respuestas.forEach((r, i) => revelarSinPerm(i)); }
 function revelarSinPerm(i) { Q.respuestas[i]._rev = true; document.querySelectorAll('.panel')[i]?.classList.add('rev'); }
 function fin() {
+  temaConcurso(true);   // fanfarria de cierre con el puntaje
   $('juego').style.display = 'none'; $('fin').style.display = 'block';
   $('finTitulo').textContent = `¡Terminó "${CAT}"!`;
   $('finPts').textContent = PTS.toLocaleString('es-CL') + ' pts';
@@ -240,6 +242,44 @@ function dingg(freq, tipo) {
     g.gain.setValueAtTime(.25, ctx.currentTime);
     g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + .5);
     o.start(); o.stop(ctx.currentTime + .5);
+  } catch (_) {}
+}
+
+/* ── Tema del concurso (WebAudio, composición PROPIA estilo game-show de TV;
+   la música real de "¿Qué dice Chile?" tiene derechos del canal y no se puede
+   alojar acá). Bronces sawtooth + bajo + hi-hat de ruido, mismo motor que las
+   fanfarrias del ranking. */
+function temaConcurso(final) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const master = ctx.createGain(); master.gain.value = .5; master.connect(ctx.destination);
+    const nota = (f, t, dur, tipo, vol) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = tipo; o.frequency.value = f; o.connect(g); g.connect(master);
+      g.gain.setValueAtTime(0, ctx.currentTime + t);
+      g.gain.linearRampToValueAtTime(vol, ctx.currentTime + t + .02);
+      g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + t + dur);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + dur + .05);
+    };
+    const hit = t => {   // hi-hat: ráfaga corta de ruido
+      const n = ctx.createBufferSource(), b = ctx.createBuffer(1, 2205, 44100), d = b.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+      n.buffer = b; const g = ctx.createGain(); g.gain.value = .12; n.connect(g); g.connect(master);
+      n.start(ctx.currentTime + t);
+    };
+    const C4=262, E4=330, G4=392, A4=440, B4=494, C5=523, D5=587, E5=659, G5=784, C6=1047;
+    if (final) {
+      // Fanfarria de cierre: arpegio ascendente + acorde sostenido
+      [[C5,0],[E5,.14],[G5,.28],[C6,.42]].forEach(([f,t]) => nota(f,t,.5,'sawtooth',.22));
+      [C5,E5,G5].forEach(f => { nota(f,.62,1.1,'sawtooth',.16); nota(f/2,.62,1.1,'triangle',.2); });
+      [0,.14,.28,.42,.62].forEach(hit);
+      return;
+    }
+    // Apertura: riff enérgico de entrada (2 compases, ~2.6 s)
+    const riff = [[C5,0,.16],[C5,.2,.16],[G4,.4,.16],[A4,.6,.16],[B4,.8,.3],[G4,1.2,.16],[A4,1.4,.16],[B4,1.6,.16],[C5,1.8,.16],[D5,2.0,.5],[G5,2.2,.6]];
+    riff.forEach(([f,t,d]) => { nota(f,t,d,'sawtooth',.2); nota(f*2,t,d,'square',.05); });
+    [[C4,0,.4],[G4/2,.4,.4],[A4/2,.8,.4],[E4,1.2,.4],[C4,1.6,.4],[G4/2,2.0,.6]].forEach(([f,t,d]) => nota(f,t,d,'triangle',.28));
+    [0,.2,.4,.6,.8,1.0,1.2,1.4,1.6,1.8,2.0,2.2].forEach(hit);
   } catch (_) {}
 }
 
