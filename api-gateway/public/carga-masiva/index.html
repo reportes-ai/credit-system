@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Carga Masiva Operaciones — AutoFácil</title><!-- v6.4 -->
+  <title>Carga Masiva Operaciones — AutoFácil</title><!-- v6.5 — card Certificacion de Operaciones con badge de pendientes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -97,6 +97,14 @@
       <span id="cmDifBadge" style="display:none;position:absolute;top:14px;right:14px;background:#d97706;color:#fff;font-size:.72rem;font-weight:800;border-radius:12px;min-width:22px;height:22px;padding:0 7px;align-items:center;justify-content:center">0</span>
     </a>
 
+    <a class="module-card" href="/creditos/certificacion/" data-func="certificacion_ops" style="position:relative">
+      <div class="mc-icon"><i class="bi bi-patch-check"></i></div>
+      <h6>Certificación de Operaciones</h6>
+      <p>Revisión manual de los valores de cada otorgada del mes contra su carta (AUTOFIN: además contra Trinidad)</p>
+      <button class="btn-acceder"><i class="bi bi-arrow-right-circle"></i>Acceder</button>
+      <span id="cmCertBadge" style="display:none;position:absolute;top:14px;right:14px;background:#dc2626;color:#fff;font-size:.72rem;font-weight:800;border-radius:12px;min-width:22px;height:22px;padding:0 7px;align-items:center;justify-content:center">0</span>
+    </a>
+
     <a class="module-card" href="/cobranza/migracion-indexa/" data-func="cobranza_migracion_indexa">
       <div class="mc-icon"><i class="bi bi-bank2"></i></div>
       <h6>Migración Cartera INDEXA</h6>
@@ -154,6 +162,14 @@ if (!token || !yo) window.location.href = '/login.html';
     if (j.success && j.data.operaciones > 0) {
       const b = document.getElementById('cmDifBadge');
       b.textContent = j.data.operaciones; b.style.display = 'flex';
+    }
+  } catch(_) {}
+  try {
+    const r = await fetch('/api/certificacion/pendientes?estado=PENDIENTE', { headers:{ Authorization:'Bearer '+token } });
+    const j = await r.json();
+    if (j.success && j.data.pendientes > 0) {
+      const b = document.getElementById('cmCertBadge');
+      b.textContent = j.data.pendientes; b.style.display = 'flex';
     }
   } catch(_) {}
 })();

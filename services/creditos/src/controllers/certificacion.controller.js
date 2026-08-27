@@ -60,11 +60,12 @@ require('../../../../shared/migrate').enFila('certificacion-ops', async () => {
         asignado_por INT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`);
-    // Card + permisos (módulo Créditos = 4)
+    // Card + permisos (módulo Carga Masiva = 180001, ahí vive la revisión de lo cargado)
     await pool.query(`INSERT IGNORE INTO funcionalidades (id_funcionalidad, id_modulo, nombre, codigo, href, icono) VALUES
-      (7940001, 4, 'Certificación de Operaciones', 'certificacion_ops', '/creditos/certificacion/', 'bi-patch-check'),
-      (7940002, 4, 'Certificación — certificar operaciones', 'certificacion_certificar', NULL, NULL),
-      (7940003, 4, 'Certificación — administrar asignación', 'certificacion_admin', NULL, NULL)`);
+      (7940001, 180001, 'Certificación de Operaciones', 'certificacion_ops', '/creditos/certificacion/', 'bi-patch-check'),
+      (7940002, 180001, 'Certificación — certificar operaciones', 'certificacion_certificar', NULL, NULL),
+      (7940003, 180001, 'Certificación — administrar asignación', 'certificacion_admin', NULL, NULL)`);
+    await pool.query("UPDATE funcionalidades SET id_modulo = 180001 WHERE id_funcionalidad IN (7940001,7940002,7940003)");
     for (const like of ['ADMINISTRADOR%']) {
       const [[p]] = await pool.query('SELECT id_perfil FROM perfiles WHERE UPPER(nombre) LIKE ? ORDER BY id_perfil LIMIT 1', [like]);
       if (!p) continue;
