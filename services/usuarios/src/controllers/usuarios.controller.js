@@ -122,11 +122,8 @@ require('../../../../shared/migrate').enFila('usuarios', async () => {
     // M/F: para don/doña en el certificado de antigüedad y saludos
     await pool.query(`ALTER TABLE usuarios ADD COLUMN sexo CHAR(1) NULL DEFAULT NULL`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration sexo]', e.message); }
-  try {
-    // Bono Jefe Comercial: mes (YYYY-MM) desde el que rige la jefatura; antes de esa
-    // fecha su gente cuenta para el jefe titular del mes (la crea también bono-jefe.controller)
-    await pool.query(`ALTER TABLE usuarios ADD COLUMN jefatura_desde CHAR(7) NULL DEFAULT NULL`);
-  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration jefatura_desde]', e.message); }
+  // jefatura_desde (Bono Jefe Comercial) la crea SU dueño: bono-jefe.controller.js
+  // (un solo hogar para el DDL; acá solo se lee/escribe la columna)
   try {
     /* EXTERNO (Pato, 19-08-2026): usuario de fuera de la organización (directores,
        asesores). NO se considera en: avisos/correos por perfil o funcionalidad,
@@ -366,6 +363,12 @@ const createUsuario = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'RUT, nombre, apellido, email y perfil son requeridos' });
     }
 
+    // Jefatura desde (Bono Jefe Comercial): vacía = NULL; no vacía debe ser YYYY-MM
+    const jdCrear = String(req.body.jefatura_desde || '').trim();
+    if (jdCrear && !/^\d{4}-\d{2}$/.test(jdCrear)) {
+      return res.status(400).json({ success: false, data: null, error: 'Jefatura desde inválida: usa el formato AAAA-MM (ej. 2026-08)' });
+    }
+
     // "Solo otorgas lo que tienes": no-Admin no puede asignar un perfil con permisos que él no tenga
     if (!(await require('../otorgables').perfilOtorgable(req.usuario.id_usuario, id_perfil))) {
       return res.status(403).json({ success: false, data: null, error: 'No puedes asignar ese perfil: tiene permisos que tú no tienes' });
@@ -375,8 +378,8 @@ const createUsuario = async (req, res) => {
     const claveTemporal = generarClaveTemporal();
     const passwordHash = await bcrypt.hash(claveTemporal, 10);
     const [result] = await pool.query(
-      'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, fecha_ingreso, fecha_nacimiento, cargo, sexo, externo, debe_cambiar_clave, password_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())',
-      [RUT.normalizar(rut) || rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, req.body.externo ? 1 : 0]
+      'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, fecha_ingreso, fecha_nacimiento, cargo, sexo, externo, jefatura_desde, debe_cambiar_clave, password_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())',
+      [RUT.normalizar(rut) || rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, req.body.externo ? 1 : 0, jdCrear || null]
     );
 
     auditar({ req, accion: 'CREAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: result.insertId,
@@ -415,7 +418,7 @@ const updateUsuario = async (req, res) => {
 
     // "Solo otorgas lo que tienes": si el editor no-Admin CAMBIA el perfil, el nuevo
     // perfil debe estar contenido en sus propios permisos (mantener el actual sí se permite).
-    const [[act]] = await pool.query('SELECT id_perfil, estado FROM usuarios WHERE id_usuario=?', [id]);
+    const [[act]] = await pool.query('SELECT id_perfil, estado, jefatura_desde FROM usuarios WHERE id_usuario=?', [id]);
     if (act && Number(act.id_perfil) !== Number(id_perfil) &&
         !(await require('../otorgables').perfilOtorgable(req.usuario.id_usuario, id_perfil))) {
       return res.status(403).json({ success: false, data: null, error: 'No puedes asignar ese perfil: tiene permisos que tú no tienes' });
@@ -431,10 +434,14 @@ const updateUsuario = async (req, res) => {
     }
 
     // jefatura_desde (Bono Jefe Comercial): si el form no la envía (undefined) se
-    // preserva; enviada vacía se limpia; enviada YYYY-MM se escribe.
+    // preserva; enviada vacía se limpia; enviada YYYY-MM se escribe. Un valor no
+    // vacío malformado se RECHAZA (nunca limpiar por un typo: mueve bonos cerrados).
     const jdSet = req.body.jefatura_desde !== undefined ? 1 : null;
     const jdRaw = String(req.body.jefatura_desde || '').trim();
-    const jdVal = /^\d{4}-\d{2}$/.test(jdRaw) ? jdRaw : null;
+    if (jdSet && jdRaw && !/^\d{4}-\d{2}$/.test(jdRaw)) {
+      return res.status(400).json({ success: false, data: null, error: 'Jefatura desde inválida: usa el formato AAAA-MM (ej. 2026-08)' });
+    }
+    const jdVal = jdRaw || null;
 
     await pool.query(
       // COALESCE: si el form no envía los campos RRHH (undefined), se preservan los existentes
@@ -457,8 +464,13 @@ const updateUsuario = async (req, res) => {
       try { await cerrarSesiones(id); } catch (e) { console.error('[usuarios] cerrarSesiones:', e.message); }
     }
 
+    // La jefatura mueve dinero (Bono Jefe): el cambio queda con valor anterior y nuevo
+    const jdCambio = jdSet && String(act?.jefatura_desde || '') !== String(jdVal || '');
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id,
-      detalle: `Editó el usuario ${nombre} ${apellido} (${email}) — perfil #${perfilFinal}, estado ${estadoFinal}`, meta: { email, id_perfil: perfilFinal, estado: estadoFinal } });
+      detalle: `Editó el usuario ${nombre} ${apellido} (${email}) — perfil #${perfilFinal}, estado ${estadoFinal}` +
+        (jdCambio ? ` — jefatura_desde: ${act?.jefatura_desde || '(histórica)'} → ${jdVal || '(histórica)'}` : ''),
+      meta: { email, id_perfil: perfilFinal, estado: estadoFinal,
+        ...(jdCambio ? { jefatura_desde_antes: act?.jefatura_desde || null, jefatura_desde_ahora: jdVal } : {}) } });
     res.json({ success: true, data: { id_usuario: id, nombre, apellido, email, id_perfil: perfilFinal, estado: estadoFinal }, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });

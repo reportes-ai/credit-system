@@ -228,13 +228,18 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
     if (idJefe) {
       try {
         const [todos] = await pool.query(
-          `SELECT j.id_usuario, j.jefatura_desde FROM usuarios j
-            WHERE j.estado='activo'
-              AND EXISTS (SELECT 1 FROM usuarios e JOIN perfiles p ON p.id_perfil=e.id_perfil
+          `SELECT j.id_usuario, j.jefatura_desde, j.estado FROM usuarios j
+            WHERE EXISTS (SELECT 1 FROM usuarios e JOIN perfiles p ON p.id_perfil=e.id_perfil
                            WHERE e.id_supervisor = j.id_usuario AND p.nombre='Ejecutivo Comercial')`);
+        // noVigentes SIN filtro de estado: si el jefe se inactiva después (renuncia),
+        // su gente igual rueda al titular en los meses históricos ya cerrados.
         const noVigentes = todos.filter(j => j.jefatura_desde && j.jefatura_desde > mes);
         const vigentes   = todos.filter(j => !j.jefatura_desde || j.jefatura_desde <= mes);
-        const titular = jefeTitular(vigentes);
+        // Titular entre los vigentes ACTIVOS (un ex-jefe con id_supervisor obsoleto no
+        // puede ganar); si no queda ninguno activo (el titular se inactivó después),
+        // cae al vigente más antiguo aunque esté inactivo — el mes cerrado no cambia.
+        const activos = vigentes.filter(j => j.estado === 'activo');
+        const titular = jefeTitular(activos.length ? activos : vigentes);
         if (noVigentes.length && titular && titular.id_usuario === idJefe)
           supervisores = [idJefe, ...noVigentes.map(j => j.id_usuario)];
       } catch (e) {

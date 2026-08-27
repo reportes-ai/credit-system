@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
+<!-- v1.7 — footer: variable Jefatura desde (ficha de Usuarios) y su efecto en meses historicos. v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bono Jefe Comercial — AutoFácil</title>
@@ -204,6 +204,7 @@
         <li><b>Pilares y ponderaciones</b> → puntajes del <a href="/comisiones/bono-jefe/">BSC Bono Jefe Comercial</a> (pestaña BSC del mes)</li>
         <li><b>Curva del premio (mín/máx/%/k/fijo)</b> → premio variable y renta total del Jefe Comercial en el mismo BSC e informe paso a paso</li>
         <li><b>Fecha de ingreso / baja</b> de cada Ejecutivo Comercial (se edita en <a href="/usuarios/">Usuarios</a>, no aquí) → define quién compone el equipo de CADA mes y por tanto el promedio y el score</li>
+        <li><b>Jefatura desde</b> de cada Jefe Comercial (se edita en <a href="/usuarios/">Usuarios</a>, no aquí) → define desde qué mes ese jefe se mide por su gente; en los meses ANTERIORES su equipo cuenta para el jefe <b>titular</b> de ese mes (vacía = jefatura histórica). Cambiarla mueve el bono de meses ya informados</li>
         <li><b>Vigencia desde / hasta</b> → define en qué meses rige este juego de variables. Los meses anteriores conservan las variables que tenían (no se recalculan) y un <b>mes cerrado no se puede tocar</b></li>
         <li><b>Cada guardado</b> → queda en la <b>Bitácora de cambios</b> (pestaña de al lado): autor, fecha y hora, antes/después de cada variable y el efecto en el bono. Es inmutable y su acceso se designa por perfil (permiso <code>bono_jefe_bitacora</code> en <a href="/usuarios/perfiles.html">Perfiles</a>)</li>
         <li><b>Definición de los pilares</b> (créditos y montos OTORGADOS · dealers nuevos que CURSARON) → documentada en <a href="/mantenedores/documentacion/procesos.html#p37">Procesos §37</a></li>
