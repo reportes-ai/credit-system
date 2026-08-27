@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.7 — footer: variable Jefatura desde (ficha de Usuarios) y su efecto en meses historicos. v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
+<!-- v1.8 — bitacora POR JEFE: la simulacion antes/despues se calcula para cada Jefe Comercial (los totales son la suma) y el detalle lo muestra por jefe. v1.7 — footer: variable Jefatura desde (ficha de Usuarios) y su efecto en meses historicos. v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bono Jefe Comercial — AutoFácil</title>
@@ -308,7 +308,12 @@ async function verCambio(id){
       <div class="umb"><h6>Bono con variables nuevas</h6><div style="font-size:1.1rem;font-weight:800">${d.bono_despues==null?'—':clp(d.bono_despues)}</div></div>
       <div class="umb"><h6>Diferencia</h6><div style="font-size:1.1rem;font-weight:800;color:${col}">${dif==null?'—':(dif>0?'+':'')+clp(dif)}</div></div>
     </div>
-    <p style="font-size:.76rem;color:#64748b;margin-bottom:10px">Simulación sobre el mes <b>${esc(d.mes_simulado||'—')}</b>: mismas métricas del equipo, calculadas con las variables antiguas y con las nuevas (total variable, con semana corrida).</p>
+    ${(d.jefes||[]).length ? `
+    <table style="margin-bottom:12px"><thead><tr><th class="nom">Jefe Comercial</th><th class="nom">Bono antes</th><th class="nom">Bono después</th><th class="nom">Diferencia</th></tr></thead>
+      <tbody>${d.jefes.map(x=>{const dj=x.despues-x.antes;const cj=dj>0?'#166534':(dj<0?'#b91c1c':'#64748b');
+        return `<tr><td class="nom">${esc(x.nombre||('#'+x.id_usuario))}</td><td class="nom">${clp(x.antes)}</td><td class="nom">${clp(x.despues)}</td><td class="nom" style="color:${cj};font-weight:700">${(dj>0?'+':'')+clp(dj)}</td></tr>`;}).join('')}
+      </tbody></table>` : ''}
+    <p style="font-size:.76rem;color:#64748b;margin-bottom:10px">Simulación sobre el mes <b>${esc(d.mes_simulado||'—')}</b>: mismas métricas, calculadas con las variables antiguas y con las nuevas (total variable, con semana corrida)${(d.jefes||[]).length ? ' — un bono por cada Jefe Comercial; los totales de arriba son la suma' : ''}.</p>
     <table><thead><tr><th class="nom">Variable</th><th class="nom">Antes</th><th class="nom">Después</th><th></th></tr></thead>
       <tbody>${filas}</tbody></table>`;
   document.getElementById('dlgBit').showModal();

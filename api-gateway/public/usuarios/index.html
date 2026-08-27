@@ -133,7 +133,7 @@
 </head>
 <body>
 
-  <!-- TOPNAV (componente) — v116.20: campo Jefatura desde (Bono Jefe Comercial) en la ficha -->
+  <!-- TOPNAV (componente) — v116.21: Jefatura desde con validacion cliente (pattern + guard en guardarUsuario) -->
   <div id="af-topnav"></div>
   <script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Usuarios',icon:'bi-people-fill',current:true}]};</script>
 
@@ -785,7 +785,7 @@
             </div>
             <div class="col-md-6">
               <label class="form-label">Jefatura desde <i class="bi bi-diagram-3" title="Bono Jefe Comercial: mes desde el que rige su jefatura. Los meses ANTERIORES su gente cuenta para el jefe titular de ese mes. Vacío = jefatura histórica (desde siempre). Solo aplica a quienes supervisan Ejecutivos Comerciales."></i></label>
-              <input type="month" id="uJefaturaDesde" class="form-control">
+              <input type="month" id="uJefaturaDesde" class="form-control" pattern="\d{4}-(0[1-9]|1[0-2])" placeholder="AAAA-MM">
             </div>
             <div class="col-md-6" id="campoEstado" style="display:none">
               <label class="form-label">Estado</label>
@@ -1237,6 +1237,15 @@
       const errEl = document.getElementById('modalError');
       errEl.classList.add('d-none');
 
+      // Espejo de la validación del servidor: en navegadores sin type=month el campo
+      // degrada a texto libre y un formato malo bloquearía TODO el guardado con un 400.
+      const jdv = document.getElementById('uJefaturaDesde').value.trim();
+      if (jdv && !/^\d{4}-(0[1-9]|1[0-2])$/.test(jdv)) {
+        errEl.textContent = 'Jefatura desde inválida: usa el formato AAAA-MM con mes 01–12 (ej. 2026-08), o déjala vacía.';
+        errEl.classList.remove('d-none');
+        return;
+      }
+
       const body = {
         rut: document.getElementById('uRut').value.trim(),
         nombre: document.getElementById('uNombre').value.trim(),
@@ -1252,7 +1261,7 @@
         externo: document.getElementById('uExterno').checked ? 1 : 0,
         id_perfil: document.getElementById('uPerfil').value,
         id_supervisor: document.getElementById('uSupervisor').value || null,
-        jefatura_desde: document.getElementById('uJefaturaDesde').value || '',
+        jefatura_desde: jdv,
         estado: document.getElementById('uEstado').value || 'activo'
       };
 

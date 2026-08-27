@@ -156,7 +156,12 @@ function premioDe(score, cfg, mes) {
    antigua o sin fecha). Caso real: Damaris asume en ago-2026 — la producción de
    julio-2026 es completa de Álvaro y queda cerrada así (Pato 26-08-2026). */
 require('../../../../shared/migrate').enFila('bono-jefe-jefatura', async () => {
-  await pool.query("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS jefatura_desde CHAR(7) NULL");
+  // Sintaxis portable (MySQL 8 no soporta ADD COLUMN IF NOT EXISTS): errno 1060 = ya existe
+  try { await pool.query("ALTER TABLE usuarios ADD COLUMN jefatura_desde CHAR(7) NULL"); }
+  catch (e) { if (e.errno !== 1060) throw e; }
+  // Bitácora por jefe: antes/después del bono de CADA Jefe Comercial en la simulación
+  try { await pool.query("ALTER TABLE bono_jefe_versiones ADD COLUMN detalle_jefes TEXT NULL"); }
+  catch (e) { if (e.errno !== 1060) throw e; }
 });
 require('../../../../shared/migrate').migrar('bono-jefe-jefatura-damaris-v1', async () => {
   const [r] = await pool.query(
@@ -228,18 +233,20 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
     if (idJefe) {
       try {
         const [todos] = await pool.query(
-          `SELECT j.id_usuario, j.jefatura_desde, j.estado FROM usuarios j
+          `SELECT j.id_usuario, j.jefatura_desde,
+                  (j.estado='activo' OR (j.fecha_baja IS NOT NULL AND j.fecha_baja >= CONCAT(?, '-01'))) AS vigente_mes
+             FROM usuarios j
             WHERE EXISTS (SELECT 1 FROM usuarios e JOIN perfiles p ON p.id_perfil=e.id_perfil
-                           WHERE e.id_supervisor = j.id_usuario AND p.nombre='Ejecutivo Comercial')`);
+                           WHERE e.id_supervisor = j.id_usuario AND p.nombre='Ejecutivo Comercial')`, [mes]);
         // noVigentes SIN filtro de estado: si el jefe se inactiva después (renuncia),
         // su gente igual rueda al titular en los meses históricos ya cerrados.
         const noVigentes = todos.filter(j => j.jefatura_desde && j.jefatura_desde > mes);
         const vigentes   = todos.filter(j => !j.jefatura_desde || j.jefatura_desde <= mes);
-        // Titular entre los vigentes ACTIVOS (un ex-jefe con id_supervisor obsoleto no
-        // puede ganar); si no queda ninguno activo (el titular se inactivó después),
-        // cae al vigente más antiguo aunque esté inactivo — el mes cerrado no cambia.
-        const activos = vigentes.filter(j => j.estado === 'activo');
-        const titular = jefeTitular(activos.length ? activos : vigentes);
+        // Titular: quien estaba vigente EN el mes evaluado (activo hoy, o con fecha_baja
+        // posterior al inicio del mes). Estable en el tiempo: una renuncia futura no
+        // reasigna un mes cerrado, y un ex-jefe antiguo con id_supervisor obsoleto no gana.
+        const delMes = vigentes.filter(j => j.vigente_mes);
+        const titular = jefeTitular(delMes.length ? delMes : vigentes);
         if (noVigentes.length && titular && titular.id_usuario === idJefe)
           supervisores = [idJefe, ...noVigentes.map(j => j.id_usuario)];
       } catch (e) {
@@ -506,21 +513,39 @@ const setVariables = async (req, res) => {
       if (String(rawAntes[k] ?? '') !== String(rawDespues[k] ?? '')) difs.push(k);
     }
     // Efecto en el bono: mismo mes y mismas métricas, config vieja vs nueva.
-    let bonoAntes = null, bonoDespues = null, mesSim = desde;
+    // POR JEFE: desde ago-2026 hay más de un Jefe Comercial — se simula el bono de
+    // cada uno (antes/después) y los totales son la suma; así la bitácora cuadra
+    // con lo que muestra cada pestaña del BSC (Pato 27-08-2026).
+    let bonoAntes = null, bonoDespues = null, mesSim = desde, detalleJefes = null;
     try {
-      const a = await calcularBSC(mesSim, cfgDe(rawAntes));
-      const d = await calcularBSC(mesSim, cfgDe(rawDespues));
-      bonoAntes = Math.round(a.premio.total_variable);
-      bonoDespues = Math.round(d.premio.total_variable);
+      const jefesSim = await jefesComerciales(mesSim);
+      if (jefesSim.length) {
+        const det = [];
+        for (const jf of jefesSim) {
+          const a = await calcularBSC(mesSim, cfgDe(rawAntes), jf.id_usuario);
+          const d = await calcularBSC(mesSim, cfgDe(rawDespues), jf.id_usuario);
+          det.push({ id_usuario: jf.id_usuario, nombre: jf.nombre,
+            antes: Math.round(a.premio.total_variable), despues: Math.round(d.premio.total_variable) });
+        }
+        detalleJefes = det;
+        bonoAntes = det.reduce((s, x) => s + x.antes, 0);
+        bonoDespues = det.reduce((s, x) => s + x.despues, 0);
+      } else {
+        const a = await calcularBSC(mesSim, cfgDe(rawAntes));
+        const d = await calcularBSC(mesSim, cfgDe(rawDespues));
+        bonoAntes = Math.round(a.premio.total_variable);
+        bonoDespues = Math.round(d.premio.total_variable);
+      }
     } catch (e) { console.error('[bono-jefe simulación]', e.message); }
 
     const nom = [req.usuario?.nombre, req.usuario?.apellido].filter(Boolean).join(' ') || req.usuario?.email || 'Sistema';
     await pool.query(
       `INSERT INTO bono_jefe_versiones (vigente_desde, vigente_hasta, valores, anterior, n_cambios,
-         bono_antes, bono_despues, mes_simulado, id_usuario, usuario_nombre)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+         bono_antes, bono_despues, mes_simulado, detalle_jefes, id_usuario, usuario_nombre)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [desde, hasta || null, JSON.stringify(despues), JSON.stringify(antes), difs.length,
-       bonoAntes, bonoDespues, mesSim, req.usuario?.id_usuario || null, nom]);
+       bonoAntes, bonoDespues, mesSim, detalleJefes ? JSON.stringify(detalleJefes) : null,
+       req.usuario?.id_usuario || null, nom]);
 
     auditar({ req, accion: 'EDITAR', modulo: 'bono-jefe', entidad: 'variables', entidad_id: 1,
       detalle: `Variables BSC Jefe Comercial (vigencia ${desde} → ${hasta || 'indefinido'}): ${cambios.join(', ')}` });
@@ -577,6 +602,7 @@ const getBitacoraDetalle = async (req, res) => {
       vigente_desde: v.vigente_desde, vigente_hasta: v.vigente_hasta, mes_simulado: v.mes_simulado,
       bono_antes: v.bono_antes, bono_despues: v.bono_despues,
       bono_diferencia: (v.bono_despues == null || v.bono_antes == null) ? null : v.bono_despues - v.bono_antes,
+      jefes: (() => { try { const a = typeof v.detalle_jefes === 'string' ? JSON.parse(v.detalle_jefes) : v.detalle_jefes; return Array.isArray(a) ? a : null; } catch { return null; } })(),
       detalle,
     }, error: null });
   } catch (e) { console.error('[bono-jefe bitacora det]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }

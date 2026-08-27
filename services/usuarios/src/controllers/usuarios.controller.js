@@ -122,8 +122,12 @@ require('../../../../shared/migrate').enFila('usuarios', async () => {
     // M/F: para don/doña en el certificado de antigüedad y saludos
     await pool.query(`ALTER TABLE usuarios ADD COLUMN sexo CHAR(1) NULL DEFAULT NULL`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration sexo]', e.message); }
-  // jefatura_desde (Bono Jefe Comercial) la crea SU dueño: bono-jefe.controller.js
-  // (un solo hogar para el DDL; acá solo se lee/escribe la columna)
+  try {
+    // Bono Jefe Comercial: mes (YYYY-MM) desde el que rige la jefatura. También la crea
+    // bono-jefe.controller, pero usuarios se monta ANTES en el gateway y sus queries la
+    // nombran sin fallback: el ALTER idempotente acá evita 500 en hosts nuevos.
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN jefatura_desde CHAR(7) NULL DEFAULT NULL`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration jefatura_desde]', e.message); }
   try {
     /* EXTERNO (Pato, 19-08-2026): usuario de fuera de la organización (directores,
        asesores). NO se considera en: avisos/correos por perfil o funcionalidad,
@@ -355,6 +359,10 @@ const getUsuarioById = async (req, res) => {
   }
 };
 
+// Mes válido para jefatura_desde: AAAA-MM con mes real 01–12 ('2026-13' NO pasa —
+// un mes imposible deja al jefe como no-vigente para siempre, sin síntoma visible)
+const MES_JEFATURA_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 const createUsuario = async (req, res) => {
   try {
     const { rut, nombre, apellido, apellido_materno, centro_costo, email, id_perfil, id_supervisor, telefono, fecha_ingreso, fecha_nacimiento, cargo, sexo } = req.body;
@@ -365,8 +373,8 @@ const createUsuario = async (req, res) => {
 
     // Jefatura desde (Bono Jefe Comercial): vacía = NULL; no vacía debe ser YYYY-MM
     const jdCrear = String(req.body.jefatura_desde || '').trim();
-    if (jdCrear && !/^\d{4}-\d{2}$/.test(jdCrear)) {
-      return res.status(400).json({ success: false, data: null, error: 'Jefatura desde inválida: usa el formato AAAA-MM (ej. 2026-08)' });
+    if (jdCrear && !MES_JEFATURA_RE.test(jdCrear)) {
+      return res.status(400).json({ success: false, data: null, error: 'Jefatura desde inválida: usa el formato AAAA-MM con mes 01–12 (ej. 2026-08)' });
     }
 
     // "Solo otorgas lo que tienes": no-Admin no puede asignar un perfil con permisos que él no tenga
@@ -383,7 +391,9 @@ const createUsuario = async (req, res) => {
     );
 
     auditar({ req, accion: 'CREAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: result.insertId,
-      detalle: `Creó el usuario ${nombre} ${apellido} (${email}) con perfil #${id_perfil}`, rut, meta: { rut, email, id_perfil } });
+      detalle: `Creó el usuario ${nombre} ${apellido} (${email}) con perfil #${id_perfil}` +
+        (jdCrear ? ` — jefatura_desde: ${jdCrear}` : ''),
+      rut, meta: { rut, email, id_perfil, ...(jdCrear ? { jefatura_desde: jdCrear } : {}) } });
 
     // Enviar la clave temporal por correo. Si falla, se devuelve para entrega manual (no aborta la creación).
     const c = correoClave(nombre, email, claveTemporal, false);
@@ -419,6 +429,7 @@ const updateUsuario = async (req, res) => {
     // "Solo otorgas lo que tienes": si el editor no-Admin CAMBIA el perfil, el nuevo
     // perfil debe estar contenido en sus propios permisos (mantener el actual sí se permite).
     const [[act]] = await pool.query('SELECT id_perfil, estado, jefatura_desde FROM usuarios WHERE id_usuario=?', [id]);
+    if (!act) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
     if (act && Number(act.id_perfil) !== Number(id_perfil) &&
         !(await require('../otorgables').perfilOtorgable(req.usuario.id_usuario, id_perfil))) {
       return res.status(403).json({ success: false, data: null, error: 'No puedes asignar ese perfil: tiene permisos que tú no tienes' });
@@ -438,8 +449,8 @@ const updateUsuario = async (req, res) => {
     // vacío malformado se RECHAZA (nunca limpiar por un typo: mueve bonos cerrados).
     const jdSet = req.body.jefatura_desde !== undefined ? 1 : null;
     const jdRaw = String(req.body.jefatura_desde || '').trim();
-    if (jdSet && jdRaw && !/^\d{4}-\d{2}$/.test(jdRaw)) {
-      return res.status(400).json({ success: false, data: null, error: 'Jefatura desde inválida: usa el formato AAAA-MM (ej. 2026-08)' });
+    if (jdSet && jdRaw && !MES_JEFATURA_RE.test(jdRaw)) {
+      return res.status(400).json({ success: false, data: null, error: 'Jefatura desde inválida: usa el formato AAAA-MM con mes 01–12 (ej. 2026-08)' });
     }
     const jdVal = jdRaw || null;
 
