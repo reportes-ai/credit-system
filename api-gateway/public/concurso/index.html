@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 -->
+<!-- v1.2 — fondo estudio del concurso -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +9,12 @@
   :root { --azul:#0a2a7a; --azul2:#1442b8; --cel:#19b8ff; --oro:#ffd23e; }
   * { box-sizing:border-box; }
   body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; color:#fff;
-    background:radial-gradient(1300px 700px at 50% -10%, #1a3fae 0%, #0a2a7a 55%, #051745 100%); min-height:100vh; }
+    /* Fondo: estudio del concurso (imagen de Pato); velo oscuro encima para que
+       las tarjetas y preguntas sigan legibles. Fija al hacer scroll. */
+    background:linear-gradient(rgba(4,12,45,.72), rgba(4,12,45,.82)),
+      url('/img/concurso-fondo.jpg') center top / cover no-repeat fixed,
+      radial-gradient(1300px 700px at 50% -10%, #1a3fae 0%, #0a2a7a 55%, #051745 100%);
+    min-height:100vh; }
   .top { display:flex; align-items:center; gap:14px; padding:14px 22px; }
   .top h1 { font-size:1.5rem; margin:0; font-weight:900; letter-spacing:.5px; text-shadow:0 3px 8px rgba(0,0,0,.4); }
   .top h1 b { color:var(--oro); }
