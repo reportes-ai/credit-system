@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v2.1 — modo Modificacion precarga los locales adicionales existentes del dealer · v2.0 — multi-local: locales en OTROS parques con tabla de comision POR local (locales_json; al cerrar sella dealer_locales/dealer_comisiones) · v1.36 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
+  <!-- v2.2 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js): datalist desde AF_BANCOS y normalizacion por AF_BANCO_CANON (alias CHILE/BCI/BBVA...). v2.1 — modo Modificacion precarga los locales adicionales existentes del dealer · v2.0 — multi-local: locales en OTROS parques con tabla de comision POR local (locales_json; al cerrar sella dealer_locales/dealer_comisiones) · v1.36 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -301,13 +301,10 @@
                Con select, tipear saltaba por primera letra (C→Coopeuch) y un valor
                importado fuera de la lista dejaba el campo vacío al imprimir. -->
           <input id="banco" list="bancosLista" placeholder="Escribe para buscar…" autocomplete="off" oninput="actualizarTercero()" onchange="bancoCanonico();actualizarTercero()" onblur="bancoCanonico()">
-          <datalist id="bancosLista">
-            <option>Banco de Chile</option><option>BancoEstado</option><option>Banco Santander</option>
-            <option>BCI</option><option>Itaú</option><option>Scotiabank</option><option>Banco Security</option>
-            <option>Banco Falabella</option><option>Banco Ripley</option><option>Banco Consorcio</option>
-            <option>Banco BICE</option><option>Banco Internacional</option><option>Banco BTG Pactual</option>
-            <option>Coopeuch</option><option>Banco del Desarrollo</option><option>HSBC</option><option>Tenpo</option><option>Mercado Pago</option>
-          </datalist></div>
+          <datalist id="bancosLista"></datalist>
+          <script src="/js/bancos-cl.js"></script>
+          <script>/* MOTOR ÚNICO de bancos: la lista vive en /js/bancos-cl.js, no acá */
+            document.getElementById('bancosLista').innerHTML = AF_BANCOS.map(b=>'<option>'+b+'</option>').join('');</script></div>
         <div class="fld"><label>Email Confirmación</label><input id="correo_confirmacion" type="email" oninput="onEmail(this,'ecEmailHint')"><small id="ecEmailHint" class="vmsg"></small></div>
       </div>
     </div>
@@ -671,11 +668,10 @@ function bancosLista(){ return [...document.querySelectorAll('#bancosLista optio
 function bancoEnLista(v){ const n=String(v||'').trim().toLowerCase(); return bancosLista().some(b=>b.toLowerCase()===n); }
 function bancoCanonico(){
   const el=$('banco'); const v=String(el.value||'').trim(); if(!v) { el.style.borderColor=''; return; }
-  const n=v.toLowerCase();
-  let m = bancosLista().filter(b=>b.toLowerCase()===n);                    // 1) igual exacto
-  if(!m.length) m = bancosLista().filter(b=>b.toLowerCase().includes(n));  // 2) contiene lo escrito
-  if(m.length===1){ el.value=m[0]; el.style.borderColor=''; }
-  else el.style.borderColor = bancoEnLista(v) ? '' : '#dc2626';
+  // MOTOR ÚNICO (/js/bancos-cl.js): resuelve exacto, alias legado (CHILE, BCI, BBVA…) y substring único
+  const a = window.AF_BANCO_CANON && AF_BANCO_CANON(v);
+  if(a){ el.value=a; el.style.borderColor=''; return; }
+  el.style.borderColor = bancoEnLista(v) ? '' : '#dc2626';
 }
 function onTipoCuenta(){
   const ct = calcCuentaTipo();
@@ -683,7 +679,7 @@ function onTipoCuenta(){
   b.textContent = ct==='EMPRESA' ? 'Empresa' : ct==='PERSONA' ? 'Persona' : '—';
   b.className = 'badge-auto' + (ct==='EMPRESA'?' emp':ct==='PERSONA'?' per':'');
   // Cuenta RUT → sólo BancoEstado (se selecciona y bloquea automáticamente)
-  if($('tipo_cuenta').value==='Cuenta RUT'){ $('banco').value='BancoEstado'; $('banco').disabled=true; }
+  if($('tipo_cuenta').value==='Cuenta RUT'){ $('banco').value='BANCO ESTADO'; $('banco').disabled=true; }
   else { $('banco').disabled=false; }
 }
 

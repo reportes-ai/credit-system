@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.23 — multi-local: locales con tabla POR local en el modal Editar Dealer (solo lectura) y en la vista de ficha (LOCALES ADICIONALES) · v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
+  <!-- v1.24 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js). v1.23 — multi-local: locales con tabla POR local en el modal Editar Dealer (solo lectura) y en la vista de ficha (LOCALES ADICIONALES) · v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -104,13 +104,10 @@
       <div class="fld"><label>Contacto</label><input id="d_contacto"></div>
       <div class="fld"><label>Teléfono</label><input id="d_telefono"></div>
       <div class="fld"><label>Correo</label><input id="d_correo"></div>
-      <div class="fld"><label>Banco</label><input id="d_banco" list="d_bancosLista" placeholder="Escribe para buscar…" autocomplete="off" onblur="dBancoCanonico()"><datalist id="d_bancosLista">
-        <option>Banco de Chile</option><option>BancoEstado</option><option>Banco Santander</option>
-        <option>BCI</option><option>Itaú</option><option>Scotiabank</option><option>Banco Security</option>
-        <option>Banco Falabella</option><option>Banco Ripley</option><option>Banco Consorcio</option>
-        <option>Banco BICE</option><option>Banco Internacional</option><option>Banco BTG Pactual</option>
-        <option>Coopeuch</option><option>Banco del Desarrollo</option><option>HSBC</option><option>Tenpo</option><option>Mercado Pago</option>
-      </datalist></div>
+      <div class="fld"><label>Banco</label><input id="d_banco" list="d_bancosLista" placeholder="Escribe para buscar…" autocomplete="off" onblur="dBancoCanonico()"><datalist id="d_bancosLista"><!-- MOTOR ÚNICO: se llena desde /js/bancos-cl.js -->
+      </datalist>
+      <script src="/js/bancos-cl.js"></script>
+      <script>document.getElementById('d_bancosLista').innerHTML = AF_BANCOS.map(b=>'<option>'+b+'</option>').join('');</script></div>
       <div class="fld"><label>N° Cuenta</label><input id="d_num_cuenta"></div>
       <div class="fld"><label>RUT Pago</label><input id="d_rut_pago"></div>
       <div class="fld"><label>Activo</label><select id="d_activo"><option value="1">Sí</option><option value="0">No</option></select></div>
@@ -669,7 +666,13 @@ function dCanonico(inputId, dl){
   el.style.borderColor = ok ? '' : '#dc2626';
   return ok;
 }
-const dBancoCanonico = () => dCanonico('d_banco','d_bancosLista');
+const dBancoCanonico = () => {
+  // MOTOR ÚNICO (/js/bancos-cl.js): exacto, alias legado (CHILE, BCI, BBVA…) o substring único
+  const el = $('d_banco');
+  const a = window.AF_BANCO_CANON && AF_BANCO_CANON(el.value);
+  if (a) { el.value = a; el.style.borderColor = ''; return true; }
+  return dCanonico('d_banco','d_bancosLista');
+};
 async function cargarParquesLista(){
   try {
     const j = await (await fetch('/api/parques-comisiones?activos=1',{headers:H})).json();
