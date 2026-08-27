@@ -199,6 +199,20 @@ const updateCredito = async (req, res) => {
     if (mes && await isMesCerrado(mes))
       return res.status(403).json({ success: false, data: null, error: `Mes ${mes} cerrado — no se permiten modificaciones` });
 
+    /* CANDADO: operación CERTIFICADA = valores finales. Los campos que pasaron
+       por Certificación de Operaciones (vehículo, pie, saldo, monto, seguros,
+       plazo, tasa) no se editan más por acá — solo Administrador puede, y queda
+       en el log. Los demás campos siguen editables. */
+    try {
+      const CERT_CAMPOS = require('./certificacion.controller').CAMPOS_CERTIFICABLES;
+      const tocaCert = Object.keys(cambios).filter(c => CERT_CAMPOS.includes(c));
+      if (tocaCert.length && req.user?.perfil_nombre !== 'Administrador') {
+        const [[cert]] = await pool.query('SELECT certificado_nombre FROM certificacion_ops WHERE id_credito = ? LIMIT 1', [id]);
+        if (cert) return res.status(403).json({ success: false, data: null,
+          error: `Operación certificada por ${cert.certificado_nombre || 'el área de crédito'} — ${tocaCert.join(', ')} son valores finales (solo Administrador puede modificarlos)` });
+      }
+    } catch (e) { console.error('[edicion candado cert]', e.message); }
+
     // Filtrar solo campos permitidos
     const colsValidas = new Set(CAMPOS_EDIT.map(c => c.col));
     const sets = [], vals = [], logEntries = [];

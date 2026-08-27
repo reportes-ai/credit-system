@@ -21,6 +21,7 @@
 const pool = require('../../../../shared/config/database');
 const { ETAPA_SQL } = require('../../../../shared/etapa-credito');
 const { auditar } = require('../../../../shared/audit');
+const { recalcularPorOps } = require('../utils/recalcular-mes');
 
 /* Catálogo ÚNICO de campos certificables: columna en creditos ↔ columna en la
    carta. Todo (detalle, certificar, reporte) sale de acá — nada hardcodeado
@@ -190,7 +191,23 @@ exports.certificar = async (req, res) => {
        cambios.length ? JSON.stringify(cambios) : null, obs]);
     auditar({ req, modulo: 'creditos', accion: 'CERTIFICAR', entidad: 'credito', entidad_id: cr.num_op,
       detalle: `Certificó OP ${cr.num_op} (${cr.mes_otorgado})${cambios.length ? ' con ' + cambios.length + ' corrección(es): ' + cambios.map(c => `${c.label} ${c.antes}→${c.despues}`).join('; ') : ' sin cambios'}` });
-    return res.json({ success: true, data: { certificada: true, cambios }, error: null });
+
+    // Las diferencias de carga abiertas de esta op quedan resueltas por la certificación
+    // (la revisión manual ES la decisión de cuál valor vale).
+    await pool.query(
+      `UPDATE carga_diferencias SET estado = 'RESUELTA', eleccion = 'CERTIFICACION',
+              resuelto_por = ?, resuelto_at = NOW() WHERE id_credito = ? AND estado = 'PENDIENTE'`,
+      [req.user.nombre || String(req.user.id_usuario), id]).catch(() => {});
+
+    /* PROPAGACIÓN: los valores certificados son los FINALES. Se recalcula el mes
+       completo de la op por el MOTOR ÚNICO (recalcular-mes.js): comisión dealer,
+       comisión/arriendo de parque, ingreso por colocación, comisiones de seguros
+       e ingreso neto. Dashboard, comisiones de ejecutivos, rentabilidad y
+       reportería leen esas columnas de `creditos` en vivo, así que quedan
+       consistentes solos (Máxima 2). Respeta forzados y meses cerrados.
+       Fire-and-forget, igual que en Edición de Créditos. */
+    if (cambios.length) recalcularPorOps(id).catch(e => console.error('[recalc certificacion]', e.message));
+    return res.json({ success: true, data: { certificada: true, cambios, recalculo: cambios.length > 0 }, error: null });
   } catch (e) {
     console.error('[certificacion certificar]', e.message);
     return res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -266,3 +283,6 @@ exports.mias = async (req, res) => {
     return res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
+
+// Para el candado de Edición de Créditos: qué campos quedan FINALES al certificar.
+exports.CAMPOS_CERTIFICABLES = CAMPOS.map(c => c.campo);
