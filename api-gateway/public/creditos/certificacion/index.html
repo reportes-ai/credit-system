@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 — subir carta actualizada abajo del detalle, para toda op con carta · v1.2 — formato pesos en vivo, documentos de la financiera (ver originales + subir carta AutoFin actualizada) · v1.1 — guardianes en el detalle (monto ≤ saldo, pie+saldo ≠ vehiculo) · v1.0 — Certificación de Operaciones: revisión manual de valores vs carta (AUTOFIN: + Trinidad), reporte mensual y asignación paramétrica -->
+<!-- v1.4 — subir respaldo NO re-renderiza el detalle (conservaba antes los valores digitados) · v1.3 — subir carta actualizada abajo del detalle, para toda op con carta · v1.2 — formato pesos en vivo, documentos de la financiera (ver originales + subir carta AutoFin actualizada) · v1.1 — guardianes en el detalle (monto ≤ saldo, pie+saldo ≠ vehiculo) · v1.0 — Certificación de Operaciones: revisión manual de valores vs carta (AUTOFIN: + Trinidad), reporte mensual y asignación paramétrica -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -255,8 +255,10 @@ async function subirCarta(id){
   const j = await (await fetch(`/api/certificacion/${id}/carta-actualizada`, { method:'POST', headers:H,
     body: JSON.stringify({ nombre: f.name, mime: f.type, data_base64: b64 }) })).json();
   if (!j.success) { alert(j.error); return; }
-  $('cartaMsg').textContent = '✓ Subida';
-  abrir(id);   // refresca el detalle con el documento nuevo listado
+  // NO se re-renderiza el detalle: eso borraba los valores ya digitados y
+  // Dagoberto perdía las correcciones antes de certificar (caso 27-08-2026).
+  $('cartaMsg').textContent = '✓ Subida — queda junto a los documentos de la financiera';
+  $('cartaNueva').value = '';
 }
 
 async function certificar(id){
