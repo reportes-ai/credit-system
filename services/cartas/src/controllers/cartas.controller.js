@@ -174,7 +174,11 @@ async function crearCreditoDesdeCartas(c) {
       cliRow = { id_cliente: ins.insertId };
     } catch (e) { console.error('[carta→cliente]', e.message); }
   }
-  const numero_credito = await generarNumeroCreditoDesdeCartas();
+  /* numero_credito = num_op SIEMPRE (regla de Pato, 27-08-2026): un crédito
+     tiene UN solo número de negocio (la OP) y el id interno; la serie YYMM###
+     que se generaba acá creaba un tercer número que solo confundía (2608074 vs
+     26081174 en la misma carta). El campo se conserva por compatibilidad pero
+     espeja la OP. */
   // Mapear acreedor → financiera
   const finMap = { 'AUTOFIN': 'AUTOFIN', 'AUTOFACIL': 'AUTOFACIL', 'UNIDAD': 'UNIDAD DE CREDITO', 'UNIDAD DE CREDITO': 'UNIDAD DE CREDITO' };
   const financiera = finMap[(c.acreedor || '').toUpperCase()] || 'AUTOFACIL';
@@ -195,7 +199,9 @@ async function crearCreditoDesdeCartas(c) {
      carrera y choca contra uq_num_op, reintenta con el siguiente número en vez
      de devolverle un 500 al usuario (auditoría 03-08-2026, A-8). */
   const { conNumOpAF } = require('../../../../shared/num-op');
+  let numOpFinal = null;
   const r = await conNumOpAF(null, async (numOpAF) => {
+    numOpFinal = numOpAF;
   const [rIns] = await pool.query(`
     INSERT INTO creditos
       (numero_credito, num_op, financiera, id_financiera, estado_eval, estado,
@@ -219,7 +225,7 @@ async function crearCreditoDesdeCartas(c) {
     /* num_op = correlativo AutoFácil desde que nace (motor único shared/num-op.js,
        regla ago-2026). numero_credito (YYMM###) sigue siendo el N° interno del
        crédito de carta; la OP es la serie única del negocio. */
-    numero_credito, numOpAF, financiera,
+    String(numOpAF), numOpAF, financiera,
     // ID de la operación en la financiera: el frontend lo manda como opOrigen
     (c.id_financiera ?? c.idFinanciera ?? c.opOrigen ?? c.op_origen ?? null),
     cliRow?.id_cliente || null,
@@ -280,7 +286,7 @@ async function crearCreditoDesdeCartas(c) {
     try { await marcarForzadosCalculo(r.insertId, { campos: ['comdea_real'] }); }
     catch (e) { console.error('[forzados carta]', e.message); }
   }
-  return { id: r.insertId, numero_credito };
+  return { id: r.insertId, numero_credito: String(numOpFinal) };
 }
 
 /* Quién recibe los avisos de cartas: se define en el mantenedor Avisos

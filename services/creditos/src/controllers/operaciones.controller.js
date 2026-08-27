@@ -233,9 +233,11 @@ const create = async (req, res) => {
         error: `El N° de operación ${b.num_op} ya existe (${dupO.estado_credito || 's/estado'}).` });
     }
 
-    // Auto-asignar numero_credito si no viene del formulario
+    // numero_credito = num_op SIEMPRE (regla de Pato, 27-08-2026): un crédito tiene un
+    // solo número de negocio. El campo se conserva por compatibilidad pero espeja la OP;
+    // la serie YYMM### queda solo como último recurso si no hay OP.
     if (!b.numero_credito) {
-      b.numero_credito = await generarNumeroCred(b.mes || null);
+      b.numero_credito = b.num_op ? String(b.num_op) : await generarNumeroCred(b.mes || null);
     }
 
     const { saldo_precio, pct_financiado } = calcular(b);
