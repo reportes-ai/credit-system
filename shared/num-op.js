@@ -14,8 +14,9 @@
      · Serie nueva ≥ 20.000.000 siempre (26.08xxxx, 27.01xxxx, …).
      · IDs de Trinidad: ~6.2 millones (crecen lento; techo 20M les da años).
      · Serie histórica AutoFácil 80000–99999 e INDEXA 519xxx: muy por debajo.
-     · numero_credito de cartas (YYMM###, 7 dígitos) queda como N° INTERNO del
-       crédito de carta; la OP es esta serie.
+     · numero_credito ESPEJA el num_op (regla 27-08-2026: un crédito tiene solo
+       N° OP e id). La serie YYMM### de 7 dígitos ya no se genera; sobrevive
+       solo en documentos históricos emitidos antes de esa fecha.
 
    Julio 2026 y hacia atrás quedó con los números con que cerró: esta regla
    rige para lo que nace desde agosto.

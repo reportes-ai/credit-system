@@ -215,17 +215,22 @@ const create = async (req, res) => {
     if (esFechaFutura(fecha_otorgamiento))
       return res.status(400).json({ success: false, data: null, error: `No se permiten créditos con fecha de otorgamiento futura (posterior a ${hoyChileDMY()}).` });
 
-    const numero_credito = await generarNumero();
+    /* Numeración (regla de Pato): num_op = correlativo AutoFácil AAMM#### (8 dígitos,
+       motor único shared/num-op.js) y numero_credito lo ESPEJA. Antes este camino
+       derivaba la OP de la serie corta YYMM### (7 dígitos) — quedaba en el rango
+       1M–20M reservado a los IDs de Trinidad y esIdFinanciera() la clasificaba
+       como ID de financiera. */
+    const { siguienteNumOpAF } = require('../../../../shared/num-op');
+    const numOpVal = await siguienteNumOpAF();   // el INSERT reintenta abajo si choca (carrera)
+    const numero_credito = String(numOpVal);
     const id_usuario = req.usuario?.id_usuario || null;
     const fin = financiera || 'AUTOFACIL';
 
-    // Numeración (ver regla de negocio): num_op = N° OP AutoFácil correlativo/único.
     // id_financiera = N° de la financiera; en AutoFácil (sin financiera externa) repite el N° OP.
-    const numOpVal   = parseInt(numero_credito) || null;
     const esBrokerage = ['AUTOFIN', 'UNIDAD DE CREDITO'].includes(String(fin).toUpperCase());
     const idFinVal   = (id_financiera && String(id_financiera).trim())
       ? String(id_financiera).trim()
-      : (esBrokerage ? null : (numOpVal != null ? String(numOpVal) : null));
+      : (esBrokerage ? null : String(numOpVal));
 
     // Resolver id_cliente
     const rutNorm = rut_cliente.replace(/\./g, '').toUpperCase().trim();
