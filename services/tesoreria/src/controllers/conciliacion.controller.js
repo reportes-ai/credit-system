@@ -186,6 +186,15 @@ function parsearCartola(buffer) {
   }
   if (hIdx < 0) throw new Error('No se encontró la fila de encabezados (se busca una columna "Fecha" y columnas de Cargo/Abono o Monto).');
 
+  // Nº de cuenta impreso sobre los encabezados (p.ej. "Cuenta Corriente N°: 0-000-7486599-2"):
+  // permite rechazar una cartola cargada en la cuenta equivocada (caso real 27-08-2026).
+  let cuentaArchivo = null;
+  for (let i = 0; i < hIdx; i++) {
+    const t = rows[i].map(x => String(x || '')).join(' ');
+    const m = t.match(/cuenta[^\d]{0,30}(\d[\d.\-\s]{6,})/i);
+    if (m) { cuentaArchivo = m[1].trim(); break; }
+  }
+
   const movs = [];
   for (let i = hIdx + 1; i < rows.length; i++) {
     const r = rows[i];
@@ -207,7 +216,17 @@ function parsearCartola(buffer) {
       n_movimiento: map.iNMov  >= 0 ? String(r[map.iNMov] || '').trim().slice(0, 30) : '',
     });
   }
+  movs.cuenta_archivo = cuentaArchivo;   // propiedad del array; hashMovs devuelve OTRO array sin ella
   return movs;
+}
+// Rechazo de cartola ajena: compara el Nº del archivo (encabezado, o su nombre como
+// respaldo) contra la cuenta seleccionada, en dígitos sin ceros a la izquierda.
+const normCta = v => String(v || '').replace(/\D/g, '').replace(/^0+/, '');
+function cuentaNoCoincide(cuentaArchivo, numeroCuenta, nombreArchivo) {
+  const cta = normCta(cuentaArchivo) || normCta((String(nombreArchivo || '').match(/(\d{8,})/) || [])[1]);
+  const sel = normCta(numeroCuenta);
+  if (!cta || !sel || cta === sel) return null;
+  return `El archivo es de la cuenta ${cuentaArchivo || 'Nº ' + cta} y estás cargando en la ${numeroCuenta}: selecciona la cuenta correcta (o créala si aún no existe).`;
 }
 // Hash idempotente: mismo archivo re-cargado no duplica; movimientos idénticos
 // legítimos (misma fecha/monto/glosa) se distinguen por su nº de ocurrencia.
@@ -226,9 +245,12 @@ const previewCartola = async (req, res) => {
   try {
     if (!req.file) return fail(res, 'Adjunta el archivo Excel de la cartola', 400);
     const idConexion = parseInt(req.params.id, 10);
-    const [[cx]] = await pool.query('SELECT id FROM banco_conexiones WHERE id=? LIMIT 1', [idConexion]);
+    const [[cx]] = await pool.query('SELECT id, numero FROM banco_conexiones WHERE id=? LIMIT 1', [idConexion]);
     if (!cx) return fail(res, 'Cuenta no encontrada', 404);
-    const movs = hashMovs(idConexion, parsearCartola(req.file.buffer));
+    const parsed = parsearCartola(req.file.buffer);
+    const errCta = cuentaNoCoincide(parsed.cuenta_archivo, cx.numero, req.file.originalname);
+    if (errCta) return fail(res, errCta, 400);
+    const movs = hashMovs(idConexion, parsed);
     if (!movs.length) return fail(res, 'El archivo no contiene movimientos reconocibles.', 400);
 
     const hashes = movs.map(m => m.fintoc_id);
@@ -251,7 +273,10 @@ const importarCartola = async (req, res) => {
     const idConexion = parseInt(req.params.id, 10);
     const [[cx]] = await pool.query('SELECT id, banco, numero FROM banco_conexiones WHERE id=? LIMIT 1', [idConexion]);
     if (!cx) return fail(res, 'Cuenta no encontrada', 404);
-    const movs = hashMovs(idConexion, parsearCartola(req.file.buffer));
+    const parsed = parsearCartola(req.file.buffer);
+    const errCta = cuentaNoCoincide(parsed.cuenta_archivo, cx.numero, req.file.originalname);
+    if (errCta) return fail(res, errCta, 400);
+    const movs = hashMovs(idConexion, parsed);
     if (!movs.length) return fail(res, 'El archivo no contiene movimientos reconocibles.', 400);
 
     let nuevas = 0;
@@ -587,4 +612,4 @@ const resumen = async (req, res) => {
 module.exports = { cuentas, crearCuentaManual, previewCartola, importarCartola, pendientes, conciliados, conciliar, conciliarAuto, desconciliar, resumen,
   reglasListar, reglaCrear, reglaToggle, reglaEliminar,
   // motor único de cartolas — reusado por Cuentas Corrientes (nunca un segundo parser)
-  parsearCartola, hashMovs };
+  parsearCartola, hashMovs, cuentaNoCoincide };

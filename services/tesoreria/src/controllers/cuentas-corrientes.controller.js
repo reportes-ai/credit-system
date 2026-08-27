@@ -13,7 +13,7 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
-const { parsearCartola, hashMovs } = require('./conciliacion.controller');
+const { parsearCartola, hashMovs, cuentaNoCoincide } = require('./conciliacion.controller');
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
@@ -131,7 +131,12 @@ const cargarCartola = async (req, res) => {
     const [[cx]] = await pool.query('SELECT id, banco, numero FROM banco_conexiones WHERE id=? LIMIT 1', [idConexion]);
     if (!cx) return fail(res, 'Cuenta no encontrada', 404);
 
-    const movs = hashMovs(idConexion, parsearCartola(req.file.buffer));
+    // Cartola de OTRA cuenta → se rechaza (caso real 27-08-2026: la cartola de la
+    // 7486599-2 se cargó sobre la 7045074-7 y hubo que separar los movimientos a mano)
+    const parsed = parsearCartola(req.file.buffer);
+    const errCta = cuentaNoCoincide(parsed.cuenta_archivo, cx.numero, req.file.originalname);
+    if (errCta) return fail(res, errCta, 400);
+    const movs = hashMovs(idConexion, parsed);
     if (!movs.length) return fail(res, 'El archivo no contiene movimientos reconocibles.', 400);
 
     let nuevas = 0;
