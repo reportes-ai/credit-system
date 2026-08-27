@@ -614,7 +614,9 @@ async function guardarFacturaComision(idSeguimiento, f, usuario) {
    PAGO: solo rebaja el pasivo contra banco por el LÍQUIDO depositado.
    Nunca bloquea la operación de negocio (el motor jamás lanza).
    Las boletas además entran al auxiliar de honorarios → libro de honorarios y F29. */
-async function contabilizarComision(idSeguimiento, momento) {
+// `ctaBancaria` (opcional, solo en PAGO): fila del mantenedor Cuentas Bancarias con
+// cuenta_contable — el asiento acredita ese banco REAL en vez del genérico 1101090.
+async function contabilizarComision(idSeguimiento, momento, ctaBancaria = null) {
   try {
     const [[d]] = await pool.query(
       `SELECT s.num_op, fc.numero_factura, fc.fecha_factura, fc.es_boleta, fc.emisor_retiene, fc.rut_dealer, fc.nombre_dealer,
@@ -629,10 +631,12 @@ async function contabilizarComision(idSeguimiento, momento) {
     const montos = d.es_boleta
       ? { honorario: Number(d.monto_bruto) || 0, retencion: Number(d.impuesto_monto) || 0, liquido: Number(d.monto_liquido) || 0 }
       : { neto: Number(d.monto_bruto) || 0, iva: Number(d.impuesto_monto) || 0, liquido: Number(d.monto_liquido) || 0 };
+    const reemplazos = (ctaBancaria && ctaBancaria.cuenta_contable) ? { '1101090': ctaBancaria.cuenta_contable } : null;
     await require('../../../contabilidad/src/motor-asientos').contabilizar({
       evento, fecha,
       glosa: `Comisión OP ${d.num_op} — ${d.nombre_dealer || ''} ${doc.toLowerCase()} ${d.numero_factura || ''}${d.es_boleta && Number(d.emisor_retiene) ? ' (retiene el emisor)' : ''}`.slice(0, 300),
       ref: `COM-${d.num_op}-${momento}`, montos, num_op: d.num_op || null, rut: d.rut_dealer || null,
+      reemplazos, detalle: ctaBancaria ? [ctaBancaria.nombre, ctaBancaria.banco].filter(Boolean).join(' · ') : undefined,
     });
     // Boleta de honorarios → auxiliar (libro de honorarios y F29 de retenciones)
     if (d.es_boleta && momento === 'DEVENGO' && d.rut_dealer && d.numero_factura) {
@@ -657,7 +661,9 @@ async function contabilizarComision(idSeguimiento, momento) {
    gasto: entra y sale por un pasivo transitorio, sin tocar el resultado. */
 // `fecha` (opcional, YYYY-MM-DD): para regularizar pagos antiguos con la fecha en
 // que ocurrieron. Sin ella, el asiento se emite con la fecha de hoy.
-async function contabilizarSaldoPrecio(idSeguimiento, etapa, fecha = null) {
+// `ctaBancaria` (opcional, solo al pagar): banco REAL del cargo (mantenedor Cuentas
+// Bancarias); su cuenta_contable reemplaza al genérico 1101090 en el asiento.
+async function contabilizarSaldoPrecio(idSeguimiento, etapa, fecha = null, ctaBancaria = null) {
   try {
     const [[s]] = await pool.query(`
       SELECT s.num_op, s.saldo_precio, s.financiera, po.num_orden, po.monto AS odp_monto,
@@ -680,14 +686,15 @@ async function contabilizarSaldoPrecio(idSeguimiento, etapa, fecha = null) {
       : montoSaldoOrden(s.financiera, s.saldo_precio, await getFijosAutoFin(), Number(s.sin_limitacion) === 1));
     if (!monto) return;
     const recibido = etapa === 'FONDOS RECIBIDOS';
-    // Trazabilidad en el libro: N° de orden de pago + dealer en cada línea del asiento.
-    const detalle = [s.num_orden, s.nombre_dealer].filter(Boolean).join(' · ');
+    // Trazabilidad en el libro: N° de orden de pago + dealer (+ cuenta de cargo) en cada línea.
+    const detalle = [s.num_orden, s.nombre_dealer, ctaBancaria && ctaBancaria.nombre].filter(Boolean).join(' · ');
+    const reemplazos = (ctaBancaria && ctaBancaria.cuenta_contable) ? { '1101090': ctaBancaria.cuenta_contable } : null;
     await require('../../../contabilidad/src/motor-asientos').contabilizar({
       evento: recibido ? 'SALDO_FONDOS_RECIBIDOS' : 'SALDO_PRECIO_PAGADO',
       fecha: /^\d{4}-\d{2}-\d{2}$/.test(fecha || '') ? fecha : new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }),
       glosa: `Saldo precio OP ${s.num_op} — ${recibido ? 'fondos recibidos' : 'pagado a ' + (s.nombre_dealer || 'dealer')}`.slice(0, 300),
       ref: `SP-${s.num_op}-${recibido ? 'IN' : 'OUT'}`, montos: { monto }, num_op: s.num_op || null,
-      rut: s.rut_dealer || null, detalle,
+      rut: s.rut_dealer || null, detalle, reemplazos,
     });
   } catch (e) { console.error('[contabilizarSaldoPrecio]', e.message); }
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cuentas Bancarias — AutoFácil</title><!-- v2.0 - cuenta contable por cuenta bancaria: el asiento del pago va al banco real -->
+  <title>Cuentas Bancarias — AutoFácil</title><!-- v2.1 - cuenta de cargo en el pago de ODP (historial): el egreso tambien va al banco real. v2.0 - cuenta contable por cuenta bancaria: el asiento del pago va al banco real -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -144,7 +144,8 @@
   <div style="background:#f8fafc;border-left:4px solid #0141A2;border-radius:8px;padding:12px 14px;font-size:.8rem;color:#475569;line-height:1.7;margin-top:16px">
     <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b><br>
     • <b>Cuentas bancarias (activo)</b> → las cuentas ofrecidas como destino de transferencia/depósito al registrar pagos en <a href="/creditos/pagar-cuotas">Pago de Cuotas (Caja)</a> y en las ODP de Cuotas.<br>
-    • <b>Cuenta contable</b> → a qué cuenta del <a href="/contabilidad/plan-cuentas/">plan de cuentas</a> asienta el motor contable los pagos recibidos en esa cuenta bancaria (reemplaza al banco genérico de la regla PAGO_CAJA en <a href="/contabilidad/reglas/">Reglas de Centralización</a>). Vacío = queda el banco de la regla.
+    • <b>Cuenta contable</b> → a qué cuenta del <a href="/contabilidad/plan-cuentas/">plan de cuentas</a> asienta el motor contable los pagos recibidos en esa cuenta bancaria (reemplaza al banco genérico de la regla PAGO_CAJA en <a href="/contabilidad/reglas/">Reglas de Centralización</a>). Vacío = queda el banco de la regla.<br>
+    • <b>Cuentas bancarias (activo)</b> → también son las opciones de <b>"Cuenta de cargo"</b> al registrar el pago de una Orden de Pago en el <a href="/ordenes-pago/historial/">Historial de ODP</a>: la orden queda con la cuenta desde la que salió la plata y el asiento del egreso (saldo precio / comisión) acredita su <b>cuenta contable</b> en vez del banco genérico.
   </div>
 </div>
 

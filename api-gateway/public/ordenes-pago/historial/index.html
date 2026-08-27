@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.29 — selector "Cuenta de cargo" al registrar el pago (mantenedor Cuentas Bancarias): queda en la orden y el asiento acredita ese banco real; el detalle muestra "desde <cuenta>". v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -129,6 +129,9 @@
     <p id="pgInfo" style="margin:0 0 14px;font-size:.9rem"></p>
     <label>Método de pago
       <select id="pgMetodo"><option>Transferencia</option><option>Cheque</option><option>Efectivo</option><option>Tarjeta</option></select>
+    </label>
+    <label>Cuenta de cargo <span style="font-weight:400;text-transform:none">(desde qué cuenta sale la plata — el asiento va a ese banco)</span>
+      <select id="pgCuenta"><option value="">— Sin especificar (banco genérico de la regla) —</option></select>
     </label>
     <label>Fecha de pago<input id="pgFecha" type="date"></label>
     <div id="pgCaja" style="font-size:.8rem;color:#15803d;font-weight:700"></div>
@@ -303,7 +306,7 @@ async function ver(id){
   document.getElementById('dTitulo').textContent = full.numero||'Orden';
   let extra = '';
   if (full.estado==='ANULADA') extra = `<p style="color:#b91c1c;font-size:.82rem;margin:0 0 10px"><i class="bi bi-x-octagon me-1"></i>Anulada por ${escH(full.anulada_nombre||'—')}${full.fecha_anulada?' · '+fdatetime(full.fecha_anulada):''}</p>`;
-  else if (full.estado==='PAGADA') extra = `<p style="color:#15803d;font-size:.82rem;margin:0 0 10px"><i class="bi bi-check-circle me-1"></i>Pagada el ${fdate(full.fecha_pago)}${full.metodo_pago?' · '+escH(full.metodo_pago):''}${full.congelada?' · <i class="bi bi-lock-fill"></i> documento en duro (inmutable)':''}</p>`;
+  else if (full.estado==='PAGADA') extra = `<p style="color:#15803d;font-size:.82rem;margin:0 0 10px"><i class="bi bi-check-circle me-1"></i>Pagada el ${fdate(full.fecha_pago)}${full.metodo_pago?' · '+escH(full.metodo_pago):''}${full.cuenta_pago?' · desde '+escH(full.cuenta_pago):''}${full.congelada?' · <i class="bi bi-lock-fill"></i> documento en duro (inmutable)':''}</p>`;
   document.getElementById('dBody').innerHTML = extra + docHTML(full);
   const foot = document.getElementById('dFoot');
   // Anular y Enviar a Contabilidad solo aplican a órdenes generales (las de Post Venta se gestionan allí).
@@ -424,9 +427,21 @@ async function anularPV(ocId){
 }
 
 /* ── Pago (egreso desde caja) — aplica a todas las órdenes ── */
+let CUENTAS_CARGO = null;   // cuentas activas del mantenedor Cuentas Bancarias
+async function cargarCuentasCargo(){
+  if (CUENTAS_CARGO) return;
+  try {
+    const j = await (await fetch('/api/cuentas-bancarias', {headers:H})).json();
+    CUENTAS_CARGO = (j.data||[]).filter(c=>Number(c.activo)===1);
+  } catch(e){ CUENTAS_CARGO = []; }
+  const sel = document.getElementById('pgCuenta');
+  sel.innerHTML = '<option value="">— Sin especificar (banco genérico de la regla) —</option>' +
+    CUENTAS_CARGO.map(c=>`<option value="${c.id_cuenta}">${escH(c.nombre)} · ${escH(c.banco||'')} ${escH(c.numero_cuenta||'')}</option>`).join('');
+}
 function pagar(ocId){
   const o = DATA.find(x=>x.id===ocId); if(!o) return;
   if (!MICAJA){ alert('Necesitas una Caja Activa para registrar pagos.'); return; }
+  cargarCuentasCargo();
   PAGO_ID = ocId;
   document.getElementById('pgTit').textContent = 'Registrar pago — '+(o.numero||'');
   document.getElementById('pgInfo').innerHTML = `<b>${escH(o.proveedor_nombre||'—')}</b> · ${escH(o.concepto||'')}<br>Monto a pagar: <b style="color:#0141A2">${fmtMon(o.monto)}</b>`;
@@ -443,7 +458,8 @@ async function confirmarPago(){
   btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Registrando…'; msg.style.display='none';
   try {
     const r = await fetch(`/api/ordenes-pago/ordenes/${PAGO_ID}/pagar`, { method:'POST', headers:H,
-      body: JSON.stringify({ metodo_pago: document.getElementById('pgMetodo').value, fecha_pago: document.getElementById('pgFecha').value||null }) });
+      body: JSON.stringify({ metodo_pago: document.getElementById('pgMetodo').value, fecha_pago: document.getElementById('pgFecha').value||null,
+        id_cuenta_bancaria: document.getElementById('pgCuenta').value || null }) });
     if (chk401(r)) { return; }
     const j = await r.json();
     if (j.success){ cerrarPago(); cargar(); toast('Pago registrado en caja '+(j.data?.caja||'')); }

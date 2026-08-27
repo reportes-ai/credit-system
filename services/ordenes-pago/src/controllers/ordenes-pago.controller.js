@@ -144,6 +144,14 @@ require('../../../../shared/migrate').enFila('ordenes-pago', async () => {
   } catch (e) { console.error('[ordenes-pago snapshot repair]', e.message); }
 });
 
+/* Cuenta bancaria de cargo del pago: desde qué cuenta de la empresa salió la
+   plata (mantenedor Cuentas Bancarias). Con ella el asiento acredita el banco
+   REAL y el mayor de cada cuenta contable cuadra contra su propia cartola. */
+require('../../../../shared/migrate').enFila('odp-cuenta-bancaria', async () => {
+  try { await pool.query('ALTER TABLE op_correlativos ADD COLUMN id_cuenta_bancaria INT NULL'); }
+  catch (e) { if (e.errno !== 1060) throw e; }
+});
+
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const norm = s => String(s ?? '').trim();
 const normRut = r => RUT.normalizar(r) || String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
@@ -388,6 +396,14 @@ const soloFecha = v => {
    (GENERAL en ordenes_pago; SALDO/COMISION desde el seguimiento + dealer + factura).
    Devuelve el objeto de datos del documento, o null si la orden de origen no existe. */
 async function construirDocumento(oc) {
+  // Cuenta bancaria desde la que se pagó (si el pago la registró) — va al documento
+  let cuentaPago = null;
+  if (oc.id_cuenta_bancaria) {
+    try {
+      const [[cb]] = await pool.query('SELECT nombre, banco, numero_cuenta FROM cuentas_bancarias WHERE id_cuenta=?', [oc.id_cuenta_bancaria]);
+      if (cb) cuentaPago = [cb.nombre, cb.banco, cb.numero_cuenta].filter(Boolean).join(' · ');
+    } catch (_) {}
+  }
   // GENERAL: la orden vive completa en ordenes_pago (mismo shape que getOrden).
   if (oc.origen === 'GENERAL') {
     const [[op]] = await pool.query('SELECT * FROM ordenes_pago WHERE id = ?', [oc.origen_id]);
@@ -420,6 +436,7 @@ async function construirDocumento(oc) {
       deposito,
       sin_datos_banco: !deposito && !op.destino,
       fecha_pago: soloFecha(oc.fecha_pagada) || op.fecha_pago, metodo_pago: oc.metodo_pago || op.metodo_pago,
+      cuenta_pago: cuentaPago,
       anulada_nombre: oc.anulada_nombre || op.anulada_nombre, fecha_anulada: oc.fecha_anulada || op.fecha_anulada,
       _v: DOC_VERSION,
     });
@@ -556,7 +573,7 @@ async function construirDocumento(oc) {
     tratamiento, monto_bruto: bruto, monto_neto: neto, impuesto_pct: pct, impuesto_monto: imp, monto, desglose,
     destino, deposito, sin_datos_banco: !deposito && !destino,
     fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
-    metodo_pago: oc.metodo_pago, estado, usuario_nombre: oc.usuario_nombre,
+    metodo_pago: oc.metodo_pago, cuenta_pago: cuentaPago, estado, usuario_nombre: oc.usuario_nombre,
     anulada_nombre: oc.anulada_nombre, fecha_anulada: oc.fecha_anulada, num_op: row.num_op, _v: DOC_VERSION,
   };
 }
@@ -998,10 +1015,21 @@ const pagarOrden = async (req, res) => {
     const metodo = norm((req.body || {}).metodo_pago) || null;
     const fechaPago = fdate((req.body || {}).fecha_pago) || require('../../../../shared/fecha-chile').hoyISO(); // día de Chile, no UTC
 
+    // Cuenta bancaria de cargo (opcional): debe existir y estar activa en el
+    // mantenedor Cuentas Bancarias. Sin ella, el asiento usa el banco genérico.
+    let ctaBancaria = null;
+    const idCta = parseInt((req.body || {}).id_cuenta_bancaria, 10) || null;
+    if (idCta) {
+      const [[cb]] = await pool.query(
+        'SELECT id_cuenta, nombre, banco, numero_cuenta, cuenta_contable FROM cuentas_bancarias WHERE id_cuenta=? AND activo=1', [idCta]);
+      if (!cb) return res.status(400).json({ success: false, data: null, error: 'La cuenta bancaria indicada no existe o está inactiva' });
+      ctaBancaria = cb;
+    }
+
     // 1) Registro central (egreso de caja).
     await pool.query(
-      `UPDATE op_correlativos SET pagada=1, fecha_pagada=NOW(), pagada_por=?, pagada_nombre=?, id_caja=?, metodo_pago=? WHERE id=?`,
-      [idU, quien, caja.id_caja, metodo, id]);
+      `UPDATE op_correlativos SET pagada=1, fecha_pagada=NOW(), pagada_por=?, pagada_nombre=?, id_caja=?, metodo_pago=?, id_cuenta_bancaria=? WHERE id=?`,
+      [idU, quien, caja.id_caja, metodo, idCta, id]);
 
     // 2) Cierre en el módulo de origen.
     if (oc.origen === 'GENERAL') {
@@ -1021,7 +1049,7 @@ const pagarOrden = async (req, res) => {
         // paso 2102045 solo crecía. Idempotente por ref; aislado, nunca rompe el pago.
         try {
           const pv = require('../../../postventa/src/controllers/postventa.controller');
-          if (pv.contabilizarSaldoPrecio) await pv.contabilizarSaldoPrecio(s.id_seguimiento, 'SALDO PRECIO PAGADO');
+          if (pv.contabilizarSaldoPrecio) await pv.contabilizarSaldoPrecio(s.id_seguimiento, 'SALDO PRECIO PAGADO', null, ctaBancaria);
         } catch (e) { console.error('[ordenes-pago contab saldo]', e.message); }
         // Aviso al dealer (plantilla correo_pago_saldo del mantenedor Post Venta;
         // nace inactiva). Aislado: un correo caído jamás debe romper el pago.
@@ -1041,7 +1069,7 @@ const pagarOrden = async (req, res) => {
           const vals = grupo.map(g => [g, 'COMISION', 'COMISION PAGADA', quien]);
           await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
           // Mismo hueco que en saldo precio: pagar desde acá no rebajaba el pasivo de la comisión.
-          if (pv.contabilizarComision) await pv.contabilizarComision(s.id_seguimiento, 'PAGO');
+          if (pv.contabilizarComision) await pv.contabilizarComision(s.id_seguimiento, 'PAGO', ctaBancaria);
           await pv.notificarPagoComisionDealer(s.id_seguimiento);
         } catch (ePV) {
           console.error('[ordenes-pago hook comision]', ePV.message);
@@ -1054,7 +1082,7 @@ const pagarOrden = async (req, res) => {
     await congelarDocumento(id);
 
     auditar({ req, accion: 'PAGAR', modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: id,
-      detalle: `Pagó ${oc.numero || id} ($${Number(oc.monto || 0).toLocaleString('es-CL')}) desde caja ${caja.nombre}${metodo ? ' · ' + metodo : ''}` });
+      detalle: `Pagó ${oc.numero || id} ($${Number(oc.monto || 0).toLocaleString('es-CL')}) desde caja ${caja.nombre}${metodo ? ' · ' + metodo : ''}${ctaBancaria ? ' · cta ' + ctaBancaria.nombre : ''}` });
     res.json({ success: true, data: { id, caja: caja.nombre }, error: null });
   } catch (e) {
     console.error('[ordenes-pago pagarOrden]', e.message);
