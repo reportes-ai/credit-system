@@ -363,6 +363,7 @@ app.use('/api/creditos',            require('../../services/creditos/src/routes/
 app.use('/api/edicion-creditos',    require('../../services/creditos/src/routes/edicion.routes'));
 app.use('/api/digitacion-faltantes', require('../../services/creditos/src/routes/digitacion-faltantes.routes'));
 app.use('/api/carga-diferencias', require('../../services/creditos/src/routes/carga-diferencias.routes'));
+app.use('/api/certificacion',       require('../../services/creditos/src/routes/certificacion.routes'));
 app.use('/api/score-mora',           require('../../services/creditos/src/routes/score-mora.routes'));
 app.use('/api/credito-documentos',  require('../../services/creditos/src/routes/credito-documentos.routes'));
 app.use('/api/documentos-af',       require('../../services/creditos/src/routes/documentos-af.routes'));

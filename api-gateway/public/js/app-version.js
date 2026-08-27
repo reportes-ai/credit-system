@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v218.21';
+const APP_VERSION = 'v219.0';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -1461,3 +1461,46 @@ document.addEventListener('DOMContentLoaded', () => {
   // Anuncios, comunicados y juegos toleran de sobra ese retardo.
   setInterval(chk, 30000);
 });
+
+/* ── Recordatorio de Certificación de Operaciones ─────────────────────────────
+   A los usuarios ASIGNADOS como certificadores (paramétrico: pestaña Asignación
+   de /creditos/certificacion/) se les muestra un pop-up con cuántas operaciones
+   del mes tienen por certificar, DOS veces al día (mañana y tarde). localStorage
+   guarda la última vez que se mostró cada media jornada para no repetirlo en
+   cada página. Si no está asignado, la llamada es una sola y no vuelve a sonar. */
+(function () {
+  if (location.pathname.startsWith('/login')) return;
+  const token = sessionStorage.getItem('token');
+  if (!token) return;
+  const yo = (() => { try { return JSON.parse(sessionStorage.getItem('usuario') || 'null'); } catch (e) { return null; } })();
+  if (!yo) return;
+  // Media jornada actual: AAAA-MM-DD-am / -pm → dos avisos al día por usuario
+  const ahora = new Date();
+  const slot = ahora.toISOString().slice(0, 10) + (ahora.getHours() < 13 ? '-am' : '-pm');
+  const key = 'af_cert_popup_' + (yo.id_usuario || yo.id || '') ;
+  try { if (localStorage.getItem(key) === slot) return; } catch (e) {}
+  setTimeout(async () => {
+    try {
+      const r = await fetch('/api/certificacion/mias', { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (!j.success || !j.data.asignado) { try { localStorage.setItem(key, slot); } catch (e) {} return; }
+      try { localStorage.setItem(key, slot); } catch (e) {}
+      if (!j.data.pendientes) return;
+      const dlg = document.createElement('dialog');
+      dlg.style.cssText = 'border:none;border-radius:16px;padding:0;max-width:420px;box-shadow:0 10px 40px rgba(0,0,0,.35)';
+      dlg.innerHTML =
+        '<div style="background:#012d70;color:#fff;padding:14px 20px;font-weight:700;font-family:Segoe UI,system-ui,sans-serif">' +
+        '<i class="bi bi-patch-check"></i> Certificación de Operaciones</div>' +
+        '<div style="padding:18px 20px;font-family:Segoe UI,system-ui,sans-serif;font-size:.9rem;color:#1e293b">' +
+        'Tienes <b style="font-size:1.3rem;color:#b91c1c">' + j.data.pendientes + '</b> operación(es) del mes <b>' + j.data.mes + '</b> pendientes de certificar.' +
+        '<div style="margin-top:14px;display:flex;gap:10px">' +
+        '<a href="/creditos/certificacion/" style="background:#0141A2;color:#fff;border-radius:9px;padding:8px 16px;font-size:.82rem;font-weight:700;text-decoration:none">Ir a certificar</a>' +
+        '<button id="afCertLuego" style="border:1.5px solid #d1d5db;background:#fff;border-radius:9px;padding:8px 16px;font-size:.82rem;cursor:pointer">Más tarde</button>' +
+        '</div></div>';
+      document.body.appendChild(dlg);
+      dlg.showModal();
+      dlg.querySelector('#afCertLuego').onclick = () => dlg.close();
+    } catch (e) {}
+  }, 2500);
+})();

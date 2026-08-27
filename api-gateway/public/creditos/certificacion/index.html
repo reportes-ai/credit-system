@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<!-- v1.0 — Certificación de Operaciones: revisión manual de valores vs carta (AUTOFIN: + Trinidad), reporte mensual y asignación paramétrica -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Certificación de Operaciones — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; --accent:#009AFE; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { width:100%; padding:22px 26px 70px; }
+  .banner { background:linear-gradient(135deg,var(--navy),var(--blue) 55%,var(--accent)); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.9; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.9; font-size:.85rem; }
+  .card-af { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:18px; }
+  .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .tab { border:1.5px solid #d1d5db; background:#fff; border-radius:9px; padding:8px 16px; font-size:.83rem; font-weight:700; cursor:pointer; color:#475569; }
+  .tab.on { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .tab .badge { background:#dc2626; color:#fff; border-radius:99px; padding:1px 8px; font-size:.7rem; margin-left:6px; }
+  select,input[type=month],input[type=number],textarea { border:1.5px solid #d1d5db; border-radius:9px; padding:7px 10px; font:inherit; font-size:.84rem; }
+  .btnx { border:none; border-radius:9px; padding:8px 16px; font-size:.82rem; font-weight:700; cursor:pointer; background:var(--blue); color:#fff; }
+  .btnx:disabled { background:#cbd5e1; cursor:not-allowed; }
+  table { width:100%; border-collapse:collapse; font-size:.8rem; }
+  th { background:var(--navy); color:#fff; text-align:left; padding:9px; font-size:.72rem; text-transform:uppercase; white-space:nowrap; }
+  td { padding:9px; border-bottom:1px solid #f1f5f9; }
+  tbody tr:hover { background:#f8fbff; }
+  .num { text-align:right; white-space:nowrap; }
+  .est { font-size:.7rem; font-weight:700; border-radius:6px; padding:2px 8px; display:inline-block; }
+  .est-PEND { background:#fef3c7; color:#92400e; }
+  .est-CERT { background:#dcfce7; color:#166534; }
+  .est-DIF  { background:#fee2e2; color:#991b1b; }
+  dialog { border:none; border-radius:16px; padding:0; width:min(880px,94vw); box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  dialog::backdrop { background:rgba(2,8,23,.55); }
+  .dlg-head { background:var(--navy); color:#fff; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+  .dlg-body { padding:18px 20px; max-height:70vh; overflow:auto; }
+  .aviso-tri { background:#fff7ed; border-left:4px solid #ea580c; border-radius:8px; padding:9px 13px; font-size:.8rem; color:#9a3412; margin-bottom:12px; }
+  .dif-row td { background:#fff5f5; }
+  .campo-in { width:130px; text-align:right; }
+  .cambiado { border-color:#dc2626 !important; background:#fef2f2; }
+  .footer-afecta { background:#f1f5f9; border-left:4px solid var(--blue); border-radius:10px; padding:14px 18px; font-size:.8rem; margin-top:24px; }
+  .footer-afecta ul { margin:8px 0 0 18px; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Créditos', href:'/creditos/' },
+  { label:'Certificación de Operaciones', icon:'bi-patch-check', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-patch-check"></i><div>
+    <h2>Certificación de Operaciones</h2>
+    <p>Revisión manual de los valores de cada operación otorgada del mes contra su <b>carta de aprobación</b> — y en AUTOFIN, además contra <b>Trinidad</b>. Vehículo, pie, saldo precio, monto del crédito, primas de seguros, plazo y tasa.</p>
+  </div></div>
+
+  <div class="card-af" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <label style="font-weight:700;font-size:.84rem;color:var(--navy)">Mes:</label>
+    <input type="month" id="mes" onchange="recargar()">
+    <div class="tabs" style="margin:0">
+      <button class="tab on" id="tabPend" onclick="verTab('PEND')">Pendientes de certificación <span class="badge" id="bPend" style="display:none"></span></button>
+      <button class="tab" id="tabCert" onclick="verTab('CERT')">Certificadas</button>
+      <button class="tab" id="tabRep"  onclick="verTab('REP')">Reporte del mes</button>
+      <button class="tab" id="tabAsig" onclick="verTab('ASIG')" style="display:none">Asignación</button>
+    </div>
+  </div>
+
+  <div class="card-af" id="vistaLista">
+    <div id="tbl">Cargando…</div>
+  </div>
+
+  <div class="card-af" id="vistaReporte" style="display:none">
+    <div id="repHead" style="margin-bottom:10px;font-size:.85rem"></div>
+    <div id="repTbl"></div>
+  </div>
+
+  <div class="card-af" id="vistaAsig" style="display:none">
+    <p style="font-size:.8rem;color:#475569;margin-top:0">Los usuarios asignados reciben un <b>pop-up 2 veces al día</b> con cuántas operaciones tienen por certificar. La asignación es paramétrica: se cambia aquí, sin tocar código.</p>
+    <div id="asigTbl">Cargando…</div>
+  </div>
+
+  <div class="footer-afecta">
+    <b><i class="bi bi-diagram-3"></i> Qué afecta este módulo</b>
+    <ul>
+      <li><b>Certificar con correcciones</b> → modifica los valores del crédito en <a href="/creditos/">Créditos</a> (y todo lo que lee de ellos: <a href="/dashboard/">Dashboard</a>, comisiones, reportería).</li>
+      <li><b>Asignación</b> → controla a quién le aparece el pop-up recordatorio (2 veces al día) en todas las páginas del sistema.</li>
+      <li><b>Reporte del mes</b> → insumo del <a href="/mantenedores/documentacion/procesos.html">proceso de cierre</a>: qué se certificó, quién y qué valores se modificaron.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Detalle / certificar -->
+<dialog id="dlg">
+  <div class="dlg-head"><b id="dlgTit">Operación</b><button class="btnx" style="background:#334155" onclick="dlg.close()">✕ Cerrar</button></div>
+  <div class="dlg-body" id="dlgBody"></div>
+</dialog>
+
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const $ = id => document.getElementById(id);
+const fmt = v => v == null ? '—' : Number(v).toLocaleString('es-CL');
+const dlg = $('dlg');
+let TAB = 'PEND', PUEDE_CERT = false;
+
+const hoy = new Date(); $('mes').value = hoy.toISOString().slice(0,7);
+
+// Permisos: pestaña Asignación solo con certificacion_admin; certificar con certificacion_certificar
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+fetch('/api/auth/mis-permisos?_=' + Date.now(), { cache:'no-store', headers: H }).then(r=>r.json()).then(j=>{
+  const cods = new Set(j.funcionalidades || []);
+  const admin = yo?.perfil === 'Administrador';
+  if (admin || cods.has('certificacion_admin')) $('tabAsig').style.display = '';
+  PUEDE_CERT = admin || cods.has('certificacion_certificar');
+}).catch(()=>{});
+
+function verTab(t){
+  TAB = t;
+  ['Pend','Cert','Rep','Asig'].forEach(x => $('tab'+x).classList.toggle('on', t === x.toUpperCase()));
+  $('vistaLista').style.display   = (t==='PEND'||t==='CERT') ? '' : 'none';
+  $('vistaReporte').style.display = t==='REP'  ? '' : 'none';
+  $('vistaAsig').style.display    = t==='ASIG' ? '' : 'none';
+  if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA({PEND:'Pendientes',CERT:'Certificadas',REP:'Reporte del mes',ASIG:'Asignación'}[t]);
+  recargar();
+}
+
+async function recargar(){
+  const mes = $('mes').value;
+  if (TAB === 'PEND' || TAB === 'CERT') {
+    $('tbl').textContent = 'Cargando…';
+    const j = await (await fetch(`/api/certificacion/pendientes?mes=${mes}&estado=${TAB==='PEND'?'PENDIENTE':'CERTIFICADA'}`, { headers:H })).json();
+    if (!j.success) { $('tbl').textContent = j.error; return; }
+    $('bPend').style.display = j.data.pendientes ? '' : 'none';
+    $('bPend').textContent = j.data.pendientes;
+    const ops = j.data.ops;
+    if (!ops.length) { $('tbl').innerHTML = '<i>No hay operaciones ' + (TAB==='PEND'?'pendientes':'certificadas') + ' en ' + mes + '.</i>'; return; }
+    $('tbl').innerHTML = `<table><thead><tr><th>OP</th><th>Fecha otorgado</th><th>Cliente</th><th>Dealer</th><th>Financiera</th><th>Carta</th><th>Estado</th><th></th></tr></thead><tbody>` +
+      ops.map(o => `<tr>
+        <td><b>${o.num_op}</b></td>
+        <td>${String(o.fecha_otorgado||'').slice(0,10)}</td>
+        <td>${o.cliente||'—'}</td><td>${o.automotora||'—'}</td>
+        <td>${o.financiera||'—'}${/AUTOFIN/i.test(o.financiera||'')?' <span class="est est-DIF" title="Validar también contra Trinidad">TRI</span>':''}</td>
+        <td>${o.op_carta||'<span style="color:#b91c1c">sin carta</span>'}</td>
+        <td>${o.id_cert ? `<span class="est est-CERT">CERTIFICADA</span><div style="font-size:.7rem;color:#64748b">${o.certificado_nombre||''}</div>` : '<span class="est est-PEND">PENDIENTE</span>'}</td>
+        <td><button class="btnx" onclick="abrir(${o.id})">${o.id_cert?'Ver':'Revisar'}</button></td>
+      </tr>`).join('') + '</tbody></table>';
+  } else if (TAB === 'REP') {
+    const j = await (await fetch(`/api/certificacion/reporte?mes=${mes}`, { headers:H })).json();
+    if (!j.success) { $('repTbl').textContent = j.error; return; }
+    const d = j.data;
+    $('repHead').innerHTML = `<b>${d.mes}</b> — ${d.total_otorgadas} otorgadas · ${d.certificadas.length} certificadas · <b style="color:${d.pendientes?'#b91c1c':'#166534'}">${d.pendientes} pendientes</b>`;
+    $('repTbl').innerHTML = !d.certificadas.length ? '<i>Sin certificaciones este mes.</i>' :
+      `<table><thead><tr><th>OP</th><th>Cliente</th><th>Certificó</th><th>Fecha</th><th>Valores modificados</th><th>Observaciones</th></tr></thead><tbody>` +
+      d.certificadas.map(r => {
+        const cs = typeof r.cambios === 'string' ? JSON.parse(r.cambios||'[]') : (r.cambios||[]);
+        return `<tr${cs.length?' class="dif-row"':''}>
+          <td><b>${r.num_op}</b></td><td>${r.cliente||'—'}</td>
+          <td>${r.certificado_nombre||'—'}</td><td>${String(r.fecha_cert||'').replace('T',' ').slice(0,16)}</td>
+          <td>${cs.length ? cs.map(c=>`${c.label||c.campo}: ${fmt(c.antes)} → <b>${fmt(c.despues)}</b>`).join('<br>') : '<span style="color:#166534">sin cambios</span>'}</td>
+          <td style="font-size:.74rem">${r.observaciones||''}</td></tr>`;
+      }).join('') + '</tbody></table>';
+  } else if (TAB === 'ASIG') {
+    const j = await (await fetch('/api/certificacion/asignados', { headers:H })).json();
+    if (!j.success) { $('asigTbl').textContent = j.error; return; }
+    $('asigTbl').innerHTML = `<table><thead><tr><th>Usuario</th><th>Perfil</th><th>Asignado</th></tr></thead><tbody>` +
+      j.data.map(u => `<tr><td>${u.nombre}<div style="font-size:.7rem;color:#64748b">${u.email||''}</div></td><td>${u.perfil||'—'}</td>
+        <td><input type="checkbox" ${u.asignado?'checked':''} onchange="asignar(${u.id_usuario}, this.checked)"></td></tr>`).join('') + '</tbody></table>';
+  }
+}
+
+async function asignar(id, on){
+  const j = await (await fetch('/api/certificacion/asignados/'+id, { method:'PUT', headers:H, body: JSON.stringify({ asignado:on }) })).json();
+  if (!j.success) { alert(j.error); recargar(); }
+}
+
+async function abrir(id){
+  const j = await (await fetch('/api/certificacion/detalle/'+id, { headers:H })).json();
+  if (!j.success) { alert(j.error); return; }
+  const d = j.data;
+  $('dlgTit').textContent = `OP ${d.num_op} — ${d.cliente||''}`;
+  const yaCert = !!d.certificacion;
+  let html = '';
+  if (d.es_autofin) html += `<div class="aviso-tri"><b><i class="bi bi-exclamation-triangle"></i> Operación AUTOFIN:</b> además de la carta, valida estos valores contra <b>Trinidad</b> antes de certificar.</div>`;
+  if (!d.op_carta) html += `<div class="aviso-tri" style="border-color:#b91c1c;color:#7f1d1d;background:#fef2f2"><b>Sin carta vinculada:</b> esta operación no tiene carta de aprobación asociada — certifica contra los documentos fundantes.</div>`;
+  if (d.diferencias_carga.length) html += `<div class="aviso-tri"><b>Diferencias abiertas con la carga:</b> ${d.diferencias_carga.map(x=>`${x.campo} (sistema ${fmt(x.valor_sistema)} / archivo ${fmt(x.valor_archivo)})`).join(' · ')}</div>`;
+  html += `<table><thead><tr><th>Campo</th><th class="num">Sistema</th><th class="num">Carta ${d.op_carta||''}</th><th class="num">${yaCert?'':'Valor certificado'}</th></tr></thead><tbody>` +
+    d.campos.map(c => {
+      const dif = c.carta != null && c.sistema != null && Number(c.sistema) !== Number(c.carta);
+      return `<tr${dif?' class="dif-row"':''}>
+        <td>${c.label}${dif?' <span class="est est-DIF">≠</span>':''}</td>
+        <td class="num">${fmt(c.sistema)}</td>
+        <td class="num">${c.carta==null?'—':fmt(c.carta)}</td>
+        <td class="num">${yaCert?'':`<input type="number" step="any" class="campo-in" data-campo="${c.campo}" data-orig="${c.sistema==null?'':c.sistema}" value="${c.sistema==null?'':c.sistema}" oninput="this.classList.toggle('cambiado', this.value !== this.dataset.orig)">`}</td>
+      </tr>`;
+    }).join('') + '</tbody></table>';
+  if (yaCert) {
+    const cs = typeof d.certificacion.cambios === 'string' ? JSON.parse(d.certificacion.cambios||'[]') : (d.certificacion.cambios||[]);
+    html += `<div style="margin-top:14px;font-size:.82rem"><b>Certificada por ${d.certificacion.por||'—'}</b> el ${String(d.certificacion.fecha||'').replace('T',' ').slice(0,16)}.` +
+      (cs.length ? '<br>Correcciones: ' + cs.map(c=>`${c.label||c.campo} ${fmt(c.antes)} → <b>${fmt(c.despues)}</b>`).join(' · ') : ' Sin correcciones.') +
+      (d.certificacion.observaciones ? `<br>Obs: ${d.certificacion.observaciones}` : '') + '</div>';
+  } else {
+    html += `<div style="margin-top:14px">
+      <textarea id="obs" rows="2" style="width:100%" placeholder="Observaciones (opcional)"></textarea>
+      <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
+        <button class="btnx" style="background:#16a34a" ${PUEDE_CERT?'':'disabled title="No tienes el permiso para certificar"'} onclick="certificar(${d.id})"><i class="bi bi-patch-check"></i> Certificar operación</button>
+        <span style="font-size:.75rem;color:#64748b">Si corriges un valor, quedará registrado antes → después y se aplicará al crédito.</span>
+      </div></div>`;
+  }
+  $('dlgBody').innerHTML = html;
+  dlg.showModal();
+}
+
+async function certificar(id){
+  const cambios = [...document.querySelectorAll('#dlgBody .campo-in')]
+    .filter(i => i.value !== i.dataset.orig && i.value !== '')
+    .map(i => ({ campo: i.dataset.campo, valor: i.value }));
+  if (cambios.length && !confirm(`Vas a certificar con ${cambios.length} corrección(es) que modificarán el crédito. ¿Continuar?`)) return;
+  const j = await (await fetch(`/api/certificacion/${id}/certificar`, { method:'POST', headers:H,
+    body: JSON.stringify({ cambios, observaciones: $('obs').value }) })).json();
+  if (!j.success) { alert(j.error); return; }
+  dlg.close(); recargar();
+}
+
+recargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
