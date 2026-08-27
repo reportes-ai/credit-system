@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.6 — se retira el mp3 (no era la musica); la fiesta vuelve a la fanfarria propia · v1.4 — fiesta al completar el tablero adivinando (serpentinas + globos + fanfarria) · v1.3 — tema musical propio estilo game-show (apertura + fanfarria final) · v1.2 — fondo estudio del concurso -->
+<!-- v1.7 — fiesta con la cortina musical del concurso (mp3 de Pato) · v1.4 — fiesta al completar el tablero adivinando (serpentinas + globos + fanfarria) · v1.3 — tema musical propio estilo game-show (apertura + fanfarria final) · v1.2 — fondo estudio del concurso -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -225,7 +225,9 @@ function chequearRonda() {
 }
 
 function fiesta() {
-  temaConcurso(true);
+  // Cortina musical del concurso (mp3 de Pato); fanfarria propia de respaldo.
+  try { new Audio('/audio/concurso-cortina.mp3').play().catch(() => temaConcurso(true)); }
+  catch (_) { temaConcurso(true); }
   const cont = document.createElement('div');
   cont.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:98;overflow:hidden';
   document.body.appendChild(cont);
