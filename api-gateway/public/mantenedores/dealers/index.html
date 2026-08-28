@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -636,7 +636,7 @@ async function cargar(p) {
       <td>${ccsBadge(d.ccs_parque)}</td>
       <td>${catBadge(d.categoria_propuesta)}</td>
       <td>${asignadaCell(d)}</td>
-      <td style="white-space:nowrap">${activoBadge(d.activo)}${(PERM.demoPortal && !d.tiene_portal) ? ` <a href="#" title="Portal (demo): abre el portal real del dealer en modo demostración para mostrárselo. Desaparece cuando el dealer activa su cuenta." style="color:#6d28d9;text-decoration:none;font-size:1rem;margin-left:6px" onclick="event.preventDefault();demoPortalDealer(${d.id_dealer}, this)"><i class="bi bi-bank"></i></a>` : ''}</td>
+      <td style="white-space:nowrap"><span style="display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%">${activoBadge(d.activo)}${(PERM.demoPortal && !d.tiene_portal) ? `<a href="#" title="Portal (demo): abre el portal real del dealer en modo demostración para mostrárselo. Desaparece cuando el dealer activa su cuenta." style="color:#6d28d9;text-decoration:none;font-size:1rem;line-height:1" onclick="event.preventDefault();demoPortalDealer(${d.id_dealer}, this)"><i class="bi bi-bank"></i></a>` : ''}</span></td>
       <td>
         <div class="acciones-cell">
           <button class="btn-ver" onclick='verDealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Ver</button>
