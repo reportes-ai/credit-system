@@ -1134,7 +1134,7 @@ const pagarOrden = async (req, res) => {
           const vals = grupo.map(g => [g, 'COMISION', 'COMISION PAGADA', quien]);
           await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
           // Mismo hueco que en saldo precio: pagar desde acá no rebajaba el pasivo de la comisión.
-          if (pv.contabilizarComision) await pv.contabilizarComision(s.id_seguimiento, 'PAGO', ctaBancaria);
+          if (pv.contabilizarComision) await pv.contabilizarComision(s.id_seguimiento, 'PAGO', ctaBancaria, oc.numero);
           await pv.notificarPagoComisionDealer(s.id_seguimiento);
         } catch (ePV) {
           console.error('[ordenes-pago hook comision]', ePV.message);

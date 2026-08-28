@@ -616,7 +616,9 @@ async function guardarFacturaComision(idSeguimiento, f, usuario) {
    Las boletas además entran al auxiliar de honorarios → libro de honorarios y F29. */
 // `ctaBancaria` (opcional, solo en PAGO): fila del mantenedor Cuentas Bancarias con
 // cuenta_contable — el asiento acredita ese banco REAL en vez del genérico 1101090.
-async function contabilizarComision(idSeguimiento, momento, ctaBancaria = null) {
+// `numOrden` (opcional, solo en PAGO): N° de la ODP que pagó la comisión — va en la
+// glosa de cada línea, igual que en los asientos de saldo precio.
+async function contabilizarComision(idSeguimiento, momento, ctaBancaria = null, numOrden = null) {
   try {
     const [[d]] = await pool.query(
       `SELECT s.num_op, fc.numero_factura, fc.fecha_factura, fc.es_boleta, fc.emisor_retiene, fc.rut_dealer, fc.nombre_dealer,
@@ -628,6 +630,17 @@ async function contabilizarComision(idSeguimiento, momento, ctaBancaria = null) 
     const fecha = (d.fecha_factura ? new Date(d.fecha_factura) : new Date()).toISOString().slice(0, 10);
     const doc = d.es_boleta ? 'BOLETA' : 'FACTURA';
     const evento = momento === 'DEVENGO' ? `COMISION_DEV_${doc}` : `COMISION_PAGADA_${doc}`;
+    // Pago marcado a mano (sin pasar por la ODP): igual se rescata el N° de la
+    // orden de la cartola si existe en el libro central.
+    if (momento === 'PAGO' && !numOrden) {
+      try {
+        const [[o]] = await pool.query(
+          `SELECT oc.numero FROM op_correlativos oc
+           JOIN postventa_ordenes_comision poc ON oc.origen='COMISION' AND oc.origen_id = poc.id
+           WHERE poc.id_seguimiento = ? ORDER BY oc.id DESC LIMIT 1`, [idSeguimiento]);
+        if (o) numOrden = o.numero;
+      } catch (_) {}
+    }
     const montos = d.es_boleta
       ? { honorario: Number(d.monto_bruto) || 0, retencion: Number(d.impuesto_monto) || 0, liquido: Number(d.monto_liquido) || 0 }
       : { neto: Number(d.monto_bruto) || 0, iva: Number(d.impuesto_monto) || 0, liquido: Number(d.monto_liquido) || 0 };
@@ -639,6 +652,7 @@ async function contabilizarComision(idSeguimiento, momento, ctaBancaria = null) 
       // Cada línea del diario/mayor lleva el documento y el beneficiario (antes solo
       // la glosa de la regla: "Honorarios por comisiones" sin saber de quién era).
       reemplazos, detalle: [
+        numOrden || null,
         `${d.es_boleta ? 'Boleta' : 'Factura'}${d.numero_factura ? ' N°' + d.numero_factura : ''}`,
         d.nombre_dealer || null,
         ctaBancaria ? [ctaBancaria.nombre, ctaBancaria.banco].filter(Boolean).join(' · ') : null,
