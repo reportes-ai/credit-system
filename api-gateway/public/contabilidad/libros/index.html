@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Diario y Mayor — AutoFácil</title>
-  <!-- v1.2 - filtro por defecto: ultimos 3 dias | v1.1 — pestana Mayor Completo: TODAS las cuentas con saldo inicial, movimientos y saldo final, exportable -->
+  <!-- v1.3 - comprobante mas ancho (980px) y N° OP / RUT en una sola linea · v1.2 - filtro por defecto: ultimos 3 dias | v1.1 — pestana Mayor Completo: TODAS las cuentas con saldo inicial, movimientos y saldo final, exportable -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -62,7 +62,7 @@
   </table></div>
 </div>
 
-<dialog id="dlgVer" style="border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:26px;width:760px;max-width:94vw"></dialog>
+<dialog id="dlgVer" style="border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:26px;width:980px;max-width:96vw"></dialog>
 
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -135,7 +135,7 @@ async function ver(id){
       ${c.estado==='ANULADO'?`<br><b class="text-danger">ANULADO por ${esc(c.anulado_por||'')}: ${esc(c.anulado_motivo||'')}</b>`:''}</div>
     <table><thead><tr><th>Cuenta</th><th>Glosa</th><th>N° OP</th><th>RUT</th><th class="text-right">Debe</th><th class="text-right">Haber</th></tr></thead>
     <tbody>${c.movimientos.map(m=>`<tr><td class="num">${esc(m.cuenta)}</td><td>${esc(m.cuenta_nombre||'')}${m.glosa?' · '+esc(m.glosa):''}</td>
-      <td>${esc(m.num_op||'')}</td><td>${esc(m.rut||'')}</td>
+      <td style="white-space:nowrap">${esc(m.num_op||'')}</td><td style="white-space:nowrap">${esc(m.rut||'')}</td>
       <td class="text-right">${m.debe>0?'$'+fmt(m.debe):''}</td><td class="text-right">${m.haber>0?'$'+fmt(m.haber):''}</td></tr>`).join('')}
       <tr class="tot"><td colspan="4">TOTAL</td><td class="text-right">$${fmt(c.total)}</td><td class="text-right">$${fmt(c.total)}</td></tr>
     </tbody></table>
