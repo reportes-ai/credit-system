@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Correos Programados — Mantenedor — AutoFácil</title>
-  <!-- v1.5 — vista previa mas ancha (900px) -->
+  <!-- v1.6 — CC parametrica editable en el correo de fundantes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -65,7 +65,7 @@
     • <b>Hora y Días</b> → cuándo se envía (hora de Chile). <b>Destinatarios</b> → a quién llega (separar con comas).<br>
     • <b>Informe Diario de Ventas</b> → créditos otorgados acumulados del mes por Ejecutivo Comercial (mayor a menor cantidad de operaciones).<br>
     • <b>Parámetros propios</b> (si el mensaje los tiene) → campos numéricos que gobiernan su comportamiento; los define cada mensaje.<br>
-    • <b>Fundantes Pendientes al Equipo Comercial</b> → informe con las operaciones otorgadas cuyos fundantes no están validados (resumen por ejecutivo + detalle), clasificadas por días de retraso (parámetros Fuera de Plazo / Plazo Crítico). Destinatarios dinámicos: fijos + Jefes Comerciales + ejecutivos con pendientes, CC Gerente General y Patricio Escobar. El <b>texto de introducción</b> se edita aquí mismo. Los casos se gestionan en <a href="/fundantes-seguimiento/">Seguimiento Fundantes</a>.<br>
+    • <b>Fundantes Pendientes al Equipo Comercial</b> → informe con las operaciones otorgadas cuyos fundantes no están validados (resumen por ejecutivo + detalle), clasificadas por días de retraso (parámetros Fuera de Plazo / Plazo Crítico). Destinatarios dinámicos: fijos + Jefes Comerciales + ejecutivos con pendientes, con <b>Copia (CC) paramétrica</b> (nace con Gerente General y Patricio Escobar). El <b>texto de introducción</b> se edita aquí mismo. Los casos se gestionan en <a href="/fundantes-seguimiento/">Seguimiento Fundantes</a>.<br>
     • <b>Pop-up Fundantes Pendientes</b> → NO es correo: pop-up bloqueante en pantalla al ejecutivo con fundantes pendientes, que lo obliga a comentar el estado del caso (va a la bitácora de la OP en <a href="/fundantes-seguimiento/">Seguimiento Fundantes</a> y se lee en <a href="/fundantes-seguimiento/devueltos.html">Fundantes Devueltos</a>). Sus parámetros: frecuencia por operación (días), espera entre pop-ups (horas) y mínimo de palabras. La hora no aplica; los días marcan cuándo puede aparecer.
   </div>
 </div>
@@ -132,6 +132,7 @@ function render(){
         <div><label>Destinatarios (separar con comas)</label><textarea id="dest_${i}" ${esAdmin?'':'disabled'}>${esc(r.destinatarios||'')}</textarea></div>
         <div><label>Desde (cuenta remitente)</label><select id="rem_${i}" ${esAdmin?'':'disabled'} style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:.9rem">${CUENTAS.map(c=>`<option value="${esc(c.clave)}" ${String(r.remitente||'sistema')===c.clave?'selected':''}>${esc(c.label)}</option>`).join('')}</select></div>
       </div>
+      ${r.cc!=null?`<div style="margin-bottom:12px"><label>Copia (CC, separar con comas)</label><textarea id="cc_${i}" style="min-height:40px" ${esAdmin?'':'disabled'}>${esc(r.cc||'')}</textarea></div>`:''}
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         ${esAdmin?`<button class="btn-af" onclick="guardar(${i})"><i class="bi bi-check-lg me-1"></i>Guardar</button>`:''}
         <button class="btn-ghost" onclick="vistaPrevia('${esc(r.codigo)}','${esc(r.nombre)}')"><i class="bi bi-eye me-1"></i>Vista previa</button>
@@ -157,8 +158,10 @@ async function guardar(i){
   if (pd) { params = {}; for (const k of Object.keys(pd)) { const el = document.getElementById('prm_'+i+'_'+k); if (el) params[k] = Number(el.value); } }
   const elTxt = document.getElementById('txt_'+i);
   const texto = elTxt ? elTxt.value : undefined;
+  const elCc = document.getElementById('cc_'+i);
+  const cc = elCc ? elCc.value : undefined;
   try {
-    const j = await (await fetch('/api/correos-programados/'+encodeURIComponent(r.codigo), { method:'PUT', headers:H, body:JSON.stringify({ activo, hora, dias, destinatarios, remitente, params, texto }) })).json();
+    const j = await (await fetch('/api/correos-programados/'+encodeURIComponent(r.codigo), { method:'PUT', headers:H, body:JSON.stringify({ activo, hora, dias, destinatarios, remitente, params, texto, cc }) })).json();
     if (!j.success) throw new Error(j.error||'Error');
     toast('✓ Guardado');
     cargar();

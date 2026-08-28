@@ -36,6 +36,8 @@ require('../../../../shared/migrate').enFila('correos', async () => {
     // Texto editable del mensaje (intro que escribe el negocio). Solo los correos
     // que lo usan lo tienen NOT NULL; el mantenedor dibuja el textarea si existe.
     try { await pool.query('ALTER TABLE correos_programados ADD COLUMN IF NOT EXISTS texto TEXT NULL'); } catch (_) {}
+    // Copia (CC) paramétrica: solo los correos que la usan la tienen NOT NULL.
+    try { await pool.query('ALTER TABLE correos_programados ADD COLUMN IF NOT EXISTS cc TEXT NULL'); } catch (_) {}
     // Pop-up Fundantes Pendientes (v163.32): NO es un correo — es un pop-up bloqueante
     // en pantalla al EJECUTIVO con fundantes pendientes, que lo obliga a comentar el
     // estado de la operación (va a la bitácora). Vive aquí porque este es el mantenedor
@@ -110,6 +112,9 @@ require('../../../../shared/migrate').enFila('correos', async () => {
           critico_desde: { label: 'Plazo Crítico desde (días de retraso)', valor: 20 },
         }),
         'Estimados,\n\nEnvío información actualizada con los fundantes PENDIENTES. Por favor gestionar con el equipo de forma urgente.']);
+    // CC paramétrica del correo de fundantes (v221.22): editable en el mantenedor.
+    await pool.query(
+      "UPDATE correos_programados SET cc='leonardo.sevilla@autofacilchile.cl, patricio.escobar@autofacilchile.cl' WHERE codigo='fundantes_pendientes_equipo' AND cc IS NULL");
     // Registrar el mantenedor en el menú (funcionalidad) si no existe
     const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_correos_programados' LIMIT 1");
     if (!ex) await pool.query(
@@ -820,7 +825,7 @@ async function buildOdpPendientes() {
    ejecutivos con pendientes; CC Gerente General + Patricio Escobar. */
 async function buildFundantesPendientes() {
   const [[cfg]] = await pool.query(
-    "SELECT params, texto, destinatarios FROM correos_programados WHERE codigo='fundantes_pendientes_equipo'");
+    "SELECT params, texto, destinatarios, cc FROM correos_programados WHERE codigo='fundantes_pendientes_equipo'");
   let fueraDesde = 8, criticoDesde = 20;
   try {
     const p = cfg && cfg.params ? (typeof cfg.params === 'string' ? JSON.parse(cfg.params) : cfg.params) : null;
@@ -871,11 +876,8 @@ async function buildFundantesPendientes() {
   const toSet = new Set(fijos.map(s => s.toLowerCase()));
   jefes.forEach(j => toSet.add(j.email.toLowerCase()));
   for (const e of pivote) { const m = emailDe.get(keyEj(e.nombre)); if (m) toSet.add(m.toLowerCase()); }
-  const [ccs] = await pool.query(
-    `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
-      WHERE p.nombre='Gerente General' AND u.estado='activo' AND u.email LIKE '%@%'`);
-  const ccSet = new Set(ccs.map(c => c.email.toLowerCase()));
-  ccSet.add('patricio.escobar@autofacilchile.cl');
+  // CC paramétrica: campo cc del mantenedor (nace con Gerente General + Patricio Escobar)
+  const ccSet = new Set(String((cfg && cfg.cc) || '').split(/[,;]/).map(s => s.trim().toLowerCase()).filter(Boolean));
   for (const c of ccSet) toSet.delete(c);   // quien va en copia no se repite en Para
 
   // ── HTML ──
@@ -1029,12 +1031,13 @@ const listar = async (req, res) => {
 
 const actualizar = async (req, res) => {
   try {
-    const { activo, hora, dias, destinatarios, remitente, texto } = req.body || {};
+    const { activo, hora, dias, destinatarios, remitente, texto, cc } = req.body || {};
     const sets = [], vals = [];
-    // Texto editable: solo para correos que nacieron con texto (no se inventa desde la UI)
-    if (texto !== undefined) {
-      const [[cur0]] = await pool.query('SELECT texto FROM correos_programados WHERE codigo=?', [req.params.codigo]);
-      if (cur0 && cur0.texto !== null) { sets.push('texto=?'); vals.push(String(texto).slice(0, 4000)); }
+    // Texto y CC editables: solo para correos que nacieron con ellos (no se inventan desde la UI)
+    if (texto !== undefined || cc !== undefined) {
+      const [[cur0]] = await pool.query('SELECT texto, cc FROM correos_programados WHERE codigo=?', [req.params.codigo]);
+      if (texto !== undefined && cur0 && cur0.texto !== null) { sets.push('texto=?'); vals.push(String(texto).slice(0, 4000)); }
+      if (cc !== undefined && cur0 && cur0.cc !== null) { sets.push('cc=?'); vals.push(String(cc).trim().slice(0, 1000)); }
     }
     if (activo !== undefined) { sets.push('activo=?'); vals.push(activo ? 1 : 0); }
     if (hora !== undefined && /^\d{2}:\d{2}$/.test(hora)) { sets.push('hora=?'); vals.push(hora); }
