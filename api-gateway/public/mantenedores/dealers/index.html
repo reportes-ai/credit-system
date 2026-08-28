@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -72,7 +72,7 @@
     .cat-tip-title { font-weight:800; font-size:0.78rem; margin-bottom:6px; }
     .cat-tip-li { font-size:0.74rem; line-height:1.5; color:#cbd5e1; }
     /* Sub-tarjetas Base/Categoría */
-    .vtabs { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:16px; }
+    .vtabs { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:16px; }
     @media(max-width:1100px){ .vtabs { grid-template-columns:repeat(2,1fr); } }
     @media(max-width:700px){ .vtabs { grid-template-columns:1fr; } }
     .vtab i { flex-shrink:0; }
@@ -154,6 +154,9 @@
     </button>
     <button class="vtab" id="tabPot" onclick="setView('potencial')">
       <i class="bi bi-graph-up-arrow"></i><div><b>POTENCIAL PARQUE/DEALER</b><span>Cuánto más podría crecer AutoFácil con cada dealer. Abre un parque para ver sus dealers.</span></div>
+    </button>
+    <button class="vtab" id="tabZona" onclick="setView('zona')">
+      <i class="bi bi-geo-alt"></i><div><b>ZONA - PARQUE - DEALER</b><span>Base de posiciones: qué dealer está en qué parque y zona, y quién lo atiende.</span></div>
     </button>
     <button class="vtab" id="tabVisitas" style="display:none" onclick="location.href='/dealers-visitas/'">
       <i class="bi bi-calendar-check"></i><div><b>RUTA AUTOFACIL</b><span>Agenda visitas a concesionarios, registra el resultado de cada gestión y haz seguimiento.</span></div>
@@ -328,6 +331,33 @@
   </div>
 </div>
 
+<!-- ====== VISTA ZONA - PARQUE - DEALER ====== -->
+<div id="viewZona" style="display:none">
+  <div style="background:#fff;border-radius:12px;padding:12px 18px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div style="position:relative;flex:1;min-width:220px">
+      <i class="bi bi-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#94a3b8"></i>
+      <input id="zpQ" type="text" placeholder="Buscar sucursal, RUT, jefe o ejecutivo..." oninput="renderZP()"
+        style="width:100%;padding:7px 10px 7px 32px;border:1.5px solid #d1d5db;border-radius:8px;font-size:.85rem;box-sizing:border-box">
+    </div>
+    <select id="zpZona" class="form-select form-select-sm" style="width:150px" onchange="renderZP()"><option value="">Todas las zonas</option></select>
+    <select id="zpParque" class="form-select form-select-sm" style="width:190px" onchange="renderZP()"><option value="">Todos los parques</option></select>
+    <label class="form-check-label d-inline-flex align-items-center" style="gap:6px;font-size:.82rem;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:4px 10px;cursor:pointer">
+      <input type="checkbox" id="zpSinRut" class="form-check-input mt-0" onchange="renderZP()"> Solo sin RUT
+    </label>
+    <span style="font-size:.8rem;color:#475569;margin-left:auto" id="zpResumen"></span>
+  </div>
+  <div class="tbl-wrap">
+    <table class="pt-table">
+      <thead><tr>
+        <th class="l">Zona</th><th class="l">Parque</th><th class="l">Sucursal (dealer)</th><th>Posiciones</th>
+        <th class="l">Categoría</th><th class="l">Estado</th><th class="l">Jefe</th><th class="l">Ejecutivo 1</th><th class="l">Ejecutivo 2</th>
+        <th class="l">RUT</th><th class="l">Dealer en la base</th>
+      </tr></thead>
+      <tbody id="zpBody"><tr><td colspan="11" style="text-align:center;padding:20px;color:#94a3b8">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
 <!-- ====== Qué afecta este mantenedor ====== -->
 <div style="background:#f8fafc;border-left:4px solid #0141A2;border-radius:8px;padding:16px 20px;margin:24px 0 8px">
   <div style="font-weight:700;color:#0141A2;margin-bottom:8px"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
@@ -338,6 +368,7 @@
     <li><b>Activo / Inactivo</b> → marca al dealer sin ventas hace 3 meses. <b>No bloquea</b> cursar operaciones: es un indicador comercial.</li>
     <li><b>Categoría asignada</b> → define la pizarra de comisión por defecto y los informes comerciales. Rangos y colores en <a href="/mantenedores/dealer-categorias/">Variables de categorías</a>.</li>
     <li><b>Posiciones y ventas mensuales</b> (pestaña Potencial) → alimentan el <b>potencial de crecimiento</b> por parque y dealer. Factor y rangos de diagnóstico en <a href="/mantenedores/potencial-dealer/">Variables del cálculo</a>.</li>
+    <li><b>Zona - Parque - Dealer</b> (base de posiciones) → mapa comercial de qué sucursal está en qué parque/zona, sus posiciones y quién la atiende (tabla <code>zona_parque_dealer</code>). El <b>RUT</b> vincula cada sucursal con la ficha del dealer; las filas en rojo aún no tienen RUT asignado y se completan aquí mismo (lápiz en la columna RUT).</li>
     <li><b>Permisos por pestaña</b> (<code>dealers_base_ver/editar</code>, <code>dealers_cat_ver/editar</code>, <code>dealers_potencial_ver/editar</code>) → deciden qué pestaña ve y edita cada perfil. Se administran en <a href="/usuarios/">Perfiles y Permisos</a>. La pestaña <b>Ruta AutoFácil</b> usa sus propios permisos (<code>visitas_ver</code>, <code>visitas_dealers</code>, <code>visitas_supervisar</code>).</li>
   </ul>
 </div>
@@ -591,6 +622,7 @@ async function cargarPermisos(){
 function aplicarPermisos(){
   const ocultar = (id, ok) => { const el=document.getElementById(id); if(el && !ok) el.style.display='none'; };
   ocultar('tabBase', PERM.baseVer); ocultar('tabCat', PERM.catVer); ocultar('tabPot', PERM.potVer);
+  ocultar('tabZona', PERM.baseVer);   // misma visibilidad que la Base Dealer
   ocultar('btnImportar', PERM.baseEd);
   ocultar('btnRecalcBase', PERM.catEd); ocultar('btnRecalcCat', PERM.catEd);
   ocultar('btnVarCat', PERM.catEd); ocultar('btnVarPot', PERM.potEd);
@@ -599,7 +631,7 @@ function aplicarPermisos(){
   if (!primera) {
     document.querySelector('.vtabs').insertAdjacentHTML('afterend',
       '<div class="alert alert-warning m-3">No tienes ninguna pestaña de Dealers habilitada. Pídele acceso al Administrador en Perfiles y Permisos.</div>');
-    ['viewBase','viewCategoria','viewPotencial'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
+    ['viewBase','viewCategoria','viewPotencial','viewZona'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
     return;
   }
   if (primera !== 'base') setView(primera);
@@ -797,13 +829,68 @@ function setView(v){
   document.getElementById('tabBase').classList.toggle('on', v==='base');
   document.getElementById('tabCat').classList.toggle('on', v==='categoria');
   document.getElementById('tabPot').classList.toggle('on', v==='potencial');
+  document.getElementById('tabZona').classList.toggle('on', v==='zona');
   document.getElementById('viewBase').style.display = v==='base' ? '' : 'none';
   document.getElementById('viewCategoria').style.display = v==='categoria' ? '' : 'none';
   document.getElementById('viewPotencial').style.display = v==='potencial' ? '' : 'none';
+  document.getElementById('viewZona').style.display = v==='zona' ? '' : 'none';
   if (typeof AF_TOPNAV_HOJA === 'function')
-    AF_TOPNAV_HOJA(v==='categoria'?'Categoría Dealers':v==='potencial'?'Potencial Parque/Dealer':null);
+    AF_TOPNAV_HOJA(v==='categoria'?'Categoría Dealers':v==='potencial'?'Potencial Parque/Dealer':v==='zona'?'Zona - Parque - Dealer':null);
   if (v==='categoria') cargarMovimientos();
   if (v==='potencial') loadPotencial();
+  if (v==='zona') loadZP();
+}
+
+/* ── Zona - Parque - Dealer (base de posiciones, v221.0) ──
+   Base cargada del Excel comercial de zonas; el RUT se completa a mano donde el
+   match automático no encontró al dealer (fila destacada en rojo). */
+let _ZP = null;
+async function loadZP(){
+  if (_ZP) { renderZP(); return; }
+  try {
+    const r = await fetch('/api/dealers/zona-parque', { headers:H });
+    const j = await r.json(); if (!j.success) return;
+    _ZP = j.data;
+    const zonas = [...new Set(_ZP.map(x=>x.zona))].sort();
+    const parques = [...new Set(_ZP.map(x=>x.parque))].sort();
+    document.getElementById('zpZona').innerHTML = '<option value="">Todas las zonas</option>' + zonas.map(z=>`<option>${z}</option>`).join('');
+    document.getElementById('zpParque').innerHTML = '<option value="">Todos los parques</option>' + parques.map(p=>`<option>${p}</option>`).join('');
+    renderZP();
+  } catch(e){}
+}
+function renderZP(){
+  if (!_ZP) return;
+  const q = (document.getElementById('zpQ').value||'').toUpperCase();
+  const fz = document.getElementById('zpZona').value, fp = document.getElementById('zpParque').value;
+  const soloSin = document.getElementById('zpSinRut').checked;
+  const rows = _ZP.filter(x =>
+    (!fz || x.zona===fz) && (!fp || x.parque===fp) && (!soloSin || !x.rut_dealer) &&
+    (!q || [x.sucursal,x.rut_dealer,x.jefe,x.ejecutivo1,x.ejecutivo2,x.dealer_bd].some(v=>String(v||'').toUpperCase().includes(q))));
+  const pos = rows.reduce((s,x)=>s+(Number(x.posiciones)||0),0);
+  const sin = rows.filter(x=>!x.rut_dealer).length;
+  document.getElementById('zpResumen').innerHTML =
+    `<b>${rows.length}</b> sucursales · <b>${pos.toLocaleString('es-CL')}</b> posiciones` + (sin ? ` · <span style="color:#b91c1c"><b>${sin}</b> sin RUT</span>` : '');
+  const edit = puedeEditarDealer;
+  document.getElementById('zpBody').innerHTML = rows.length ? rows.map(x => `
+    <tr${!x.rut_dealer ? ' style="background:#fef2f2"' : ''}>
+      <td class="l">${x.zona}</td><td class="l">${x.parque}</td>
+      <td class="l"><b>${x.sucursal}</b></td>
+      <td style="text-align:center">${x.posiciones||0}</td>
+      <td class="l">${x.categoria||''}</td><td class="l">${x.estado||''}</td>
+      <td class="l">${x.jefe||''}</td><td class="l">${x.ejecutivo1||''}</td><td class="l">${x.ejecutivo2||''}</td>
+      <td class="l">${x.rut_dealer ? x.rut_dealer : '<span style="color:#b91c1c">—</span>'}${edit ? ` <a href="#" onclick="editarRutZP(${x.id});return false" title="Asignar / corregir RUT"><i class="bi bi-pencil-square"></i></a>` : ''}</td>
+      <td class="l" style="color:#64748b">${x.dealer_bd||''}</td>
+    </tr>`).join('') : '<tr><td colspan="11" style="text-align:center;padding:20px;color:#94a3b8">Sin resultados</td></tr>';
+}
+async function editarRutZP(id){
+  const fila = _ZP.find(x=>x.id===id); if (!fila) return;
+  const rut = prompt(`RUT del dealer para "${fila.sucursal}" (debe existir en la base de dealers):`, fila.rut_dealer||'');
+  if (rut === null) return;
+  const r = await fetch('/api/dealers/zona-parque/'+id, { method:'PUT', headers:H, body: JSON.stringify({ rut_dealer: rut.trim() }) });
+  const j = await r.json();
+  if (!j.success) { alert(j.error||'No se pudo guardar'); return; }
+  fila.rut_dealer = rut.trim()||null; fila.dealer_bd = (j.data&&j.data.dealer_bd)||null;
+  renderZP();
 }
 
 /* ── Potencial Parque/Dealer (solo lectura; datos/variables en el mantenedor) ── */

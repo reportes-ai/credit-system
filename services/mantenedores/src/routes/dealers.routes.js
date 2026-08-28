@@ -12,6 +12,11 @@ router.post('/geocodificar', verifyToken, requireFunc('mantenedores_dealers'), c
 // Revisión de direcciones (tu dirección vs la normalizada por Google).
 router.get('/direcciones',        verifyToken, requireFunc('mantenedores_dealers', 'dealer_ficha_revisar'), ctrl.getDirecciones);
 router.post('/:id/direccion',     verifyToken, requireFunc('mantenedores_dealers', 'dealer_ficha_revisar'), ctrl.setDireccion);
+// Zona - Parque - Dealer: base de posiciones por parque (v221.0). Antes de '/:id'.
+router.get('/zona-parque',        verifyToken, ctrl.getZonaParque);
+router.post('/zona-parque',       verifyToken, requireFunc('mantenedores_dealers', 'dealers_base_editar'), ctrl.createZonaParque);
+router.put('/zona-parque/:id',    verifyToken, requireFunc('mantenedores_dealers', 'dealers_base_editar'), ctrl.updateZonaParque);
+router.delete('/zona-parque/:id', verifyToken, requireFunc('mantenedores_dealers', 'dealers_base_editar'), ctrl.deleteZonaParque);
 router.get('/',          verifyToken, ctrl.getDealers);
 router.get('/:id',       verifyToken, ctrl.getDealer);
 // Locales del dealer (multi-parque + calle) y tabla de comisión por ubicación (v218.0).

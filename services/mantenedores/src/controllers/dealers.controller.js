@@ -620,4 +620,86 @@ const deleteLocal = async (req, res) => {
   } catch (e) { console.error('[deleteLocal]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getDealers, getDealer, getCcsList, importar, createDealer, updateDealer, deleteDealer, getMapa, geocodificar, getDirecciones, setDireccion, getLocales, saveLocal, deleteLocal };
+/* ── Zona - Parque - Dealer (base de posiciones, v221.0) ─────────────────────
+   Base comercial cargada desde el Excel de zonas: qué dealer (sucursal) está en
+   qué parque/zona, cuántas posiciones tiene y quién lo atiende. El RUT se agregó
+   con match automático contra `dealers` (los sin match quedan NULL y se completan
+   a mano desde el mantenedor). categoria/estado aquí son los del Excel comercial,
+   NO reemplazan a categoria_asignada de dealers. */
+require('../../../../shared/migrate').enFila('zona-parque-dealer', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS zona_parque_dealer (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    zona VARCHAR(60) NOT NULL,
+    parque VARCHAR(120) NOT NULL,
+    sucursal VARCHAR(200) NOT NULL,
+    posiciones INT DEFAULT 0,
+    categoria VARCHAR(40) NULL,
+    estado VARCHAR(60) NULL,
+    jefe VARCHAR(120) NULL,
+    ejecutivo1 VARCHAR(120) NULL,
+    ejecutivo2 VARCHAR(120) NULL,
+    rut_dealer VARCHAR(15) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_zona (zona), KEY idx_parque (parque), KEY idx_rut (rut_dealer)
+  )`);
+});
+
+const getZonaParque = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT z.*, d.nombre_indexa AS dealer_bd
+      FROM zona_parque_dealer z
+      LEFT JOIN dealers d ON d.rut = z.rut_dealer
+      ORDER BY z.zona, z.parque, z.sucursal`);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+const updateZonaParque = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ success: false, error: 'id inválido' });
+    const b = req.body || {};
+    const campos = ['zona','parque','sucursal','posiciones','categoria','estado','jefe','ejecutivo1','ejecutivo2','rut_dealer'];
+    const sets = [], vals = [];
+    for (const c of campos) if (c in b) { sets.push(`${c}=?`); vals.push(b[c] === '' ? null : b[c]); }
+    if (!sets.length) return res.status(400).json({ success: false, error: 'nada que actualizar' });
+    let dealer_bd = null;
+    if (b.rut_dealer) {
+      const [[d]] = await pool.query('SELECT nombre_indexa FROM dealers WHERE rut = ?', [String(b.rut_dealer).trim()]);
+      if (!d) return res.status(404).json({ success: false, error: `RUT ${b.rut_dealer} no existe en la base de dealers` });
+      dealer_bd = d.nombre_indexa;
+    }
+    vals.push(id);
+    const [r] = await pool.query(`UPDATE zona_parque_dealer SET ${sets.join(', ')} WHERE id = ?`, vals);
+    if (!r.affectedRows) return res.status(404).json({ success: false, error: 'fila no encontrada' });
+    res.json({ success: true, data: { dealer_bd }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+const createZonaParque = async (req, res) => {
+  try {
+    const b = req.body || {};
+    if (!b.zona || !b.parque || !b.sucursal) return res.status(400).json({ success: false, error: 'zona, parque y sucursal son obligatorios' });
+    if (b.rut_dealer) {
+      const [[d]] = await pool.query('SELECT rut FROM dealers WHERE rut = ?', [String(b.rut_dealer).trim()]);
+      if (!d) return res.status(404).json({ success: false, error: `RUT ${b.rut_dealer} no existe en la base de dealers` });
+    }
+    const [r] = await pool.query(
+      `INSERT INTO zona_parque_dealer (zona, parque, sucursal, posiciones, categoria, estado, jefe, ejecutivo1, ejecutivo2, rut_dealer)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [b.zona, b.parque, b.sucursal, Number(b.posiciones)||0, b.categoria||null, b.estado||null, b.jefe||null, b.ejecutivo1||null, b.ejecutivo2||null, b.rut_dealer||null]);
+    res.json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+const deleteZonaParque = async (req, res) => {
+  try {
+    const [r] = await pool.query('DELETE FROM zona_parque_dealer WHERE id = ?', [Number(req.params.id)]);
+    if (!r.affectedRows) return res.status(404).json({ success: false, error: 'fila no encontrada' });
+    res.json({ success: true, data: null, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+module.exports = { getDealers, getDealer, getCcsList, importar, createDealer, updateDealer, deleteDealer, getMapa, geocodificar, getDirecciones, setDireccion, getLocales, saveLocal, deleteLocal, getZonaParque, updateZonaParque, createZonaParque, deleteZonaParque };
