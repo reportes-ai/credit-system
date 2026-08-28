@@ -49,9 +49,10 @@ require('../../../../shared/migrate').migrar('cuentas-bancarias-seed-empresa-202
   ];
   for (const [rs, rut, nom, num, bco, mon] of filas) {
     const [[ex]] = await pool.query('SELECT id_cuenta FROM cuentas_bancarias WHERE numero_cuenta=? LIMIT 1', [num]);
+    // USD nacen inactivas: no deben ofrecerse como cuenta de cargo (pedido Pato 28-08)
     if (!ex) await pool.query(
     `INSERT INTO cuentas_bancarias (razon_social, rut, nombre, numero_cuenta, banco, tipo_cuenta, activo, moneda)
-     VALUES (?,?,?,?,?, 'Cuenta Corriente', 1, ?)`, [rs, rut, nom, num, bco, mon]);
+     VALUES (?,?,?,?,?, 'Cuenta Corriente', ?, ?)`, [rs, rut, nom, num, bco, mon === 'USD' ? 0 : 1, mon]);
   }
   });
 
