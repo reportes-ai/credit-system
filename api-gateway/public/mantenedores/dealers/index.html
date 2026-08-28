@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.1 — boton Portal (demo comercial) por fila, permiso portal_demo_dealer · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -498,6 +498,23 @@ let puedeEditarDealer = esAdmin;
 // Permiso por pestaña (v216.7): cada una se abre por separado en ver y editar.
 // Admin ve y edita todo por bypass; el resto depende de la matriz de Perfiles.
 const PERM = { baseVer:esAdmin, baseEd:esAdmin, catVer:esAdmin, catEd:esAdmin, potVer:esAdmin, potEd:esAdmin };
+/* Demo comercial del portal (mismo endpoint que la ficha de Mantención de
+   Dealers): portal real en solo lectura; el servidor bloquea si ya se registró. */
+async function demoPortalDealer(id, btn){
+  try {
+    const r = await fetch('/api/atencion-remota/dealer/demo', { method:'POST',
+      headers: H,
+      body: JSON.stringify({ id_dealer: id }) });
+    const j = await r.json();
+    if (!j.success) {
+      if (j.data && j.data.registrado) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-check-circle"></i> Registrado'; btn.title = 'Este dealer ya tiene su acceso al portal'; }
+      else alert(j.error || 'No se pudo abrir la demo');
+      return;
+    }
+    window.open('/portal-dealer#vc=' + j.data.token, '_blank');
+  } catch(e){ alert('No se pudo abrir la demo'); }
+}
+
 async function cargarPermisos(){
   // Card Ruta AutoFácil (ex Calendario de Visitas): visible para Admin o quien tenga permiso de visitas.
   try { const r=await fetch('/api/auth/mis-permisos?_='+Date.now(),{headers:H}); const j=await r.json();
@@ -509,6 +526,7 @@ async function cargarPermisos(){
     PERM.catVer = PERM.catVer || PERM.catEd || t('dealers_cat_ver');
     PERM.potEd  = PERM.potEd  || t('dealers_potencial_editar');
     PERM.potVer = PERM.potVer || PERM.potEd || t('dealers_potencial_ver');
+    PERM.demoPortal = esAdmin || t('portal_demo_dealer');
     if (esAdmin || t('dealer_ficha_revisar') || PERM.baseEd) puedeEditarDealer = true;
     if (esAdmin || t('visitas_ver') || t('visitas_dealers') || t('visitas_supervisar')) {
       const tv=document.getElementById('tabVisitas'); if(tv) tv.style.display='';
@@ -624,6 +642,7 @@ async function cargar(p) {
           <button class="btn-ver" onclick='verDealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Ver</button>
           ${puedeEditarDealer ? `<button class="btn-editar-row" onclick='abrirEditarDirecto(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Editar</button>` : ''}
           ${d.tiene_reporte_ia ? `<button class="btn-ver" title="Ver Reporte IA (Anthropic) — empresa + socios" style="background:#fdf3ee;border-color:#f2d3c4;color:#c2410c" onclick='verReporteIADealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'><i class="bi bi-stars"></i> IA</button>` : ''}
+          ${PERM.demoPortal ? `<button class="btn-ver" title="Portal (demo): abre el portal real del dealer en modo demostración para mostrárselo. Se bloquea cuando el dealer ya tiene su acceso." style="background:#f5f3ff;border-color:#ddd6fe;color:#6d28d9" onclick="demoPortalDealer(${d.id_dealer}, this)"><i class="bi bi-bank"></i> Portal</button>` : ''}
         </div>
       </td>
     </tr>`).join('');
