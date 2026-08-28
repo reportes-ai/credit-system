@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cuentas Bancarias — AutoFácil</title><!-- v2.1 - cuenta de cargo en el pago de ODP (historial): el egreso tambien va al banco real. v2.0 - cuenta contable por cuenta bancaria: el asiento del pago va al banco real -->
+  <title>Cuentas Bancarias — AutoFácil</title><!-- v2.2 - las 12 cuentas reales de la empresa cargadas (AUTOFACIL SpA + AFA PLUS) + columna Moneda CLP/USD -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -123,13 +123,14 @@
           <th>N° CUENTA</th>
           <th>BANCO</th>
           <th>TIPO</th>
+          <th>MONEDA</th>
           <th>CTA. CONTABLE</th>
           <th>ACTIVO</th>
           <th>ACCIONES</th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr><td colspan="10" class="text-center text-muted py-5">Cargando…</td></tr>
+        <tr><td colspan="11" class="text-center text-muted py-5">Cargando…</td></tr>
       </tbody>
     </table>
     <div class="pag-row">
@@ -211,13 +212,20 @@
             </select>
           </div>
           <div class="col-md-3">
+            <label class="form-label">Moneda</label>
+            <select class="form-select form-select-sm" id="fMoneda">
+              <option value="CLP">CLP</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+          <div class="col-md-3">
             <label class="form-label">Activo</label>
             <select class="form-select form-select-sm" id="fActivo">
               <option value="1">SI</option>
               <option value="0">NO</option>
             </select>
           </div>
-          <div class="col-md-9">
+          <div class="col-md-6">
             <label class="form-label">Cuenta contable (plan de cuentas)</label>
             <input class="form-control form-control-sm" id="fCuentaContable" list="dlCuentasCtb" placeholder="ej: 1101040">
             <datalist id="dlCuentasCtb"></datalist>
@@ -297,7 +305,7 @@ function renderTabla() {
 
   const tb = document.getElementById('tbody');
   if (!pagina.length) {
-    tb.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-5">Sin resultados</td></tr>';
+    tb.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5">Sin resultados</td></tr>';
     return;
   }
 
@@ -310,6 +318,7 @@ function renderTabla() {
       <td class="td-cuenta">${esc(r.numero_cuenta)}</td>
       <td class="td-banco">${esc(r.banco) || '—'}</td>
       <td style="font-size:0.82rem;color:#6b7280">${esc(r.tipo_cuenta) || '—'}</td>
+      <td style="font-size:0.8rem;font-weight:${(r.moneda||'CLP')==='USD'?'800':'400'};color:${(r.moneda||'CLP')==='USD'?'#15803d':'#6b7280'}">${esc(r.moneda||'CLP')}</td>
       <td style="font-size:0.8rem;font-family:monospace;color:#0141A2">${esc(r.cuenta_contable) || '—'}</td>
       <td>${r.activo ? '<span class="activo-si">✓ SI</span>' : '<span class="activo-no">✗ NO</span>'}</td>
       <td>
@@ -342,6 +351,7 @@ function abrirNuevo() {
   document.getElementById('fBanco').value        = '';
   document.getElementById('fTipoCuenta').value   = '';
   document.getElementById('fActivo').value       = '1';
+  document.getElementById('fMoneda').value       = 'CLP';
   document.getElementById('fCuentaContable').value = '';
   getModal().show();
 }
@@ -358,6 +368,7 @@ function abrirEditar(id) {
   document.getElementById('fBanco').value        = r.banco || '';
   document.getElementById('fTipoCuenta').value   = r.tipo_cuenta || '';
   document.getElementById('fActivo').value       = r.activo ? '1' : '0';
+  document.getElementById('fMoneda').value       = r.moneda || 'CLP';
   document.getElementById('fCuentaContable').value = r.cuenta_contable || '';
   getModal().show();
 }
@@ -372,13 +383,14 @@ async function guardar() {
   const tipo_cuenta  = document.getElementById('fTipoCuenta').value;
   const activo       = parseInt(document.getElementById('fActivo').value);
   const cuenta_contable = document.getElementById('fCuentaContable').value.trim().split(' ')[0];
+  const moneda       = document.getElementById('fMoneda').value;
 
   if (!razon_social || !rut || !nombre || !numero_cuenta) {
     alert('Razón social, RUT, nombre y número de cuenta son requeridos.');
     return;
   }
 
-  const body = JSON.stringify({ razon_social, rut, nombre, numero_cuenta, banco: banco||null, tipo_cuenta: tipo_cuenta||null, activo, cuenta_contable: cuenta_contable||null });
+  const body = JSON.stringify({ razon_social, rut, nombre, numero_cuenta, banco: banco||null, tipo_cuenta: tipo_cuenta||null, activo, cuenta_contable: cuenta_contable||null, moneda });
   const url    = id ? `/api/cuentas-bancarias/${id}` : '/api/cuentas-bancarias';
   const method = id ? 'PUT' : 'POST';
 
