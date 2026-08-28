@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.9 — Potencial: columnas RUT y Zona; posiciones de dealers presentes en Zona-Parque-Dealer se leen de esa base (fuente unica, bloqueadas aqui) · v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.10 — Zona-Parque-Dealer: razones sociales largas abreviadas a EIRL en BD y columna Sucursal acotada · v2.9 — Potencial: columnas RUT y Zona; posiciones de dealers presentes en Zona-Parque-Dealer se leen de esa base (fuente unica, bloqueadas aqui) · v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -880,7 +880,7 @@ function renderZP(){
   document.getElementById('zpBody').innerHTML = rows.length ? rows.map(x => `
     <tr${!x.rut_dealer ? ' style="background:#fef2f2"' : ''}>
       <td class="l">${x.zona}</td><td class="l">${x.parque}</td>
-      <td class="l"><b>${x.sucursal}</b></td>
+      <td class="l" style="max-width:280px"><b style="font-size:.78rem">${x.sucursal}</b></td>
       <td style="text-align:center">${x.posiciones||0}</td>
       <td class="l">${catZP(x.categoria)}</td><td class="l">${x.estado||''}</td>
       <td class="l">${x.jefe||''}</td><td class="l">${x.ejecutivo1||''}</td><td class="l">${x.ejecutivo2||''}</td>
