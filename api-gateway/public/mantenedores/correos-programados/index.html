@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Correos Programados — Mantenedor — AutoFácil</title>
-  <!-- v1.7 — parametros propios en cajitas parejas (220px) -->
+  <!-- v1.8 — destinatarios ancho, remitente fijo 260px -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -128,7 +128,7 @@ function render(){
           `<div style="width:220px"><label>${esc(p[k].label||k)}</label><input type="number" min="1" id="prm_${i}_${esc(k)}" value="${esc(p[k].valor)}" ${esAdmin?'':'disabled'} style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:.9rem"></div>`).join('') + '</div>';
       })()}
       ${r.texto!=null?`<div style="margin-bottom:12px"><label>Texto del mensaje (introducción)</label><textarea id="txt_${i}" style="min-height:80px" ${esAdmin?'':'disabled'}>${esc(r.texto||'')}</textarea></div>`:''}
-      <div class="grid" style="margin-bottom:12px">
+      <div class="grid" style="margin-bottom:12px;grid-template-columns:1fr 260px">
         <div><label>Destinatarios (separar con comas)</label><textarea id="dest_${i}" ${esAdmin?'':'disabled'}>${esc(r.destinatarios||'')}</textarea></div>
         <div><label>Desde (cuenta remitente)</label><select id="rem_${i}" ${esAdmin?'':'disabled'} style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:.9rem">${CUENTAS.map(c=>`<option value="${esc(c.clave)}" ${String(r.remitente||'sistema')===c.clave?'selected':''}>${esc(c.label)}</option>`).join('')}</select></div>
       </div>
