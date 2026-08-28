@@ -772,13 +772,15 @@ async function _ligarCreditoEstado(carta, nuevoEstado, estadosOrigen) {
 async function barrerVencidas() {
   const dias = await vigenciaDias();
   // Estado propio VENCIDA (distinto de DESISTIDA, que es baja manual). El plazo corre desde la
-  // FECHA de la carta (dato de negocio). Aplica a pendientes y aprobadas aún no otorgadas.
+  // FECHA de la carta (dato de negocio) — pero NUNCA antes de su digitación en el sistema:
+  // el documento de Unidad llega con fecha anterior (cursado en sus sistemas días antes) y
+  // la carta 26653100DS nació ya "vencida" sin haber estado vigente ni un día (caso 28-08).
   const [r] = await pool.query(
     `UPDATE cartas_aprobacion
         SET status='VENCIDA', desistido_auto=1, fecha_desistimiento=NOW(),
             motivo_desistimiento=CONCAT('Vencida automáticamente (', ?, ' días corridos desde la fecha de la carta).')
       WHERE status IN ('PENDIENTE','APROBADA') AND otorgado=0 AND fecha IS NOT NULL
-        AND DATE_ADD(DATE(fecha), INTERVAL ? DAY) < CURDATE()`, [dias, dias]);
+        AND DATE_ADD(GREATEST(DATE(fecha), DATE(COALESCE(fecha_creacion, fecha))), INTERVAL ? DAY) < CURDATE()`, [dias, dias]);
   if (r.affectedRows) {
     await pool.query(
       `UPDATE creditos cr JOIN cartas_aprobacion ca ON ca.id_credito_creado = cr.id
