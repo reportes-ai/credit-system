@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -72,8 +72,9 @@
     .cat-tip-title { font-weight:800; font-size:0.78rem; margin-bottom:6px; }
     .cat-tip-li { font-size:0.74rem; line-height:1.5; color:#cbd5e1; }
     /* Sub-tarjetas Base/Categoría */
-    .vtabs { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
-    @media(max-width:900px){ .vtabs { grid-template-columns:1fr; } }
+    .vtabs { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:16px; }
+    @media(max-width:1100px){ .vtabs { grid-template-columns:repeat(2,1fr); } }
+    @media(max-width:700px){ .vtabs { grid-template-columns:1fr; } }
     .vtab i { flex-shrink:0; }
     .vtab { display:flex; align-items:center; gap:14px; text-align:left; background:#fff; border:2px solid #e5e7eb; border-radius:14px; padding:16px 20px; cursor:pointer; transition:.15s; }
     .vtab:hover { border-color:var(--navy); }
