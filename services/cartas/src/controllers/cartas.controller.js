@@ -1065,9 +1065,24 @@ const desistir = async (req, res) => {
   } catch (e) { console.error('[cartas desistir]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* Cartas APROBADA aún "vigentes" cuyo crédito YA está OTORGADO por otro camino
+   (carga Trinidad / edición): se marcan otorgadas solas, con la fecha real del
+   crédito. Sin esto quedaban en Vigentes ofreciendo el botón Otorgar de una op
+   ya cursada (caso 26081173/26081176, 27-08-2026). */
+async function barrerYaOtorgadas() {
+  const { ETAPA_SQL } = require('../../../../shared/etapa-credito');
+  const [r] = await pool.query(
+    `UPDATE cartas_aprobacion ca JOIN creditos cr ON cr.id = ca.id_credito_creado
+        SET ca.otorgado = 1, ca.fecha_otorgado = COALESCE(cr.fecha_otorgado, NOW())
+      WHERE ca.status = 'APROBADA' AND ca.otorgado = 0 AND ${ETAPA_SQL('cr')} = 'OTORGADO'`);
+  if (r.affectedRows) console.log(`[cartas] ${r.affectedRows} carta(s) marcadas otorgadas (crédito ya OTORGADO por otro camino)`);
+  return r.affectedRows;
+}
+
 const getAll = async (req, res) => {
   try {
     await barrerVencidas().catch(() => {});   // mantiene la lista de vigentes al día
+    await barrerYaOtorgadas().catch(() => {});
     const verTodas = await puedeVerTodas(req.usuario);
     const login = req.usuario?.email || String(req.usuario?.id_usuario || '');
     // JOIN al crédito enlazado: NUESTRO N° de operación (num_op), numero_credito,
