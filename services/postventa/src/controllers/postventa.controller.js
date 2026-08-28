@@ -636,7 +636,13 @@ async function contabilizarComision(idSeguimiento, momento, ctaBancaria = null) 
       evento, fecha,
       glosa: `Comisión OP ${d.num_op} — ${d.nombre_dealer || ''} ${doc.toLowerCase()} ${d.numero_factura || ''}${d.es_boleta && Number(d.emisor_retiene) ? ' (retiene el emisor)' : ''}`.slice(0, 300),
       ref: `COM-${d.num_op}-${momento}`, montos, num_op: d.num_op || null, rut: d.rut_dealer || null,
-      reemplazos, detalle: ctaBancaria ? [ctaBancaria.nombre, ctaBancaria.banco].filter(Boolean).join(' · ') : undefined,
+      // Cada línea del diario/mayor lleva el documento y el beneficiario (antes solo
+      // la glosa de la regla: "Honorarios por comisiones" sin saber de quién era).
+      reemplazos, detalle: [
+        `${d.es_boleta ? 'Boleta' : 'Factura'}${d.numero_factura ? ' N°' + d.numero_factura : ''}`,
+        d.nombre_dealer || null,
+        ctaBancaria ? [ctaBancaria.nombre, ctaBancaria.banco].filter(Boolean).join(' · ') : null,
+      ].filter(Boolean).join(' · '),
     });
     // Boleta de honorarios → auxiliar (libro de honorarios y F29 de retenciones)
     if (d.es_boleta && momento === 'DEVENGO' && d.rut_dealer && d.numero_factura) {
