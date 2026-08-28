@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.1 — boton Portal (demo comercial) por fila, permiso portal_demo_dealer · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -507,7 +507,7 @@ async function demoPortalDealer(id, btn){
       body: JSON.stringify({ id_dealer: id }) });
     const j = await r.json();
     if (!j.success) {
-      if (j.data && j.data.registrado) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-check-circle"></i> Registrado'; btn.title = 'Este dealer ya tiene su acceso al portal'; }
+      if (j.data && j.data.registrado) btn.remove();   // el dealer ya activó su cuenta: el ícono desaparece
       else alert(j.error || 'No se pudo abrir la demo');
       return;
     }
@@ -636,13 +636,12 @@ async function cargar(p) {
       <td>${ccsBadge(d.ccs_parque)}</td>
       <td>${catBadge(d.categoria_propuesta)}</td>
       <td>${asignadaCell(d)}</td>
-      <td>${activoBadge(d.activo)}</td>
+      <td style="white-space:nowrap">${activoBadge(d.activo)}${(PERM.demoPortal && !d.tiene_portal) ? ` <a href="#" title="Portal (demo): abre el portal real del dealer en modo demostración para mostrárselo. Desaparece cuando el dealer activa su cuenta." style="color:#6d28d9;text-decoration:none;font-size:1rem;margin-left:6px" onclick="event.preventDefault();demoPortalDealer(${d.id_dealer}, this)"><i class="bi bi-bank"></i></a>` : ''}</td>
       <td>
         <div class="acciones-cell">
           <button class="btn-ver" onclick='verDealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Ver</button>
           ${puedeEditarDealer ? `<button class="btn-editar-row" onclick='abrirEditarDirecto(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Editar</button>` : ''}
           ${d.tiene_reporte_ia ? `<button class="btn-ver" title="Ver Reporte IA (Anthropic) — empresa + socios" style="background:#fdf3ee;border-color:#f2d3c4;color:#c2410c" onclick='verReporteIADealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'><i class="bi bi-stars"></i> IA</button>` : ''}
-          ${PERM.demoPortal ? `<button class="btn-ver" title="Portal (demo): abre el portal real del dealer en modo demostración para mostrárselo. Se bloquea cuando el dealer ya tiene su acceso." style="background:#f5f3ff;border-color:#ddd6fe;color:#6d28d9" onclick="demoPortalDealer(${d.id_dealer}, this)"><i class="bi bi-bank"></i> Portal</button>` : ''}
         </div>
       </td>
     </tr>`).join('');

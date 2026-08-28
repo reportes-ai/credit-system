@@ -241,6 +241,13 @@ const getDealers = async (req, res) => {
       [...params, parseInt(limit), offset]);
     const body = r => { const s = String(r || '').toUpperCase().replace(/[.\-\s]/g, ''); return s.slice(0, -1); };
     rows.forEach(r => { r.tiene_reporte_ia = rutsIA.has(body(r.rut)) ? 1 : 0; });
+    // Flag "ya tiene cuenta del portal": apaga el botón de demo comercial en la
+    // Base Dealer (mismo patrón tabla-chica de rutsIA, sin EXISTS por fila).
+    try {
+      const [pc] = await pool.query('SELECT DISTINCT id_dealer FROM ar_dealer_cuentas WHERE activo = 1 AND id_dealer IS NOT NULL');
+      const conPortal = new Set(pc.map(x => x.id_dealer));
+      rows.forEach(r => { r.tiene_portal = conPortal.has(r.id_dealer) ? 1 : 0; });
+    } catch (_) { rows.forEach(r => { r.tiene_portal = 0; }); }
     // Locales activos (multi-parque + calle): la carta los usa para ofrecer al dealer
     // en CADA parque donde tenga local y en calle (v218.4).
     try {
