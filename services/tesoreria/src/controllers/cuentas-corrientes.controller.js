@@ -41,6 +41,20 @@ require('../../../../shared/migrate').enFila('cuentas-corrientes', async () => {
   } catch (e) { console.error('[cuentas-corrientes migration]', e.message); }
 });
 
+// Semilla una vez (28-08-2026): conexión MANUAL para cada cuenta del mantenedor
+// Cuentas Bancarias que aún no tenga (fuente única: cuentas_bancarias), para poder
+// cargarles cartola. Las que ya existían (Autofacil 1 y 2) se conservan.
+require('../../../../shared/migrate').migrar('banco-conexiones-desde-cuentas-bancarias-2026-08', async () => {
+  const [ctas] = await pool.query('SELECT razon_social, nombre, numero_cuenta, banco, COALESCE(moneda,\'CLP\') moneda FROM cuentas_bancarias');
+  for (const c of ctas) {
+    const [[ex]] = await pool.query('SELECT id FROM banco_conexiones WHERE numero=? LIMIT 1', [c.numero_cuenta]);
+    if (!ex) await pool.query(
+      `INSERT INTO banco_conexiones (banco, alias, link_token, numero, titular, moneda, activo)
+       VALUES (?,?,'MANUAL',?,?,?,1)`,
+      [c.banco || 'Banco', c.nombre, c.numero_cuenta, c.razon_social, c.moneda]);
+  }
+});
+
 /* ── Cuentas con su saldo de cartola más reciente ───────────────────────────── */
 const cuentas = async (req, res) => {
   try {
