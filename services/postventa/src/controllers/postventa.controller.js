@@ -630,14 +630,16 @@ async function contabilizarComision(idSeguimiento, momento, ctaBancaria = null, 
     const fecha = (d.fecha_factura ? new Date(d.fecha_factura) : new Date()).toISOString().slice(0, 10);
     const doc = d.es_boleta ? 'BOLETA' : 'FACTURA';
     const evento = momento === 'DEVENGO' ? `COMISION_DEV_${doc}` : `COMISION_PAGADA_${doc}`;
-    // Pago marcado a mano (sin pasar por la ODP): igual se rescata el N° de la
-    // orden de la cartola si existe en el libro central.
-    if (momento === 'PAGO' && !numOrden) {
+    // N° de ODP para la glosa: en este flujo la orden de la cartola suele existir
+    // ANTES del devengo (se emite al recibir la factura), así que se busca en el
+    // libro central para ambos momentos, no solo al pagar.
+    if (!numOrden) {
       try {
         const [[o]] = await pool.query(
           `SELECT oc.numero FROM op_correlativos oc
            JOIN postventa_ordenes_comision poc ON oc.origen='COMISION' AND oc.origen_id = poc.id
-           WHERE poc.id_seguimiento = ? ORDER BY oc.id DESC LIMIT 1`, [idSeguimiento]);
+           WHERE poc.id_seguimiento = ? AND COALESCE(oc.anulada,0)=0
+           ORDER BY oc.id DESC LIMIT 1`, [idSeguimiento]);
         if (o) numOrden = o.numero;
       } catch (_) {}
     }
