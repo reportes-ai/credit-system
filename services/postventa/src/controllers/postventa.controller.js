@@ -1088,11 +1088,17 @@ const getAll = async (req, res) => {
              fc.impuesto_pct AS fac_imp_pct, fc.impuesto_monto AS fac_imp_monto,
              fc.monto_liquido AS fac_liquido,   -- lo que EFECTIVAMENTE se deposita
              s.fundantes_devueltos_en, s.fundantes_devueltos_por, s.fundantes_devueltos_motivo,
+             po.num_orden AS odp_saldo,
+             poc.num_orden AS odp_comision,
              ${SIN_LIM_SQL}
       FROM postventa_seguimiento s
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
       LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
+      LEFT JOIN postventa_ordenes po ON po.id_seguimiento = s.id
+      /* La ODP de comisión cubre toda la cartola: si esta op es réplica, la orden vive en la titular. */
+      LEFT JOIN postventa_ordenes_comision poc
+        ON poc.id_seguimiento = CASE WHEN COALESCE(fc.es_replica,0)=1 AND fc.id_titular IS NOT NULL THEN fc.id_titular ELSE s.id END
       /* Una operación ANULADA no tiene saldo precio ni comisión que pagar: sale
          del seguimiento sola, sin borrar su historia. El sync solo INSERTA los
          otorgados, pero nunca sacaba a los que se anulaban después, y quedaban
