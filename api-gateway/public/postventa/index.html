@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Post Venta — AutoFácil</title>
-  <!-- v1.10 — navbar migrada al componente topnav -->
+  <!-- v1.11 — cards "a Pagar" con distintivo verde tesoreria (mismo lenguaje visual de Solo Dios) · v1.10 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -24,6 +24,13 @@
     .module-card h5 { font-weight:700; font-size:1.05rem; margin:0 0 8px; color:#111827; }
     .module-card p { font-size:.83rem; color:#6b7280; margin:0 0 20px; }
     .btn-acceder { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:7px 16px; font-size:.82rem; font-weight:600; }
+    /* Cards "a Pagar": mismo lenguaje visual de Solo Dios pero en verde tesorería —
+       de un vistazo se distingue dónde se pagan las órdenes de pago. */
+    .card-pago .card-icon { background:linear-gradient(135deg,#064e3b,#16a34a 55%,#f59e0b); color:#fff; box-shadow:0 4px 14px rgba(22,163,74,.35); transition:all .2s; }
+    .card-pago:hover { border-color:#16a34a; box-shadow:0 14px 36px rgba(22,163,74,.22); }
+    .card-pago:hover .card-icon { background:linear-gradient(135deg,#064e3b,#16a34a 55%,#f59e0b); box-shadow:0 6px 20px rgba(22,163,74,.5); transform:scale(1.08); }
+    .card-pago .btn-acceder { background:linear-gradient(135deg,#16a34a,#f59e0b); box-shadow:0 2px 8px rgba(22,163,74,.3); }
+    .card-pago:hover .btn-acceder { box-shadow:0 4px 14px rgba(22,163,74,.45); filter:brightness(1.08); }
   </style>
 </head>
 <body>
@@ -43,7 +50,7 @@
     <p>Créditos otorgados de todas las financieras: etapas de fundantes, pago de saldo precio y ciclo de comisión por crédito.</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
-  <a href="/postventa/saldos-a-pagar/" class="module-card" id="cardPagar" style="display:none">
+  <a href="/postventa/saldos-a-pagar/" class="module-card card-pago" id="cardPagar" style="display:none">
     <div class="card-icon"><i class="bi bi-cash-coin"></i></div>
     <h5>Saldos Precios a Pagar</h5>
     <p>Operaciones liberadas a pago: selecciona las que se cargarán al banco y márcalas como pagadas.</p>
@@ -55,13 +62,13 @@
     <p>Operaciones con fondos recibidos: revisa, envía a Contabilidad y emite la orden de pago de saldo precio.</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
-  <a href="/postventa/comisiones-a-pagar/" class="module-card" id="cardComPagar" style="display:none">
+  <a href="/postventa/comisiones-a-pagar/" class="module-card card-pago" id="cardComPagar" style="display:none">
     <div class="card-icon"><i class="bi bi-percent"></i></div>
     <h5>Comisiones Dealer a Pagar</h5>
     <p>Comisiones con orden de pago emitida: selecciona las que se cargarán al banco y márcalas como pagadas.</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
-  <a href="/postventa/comisiones-parques/" class="module-card" id="cardComParques" style="display:none">
+  <a href="/postventa/comisiones-parques/" class="module-card card-pago" id="cardComParques" style="display:none">
     <div class="card-icon"><i class="bi bi-signpost-2"></i></div>
     <h5>Comisiones Parques a Pagar</h5>
     <p>Pago mensual a cada parque: arriendo + comisión por créditos, con aprobación, orden de pago y confirmación.</p>
