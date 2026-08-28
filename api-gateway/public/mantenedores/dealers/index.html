@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -368,7 +368,7 @@
     <li><b>Activo / Inactivo</b> → marca al dealer sin ventas hace 3 meses. <b>No bloquea</b> cursar operaciones: es un indicador comercial.</li>
     <li><b>Categoría asignada</b> → define la pizarra de comisión por defecto y los informes comerciales. Rangos y colores en <a href="/mantenedores/dealer-categorias/">Variables de categorías</a>.</li>
     <li><b>Posiciones y ventas mensuales</b> (pestaña Potencial) → alimentan el <b>potencial de crecimiento</b> por parque y dealer. Factor y rangos de diagnóstico en <a href="/mantenedores/potencial-dealer/">Variables del cálculo</a>.</li>
-    <li><b>Zona - Parque - Dealer</b> (base de posiciones) → mapa comercial de qué sucursal está en qué parque/zona, sus posiciones y quién la atiende (tabla <code>zona_parque_dealer</code>). El <b>RUT</b> vincula cada sucursal con la ficha del dealer; las filas en rojo aún no tienen RUT asignado y se completan aquí mismo (lápiz en la columna RUT).</li>
+    <li><b>Zona - Parque - Dealer</b> (base de posiciones) → mapa comercial de qué sucursal está en qué parque/zona, sus posiciones y quién la atiende (tabla <code>zona_parque_dealer</code>). El <b>RUT</b> vincula cada sucursal con la ficha del dealer; las filas en rojo aún no tienen RUT asignado y se completan aquí mismo (lápiz en la columna RUT). La <b>categoría</b> de las filas con RUT se lee en vivo de la <b>categoría asignada</b> de la ficha (fuente única): cambiarla en Base Dealer la cambia también aquí.</li>
     <li><b>Permisos por pestaña</b> (<code>dealers_base_ver/editar</code>, <code>dealers_cat_ver/editar</code>, <code>dealers_potencial_ver/editar</code>) → deciden qué pestaña ve y edita cada perfil. Se administran en <a href="/usuarios/">Perfiles y Permisos</a>. La pestaña <b>Ruta AutoFácil</b> usa sus propios permisos (<code>visitas_ver</code>, <code>visitas_dealers</code>, <code>visitas_supervisar</code>).</li>
   </ul>
 </div>
@@ -858,6 +858,12 @@ async function loadZP(){
     renderZP();
   } catch(e){}
 }
+// La categoría de las filas con RUT viene de la ficha del dealer (SOCIO/PARTNER/
+// SUPER_PARTNER); las sin RUT traen el texto del Excel. Se muestran homologadas.
+function catZP(c){
+  const m = { 'SOCIO':'Socio', 'PARTNER':'Partner', 'SUPER_PARTNER':'Super Partner' };
+  return m[String(c||'').toUpperCase()] || c || '';
+}
 function renderZP(){
   if (!_ZP) return;
   const q = (document.getElementById('zpQ').value||'').toUpperCase();
@@ -876,7 +882,7 @@ function renderZP(){
       <td class="l">${x.zona}</td><td class="l">${x.parque}</td>
       <td class="l"><b>${x.sucursal}</b></td>
       <td style="text-align:center">${x.posiciones||0}</td>
-      <td class="l">${x.categoria||''}</td><td class="l">${x.estado||''}</td>
+      <td class="l">${catZP(x.categoria)}</td><td class="l">${x.estado||''}</td>
       <td class="l">${x.jefe||''}</td><td class="l">${x.ejecutivo1||''}</td><td class="l">${x.ejecutivo2||''}</td>
       <td class="l">${x.rut_dealer ? x.rut_dealer : '<span style="color:#b91c1c">—</span>'}${edit ? ` <a href="#" onclick="editarRutZP(${x.id});return false" title="Asignar / corregir RUT"><i class="bi bi-pencil-square"></i></a>` : ''}</td>
       <td class="l" style="color:#64748b">${x.dealer_bd||''}</td>

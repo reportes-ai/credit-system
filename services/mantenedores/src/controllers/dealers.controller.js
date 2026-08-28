@@ -647,8 +647,14 @@ require('../../../../shared/migrate').enFila('zona-parque-dealer', async () => {
 
 const getZonaParque = async (req, res) => {
   try {
+    // Categoría: si la fila está vinculada a un dealer (RUT), manda la categoria_asignada
+    // de su ficha (fuente única — se refleja solo al cambiarla en Base Dealer); si no
+    // hay RUT, queda la que venía del Excel comercial.
     const [rows] = await pool.query(`
-      SELECT z.*, d.nombre_indexa AS dealer_bd
+      SELECT z.id, z.zona, z.parque, z.sucursal, z.posiciones, z.estado, z.jefe,
+             z.ejecutivo1, z.ejecutivo2, z.rut_dealer,
+             COALESCE(NULLIF(TRIM(d.categoria_asignada), ''), z.categoria) AS categoria,
+             d.nombre_indexa AS dealer_bd
       FROM zona_parque_dealer z
       LEFT JOIN dealers d ON d.rut = z.rut_dealer
       ORDER BY z.zona, z.parque, z.sucursal`);
