@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.9 — Potencial: columnas RUT y Zona; posiciones de dealers presentes en Zona-Parque-Dealer se leen de esa base (fuente unica, bloqueadas aqui) · v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -322,11 +322,11 @@
   <div class="tbl-wrap">
     <table class="pt-table">
       <thead><tr>
-        <th class="l">Parque / Dealer</th><th>Posiciones</th><th>Ventas mens.</th><th>Rotación ×pos</th>
+        <th class="l">Parque / Dealer</th><th class="l">RUT</th><th class="l">Zona</th><th>Posiciones</th><th>Ventas mens.</th><th>Rotación ×pos</th>
         <th>Ventas c/créd</th><th>% c/créd</th><th id="potM0"></th><th id="potM1"></th><th id="potM2"></th>
         <th>Créd. prom</th><th>Ventas pot.</th><th>Potencial</th><th class="l">Diagnóstico</th>
       </tr></thead>
-      <tbody id="potBody"><tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Cargando…</td></tr></tbody>
+      <tbody id="potBody"><tr><td colspan="15" style="text-align:center;padding:20px;color:#94a3b8">Cargando…</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -367,7 +367,7 @@
     <li><b>Locales del dealer</b> (multi-parque + calle) → cada local tiene su tabla de comisión propia (<code>dealer_comisiones</code>); el motor cobra por el local donde cursó <b>cada operación</b> (columna PARQUE de la op). Afecta el cálculo de comisión dealer al guardar y en el <b>recálculo mensual</b>, la comisión sugerida de la <a href="/cartas-aprobacion/">carta de aprobación</a> y la <a href="/postventa/cartolas-parque/">cartola del parque</a> correspondiente. Calle no paga parque (por eso su % es más alto).</li>
     <li><b>Activo / Inactivo</b> → marca al dealer sin ventas hace 3 meses. <b>No bloquea</b> cursar operaciones: es un indicador comercial.</li>
     <li><b>Categoría asignada</b> → define la pizarra de comisión por defecto y los informes comerciales. Rangos y colores en <a href="/mantenedores/dealer-categorias/">Variables de categorías</a>.</li>
-    <li><b>Posiciones y ventas mensuales</b> (pestaña Potencial) → alimentan el <b>potencial de crecimiento</b> por parque y dealer. Factor y rangos de diagnóstico en <a href="/mantenedores/potencial-dealer/">Variables del cálculo</a>.</li>
+    <li><b>Posiciones y ventas mensuales</b> (pestaña Potencial) → alimentan el <b>potencial de crecimiento</b> por parque y dealer. Si el dealer existe en la base <b>Zona - Parque - Dealer</b>, sus posiciones se leen de allá (fuente única) y aquí quedan bloqueadas. Factor y rangos de diagnóstico en <a href="/mantenedores/potencial-dealer/">Variables del cálculo</a>.</li>
     <li><b>Zona - Parque - Dealer</b> (base de posiciones) → mapa comercial de qué sucursal está en qué parque/zona, sus posiciones y quién la atiende (tabla <code>zona_parque_dealer</code>). El <b>RUT</b> vincula cada sucursal con la ficha del dealer; las filas en rojo aún no tienen RUT asignado y se completan aquí mismo (lápiz en la columna RUT). La <b>categoría</b> de las filas con RUT se lee en vivo de la <b>categoría asignada</b> de la ficha (fuente única): cambiarla en Base Dealer la cambia también aquí.</li>
     <li><b>Permisos por pestaña</b> (<code>dealers_base_ver/editar</code>, <code>dealers_cat_ver/editar</code>, <code>dealers_potencial_ver/editar</code>) → deciden qué pestaña ve y edita cada perfil. Se administran en <a href="/usuarios/">Perfiles y Permisos</a>. La pestaña <b>Ruta AutoFácil</b> usa sus propios permisos (<code>visitas_ver</code>, <code>visitas_dealers</code>, <code>visitas_supervisar</code>).</li>
   </ul>
@@ -930,13 +930,13 @@ function renderPot(){
   const pc=n=>n==null?'':(n>=0?'pos':'neg');
   const sgn = _potDir==='desc' ? -1 : 1;
   const key = x => { const v=x[_potSort]; return (v==null||isNaN(v)) ? -Infinity : v; };
-  const filaP=(p,pi,expand)=>`<tr class="row-parque" onclick="togglePot(${pi})"><td class="l"><span class="caret" id="pcar${pi}">${expand?'▼':'▶'}</span> ${e(p.parque)} <span style="color:#94a3b8;font-weight:600">(${p.n_dealers})</span></td><td>${fN(p.posiciones)}</td><td>${fN(p.ventas_mensuales)}</td><td>${f1(p.rotacion)}</td><td>${fN(p.ventas_con_credito)}</td><td>${fPct(p.pct_credito)}</td><td>${fN(p.cred_meses[0])}</td><td>${fN(p.cred_meses[1])}</td><td>${fN(p.cred_meses[2])}</td><td>${f1(p.cred_prom)}</td><td>${fN(p.ventas_potencial)}</td><td class="${pc(p.potencial)}" style="font-weight:800">${fPot(p.potencial)}</td><td class="l">${diag(p.diagnostico,p.diag_color)}</td></tr>`;
+  const filaP=(p,pi,expand)=>`<tr class="row-parque" onclick="togglePot(${pi})"><td class="l"><span class="caret" id="pcar${pi}">${expand?'▼':'▶'}</span> ${e(p.parque)} <span style="color:#94a3b8;font-weight:600">(${p.n_dealers})</span></td><td></td><td></td><td>${fN(p.posiciones)}</td><td>${fN(p.ventas_mensuales)}</td><td>${f1(p.rotacion)}</td><td>${fN(p.ventas_con_credito)}</td><td>${fPct(p.pct_credito)}</td><td>${fN(p.cred_meses[0])}</td><td>${fN(p.cred_meses[1])}</td><td>${fN(p.cred_meses[2])}</td><td>${f1(p.cred_prom)}</td><td>${fN(p.ventas_potencial)}</td><td class="${pc(p.potencial)}" style="font-weight:800">${fPot(p.potencial)}</td><td class="l">${diag(p.diagnostico,p.diag_color)}</td></tr>`;
   const inp=(d,campo)=> PERM.potEd
     ? `<td><input class="pinp" type="number" value="${d[campo]==null?'':d[campo]}" onchange="guardarPotDealer(${d.id_dealer},'${campo}',this.value)"></td>`
     : `<td>${fN(d[campo])}</td>`;
   const filaD=(d,pi,expand)=> d._huerfano
-    ? `<tr class="row-dealer ppq${pi}" style="display:${expand?'':'none'};font-style:italic;color:#64748b;background:#fbfdff"><td class="l" style="padding-left:28px">${e(d.dealer)}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>${fN(d.cred_meses[0])}</td><td>${fN(d.cred_meses[1])}</td><td>${fN(d.cred_meses[2])}</td><td>${f1(d.cred_prom)}</td><td>—</td><td>—</td><td class="l">créditos sin RUT de dealer</td></tr>`
-    : `<tr class="row-dealer ppq${pi}" style="display:${expand?'':'none'}"><td class="l" style="padding-left:28px">${e(d.dealer)}</td>${inp(d,'posiciones')}${inp(d,'ventas_mensuales')}<td>${f1(d.rotacion)}</td>${inp(d,'ventas_con_credito')}<td>${fPct(d.pct_credito)}</td><td>${fN(d.cred_meses[0])}</td><td>${fN(d.cred_meses[1])}</td><td>${fN(d.cred_meses[2])}</td><td>${f1(d.cred_prom)}</td><td>${fN(d.ventas_potencial)}</td><td class="${pc(d.potencial)}" style="font-weight:800">${fPot(d.potencial)}</td><td class="l">${diag(d.diagnostico,d.diag_color)}</td></tr>`;
+    ? `<tr class="row-dealer ppq${pi}" style="display:${expand?'':'none'};font-style:italic;color:#64748b;background:#fbfdff"><td class="l" style="padding-left:28px">${e(d.dealer)}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>${fN(d.cred_meses[0])}</td><td>${fN(d.cred_meses[1])}</td><td>${fN(d.cred_meses[2])}</td><td>${f1(d.cred_prom)}</td><td>—</td><td>—</td><td class="l">créditos sin RUT de dealer</td></tr>`
+    : `<tr class="row-dealer ppq${pi}" style="display:${expand?'':'none'}"><td class="l" style="padding-left:28px">${e(d.dealer)}</td><td class="l">${e(d.rut||'')}</td><td class="l">${e(d.zona||'')}</td>${d.pos_zpd ? `<td title="Posiciones desde la base Zona - Parque - Dealer (se editan allá)" style="color:#0141A2;font-weight:700">${fN(d.posiciones)}</td>` : inp(d,'posiciones')}${inp(d,'ventas_mensuales')}<td>${f1(d.rotacion)}</td>${inp(d,'ventas_con_credito')}<td>${fPct(d.pct_credito)}</td><td>${fN(d.cred_meses[0])}</td><td>${fN(d.cred_meses[1])}</td><td>${fN(d.cred_meses[2])}</td><td>${f1(d.cred_prom)}</td><td>${fN(d.ventas_potencial)}</td><td class="${pc(d.potencial)}" style="font-weight:800">${fPot(d.potencial)}</td><td class="l">${diag(d.diagnostico,d.diag_color)}</td></tr>`;
 
   let parques = _POT.parques.map(p => {
     const matchP = !_potQ || (p.parque||'').toLowerCase().includes(_potQ);
@@ -947,7 +947,7 @@ function renderPot(){
   _potNames = parques.map(x => x.p.parque);
 
   const tb=document.getElementById('potBody');
-  if(!parques.length){ tb.innerHTML='<tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Sin resultados.</td></tr>'; return; }
+  if(!parques.length){ tb.innerHTML='<tr><td colspan="15" style="text-align:center;padding:20px;color:#94a3b8">Sin resultados.</td></tr>'; return; }
   let html='';
   parques.forEach((x,pi)=>{
     const expand = _potQ ? true : _potOpen.has(x.p.parque);

@@ -142,10 +142,23 @@ const getPotencial = async (req, res) => {
 
     const { byDealer, orphanByParque } = await contarCreditos(activeRut, parqueCanon);
 
+    // Zona - Parque - Dealer: para los dealers presentes en esa base, la ZONA y las
+    // POSICIONES se LEEN de allí (fuente única — el mantenedor debe leerse, no copiarse).
+    // Un RUT con varias sucursales suma sus posiciones. Los demás siguen editables aquí.
+    const [zpdRows] = await pool.query(`
+      SELECT rut_dealer, GROUP_CONCAT(DISTINCT zona ORDER BY zona SEPARATOR ' / ') AS zona,
+             SUM(posiciones) AS pos
+      FROM zona_parque_dealer WHERE rut_dealer IS NOT NULL GROUP BY rut_dealer`);
+    const zpdMap = new Map(zpdRows.map(z => [normRut(z.rut_dealer), z]));
+
     const filas = dealers.map(d => {
       const cred = byDealer[normRut(d.rut)] || {};
       const credMeses = meses.map(m => cred[m] || 0);
+      const z = zpdMap.get(normRut(d.rut));
+      if (z) d.posiciones = Number(z.pos) || 0;
       const f = calcDealer(d, credMeses, factor, rangos);
+      f.zona = z ? z.zona : null;
+      f.pos_zpd = !!z;
       f.parque = (d.ccs_parque || '').trim() || '(SIN PARQUE)';
       return f;
     });
