@@ -2415,6 +2415,18 @@ async function asegurarOrdenComision(idPedido, reqUsuario) {
     origen: 'COMISION', origen_id: poId, concepto: 'Comisión OP ' + (seg.num_op || ''),
     monto: seg.comision, id_usuario: reqUsuario && reqUsuario.id_usuario, usuario_nombre: loginDe(reqUsuario) });
   await pool.query('UPDATE postventa_ordenes_comision SET num_orden=? WHERE id=?', [numero, poId]);
+  // Los devengos de la cartola nacieron antes que esta ODP: se les completa la
+  // trazabilidad en las glosas del libro (mismo enganche que el saldo precio).
+  try {
+    const grupo = await idsGrupoFactura(id);
+    if (grupo.length) await pool.query(`
+      UPDATE ctb_movimientos m
+      JOIN ctb_comprobantes c ON c.id = m.id_comprobante
+      JOIN postventa_seguimiento s ON CONCAT('COM-', s.num_op, '-DEVENGO') = c.origen_ref
+      SET m.glosa = LEFT(CONCAT(m.glosa, ' · ', ?), 300)
+      WHERE s.id IN (?) AND c.origen IN ('COMISION_DEV_BOLETA','COMISION_DEV_FACTURA')
+        AND m.glosa NOT LIKE '%ODP%'`, [numero, grupo]);
+  } catch (_) {}
   return numero;
 }
 
