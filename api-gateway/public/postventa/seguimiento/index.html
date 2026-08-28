@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v4.13 — N° de ODP visible bajo ORDEN DE PAGO EMITIDA (saldo y comision; en replicas muestra la orden de la titular) · v4.12 — popup Emitir ODP con la narrativa desde el neto (+IVA / −retencion / emisor retiene) · v4.11 — boleta con "el emisor retiene": retencion 0, se deposita el bruto completo · v4.10 — casilla delegable pv_marcar_cartola_enviada · v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v4.14 — solo lectura parametrico: sin postventa_seguimiento se ve todo pero no se marca nada (checkboxes bloqueados, sin Emitir/Revertir/editar factura) · v4.13 — N° de ODP visible bajo ORDEN DE PAGO EMITIDA (saldo y comision; en replicas muestra la orden de la titular) · v4.12 — popup Emitir ODP con la narrativa desde el neto (+IVA / −retencion / emisor retiene) · v4.11 — boleta con "el emisor retiene": retencion 0, se deposita el bruto completo · v4.10 — casilla delegable pv_marcar_cartola_enviada · v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -99,6 +99,10 @@ let selFin = new Set(), selSaldo = new Set(), selCom = new Set(), selMes = new S
 // Marcar CARTOLA ENVIADA a mano: Admin siempre; delegable con la casilla
 // pv_marcar_cartola_enviada (el servidor aplica el mismo permiso).
 let PUEDE_CARTOLA_ENV = yo?.perfil === 'Administrador';
+/* Solo lectura paramétrico: sin la casilla "Seguimiento Saldos y Comisiones —
+   marcar etapas" (postventa_seguimiento) se ve todo pero no se toca nada.
+   El servidor aplica el mismo permiso en cada escritura. */
+let PUEDE_EDITAR = yo?.perfil === 'Administrador';
 let filtroPagado = true; // por defecto oculta completamente pagados
 const FINANCIERAS = ['AUTOFIN','UNIDAD DE CREDITO','AUTOFACIL'];
 const MESES_N = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
@@ -121,7 +125,9 @@ async function init(){
     const jD = await rD.json(), jC = await rC.json();
     if (jD.success === false) throw new Error(jD.error || 'No se pudo cargar el seguimiento');
     try { const jI = await rI.json(); if (jI.success && jI.data) IMPUESTOS = Object.assign(IMPUESTOS, jI.data); } catch(e){}
-    try { const jP = rP && await rP.json(); if ((jP.funcionalidades||[]).includes('pv_marcar_cartola_enviada')) PUEDE_CARTOLA_ENV = true; } catch(e){}
+    try { const jP = rP && await rP.json(); const fs = jP.funcionalidades||[];
+      if (fs.includes('pv_marcar_cartola_enviada')) PUEDE_CARTOLA_ENV = true;
+      if (fs.includes('postventa_seguimiento')) PUEDE_EDITAR = true; } catch(e){}
     DATA = jD.data || [];
     if (jD.fijos) FIJOS = jD.fijos;
     if (jC.data) CFG = { etapas_saldo: jC.data.etapas_saldo||[], etapas_comision: jC.data.etapas_comision||[] };
@@ -311,13 +317,13 @@ function trackHTML(r, track, lista){
     const esAuto = (track==='SALDO' && ['FUNDANTES RECIBIDOS','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'].includes(x.etapa))
                 || (track==='COMISION' && autoComision.includes(x.etapa));
 
-    // ¿Puede marcar? Etapa anterior debe estar marcada
+    // ¿Puede marcar? Etapa anterior debe estar marcada (y tener permiso de edición)
     const prevMarcado = i === 0 || !!marc[lista[i-1].etapa];
-    const canMark = !esAuto && !m && !esSistema && prevMarcado;
+    const canMark = PUEDE_EDITAR && !esAuto && !m && !esSistema && prevMarcado;
 
     // ¿Puede desmarcar? Debe ser la última y marcada hoy (o admin)
     const esHoy = m && new Date(m.fecha).toISOString().slice(0,10) === hoy;
-    const canUnmark = !esAuto && m && !esSistema && i === lastIdx && (esAdmin || esHoy);
+    const canUnmark = PUEDE_EDITAR && !esAuto && m && !esSistema && i === lastIdx && (esAdmin || esHoy);
 
     const disabled = esAuto || esSistema || (!m && !canMark) || (m && !canUnmark) ? 'disabled' : '';
 
@@ -377,6 +383,7 @@ function trackHTML(r, track, lista){
       if (!(x.etapa==='ORDEN DE PAGO EMITIDA' && m)) title += ' Acá solo se refleja lo que pasó allá.';
     }
     else if (esSistema) title = 'La primera etapa la marca el sistema al otorgarse la operación. No se marca ni se desmarca a mano.';
+    else if (!PUEDE_EDITAR)   title = 'Solo lectura: tu perfil puede ver el seguimiento pero no marcar etapas. El permiso es la casilla «Seguimiento Saldos y Comisiones — marcar etapas» en Perfiles y Permisos.';
     else if (!m && !canMark)  title = `Las etapas se marcan en orden: primero hay que marcar «${lista[i-1]?.etapa}».`;
     else if (m && !canUnmark) title = (i !== lastIdx)
       ? `Las etapas se deshacen en orden inverso: primero hay que desmarcar «${lista[lastIdx]?.etapa}», que es la última marcada.`
@@ -392,7 +399,7 @@ function trackHTML(r, track, lista){
       <div class="tit">${escH(x.etapa)}</div>
       <div class="usr">${m?escH(m.usuario||''):''}</div>
       <div>
-        ${(x.etapa==='ORDEN DE PAGO EMITIDA' && !m && prevMarcado)
+        ${(x.etapa==='ORDEN DE PAGO EMITIDA' && !m && prevMarcado && PUEDE_EDITAR)
           ? `<button onclick="abrirEmitirODP(${r.id},'${track}')" title="Emitir la Orden de Pago" style="background:#0141A2;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:.66rem;font-weight:700;cursor:pointer;white-space:nowrap">📄 Emitir</button>`
           : `${disabled && title ? `<span class="chkw" data-msg="${escA(title)}" data-href="${escA(donde)}" data-dtxt="${escA(dondeTxt)}" data-et="${escA(x.etapa)}" onclick="porQueBloqueado(this)">` : ''}
             <input type="checkbox" ${m?'checked':''} ${disabled} title="${escA(title)}"
@@ -402,7 +409,7 @@ function trackHTML(r, track, lista){
               : (!m?`<span class="pend">${canMark?'Pendiente':'🔒'}</span>`:'')}
             ${disabled && title ? '</span>' : ''}`}
         ${(esAuto && x.etapa==='SALDO PRECIO PAGADO' && m && esAdmin)?`<button onclick="revertirPago(${r.id})" title="Revertir pago (con motivo, Administrador)" style="display:block;margin:3px auto 0;background:#fff1f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">↶ Revertir</button>`:''}
-        ${(track==='COMISION' && x.etapa==='FACTURA RECIBIDA' && m)?`<button onclick="editarFactura(${r.id})" title="Ver / editar datos de la factura" style="display:block;margin:3px auto 0;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">✎ Factura</button>`:''}
+        ${(track==='COMISION' && x.etapa==='FACTURA RECIBIDA' && m && PUEDE_EDITAR)?`<button onclick="editarFactura(${r.id})" title="Ver / editar datos de la factura" style="display:block;margin:3px auto 0;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">✎ Factura</button>`:''}
       </div>
       <div class="fecha">${m?fmtF(m.fecha):''}</div>
       ${(x.etapa==='ORDEN DE PAGO EMITIDA' && m && (track==='SALDO' ? r.odp_saldo : r.odp_comision))
