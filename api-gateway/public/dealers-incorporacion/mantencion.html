@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.24 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js). v1.23 — multi-local: locales con tabla POR local en el modal Editar Dealer (solo lectura) y en la vista de ficha (LOCALES ADICIONALES) · v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
+  <!-- v1.25 — boton Portal (demo) en Editar Dealer: abre el portal real en modo demostracion; bloqueado si el dealer ya se registro · v1.24 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js). v1.23 — multi-local: locales con tabla POR local en el modal Editar Dealer (solo lectura) y en la vista de ficha (LOCALES ADICIONALES) · v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -121,7 +121,9 @@
       <div style="margin-top:8px;font-size:.76rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px"><i class="bi bi-lock me-1"></i>Las comisiones <b>no se editan aquí</b>. Para cambiarlas (incluidas las de cada local), crea una <b>ficha de Modificación</b> del dealer: pasa por la cadena de aprobación (y por Gerencia si supera la pizarra). Los locales también se administran en el mantenedor <a href="/mantenedores/dealers/" target="_blank">Dealers</a>.</div>
     </div>
   </div>
-  <div class="dlg-foot"><button class="btn btn-light" onclick="dlgDealer.close()">Cancelar</button>
+  <div class="dlg-foot">
+    <button class="btn btn-light" id="btnDemoPortal" style="margin-right:auto;border:1.5px solid #7c3aed;color:#7c3aed" onclick="demoPortal()" title="Abre el portal real del dealer en modo demostración (solo lectura) para mostrárselo. Se bloquea cuando el dealer ya tiene su acceso."><i class="bi bi-display me-1"></i>Portal (demo)</button>
+    <button class="btn btn-light" onclick="dlgDealer.close()">Cancelar</button>
     <button class="btn btn-navy" onclick="guardarDealer()"><i class="bi bi-save me-1"></i>Guardar</button></div>
 </dialog>
 
@@ -682,6 +684,26 @@ async function cargarParquesLista(){
   } catch(e){}
 }
 cargarParquesLista();
+/* Demo comercial del portal: abre el portal REAL del dealer (solo lectura) para
+   mostrárselo y fidelizarlo. El servidor bloquea si el dealer ya se registró. */
+async function demoPortal(){
+  const id = parseInt($('d_id').value, 10);
+  if (!id) return;
+  const b = $('btnDemoPortal');
+  try {
+    const r = await fetch('/api/atencion-remota/dealer/demo', { method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token },
+      body: JSON.stringify({ id_dealer: id }) });
+    const j = await r.json();
+    if (!j.success) {
+      if (j.data && j.data.registrado) { b.disabled = true; b.innerHTML = '<i class="bi bi-check-circle me-1"></i>Dealer ya registrado'; }
+      else toast(j.error || 'No se pudo abrir la demo');
+      return;
+    }
+    window.open('/portal-dealer#vc=' + j.data.token, '_blank');
+  } catch(e){ toast('No se pudo abrir la demo'); }
+}
+
 async function guardarDealer(){
   const id=$('d_id').value;
   if(!dCanonico('d_banco','d_bancosLista')) { toast('Banco: "'+$('d_banco').value+'" no está en la lista de bancos — elígelo de las sugerencias', true); return; }

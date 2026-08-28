@@ -44,6 +44,12 @@ async function logAcceso({ tipo, email, id_cuenta, resultado, req }) {
 /* ── Migraciones ─────────────────────────────────────────────────────────── */
 require('../../../../shared/migrate').enFila('atencion', async () => {
   try {
+    // Permiso del modo demo comercial del portal (módulo Dealers): quien lo tenga
+    // puede abrir el portal de un dealer AÚN NO registrado para mostrárselo.
+    await pool.query(`INSERT IGNORE INTO funcionalidades (id_funcionalidad, id_modulo, nombre, codigo, href, icono) VALUES
+      (9570008, 12330002, 'Portal Dealer — demo comercial (mostrar y enviar invitación)', 'portal_demo_dealer', NULL, NULL)`);
+    await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+      SELECT p.id_perfil, 9570008, 1 FROM perfiles p WHERE UPPER(p.nombre) LIKE 'ADMINISTRADOR%'`);
     await pool.query(`CREATE TABLE IF NOT EXISTS ar_dealer_cuentas (
       id            INT AUTO_INCREMENT PRIMARY KEY,
       id_dealer     INT NULL,
@@ -757,6 +763,63 @@ const verComoDealer = async (req, res) => {
   } catch (e) { errSrv(res, e, 'verComoDealer'); }
 };
 
+/* ── Demo comercial del portal (pedido de Pato, 28-08-2026) ─────────────────
+   POST /dealer/demo {id_dealer} — el Ejecutivo Comercial abre el portal REAL
+   del dealer para mostrárselo y fidelizarlo (permiso portal_demo_dealer, se
+   lanza desde la ficha del dealer — nunca digitando RUT como login).
+   Mismo token ver_como (solo lectura, 30 min) + marca demo. CANDADO: si el
+   dealer ya tiene cuenta activa del portal, el modo demo se bloquea — solo el
+   Administrador conserva la mirada de soporte (el ver-como clásico). */
+const demoDealer = async (req, res) => {
+  try {
+    const idDealer = parseInt(req.body && req.body.id_dealer, 10);
+    if (!idDealer) return res.status(400).json({ success: false, data: null, error: 'id_dealer requerido' });
+    const [[d]] = await pool.query('SELECT id_dealer, rut, nombre_razon, nombre_indexa, correo FROM dealers WHERE id_dealer=?', [idDealer]);
+    if (!d) return res.status(404).json({ success: false, data: null, error: 'El dealer no existe' });
+    const [[cta]] = await pool.query('SELECT id FROM ar_dealer_cuentas WHERE id_dealer=? AND activo=1 LIMIT 1', [idDealer]);
+    if (cta && req.usuario?.perfil_nombre !== 'Administrador')
+      return res.status(409).json({ success: false, data: { registrado: true }, error: 'Este dealer ya tiene su acceso al portal — el modo demostración queda bloqueado.' });
+    const nombre = d.nombre_razon || d.nombre_indexa || `Dealer ${d.id_dealer}`;
+    const quien = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
+    const token = jwt.sign(
+      { tipo: 'dealer', ver_como: true, demo: true, id_dealer: d.id_dealer, rut: d.rut, nombre, por: quien, por_id: req.usuario.id_usuario },
+      JWT_SECRET, { expiresIn: '30m' });
+    auditar({ req, accion: 'DEMO_PORTAL', modulo: 'atencion-remota', entidad: 'portal_dealer', entidad_id: d.id_dealer,
+      detalle: `Mostró el portal en modo demostración al dealer ${nombre} (solo lectura, 30 min)`, rut: d.rut });
+    res.json({ success: true, data: { token, dealer: { id_dealer: d.id_dealer, rut: d.rut, nombre, correo: d.correo || null } }, error: null });
+  } catch (e) { errSrv(res, e, 'demoDealer'); }
+};
+
+/* POST /dealer/demo-invitar — botón "Enviar invitación" DENTRO del portal en
+   modo demo. Se autentica con el propio token demo (firmado por nosotros, 30
+   min, lleva quién lo emitió): manda el correo de auto-registro que ya existe
+   (plantilla paramétrica dealer_invitacion_portal) y estampa portal_invitado_en. */
+const demoInvitar = async (req, res) => {
+  try {
+    const d = jwt.verify(rawToken(req), JWT_SECRET);
+    if (d.tipo !== 'dealer' || !d.ver_como || !d.demo)
+      return res.status(403).json({ success: false, data: null, error: 'Solo disponible en modo demostración' });
+    const [[dealer]] = await pool.query('SELECT id_dealer, rut, COALESCE(NULLIF(nombre_razon,\'\'), nombre_indexa) AS nombre, correo FROM dealers WHERE id_dealer=?', [d.id_dealer]);
+    if (!dealer) return res.status(404).json({ success: false, data: null, error: 'El dealer no existe' });
+    const correo = String(dealer.correo || '').trim();
+    if (!correo || !correo.includes('@'))
+      return res.status(409).json({ success: false, data: null, error: 'El dealer no tiene correo en su ficha — complétalo en Dealers antes de invitar.' });
+    const tpl = await require('../../../../shared/plantillas-correo').obtener('dealer_invitacion_portal').catch(() => null);
+    if (!tpl) return res.status(500).json({ success: false, data: null, error: 'No existe la plantilla dealer_invitacion_portal' });
+    const nombreSafe = String(dealer.nombre || 'Estimado dealer').replace(/[<>&]/g, ' ').trim();
+    await enviarCorreo({ to: correo, subject: tpl.asunto,
+      html: envolverHTML(String(tpl.cuerpo).replace(/\{\{\s*nombre\s*\}\}/gi, nombreSafe)),
+      text: `Te invitamos al nuevo Portal Dealer de AutoFácil: ${APP_URL}/portal-dealer — Regístrate con tu RUT y el correo de tu ficha.` });
+    await pool.query('UPDATE dealers SET portal_invitado_en=NOW() WHERE id_dealer=?', [dealer.id_dealer]);
+    auditar({ usuario: { id_usuario: d.por_id || null, nombre: d.por || null }, accion: 'ENVIAR', modulo: 'atencion-remota', entidad: 'invitacion_portal', entidad_id: dealer.id_dealer,
+      detalle: `Invitación al portal enviada a ${dealer.nombre} (${correo}) desde la demo comercial por ${d.por || '—'}`, rut: dealer.rut });
+    res.json({ success: true, data: { enviado: true, correo }, error: null });
+  } catch (e) {
+    if (/jwt|token/i.test(e.message || '')) return res.status(401).json({ success: false, data: null, error: 'Token inválido o expirado' });
+    errSrv(res, e, 'demoInvitar');
+  }
+};
+
 const actualizarCuenta = async (req, res) => {
   try {
     const { activo, password } = req.body || {};
@@ -1026,6 +1089,7 @@ module.exports = {
   // dealer
   dealerLogin, dealerAcceso, iniciarAcceso, onboarding, tourVisto, recuperarClave, resetClave, listarCuentas, crearCuenta, actualizarCuenta, regenerarLink, verComoDealer,
   listarInvitables, enviarInvitaciones, registrarActividad, bitacoraCuenta,
+  demoDealer, demoInvitar,
   // ejecutivo
   getCola, getMensajes,
   // comunes

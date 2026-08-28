@@ -39,6 +39,9 @@ router.post('/cuentas/:id/regenerar-link', verifyToken, requireFunc('atencion_re
 router.get('/cuentas/:id/bitacora',        verifyToken, requireFunc('atencion_remota'), C.bitacoraCuenta);
 // "Ver como dealer": token de mirada de solo lectura sobre el portal (auditado, 30 min)
 router.post('/dealer/ver-como', verifyToken, requireFunc('atencion_remota'), C.verComoDealer);
+// Demo comercial del portal: el ejecutivo lo muestra al dealer; se bloquea cuando el dealer ya se registró
+router.post('/dealer/demo', verifyToken, requireFunc('portal_demo_dealer'), C.demoDealer);
+router.post('/dealer/demo-invitar', C.demoInvitar);   // se autentica con el propio token demo
 
 // Invitaciones al portal (correo masivo self-service; no crea cuentas ni toca claves)
 router.get('/invitaciones/dealers', verifyToken, requireFunc('atencion_remota'), C.listarInvitables);
