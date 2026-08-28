@@ -62,6 +62,9 @@ require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
       "ALTER TABLE fundantes_seg ADD COLUMN sin_limitacion TINYINT NOT NULL DEFAULT 0",
       "ALTER TABLE fundantes_seg ADD COLUMN sin_limitacion_por VARCHAR(150) NULL",
       "ALTER TABLE fundantes_seg ADD COLUMN sin_limitacion_at DATETIME NULL",
+      // Nº de envío a validación: 1er envío, 2do (tras rechazo interno o devolución
+      // de la financiera), etc. Se incrementa en cada enviar(); backfill desde auditoría.
+      "ALTER TABLE fundantes_seg ADD COLUMN envios INT NOT NULL DEFAULT 0",
     ]) { try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[fundantes devolucion]', e.message); } }
     /* Bitácora de gestión: comentarios manuales sobre el estado de la operación
        (qué se conversó con la financiera, qué falta, con quién se está viendo).
@@ -301,7 +304,8 @@ const listar = async (req, res) => {
              DATEDIFF(CURDATE(), c.fecha_otorgado) AS dias,
              COALESCE(fs.estado,'PENDIENTE') AS estado, fs.comentario_rechazo,
              fs.fecha_envio, fs.fecha_validacion, fs.validado_por,
-             COALESCE(fs.sin_limitacion,0) AS sin_limitacion
+             COALESCE(fs.sin_limitacion,0) AS sin_limitacion,
+             COALESCE(fs.envios,0) AS envios
       FROM creditos c LEFT JOIN fundantes_seg fs ON fs.id_credito = c.id
       ${whereData}
       ORDER BY dias DESC, c.num_op DESC
@@ -339,6 +343,8 @@ const listar = async (req, res) => {
         liberado_pago: Number(o.liberado_pago) || 0, fecha_liberado_pago: o.fecha_liberado_pago, fecha_pago: o.fecha_pago,
         estado_op: o.estado_pago === 'PAGADO' ? 'FONDOS_LIBERADOS' : (Number(o.liberado_pago) === 1 ? 'LIBERADO_PAGO' : (o.estado === 'CERRADO' ? 'FUNDANTES_RECIBIDOS' : (o.estado === 'ENVIADO' ? 'POR_VALIDAR' : o.estado))),
         docs, faltan, puede_enviar, sin_limitacion: sinLim ? 1 : 0,
+        // Nº de envío: mínimo 1 si ya tiene fecha_envio (filas anteriores al contador)
+        envios: Math.max(Number(o.envios) || 0, o.fecha_envio ? 1 : 0),
       };
     });
 
@@ -499,9 +505,9 @@ const enviar = async (req, res) => {
     if (faltan.length) return res.status(400).json({ success: false, data: null, error: 'Faltan documentos obligatorios por subir' });
 
     await pool.query(
-      `INSERT INTO fundantes_seg (id_credito, estado, comentario_rechazo, fecha_envio, enviado_por, id_enviado_por)
-       VALUES (?, 'ENVIADO', NULL, NOW(), ?, ?)
-       ON DUPLICATE KEY UPDATE estado='ENVIADO', comentario_rechazo=NULL, fecha_envio=NOW(), enviado_por=VALUES(enviado_por), id_enviado_por=VALUES(id_enviado_por)`,
+      `INSERT INTO fundantes_seg (id_credito, estado, comentario_rechazo, fecha_envio, enviado_por, id_enviado_por, envios)
+       VALUES (?, 'ENVIADO', NULL, NOW(), ?, ?, 1)
+       ON DUPLICATE KEY UPDATE estado='ENVIADO', comentario_rechazo=NULL, fecha_envio=NOW(), enviado_por=VALUES(enviado_por), id_enviado_por=VALUES(id_enviado_por), envios=envios+1`,
       [id, nombreUsuario(req), req.usuario.id_usuario || null]);
     auditar({ req, accion: 'ENVIAR_FUNDANTES', modulo: 'fundantes-seguimiento', entidad: 'credito', entidad_id: id,
       detalle: `Envió a validación los fundantes de la OP ${op.num_op}${sinLim ? ' — SIN LIMITACIÓN' : ''}` });

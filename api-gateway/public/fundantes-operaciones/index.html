@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Fundantes — Operaciones</title>
-  <!-- v1.1 — pill SIN LIMITACION en la lista y en el visor de revision -->
+  <!-- v1.2 — columna Envio (1er/2do/3er envio) junto a Fecha Otorgado; 2+ resalta en naranjo · v1.1 — pill SIN LIMITACION en la lista y en el visor de revision -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; --amber:#b45309; }
@@ -271,6 +271,16 @@ function buscar(){
   clearTimeout(_buscarT);
   _buscarT = setTimeout(() => { if (F.q !== v) { F.q = v; cargar(); } }, 350);
 }
+// Nº de envío a validación: 1er envío / 2do envío / 3er envío… (2+ resalta: la
+// operación ya fue rechazada o devuelta antes). 0 = aún no se envía.
+function envioLbl(n){
+  n = Number(n) || 0;
+  if (!n) return '<span style="color:#94a3b8">—</span>';
+  const ord = ({1:'1er', 2:'2do', 3:'3er'})[n] || (n + 'to');
+  const est = n === 1 ? 'background:#f0fdf4;color:#166534;border:1.5px solid #bbf7d0'
+                      : 'background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74';
+  return `<span style="display:inline-block;${est};border-radius:20px;padding:2px 10px;font-size:.72rem;font-weight:800">${ord} envío</span>`;
+}
 function pintar(){
   const wrap = document.getElementById('tableWrap');
   const rows = DATA;
@@ -290,6 +300,7 @@ function pintar(){
       <td>${esc(r.financiera||'—')}</td>
       <td>${esc(r.id_financiera||'—')}</td>
       <td>${fmtF(r.fecha_otorgado)}</td>
+      <td>${envioLbl(r.envios)}</td>
       <td><span class="dias-pill ${diasCls(r.dias)}">${r.dias} d</span></td>
       <td>${subidos} doc${subidos===1?'':'s'}${r.sin_limitacion ? ' <span style="display:inline-flex;align-items:center;gap:4px;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;border-radius:20px;padding:2px 9px;font-size:.68rem;font-weight:800;margin-left:5px"><i class="bi bi-slash-circle"></i>SIN LIMITACIÓN</span>' : ''}</td>
       <td><button class="btn-rev" onclick="abrirRev(${r.id_credito})"><i class="bi bi-eye"></i> Revisar</button></td>
@@ -297,7 +308,7 @@ function pintar(){
   }).join('');
   wrap.innerHTML = `<table class="grid"><thead><tr>
     <th>Ejecutivo Comercial</th><th>N° Op</th><th>Financiera</th><th>ID Financiera</th>
-    <th>Fecha Otorgado</th><th>Días</th><th>Docs</th><th></th></tr></thead><tbody>${body}</tbody></table>`;
+    <th>Fecha Otorgado</th><th>Envío</th><th>Días</th><th>Docs</th><th></th></tr></thead><tbody>${body}</tbody></table>`;
 }
 
 /* ── Visor live ── */
