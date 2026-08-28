@@ -55,6 +55,12 @@
     <p>Administra los proveedores: datos, contacto y cuenta bancaria para emitir órdenes más rápido.</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
+  <a href="/ordenes-pago/compras-a-pagar/" class="module-card" id="cardComprasPagar" style="display:none">
+    <div class="card-icon"><i class="bi bi-cart-check"></i></div>
+    <h5>Otras Compras a Pagar</h5>
+    <p>Cola de pago de las órdenes a proveedores (todo lo que no es saldo precio, comisión dealer ni parque): selecciona, envía a pago, nómina y confirma.</p>
+    <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+  </a>
   <a href="/ordenes-pago/estadisticas/" class="module-card" id="cardEstadisticas" style="display:none">
     <div class="card-icon"><i class="bi bi-bar-chart"></i></div>
     <h5>Estadísticas</h5>
@@ -84,6 +90,7 @@ if (!token || !yo) location.href='/login.html';
   if (tiene('ordenes_pago_historial'))    { document.getElementById('cardHistorial').style.display='';    alguna=true; }
   if (tiene('ordenes_pago_proveedores'))  { document.getElementById('cardProveedores').style.display='';  alguna=true; }
   if (tiene('ordenes_pago_estadisticas')) { document.getElementById('cardEstadisticas').style.display=''; alguna=true; }
+  if (tiene('odp_compras_pagar'))         { document.getElementById('cardComprasPagar').style.display=''; alguna=true; }
   if (!alguna) document.getElementById('sinAcceso').style.display='';
 })();
 </script>

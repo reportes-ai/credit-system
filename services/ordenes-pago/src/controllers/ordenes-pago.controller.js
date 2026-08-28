@@ -152,6 +152,95 @@ require('../../../../shared/migrate').enFila('odp-cuenta-bancaria', async () => 
   catch (e) { if (e.errno !== 1060) throw e; }
 });
 
+/* ── Otras Compras a Pagar (v221.16) ─────────────────────────────────────────
+   Cola de pago para las ODP GENERAL (proveedores) con el MISMO flujo de Saldos
+   Precios a Pagar: seleccionar → Enviar a Pago → nómina → Confirmar pago.
+   El pago real sigue siendo pagarOrden (caja activa, horario, segregación,
+   asiento) — acá solo se agrega la marca "enviado a pago" en el libro central. */
+require('../../../../shared/migrate').enFila('odp-compras-pagar', async () => {
+  for (const ddl of [
+    'ALTER TABLE op_correlativos ADD COLUMN enviado_pago TINYINT NOT NULL DEFAULT 0',
+    'ALTER TABLE op_correlativos ADD COLUMN enviado_pago_por VARCHAR(150) NULL',
+    'ALTER TABLE op_correlativos ADD COLUMN enviado_pago_at DATETIME NULL',
+  ]) { try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) throw e; } }
+  await pool.query(`INSERT IGNORE INTO funcionalidades (id_funcionalidad, id_modulo, nombre, codigo, href, icono) VALUES
+    (3390008, 400001, 'Otras Compras a Pagar', 'odp_compras_pagar', '/ordenes-pago/compras-a-pagar/', 'bi-cart-check'),
+    (3390009, 400001, 'Seleccionar Compras a Pagar (Enviar a Pago)', 'odp_compras_seleccionar', NULL, NULL),
+    (3390010, 400001, 'Definir Fondos Disponibles (Compras)', 'odp_compras_fondos', NULL, NULL)`);
+  await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad)
+    SELECT p.id_perfil, f.id_funcionalidad FROM perfiles p
+    JOIN funcionalidades f ON f.id_funcionalidad IN (3390008, 3390009, 3390010)
+    WHERE p.nombre IN ('Administrador', 'Administrador de Sistema')`);
+});
+
+/* GET /api/ordenes-pago/compras-a-pagar — ODP GENERAL emitidas, no pagadas (+ pagadas hoy) */
+const getComprasAPagar = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT oc.id, oc.numero, oc.concepto, oc.monto,
+             DATE_FORMAT(oc.created_at,'%Y-%m-%d') AS fecha_orden,
+             DATEDIFF(CURDATE(), oc.created_at) AS dias,
+             (oc.pagada=1) AS pagado_hoy_flag, oc.enviado_pago, oc.enviado_pago_por,
+             op.proveedor_nombre, op.proveedor_rut, op.categoria, op.tipo_documento,
+             op.numero_documento, op.metodo_pago,
+             p.banco, p.numero_cuenta, p.tipo_cuenta
+      FROM op_correlativos oc
+      JOIN ordenes_pago op ON op.id = oc.origen_id
+      LEFT JOIN proveedores p ON p.id = op.id_proveedor
+      WHERE oc.origen='GENERAL' AND oc.anulada=0
+        AND (oc.pagada=0 OR DATE(oc.fecha_pagada)=CURDATE())
+      ORDER BY oc.created_at ASC`);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[odp comprasAPagar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* POST /api/ordenes-pago/compras-a-pagar/enviar { ids } — fija la selección */
+const enviarComprasAPago = async (req, res) => {
+  try {
+    const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter(Boolean);
+    if (!ids.length) return res.status(400).json({ success: false, data: null, error: 'Sin órdenes seleccionadas' });
+    const [r] = await pool.query(
+      `UPDATE op_correlativos SET enviado_pago=1, enviado_pago_por=?, enviado_pago_at=NOW()
+       WHERE id IN (?) AND origen='GENERAL' AND pagada=0 AND anulada=0`, [nombreUsuario(req), ids]);
+    auditar({ req, accion: 'ENVIAR', modulo: 'ordenes-pago', entidad: 'compras_a_pago', entidad_id: ids[0],
+      detalle: `Envió a pago ${r.affectedRows} orden(es) GENERAL` });
+    res.json({ success: true, data: { enviadas: r.affectedRows }, error: null });
+  } catch (e) { console.error('[odp enviarCompras]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* POST /api/ordenes-pago/compras-a-pagar/deshacer-envio { ids } */
+const deshacerEnvioCompras = async (req, res) => {
+  try {
+    const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter(Boolean);
+    if (!ids.length) return res.status(400).json({ success: false, data: null, error: 'Sin órdenes' });
+    const [r] = await pool.query(
+      `UPDATE op_correlativos SET enviado_pago=0, enviado_pago_por=NULL, enviado_pago_at=NULL
+       WHERE id IN (?) AND origen='GENERAL' AND pagada=0`, [ids]);
+    auditar({ req, accion: 'REVERTIR', modulo: 'ordenes-pago', entidad: 'compras_a_pago', entidad_id: ids[0],
+      detalle: `Deshizo el envío a pago de ${r.affectedRows} orden(es) GENERAL` });
+    res.json({ success: true, data: { deshechas: r.affectedRows }, error: null });
+  } catch (e) { console.error('[odp deshacerEnvio]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* Fondos disponibles del día para compras (mismo patrón que saldos/comisiones:
+   compartido en BD, válido solo hoy; clave propia para no mezclar bolsillos). */
+const getFondosCompras = async (req, res) => {
+  try {
+    const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='fondos_disp_compras'");
+    let d = null; if (row) { try { d = JSON.parse(row.valor); } catch (_) {} }
+    res.json({ success: true, data: d, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const setFondosCompras = async (req, res) => {
+  try {
+    const { monto, fecha_iso, fecha_dia } = req.body || {};
+    const valor = { monto: Number(monto) || 0, fecha_iso: fecha_iso || new Date().toISOString(), fecha_dia, usuario: nombreUsuario(req) };
+    await pool.query(`INSERT INTO postventa_config (clave, valor) VALUES ('fondos_disp_compras', ?)
+       ON DUPLICATE KEY UPDATE valor = VALUES(valor)`, [JSON.stringify(valor)]);
+    res.json({ success: true, data: valor, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const norm = s => String(s ?? '').trim();
 const normRut = r => RUT.normalizar(r) || String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
@@ -1273,4 +1362,5 @@ module.exports = {
   listarProveedores, crearProveedor, actualizarProveedor, eliminarProveedor,
   listarOrdenes, getOrden, getDocumento, crearOrden, cambiarEstadoOrden, estadisticas, enviarCorreoOrden,
   pagarOrden, miCajaOP, anularOrdenPostventa,
+  getComprasAPagar, enviarComprasAPago, deshacerEnvioCompras, getFondosCompras, setFondosCompras,
 };

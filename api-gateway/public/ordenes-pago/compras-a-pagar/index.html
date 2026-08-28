@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Otras Compras a Pagar — AutoFácil</title>
+  <!-- v1.0 — cola de pago de las ODP a proveedores (origen GENERAL): mismo flujo que Saldos Precios a Pagar (fondos, propuestas, Enviar a Pago, nomina, Confirmar pago via pagarOrden con caja activa) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .wrap { max-width:none; margin:0 auto; padding:20px 24px; }
+    .head-row { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+    .resumen { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+    .stat { flex:1 1 220px; background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; border-left:5px solid #cbd5e1; box-sizing:border-box; }
+    .stat .lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; font-weight:700; }
+    .stat .val { font-size:1.5rem; font-weight:800; color:var(--navy); margin-top:2px; }
+    .stat .sub { font-size:.82rem; color:#475569; margin-top:1px; }
+    .stat.pend { border-left-color:#0141A2; }
+    .stat.pag  { border-left-color:#16a34a; } .stat.pag .val { color:#15803d; }
+    .stat.selb { border-left-color:#0d9488; } .stat.selb .val { color:#0f766e; }
+    .stat.selb.excede { border-left-color:#b91c1c; background:#fef2f2; }
+    .stat.selb.excede .val { color:#b91c1c; }
+    .stat.selb .sub { font-size:.72rem; margin-top:2px; color:#64748b; }
+    .stat.selb.excede .sub { color:#b91c1c; font-weight:700; }
+    .stat.fondos { border-left-color:#0ea5e9; }
+    .stat.fondos input { width:100%; box-sizing:border-box; margin-top:4px; border:1.5px solid #d1d5db; border-radius:8px; padding:7px 11px; font-size:1.15rem; font-weight:800; color:var(--navy); }
+    .stat.fondos input:focus { outline:none; border-color:#0ea5e9; }
+    .stat.prop { cursor:default; border-left-color:#7c3aed; display:flex; flex-direction:column; }
+    .stat.prop.ant { border-left-color:#d97706; }
+    .stat.prop .prop-line { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .btn-marcar { border:none; color:#fff; background:#7c3aed; border-radius:8px; padding:6px 16px; font-size:.8rem; font-weight:700; cursor:pointer; white-space:nowrap; transition:.15s; }
+    .stat.prop.ant .btn-marcar { background:#d97706; }
+    .btn-marcar.on { box-shadow:inset 0 0 0 2px rgba(255,255,255,.75); filter:brightness(.9); }
+    .btn-marcar:disabled { opacity:.45; cursor:default; }
+    tbody tr.row-prop td { box-shadow:inset 0 0 0 9999px rgba(124,58,237,.08); }
+    tbody tr.row-prop-ant td { box-shadow:inset 0 0 0 9999px rgba(217,119,6,.10); }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:6px 0 0; overflow:hidden; }
+    .tbl-scroll { max-height:calc(100vh - 320px); overflow:auto; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    thead th { position:sticky; top:0; z-index:2; background:#0f2a52; color:#fff; font-size:.68rem; text-transform:uppercase; letter-spacing:.3px; padding:9px 10px; text-align:left; white-space:nowrap; }
+    thead th.num { text-align:right; }
+    tbody td { padding:7px 10px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+    tbody td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    tbody tr:hover { background:#f8fafc; }
+    tbody tr.row-sel { background:#ecfdf3; }
+    tbody tr.row-enviado { background:#f5f3ff; }
+    tbody tr.sel { background:#ecfdf3; }
+    tfoot td { position:sticky; bottom:0; background:#f1f5f9; font-weight:800; color:var(--navy); padding:10px; border-top:2px solid #cbd5e1; font-size:.85rem; }
+    tfoot td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    .vacio { text-align:center; color:#94a3b8; padding:40px; font-size:.9rem; }
+    .dias-pill { display:inline-block; min-width:42px; text-align:center; border-radius:8px; padding:2px 8px; font-weight:800; font-size:.78rem; }
+    .d-red { background:#fee2e2; color:#b91c1c; } .d-yel { background:#fef9c3; color:#a16207; } .d-grn { background:#dcfce7; color:#15803d; }
+    .pagado-tag { color:#15803d; font-weight:700; font-size:.78rem; }
+    .selchk { width:18px; height:18px; cursor:pointer; accent-color:#16a34a; }
+    .pagar-cell { display:inline-flex; align-items:center; gap:5px; }
+    .indbox { display:inline-block; width:18px; height:18px; border-radius:4px; background:#f1f5f9; border:1px solid #e2e8f0; }
+    .indbox.on-max { background:#7c3aed; border-color:#7c3aed; }
+    .indbox.on-ant { background:#d97706; border-color:#d97706; }
+    .search-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+    .accionbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .btn-confirmar { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:7px 16px; font-weight:800; cursor:pointer; font-size:.85rem; }
+    .btn-confirmar:disabled { opacity:.45; cursor:default; }
+    .btn-enviar { background:#7c3aed; color:#fff; border:none; border-radius:8px; padding:7px 16px; font-weight:800; cursor:pointer; font-size:.85rem; }
+    .btn-enviar:disabled { opacity:.45; cursor:default; }
+    .accionbar .sep { width:1px; height:24px; background:#cbd5e1; margin:0 2px; }
+    .enviado-tag { color:#6d28d9; font-weight:700; font-size:.78rem; display:block; }
+    .btn-deshacer { display:block; margin:3px auto 0; background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; border-radius:7px; padding:2px 9px; font-size:.72rem; font-weight:700; cursor:pointer; }
+    .btn-sec { background:#eef2f7; color:#0141A2; border:none; border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer; font-size:.82rem; }
+    .btn-sec:disabled { opacity:.45; cursor:default; }
+    #buscar { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.85rem; width:260px; }
+    .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
+    .toast.err { background:#dc2626; }
+    #dlgODP::backdrop { background:rgba(15,23,42,.55); }
+    .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Órdenes de Pago',href:'/ordenes-pago/'},{label:'Otras Compras a Pagar',current:true}]};</script>
+
+<div class="wrap">
+  <div class="head-row">
+    <div>
+      <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-cart-check me-2"></i>Otras Compras a Pagar</h5>
+      <span style="font-size:.82rem;color:#64748b">Órdenes de pago a <b>proveedores</b> emitidas y sin pagar (todo lo que NO es saldo precio, comisión dealer ni parque). <b>Selecciona</b> las que se pagarán (o usa una propuesta), presiona <b>Enviar a Pago</b> para fijarlas, genera la <b>nómina</b> y <b>Confirma el pago</b> (exige Caja Activa; quien emitió no puede pagar).</span>
+    </div>
+  </div>
+
+  <div class="search-row">
+    <input id="buscar" placeholder="Buscar ODP, proveedor, RUT, concepto…" oninput="render()">
+    <div class="accionbar" id="accionBar" style="display:none">
+      <button class="btn-enviar" id="btnEnviar" onclick="enviarSeleccion()" disabled><i class="bi bi-send-check me-1"></i>Enviar a Pago</button>
+      <span class="sep"></span>
+      <button class="btn-sec" id="btnNomina" onclick="copiarNomina()" disabled><i class="bi bi-clipboard me-1"></i>Nómina</button>
+      <button class="btn-sec" id="btnCSV" onclick="descargarCSV()" disabled><i class="bi bi-download me-1"></i>CSV</button>
+      <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarPago()" disabled><i class="bi bi-check2-all me-1"></i>Confirmar pago</button>
+    </div>
+  </div>
+
+  <div class="resumen">
+    <div class="stat pend"><div class="lbl">Pendientes de pago</div>
+      <div class="val"><span id="cntPend">0</span> ops X <span id="montoPend">$0</span></div></div>
+    <div class="stat pag"><div class="lbl">Pagadas hoy</div>
+      <div class="val"><span id="cntPag">0</span> ops X <span id="montoPag">$0</span></div></div>
+    <div class="stat selb"><div class="lbl">Seleccionadas</div>
+      <div class="val"><span id="selN">0</span> ops X <span id="selM">$0</span></div>
+      <div class="sub" id="selSub"></div></div>
+    <div class="stat fondos"><div class="lbl">Fondos disponibles</div>
+      <input id="fondos" inputmode="numeric" placeholder="$0" oninput="onFondos(this)">
+      <div class="sub" id="fondosSub">Disponible para asignar: $0</div>
+      <div class="sub" id="fondosMeta" style="font-size:.72rem;color:#94a3b8">Sin monto cargado hoy</div></div>
+  </div>
+
+  <div class="resumen" id="propBox" style="display:none">
+    <div class="stat prop max" id="propMax" onmouseenter="hl('max')" onmouseleave="hl(null)">
+      <div class="lbl">Propuesta · Máximo de órdenes</div>
+      <div class="prop-line"><div class="val" id="propMaxN">0 ops X $0</div>
+        <button class="btn-marcar" id="propMaxBtn" onclick="aplicarPropuesta('max')">Marcar</button></div>
+      <div class="sub" id="propMaxM">Queda disponible $0</div>
+    </div>
+    <div class="stat prop ant" id="propAnt" onmouseenter="hl('ant')" onmouseleave="hl(null)">
+      <div class="lbl">Propuesta · Prioriza antigüedad</div>
+      <div class="prop-line"><div class="val" id="propAntN">0 ops X $0</div>
+        <button class="btn-marcar" id="propAntBtn" onclick="aplicarPropuesta('ant')">Marcar</button></div>
+      <div class="sub" id="propAntM">Queda disponible $0</div>
+    </div>
+  </div>
+
+  <div class="card-af">
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr>
+          <th>Orden de Pago</th>
+          <th>Proveedor</th>
+          <th>RUT</th>
+          <th>Concepto</th>
+          <th>Categoría</th>
+          <th>Documento</th>
+          <th>Cuenta</th>
+          <th>Banco</th>
+          <th>Método</th>
+          <th style="text-align:center">Días</th>
+          <th class="num">A pagar</th>
+          <th style="text-align:center">Pagar</th>
+        </tr></thead>
+        <tbody id="body"></tbody>
+        <tfoot><tr>
+          <td colspan="10" style="text-align:right">TOTAL A PAGAR (visible)</td>
+          <td class="num" id="totMonto">$0</td><td></td>
+        </tr></tfoot>
+      </table>
+    </div>
+    <div class="vacio" id="vacio" style="display:none"><i class="bi bi-inbox" style="font-size:1.6rem"></i><br>No hay compras pendientes de pago.</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+if (!token || !yo) location.href='/login.html?next='+encodeURIComponent(location.pathname+location.search);
+
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const fmt = n => '$'+Number(n||0).toLocaleString('es-CL');
+const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fechaCL = f => { if(!f) return '—'; const d=new Date(f); return isNaN(d)?'—':d.toLocaleDateString('es-CL',{timeZone:'UTC'}); };
+function toast(m, err){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',3200); }
+let DATA = [], fondosVal = 0, lastProp = { max:{set:[],monto:0}, ant:{set:[],monto:0} }, propActiva = null;
+const HOY_CL = () => new Date().toLocaleDateString('en-CA', { timeZone:'America/Santiago' });
+let diaCargado = HOY_CL();
+
+/* Atribuciones paramétricas: seleccionar/enviar (odp_compras_seleccionar) y
+   fondos (odp_compras_fondos). Confirmar pago lo gobierna el servidor: Caja
+   Activa + horario + segregación (quien emitió no paga). */
+let CAN = { fondos:false, seleccionar:false };
+async function cargarPermisos(){
+  try {
+    const admin = (yo.perfil||'') === 'Administrador';
+    const j = await fetch('/api/auth/mis-permisos', { headers:H }).then(r=>r.json()).catch(()=>({}));
+    const fx = j.funcionalidades || [];
+    CAN.seleccionar = admin || fx.includes('odp_compras_seleccionar');
+    CAN.fondos = admin || fx.includes('odp_compras_fondos');
+  } catch(e){}
+}
+
+(async function init(){
+  await cargarPermisos();
+  await cargarFondos();
+  try {
+    const r = await fetch('/api/ordenes-pago/compras-a-pagar', { headers:H });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    DATA = (j.data || []).map(x => ({ ...x, pagado: !!Number(x.pagado_hoy_flag), enviado: !!Number(x.enviado_pago) }));
+    render();
+  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="12" class="vacio">Error: ${escH(e.message)}</td></tr>`; }
+})();
+
+setInterval(async () => {
+  if (HOY_CL() !== diaCargado){ diaCargado = HOY_CL(); fondosVal = 0; document.getElementById('fondos').value=''; pintarMetaFondos(null); recalcPropuestas(); return; }
+  if (document.activeElement !== document.getElementById('fondos')){ await cargarFondos(); recalcPropuestas(); }
+}, 60000);
+
+function visibles(){
+  const q = (document.getElementById('buscar').value||'').toLowerCase();
+  return DATA.filter(r => !q || [r.numero,r.proveedor_nombre,r.proveedor_rut,r.concepto,r.categoria].some(v => String(v||'').toLowerCase().includes(q)));
+}
+
+const montoP = r => Number(r.monto)||0;
+const sum = arr => arr.reduce((a,r)=>a+montoP(r),0);
+const seleccionadas = () => DATA.filter(r => !r.pagado && !r.enviado && r.sel);
+const enviadas      = () => DATA.filter(r => !r.pagado && r.enviado);
+
+function celdaAccion(r){
+  if (r.pagado) return `<span class="pagado-tag">Pagada hoy</span>`;
+  if (r.enviado){
+    const undo = CAN.seleccionar ? `<button class="btn-deshacer" onclick="revertirEnvio(${r.id})">Deshacer envío</button>` : '';
+    return `<span class="enviado-tag" title="Enviado por ${escH(r.enviado_pago_por||'')}">✓ Enviada a pago</span>${undo}`;
+  }
+  const dis = CAN.seleccionar ? '' : 'disabled title="Necesitas el permiso Seleccionar Compras a Pagar"';
+  return `<span class="pagar-cell">
+    <span class="indbox" id="indmax_${r.id}" title="En propuesta Máximo de órdenes"></span>
+    <span class="indbox" id="indant_${r.id}" title="En propuesta Prioriza antigüedad"></span>
+    <input type="checkbox" class="selchk" ${r.sel?'checked':''} ${dis} onchange="toggleSel(${r.id},this)">
+  </span>`;
+}
+
+function render(){
+  const tb = document.getElementById('body');
+  const rows = visibles();
+  if (!rows.length){ tb.innerHTML=''; document.getElementById('vacio').style.display=''; recalc(); return; }
+  document.getElementById('vacio').style.display='none';
+  tb.innerHTML = rows.map(r => `
+    <tr id="row_${r.id}" class="${r.pagado?'sel':(r.enviado?'row-enviado':(r.sel?'row-sel':''))}">
+      <td><a href="javascript:void 0" onclick="verODP(${r.id})" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-file-earmark-text"></i> ${escH(r.numero)}</a><div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_orden)}</div></td>
+      <td>${escH(r.proveedor_nombre||'—')}</td>
+      <td>${escH(r.proveedor_rut||'—')}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${escH(r.concepto||'')}">${escH(r.concepto||'—')}</td>
+      <td>${escH(r.categoria||'—')}</td>
+      <td>${escH([r.tipo_documento, r.numero_documento?('N° '+r.numero_documento):''].filter(Boolean).join(' ')||'—')}</td>
+      <td>${escH(r.numero_cuenta||'—')}</td>
+      <td>${escH(r.banco||'—')}</td>
+      <td>${escH(r.metodo_pago||'—')}</td>
+      <td style="text-align:center"><span class="dias-pill ${r.dias>5?'d-red':(r.dias>2?'d-yel':'d-grn')}">${r.dias} d</span></td>
+      <td class="num">${fmt(montoP(r))}</td>
+      <td style="text-align:center">${celdaAccion(r)}</td>
+    </tr>`).join('');
+  recalc();
+}
+
+function toggleSel(id, chk){
+  const r = DATA.find(x => x.id===id); if (!r) return;
+  r.sel = chk.checked; propActiva = null;
+  document.getElementById('row_'+id)?.classList.toggle('row-sel', r.sel);
+  recalc();
+}
+
+function recalc(){
+  document.getElementById('totMonto').textContent = fmt(sum(visibles()));
+  const pend = DATA.filter(r => !r.pagado), pag = DATA.filter(r => r.pagado);
+  document.getElementById('cntPend').textContent = pend.length;
+  document.getElementById('montoPend').textContent = fmt(sum(pend));
+  document.getElementById('cntPag').textContent = pag.length;
+  document.getElementById('montoPag').textContent = fmt(sum(pag));
+  const sel = seleccionadas(), env = enviadas();
+  document.getElementById('selN').textContent = sel.length;
+  document.getElementById('selM').textContent = fmt(sum(sel));
+  const dispAsig = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado || r.enviado)));
+  const excede = sum(sel) - dispAsig;
+  document.querySelector('.stat.selb')?.classList.toggle('excede', excede > 0);
+  const subSel = document.getElementById('selSub');
+  if (subSel) subSel.textContent = !sel.length ? ''
+    : excede > 0 ? ('Excede los fondos en ' + fmt(excede) + ' — no alcanza para pagarlas todas hoy')
+    : ('Queda disponible ' + fmt(dispAsig - sum(sel)));
+  const be = document.getElementById('btnEnviar');
+  be.disabled = sel.length===0 || !CAN.seleccionar;
+  const bc = document.getElementById('btnConfirmar'), bn = document.getElementById('btnNomina'), bv = document.getElementById('btnCSV');
+  bc.disabled = env.length===0;
+  bn.disabled = env.length===0; bv.disabled = env.length===0;
+  document.getElementById('accionBar').style.display = DATA.some(r => !r.pagado) ? 'flex' : 'none';
+  recalcPropuestas();
+}
+
+/* Fondos del día (clave propia fondos_disp_compras — bolsillo aparte del de saldos) */
+let fondosTimer = null;
+function onFondos(inp){
+  const digits = (inp.value||'').replace(/\D/g,'');
+  fondosVal = Number(digits||0);
+  inp.value = digits ? '$'+fondosVal.toLocaleString('es-CL') : '';
+  recalcPropuestas(); recalc();
+  clearTimeout(fondosTimer); fondosTimer = setTimeout(guardarFondos, 600);
+}
+function pintarMetaFondos(d){
+  const el = document.getElementById('fondosMeta'); if (!el) return;
+  el.textContent = (d && d.fecha_iso)
+    ? `Cargado por ${d.usuario||'—'} · ${new Date(d.fecha_iso).toLocaleString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}`
+    : 'Sin monto cargado hoy';
+  const inp = document.getElementById('fondos');
+  inp.disabled = !CAN.fondos;
+  inp.style.background = CAN.fondos ? '' : '#f1f5f9';
+  if (!CAN.fondos) inp.title = 'Necesitas el permiso Definir Fondos Disponibles (Compras)';
+}
+async function cargarFondos(){
+  try {
+    const j = await fetch('/api/ordenes-pago/compras-a-pagar/fondos', { headers:H }).then(r=>r.json());
+    const d = j.data;
+    if (d && d.fecha_dia === HOY_CL()){
+      fondosVal = Number(d.monto)||0;
+      if (fondosVal) document.getElementById('fondos').value = '$'+fondosVal.toLocaleString('es-CL');
+      pintarMetaFondos(d);
+    } else { fondosVal = 0; pintarMetaFondos(null); }
+  } catch(e){ pintarMetaFondos(null); }
+}
+async function guardarFondos(){
+  if (!CAN.fondos) return;
+  const payload = { monto: fondosVal, fecha_iso: new Date().toISOString(), fecha_dia: HOY_CL() };
+  try {
+    const j = await fetch('/api/ordenes-pago/compras-a-pagar/fondos', { method:'PUT', headers:H, body: JSON.stringify(payload) }).then(r=>r.json());
+    pintarMetaFondos(j.data || { ...payload, usuario: (yo.nombre+' '+(yo.apellido||'')).trim() });
+  } catch(e){}
+}
+
+function recalcPropuestas(){
+  const D = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado || r.enviado)));
+  document.getElementById('fondosSub').textContent = 'Disponible para asignar: ' + fmt(D);
+  const cand = DATA.filter(r => !r.pagado && !r.enviado);
+  const llenar = lista => { const set=[]; let acc=0;
+    for (const r of lista){ const v=montoP(r); if (acc+v <= D){ set.push(r); acc+=v; } }
+    return { set, monto:acc }; };
+  lastProp.max = llenar(cand.slice().sort((a,b)=>montoP(a)-montoP(b)));
+  lastProp.ant = llenar(cand);
+  const pintar = (which, nEl, mEl, btn) => {
+    const p = lastProp[which];
+    document.getElementById(nEl).textContent = p.set.length + ' ops X ' + fmt(p.monto);
+    document.getElementById(mEl).textContent = 'Queda disponible ' + fmt(D - p.monto);
+    const b = document.getElementById(btn);
+    const on = (propActiva === which);
+    b.classList.toggle('on', on);
+    b.textContent = on ? '✓ Seleccionada' : 'Marcar';
+    b.disabled = (p.set.length === 0 && !on) || !CAN.seleccionar;
+  };
+  pintar('max','propMaxN','propMaxM','propMaxBtn');
+  pintar('ant','propAntN','propAntM','propAntBtn');
+  document.getElementById('propBox').style.display = fondosVal > 0 ? 'flex' : 'none';
+  const inMax = new Set(lastProp.max.set.map(r=>r.id)), inAnt = new Set(lastProp.ant.set.map(r=>r.id));
+  DATA.forEach(r => {
+    const em = document.getElementById('indmax_'+r.id), ea = document.getElementById('indant_'+r.id);
+    if (em) em.className = 'indbox' + (inMax.has(r.id) ? ' on-max' : '');
+    if (ea) ea.className = 'indbox' + (inAnt.has(r.id) ? ' on-ant' : '');
+  });
+}
+function hl(which){
+  document.querySelectorAll('tr.row-prop, tr.row-prop-ant').forEach(tr => tr.classList.remove('row-prop','row-prop-ant'));
+  if (!which) return;
+  const cls = which==='ant' ? 'row-prop-ant' : 'row-prop';
+  lastProp[which].set.forEach(r => document.getElementById('row_'+r.id)?.classList.add(cls));
+}
+function aplicarPropuesta(which){
+  if (propActiva === which){ propActiva = null; DATA.forEach(r => { if (!r.pagado && !r.enviado) r.sel = false; }); }
+  else { propActiva = which; const ids = new Set(lastProp[which].set.map(r=>r.id));
+    DATA.forEach(r => { if (!r.pagado && !r.enviado) r.sel = ids.has(r.id); }); }
+  hl(null); render();
+}
+
+async function enviarSeleccion(){
+  const sel = seleccionadas(); if (!sel.length) return;
+  if (!confirm(`Vas a ENVIAR A PAGO ${sel.length} orden(es) por ${fmt(sum(sel))}. Quedarán fijas para que Tesorería las pague. ¿Confirmas?`)) return;
+  const ids = sel.map(r => r.id);
+  try {
+    const j = await fetch('/api/ordenes-pago/compras-a-pagar/enviar', { method:'POST', headers:H, body: JSON.stringify({ ids }) }).then(r=>r.json());
+    if (!j.success) throw new Error(j.error||'Error');
+    sel.forEach(r => { r.enviado = true; r.sel = false; r.enviado_pago_por = (yo.nombre+' '+(yo.apellido||'')).trim(); });
+    propActiva = null; render(); toast(`${ids.length} orden(es) enviadas a pago`);
+  } catch(e){ toast(e.message, true); }
+}
+async function revertirEnvio(id){
+  const r = DATA.find(x => x.id===id); if (!r) return;
+  if (!confirm(`¿Deshacer el envío a pago de la ${r.numero}? Volverá a quedar seleccionable.`)) return;
+  try {
+    const j = await fetch('/api/ordenes-pago/compras-a-pagar/deshacer-envio', { method:'POST', headers:H, body: JSON.stringify({ ids:[id] }) }).then(r=>r.json());
+    if (!j.success) throw new Error(j.error||'Error');
+    r.enviado = false; r.sel = false; propActiva = null;
+    render(); toast(`Envío de ${r.numero} deshecho`);
+  } catch(e){ toast(e.message, true); }
+}
+
+/* Confirmar pago: usa el MISMO endpoint del pago individual (un solo motor —
+   caja activa, horario de pagos, segregación emisor≠pagador, asiento contable
+   y cuenta de cargo heredada). Se paga una a una y se informa lo que falló. */
+async function confirmarPago(){
+  const env = enviadas(); if (!env.length) return;
+  if (!confirm(`Vas a registrar el PAGO de ${env.length} orden(es) por ${fmt(sum(env))}. Exige Caja Activa y quien emitió no puede pagar. ¿Confirmas?`)) return;
+  const btn = document.getElementById('btnConfirmar');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Procesando…';
+  let ok = 0; const errores = [];
+  for (const r of env){
+    try {
+      const j = await fetch('/api/ordenes-pago/ordenes/'+r.id+'/pagar', { method:'POST', headers:H, body: JSON.stringify({}) }).then(x=>x.json());
+      if (j.success){ r.pagado = true; r.sel = false; ok++; }
+      else errores.push(`${r.numero}: ${j.error||'error'}`);
+    } catch(e){ errores.push(`${r.numero}: error de red`); }
+  }
+  propActiva = null; render();
+  btn.innerHTML = '<i class="bi bi-check2-all me-1"></i>Confirmar pago';
+  if (errores.length) { toast(`${ok} pagadas · ${errores.length} con error`, true); alert('No se pudieron pagar:\n\n' + errores.join('\n')); }
+  else toast(`${ok} orden(es) pagadas`);
+}
+
+/* Nómina bancaria de las órdenes enviadas a pago */
+const COLS = ['RUT Beneficiario','Nombre Beneficiario','Banco','N° Cuenta','Monto','Glosa'];
+function nominaMatriz(){
+  return enviadas().map(r => [
+    r.proveedor_rut||'', r.proveedor_nombre||'', r.banco||'', r.numero_cuenta||'',
+    Math.round(montoP(r)), `${r.numero} — ${r.concepto||''}`.slice(0,60)
+  ]);
+}
+async function copiarNomina(){
+  const m = nominaMatriz(); if (!m.length) return;
+  const tsv = [COLS.join('\t'), ...m.map(f => f.join('\t'))].join('\n');
+  const html = `<table border="1" cellpadding="4" style="border-collapse:collapse;font-family:Arial;font-size:12px">
+    <thead><tr>${COLS.map(c=>`<th style="background:#dbeafe">${c}</th>`).join('')}</tr></thead>
+    <tbody>${m.map(f=>`<tr>${f.map((v,i)=>`<td${i===4?' align="right"':''}>${escH(i===4?fmt(v):v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  try {
+    if (navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html],{type:'text/html'}),
+        'text/plain': new Blob([tsv],{type:'text/plain'}),
+      })]);
+    } else { await navigator.clipboard.writeText(tsv); }
+    toast(`Nómina de ${m.length} pago(s) copiada`);
+  } catch(e){ toast('No se pudo copiar: '+e.message, true); }
+}
+function descargarCSV(){
+  const m = nominaMatriz(); if (!m.length) return;
+  const esc = v => { const s=String(v); return /[;"\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const csv = [COLS.join(';'), ...m.map(f => f.map(esc).join(';'))].join('\r\n');
+  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `nomina-compras-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast(`CSV de ${m.length} pago(s) descargado`);
+}
+
+/* Ver la ODP en popup (motor único /js/odp-documento.js) */
+async function verODP(ordenId){
+  const dlg = document.getElementById('dlgODP');
+  document.getElementById('odpTitulo').textContent = 'Orden de Pago';
+  document.getElementById('odpBody').innerHTML = '<p style="color:#94a3b8;padding:20px 0;text-align:center">Cargando…</p>';
+  dlg.showModal();
+  try {
+    const j = await fetch('/api/ordenes-pago/ordenes/'+ordenId+'/documento', { headers:H }).then(r=>r.json());
+    if (!j.success || !j.data) throw new Error(j.error||'No se pudo cargar la orden');
+    document.getElementById('odpTitulo').textContent = j.data.numero || 'Orden de Pago';
+    document.getElementById('odpBody').innerHTML = AF_ODP_DOC.html(j.data);
+  } catch(e){ document.getElementById('odpBody').innerHTML = '<p style="color:#b91c1c;padding:20px 0;text-align:center">'+escH(e.message)+'</p>'; }
+}
+</script>
+<dialog id="dlgODP" style="border:none;border-radius:16px;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3);max-width:880px;width:96%">
+  <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:15px 20px;font-weight:700;display:flex;justify-content:space-between">
+    <span id="odpTitulo">Orden de Pago</span>
+    <i class="bi bi-x-lg" style="cursor:pointer" onclick="document.getElementById('dlgODP').close()"></i>
+  </div>
+  <div style="padding:18px 20px;font-size:.86rem;color:#334155" id="odpBody"></div>
+  <div style="padding:13px 20px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
+    <button class="btn-ghost" onclick="document.getElementById('dlgODP').close()">Cerrar</button>
+    <a class="btn-ghost" style="text-decoration:none;color:#334155" href="/ordenes-pago/historial/?origen=GENERAL" target="_blank"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir en Historial</a>
+  </div>
+</dialog>
+<script src="/js/timbre-pagado.js"></script>
+<script src="/js/odp-documento.js?v=213.30"></script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -17,6 +17,14 @@ router.post('/proveedores',       verifyToken, requireFunc('ordenes_pago_proveed
 router.put('/proveedores/:id',    verifyToken, requireFunc('ordenes_pago_proveedores'), c.actualizarProveedor);
 router.delete('/proveedores/:id', verifyToken, requireFunc('ordenes_pago_proveedores'), c.eliminarProveedor);
 
+// Otras Compras a Pagar: cola de pago de las ODP GENERAL (mismo flujo que Saldos
+// Precios a Pagar). El pago real sigue siendo POST /ordenes/:id/pagar (caja activa).
+router.get('/compras-a-pagar',                 verifyToken, requireFunc('odp_compras_pagar'), c.getComprasAPagar);
+router.post('/compras-a-pagar/enviar',         verifyToken, requireFunc('odp_compras_seleccionar'), c.enviarComprasAPago);
+router.post('/compras-a-pagar/deshacer-envio', verifyToken, requireFunc('odp_compras_seleccionar'), c.deshacerEnvioCompras);
+router.get('/compras-a-pagar/fondos',          verifyToken, requireFunc('odp_compras_pagar'), c.getFondosCompras);
+router.put('/compras-a-pagar/fondos',          verifyToken, requireFunc('odp_compras_fondos'), c.setFondosCompras);
+
 // Órdenes de pago
 router.get('/ordenes',            verifyToken, puedeVer, c.listarOrdenes);
 router.get('/ordenes/:id/documento', verifyToken, puedeVer, c.getDocumento);   // :id = op_correlativos.id (cualquier origen)
