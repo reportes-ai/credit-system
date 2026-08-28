@@ -783,7 +783,7 @@ async function buildOdpPendientes() {
         ${seccion(1, 'Órdenes de Pago Saldo Precio', '/postventa/saldos-a-pagar/', gSaldo)}
         ${seccion(2, 'Órdenes de Pago Comisiones', '/postventa/comisiones-a-pagar/', gCom)}
         ${seccion(3, 'Órdenes de Pago Comisiones Parque', '/postventa/comisiones-parques/', gParque)}
-        ${seccion(4, 'Otras Órdenes de Pago por pagar (proveedores y cuotas)', '/ordenes-pago/historial/', gOtras)}
+        ${seccion(4, 'Otras Órdenes de Pago por pagar (proveedores y cuotas)', '/ordenes-pago/compras-a-pagar/', gOtras)}
         <div style="margin-top:14px;font-size:11px;color:#94a3b8">Plazo del Saldo Precio: SLA por categoría del dealer (mantenedor Categoría y Potencial Dealer). Plazo de los demás grupos: ${plazoOtros} días (parámetro de este correo).</div>
       </div>
       <div style="padding:12px 24px;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:11px">Correo automático de AutoFácil · se configura en Mantenedores → Correos Programados.</div>
