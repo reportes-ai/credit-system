@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -191,8 +191,27 @@
     <button class="btn-importar" id="btnRecalcBase" onclick="recalcularCategorias()" title="Propone la categoría de cada dealer según las ventas del mes pasado">
       <i class="bi bi-arrow-repeat me-1 text-primary"></i>Recalcular categorías
     </button>
+    <button class="btn-importar" id="btnDemoCfg" style="display:none;color:#6d28d9;border-color:#ddd6fe" onclick="dlgDemoCfg.showModal()" title="Paso a producción controlado: en qué categorías de dealer está habilitada la demo del portal">
+      <i class="bi bi-bank me-1"></i>Demo portal
+    </button>
     <span class="count-badge" id="countBadge"></span>
   </div>
+
+  <!-- Alcance de la demo del portal (solo Administrador) -->
+  <dialog id="dlgDemoCfg" style="border:none;border-radius:14px;padding:0;width:min(430px,92vw)">
+    <div style="background:#012d70;color:#fff;padding:12px 18px;font-weight:700"><i class="bi bi-bank"></i> Demo del portal — alcance</div>
+    <div style="padding:16px 20px;font-size:.85rem">
+      <p style="margin-top:0;color:#475569">El ícono 🏛 (y el modo demo) solo funciona para dealers de las categorías marcadas. El Administrador siempre puede probar.</p>
+      <label style="display:block;margin:6px 0"><input type="checkbox" id="dcTodas" onchange="['SUPER_PARTNER','PARTNER','SOCIO'].forEach(c=>document.getElementById('dc_'+c).disabled=this.checked)"> <b>Todas las categorías</b></label>
+      <label style="display:block;margin:6px 0 6px 22px"><input type="checkbox" id="dc_SUPER_PARTNER"> Super Partner</label>
+      <label style="display:block;margin:6px 0 6px 22px"><input type="checkbox" id="dc_PARTNER"> Partner</label>
+      <label style="display:block;margin:6px 0 6px 22px"><input type="checkbox" id="dc_SOCIO"> Socio</label>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn-importar" onclick="dlgDemoCfg.close()">Cancelar</button>
+        <button class="btn-importar" style="background:#0141A2;color:#fff" onclick="guardarDemoCfg()">Guardar</button>
+      </div>
+    </div>
+  </dialog>
 
   <!-- Tabla -->
   <div class="table-wrap">
@@ -499,6 +518,39 @@ let puedeEditarDealer = esAdmin;
 // Permiso por pestaña (v216.7): cada una se abre por separado en ver y editar.
 // Admin ve y edita todo por bypass; el resto depende de la matriz de Perfiles.
 const PERM = { baseVer:esAdmin, baseEd:esAdmin, catVer:esAdmin, catEd:esAdmin, potVer:esAdmin, potEd:esAdmin };
+/* Alcance paramétrico de la demo (rollout por categoría asignada). El servidor
+   es quien manda; esto solo pinta u oculta el ícono. Admin ve todo. */
+let DEMO_CFG = { todas: true, set: new Set() };
+async function cargarDemoCfg(){
+  try {
+    const r = await fetch('/api/atencion-remota/dealer/demo-config', { headers: H });
+    const j = await r.json();
+    if (j.success) DEMO_CFG = { todas: !!j.data.todas, set: new Set(j.data.categorias || []) };
+  } catch(_){}
+  if (esAdmin) {
+    const b = document.getElementById('btnDemoCfg'); if (b) b.style.display = '';
+    document.getElementById('dcTodas').checked = DEMO_CFG.todas;
+    ['SUPER_PARTNER','PARTNER','SOCIO'].forEach(c => {
+      const el = document.getElementById('dc_'+c);
+      el.checked = DEMO_CFG.set.has(c); el.disabled = DEMO_CFG.todas;
+    });
+  }
+}
+function demoHabilitada(d){
+  if (esAdmin) return true;
+  if (DEMO_CFG.todas) return true;
+  return DEMO_CFG.set.has(String(d.categoria_asignada || '').toUpperCase());
+}
+async function guardarDemoCfg(){
+  const body = document.getElementById('dcTodas').checked
+    ? { todas: true }
+    : { todas: false, categorias: ['SUPER_PARTNER','PARTNER','SOCIO'].filter(c => document.getElementById('dc_'+c).checked) };
+  const r = await fetch('/api/atencion-remota/dealer/demo-config', { method:'PUT', headers: H, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!j.success) { alert(j.error); return; }
+  dlgDemoCfg.close(); await cargarDemoCfg(); cargar(pag);
+}
+
 /* Demo comercial del portal (mismo endpoint que la ficha de Mantención de
    Dealers): portal real en solo lectura; el servidor bloquea si ya se registró. */
 async function demoPortalDealer(id, btn){
@@ -637,7 +689,7 @@ async function cargar(p) {
       <td>${ccsBadge(d.ccs_parque)}</td>
       <td>${catBadge(d.categoria_propuesta)}</td>
       <td>${asignadaCell(d)}</td>
-      <td style="white-space:nowrap;text-align:center"><span style="display:inline-flex;align-items:center;gap:6px;vertical-align:middle">${activoBadge(d.activo)}${(PERM.demoPortal && !d.tiene_portal) ? `<a href="#" title="Portal (demo): abre el portal real del dealer en modo demostración para mostrárselo. Desaparece cuando el dealer activa su cuenta." style="color:#6d28d9;text-decoration:none;font-size:1rem;line-height:1" onclick="event.preventDefault();demoPortalDealer(${d.id_dealer}, this)"><i class="bi bi-bank"></i></a>` : ''}</span></td>
+      <td style="white-space:nowrap;text-align:center"><span style="display:inline-flex;align-items:center;gap:6px;vertical-align:middle">${activoBadge(d.activo)}${(PERM.demoPortal && !d.tiene_portal && demoHabilitada(d)) ? `<a href="#" title="Portal (demo): abre el portal real del dealer en modo demostración para mostrárselo. Desaparece cuando el dealer activa su cuenta." style="color:#6d28d9;text-decoration:none;font-size:1rem;line-height:1" onclick="event.preventDefault();demoPortalDealer(${d.id_dealer}, this)"><i class="bi bi-bank"></i></a>` : ''}</span></td>
       <td>
         <div class="acciones-cell">
           <button class="btn-ver" onclick='verDealer(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Ver</button>
@@ -1323,7 +1375,7 @@ async function confirmarImport() {
 // Init
 // cargarPermisos() ya dejó abierta la primera pestaña permitida; la Base solo se
 // consulta si efectivamente puede verla (evita un 403 y una consulta de más).
-Promise.all([cargarCategorias(), cargarPizarraDef(), cargarPermisos()]).then(() => { if (PERM.baseVer) cargar(1); });
+Promise.all([cargarCategorias(), cargarPizarraDef(), cargarPermisos()]).then(async () => { if (PERM.demoPortal) await cargarDemoCfg(); if (PERM.baseVer) cargar(1); });
 cargarCcs();
 </script>
 <script src="/js/topnav.js"></script>

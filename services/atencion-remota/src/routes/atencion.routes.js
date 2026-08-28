@@ -42,6 +42,8 @@ router.post('/dealer/ver-como', verifyToken, requireFunc('atencion_remota'), C.v
 // Demo comercial del portal: el ejecutivo lo muestra al dealer; se bloquea cuando el dealer ya se registró
 router.post('/dealer/demo', verifyToken, requireFunc('portal_demo_dealer'), C.demoDealer);
 router.post('/dealer/demo-invitar', C.demoInvitar);   // se autentica con el propio token demo
+router.get('/dealer/demo-config', verifyToken, requireFunc('portal_demo_dealer'), C.demoConfigGet);
+router.put('/dealer/demo-config', verifyToken, C.demoConfigPut);   // solo Administrador (validado en el handler)
 
 // Invitaciones al portal (correo masivo self-service; no crea cuentas ni toca claves)
 router.get('/invitaciones/dealers', verifyToken, requireFunc('atencion_remota'), C.listarInvitables);

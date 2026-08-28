@@ -140,6 +140,12 @@ require('../../../../shared/migrate').enFila('atencion', async () => {
       updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
 
+    // Paso a producción CONTROLADO de la demo comercial del portal: CSV de
+    // categorías asignadas habilitadas ('*' = todas, '' = ninguna). Paramétrico
+    // desde la Base Dealer (solo Administrador).
+    await pool.query(`ALTER TABLE ar_config ADD COLUMN demo_categorias VARCHAR(200) NOT NULL DEFAULT '*'`)
+      .catch(e => { if (e.errno !== 1060) console.error('[ar_config demo_categorias]', e.message); });
+
     // Fila única de configuración (id=1). TURN público gratuito (Open Relay) por
     // defecto para que el video funcione tras NAT sin instalar nada; el admin lo
     // reemplaza por el suyo en el mantenedor.
@@ -770,12 +776,25 @@ const verComoDealer = async (req, res) => {
    Mismo token ver_como (solo lectura, 30 min) + marca demo. CANDADO: si el
    dealer ya tiene cuenta activa del portal, el modo demo se bloquea — solo el
    Administrador conserva la mirada de soporte (el ver-como clásico). */
+// Categorías con demo habilitada ('*' = todas, '' = ninguna). Rollout controlado.
+async function demoCategorias() {
+  const [[cfg]] = await pool.query('SELECT demo_categorias FROM ar_config WHERE id=1').catch(() => [[null]]);
+  const raw = cfg ? String(cfg.demo_categorias ?? '*') : '*';
+  return { todas: raw.trim() === '*', lista: raw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) };
+}
+
 const demoDealer = async (req, res) => {
   try {
     const idDealer = parseInt(req.body && req.body.id_dealer, 10);
     if (!idDealer) return res.status(400).json({ success: false, data: null, error: 'id_dealer requerido' });
-    const [[d]] = await pool.query('SELECT id_dealer, rut, nombre_razon, nombre_indexa, correo FROM dealers WHERE id_dealer=?', [idDealer]);
+    const [[d]] = await pool.query('SELECT id_dealer, rut, nombre_razon, nombre_indexa, correo, categoria_asignada FROM dealers WHERE id_dealer=?', [idDealer]);
     if (!d) return res.status(404).json({ success: false, data: null, error: 'El dealer no existe' });
+    // Rollout por categoría asignada (Administrador exento para probar)
+    if (req.usuario?.perfil_nombre !== 'Administrador') {
+      const cat = await demoCategorias();
+      if (!cat.todas && !cat.lista.includes(String(d.categoria_asignada || '').toUpperCase()))
+        return res.status(403).json({ success: false, data: { deshabilitado: true }, error: 'La demo del portal aún no está habilitada para dealers de esta categoría.' });
+    }
     const [[cta]] = await pool.query('SELECT id FROM ar_dealer_cuentas WHERE id_dealer=? AND activo=1 LIMIT 1', [idDealer]);
     if (cta && req.usuario?.perfil_nombre !== 'Administrador')
       return res.status(409).json({ success: false, data: { registrado: true }, error: 'Este dealer ya tiene su acceso al portal — el modo demostración queda bloqueado.' });
@@ -818,6 +837,28 @@ const demoInvitar = async (req, res) => {
     if (/jwt|token/i.test(e.message || '')) return res.status(401).json({ success: false, data: null, error: 'Token inválido o expirado' });
     errSrv(res, e, 'demoInvitar');
   }
+};
+
+/* GET/PUT /dealer/demo-config — categorías con la demo habilitada (rollout).
+   Leer: cualquier usuario con el permiso de demo (pinta u oculta el ícono).
+   Escribir: solo Administrador. */
+const demoConfigGet = async (req, res) => {
+  try {
+    const cat = await demoCategorias();
+    res.json({ success: true, data: { todas: cat.todas, categorias: cat.lista }, error: null });
+  } catch (e) { errSrv(res, e, 'demoConfigGet'); }
+};
+const demoConfigPut = async (req, res) => {
+  try {
+    if (req.usuario?.perfil_nombre !== 'Administrador')
+      return res.status(403).json({ success: false, data: null, error: 'Solo el Administrador puede cambiar el alcance de la demo' });
+    const b = req.body || {};
+    const valor = b.todas ? '*' : (Array.isArray(b.categorias) ? b.categorias.map(s => String(s).trim().toUpperCase()).filter(Boolean).join(',') : '');
+    await pool.query("UPDATE ar_config SET demo_categorias=? WHERE id=1", [valor]);
+    auditar({ req, accion: 'EDITAR', modulo: 'atencion-remota', entidad: 'demo_config',
+      detalle: `Demo del portal habilitada para: ${valor === '*' ? 'TODAS las categorías' : (valor || 'NINGUNA')}` });
+    res.json({ success: true, data: { demo_categorias: valor }, error: null });
+  } catch (e) { errSrv(res, e, 'demoConfigPut'); }
 };
 
 const actualizarCuenta = async (req, res) => {
@@ -1089,7 +1130,7 @@ module.exports = {
   // dealer
   dealerLogin, dealerAcceso, iniciarAcceso, onboarding, tourVisto, recuperarClave, resetClave, listarCuentas, crearCuenta, actualizarCuenta, regenerarLink, verComoDealer,
   listarInvitables, enviarInvitaciones, registrarActividad, bitacoraCuenta,
-  demoDealer, demoInvitar,
+  demoDealer, demoInvitar, demoConfigGet, demoConfigPut,
   // ejecutivo
   getCola, getMensajes,
   // comunes
