@@ -62,7 +62,9 @@ const err = (res, e, s=500) => res.status(s).json({ success: false, data: null, 
 const list = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT * FROM cuentas_bancarias ORDER BY razon_social, nombre`
+      `SELECT * FROM cuentas_bancarias
+        ORDER BY (UPPER(razon_social) LIKE 'AFA PLUS%'), razon_social,
+                 banco, nombre, (COALESCE(moneda,'CLP')<>'CLP'), activo DESC`
     );
     ok(res, rows);
   } catch(e) { err(res, e); }
