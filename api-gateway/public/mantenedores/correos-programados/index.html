@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Correos Programados — Mantenedor — AutoFácil</title>
-  <!-- v1.3 — navbar migrada al componente topnav -->
+  <!-- v1.4 — correo Fundantes Pendientes al Equipo Comercial: texto editable del mensaje -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -65,6 +65,7 @@
     • <b>Hora y Días</b> → cuándo se envía (hora de Chile). <b>Destinatarios</b> → a quién llega (separar con comas).<br>
     • <b>Informe Diario de Ventas</b> → créditos otorgados acumulados del mes por Ejecutivo Comercial (mayor a menor cantidad de operaciones).<br>
     • <b>Parámetros propios</b> (si el mensaje los tiene) → campos numéricos que gobiernan su comportamiento; los define cada mensaje.<br>
+    • <b>Fundantes Pendientes al Equipo Comercial</b> → informe con las operaciones otorgadas cuyos fundantes no están validados (resumen por ejecutivo + detalle), clasificadas por días de retraso (parámetros Fuera de Plazo / Plazo Crítico). Destinatarios dinámicos: fijos + Jefes Comerciales + ejecutivos con pendientes, CC Gerente General y Patricio Escobar. El <b>texto de introducción</b> se edita aquí mismo. Los casos se gestionan en <a href="/fundantes-seguimiento/">Seguimiento Fundantes</a>.<br>
     • <b>Pop-up Fundantes Pendientes</b> → NO es correo: pop-up bloqueante en pantalla al ejecutivo con fundantes pendientes, que lo obliga a comentar el estado del caso (va a la bitácora de la OP en <a href="/fundantes-seguimiento/">Seguimiento Fundantes</a> y se lee en <a href="/fundantes-seguimiento/devueltos.html">Fundantes Devueltos</a>). Sus parámetros: frecuencia por operación (días), espera entre pop-ups (horas) y mínimo de palabras. La hora no aplica; los días marcan cuándo puede aparecer.
   </div>
 </div>
@@ -126,6 +127,7 @@ function render(){
         return '<div class="grid" style="margin-bottom:12px">' + Object.keys(p).map(k =>
           `<div><label>${esc(p[k].label||k)}</label><input type="number" min="1" id="prm_${i}_${esc(k)}" value="${esc(p[k].valor)}" ${esAdmin?'':'disabled'} style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:.9rem"></div>`).join('') + '</div>';
       })()}
+      ${r.texto!=null?`<div style="margin-bottom:12px"><label>Texto del mensaje (introducción)</label><textarea id="txt_${i}" style="min-height:80px" ${esAdmin?'':'disabled'}>${esc(r.texto||'')}</textarea></div>`:''}
       <div class="grid" style="margin-bottom:12px">
         <div><label>Destinatarios (separar con comas)</label><textarea id="dest_${i}" ${esAdmin?'':'disabled'}>${esc(r.destinatarios||'')}</textarea></div>
         <div><label>Desde (cuenta remitente)</label><select id="rem_${i}" ${esAdmin?'':'disabled'} style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:.9rem">${CUENTAS.map(c=>`<option value="${esc(c.clave)}" ${String(r.remitente||'sistema')===c.clave?'selected':''}>${esc(c.label)}</option>`).join('')}</select></div>
@@ -153,8 +155,10 @@ async function guardar(i){
   let params;   // parámetros propios (si el mensaje los tiene)
   let pd = r.params; try { if (typeof pd==='string') pd = JSON.parse(pd); } catch(_) { pd = null; }
   if (pd) { params = {}; for (const k of Object.keys(pd)) { const el = document.getElementById('prm_'+i+'_'+k); if (el) params[k] = Number(el.value); } }
+  const elTxt = document.getElementById('txt_'+i);
+  const texto = elTxt ? elTxt.value : undefined;
   try {
-    const j = await (await fetch('/api/correos-programados/'+encodeURIComponent(r.codigo), { method:'PUT', headers:H, body:JSON.stringify({ activo, hora, dias, destinatarios, remitente, params }) })).json();
+    const j = await (await fetch('/api/correos-programados/'+encodeURIComponent(r.codigo), { method:'PUT', headers:H, body:JSON.stringify({ activo, hora, dias, destinatarios, remitente, params, texto }) })).json();
     if (!j.success) throw new Error(j.error||'Error');
     toast('✓ Guardado');
     cargar();

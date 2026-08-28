@@ -33,6 +33,9 @@ require('../../../../shared/migrate').enFila('correos', async () => {
     // Parámetros propios de cada mensaje (JSON {clave:{label,valor}}) — el mantenedor
     // los dibuja como campos numéricos editables. Hoy los usa el pop-up de fundantes.
     try { await pool.query('ALTER TABLE correos_programados ADD COLUMN IF NOT EXISTS params JSON NULL'); } catch (_) {}
+    // Texto editable del mensaje (intro que escribe el negocio). Solo los correos
+    // que lo usan lo tienen NOT NULL; el mantenedor dibuja el textarea si existe.
+    try { await pool.query('ALTER TABLE correos_programados ADD COLUMN IF NOT EXISTS texto TEXT NULL'); } catch (_) {}
     // Pop-up Fundantes Pendientes (v163.32): NO es un correo — es un pop-up bloqueante
     // en pantalla al EJECUTIVO con fundantes pendientes, que lo obliga a comentar el
     // estado de la operación (va a la bitácora). Vive aquí porque este es el mantenedor
@@ -92,6 +95,21 @@ require('../../../../shared/migrate').enFila('correos', async () => {
         JSON.stringify({
           plazo_otros_dias: { label: 'Plazo de pago (días) para Comisiones, Parques y Otras', valor: 5 },
         })]);
+    // Fundantes Pendientes al Equipo Comercial (v221.20, pedido Pato 28-08-2026):
+    // reemplaza el correo manual que armaba Sandra. Destinatarios DINÁMICOS: a los
+    // fijos de abajo se suman solos los Jefes Comerciales y los ejecutivos con
+    // fundantes pendientes; va con copia al Gerente General y a Patricio Escobar.
+    await pool.query(
+      `INSERT IGNORE INTO correos_programados (codigo, nombre, descripcion, hora, dias, destinatarios, activo, params, texto)
+       VALUES (?,?,?,?,?,?,1,?,?)`,
+      ['fundantes_pendientes_equipo', 'Fundantes Pendientes al Equipo Comercial',
+        'Informe con las operaciones otorgadas brokerage cuyos fundantes aún no se validan (todo lo que no está CERRADO): resumen por ejecutivo y detalle por operación, clasificados en Plazo Crítico / Fuera de Plazo / Dentro de Plazo según los días de retraso (parámetros de abajo). Los destinatarios fijos de abajo se SUMAN automáticamente a los Jefes Comerciales y a los ejecutivos con fundantes pendientes; va con copia al Gerente General y a Patricio Escobar. El texto de introducción se edita aquí mismo.',
+        '16:00', '1,2,3,4,5', 'operaciones@autofacilchile.cl',
+        JSON.stringify({
+          fuera_desde: { label: 'Fuera de Plazo desde (días de retraso)', valor: 8 },
+          critico_desde: { label: 'Plazo Crítico desde (días de retraso)', valor: 20 },
+        }),
+        'Estimados,\n\nEnvío información actualizada con los fundantes PENDIENTES. Por favor gestionar con el equipo de forma urgente.']);
     // Registrar el mantenedor en el menú (funcionalidad) si no existe
     const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_correos_programados' LIMIT 1");
     if (!ex) await pool.query(
@@ -792,8 +810,160 @@ async function buildOdpPendientes() {
   return { asunto: `📋 ODPs pendientes de pagar: ${totalN} x ${fmt(totalM)}${gSaldo.fuera.n + gCom.fuera.n + gParque.fuera.n + gOtras.fuera.n ? ' — ⚠ ' + (gSaldo.fuera.n + gCom.fuera.n + gParque.fuera.n + gOtras.fuera.n) + ' fuera de plazo' : ''}`, html };
 }
 
+/* ── Reporte: Fundantes Pendientes al Equipo Comercial ──────────────────────
+   Réplica automatizada del correo que armaba a mano Post Venta: operaciones
+   otorgadas brokerage con fundantes sin validar (estado <> CERRADO), con la
+   MISMA definición de la cola de Seguimiento Fundantes (la etapa OTORGADO
+   manda, no fecha_otorgado sola). Clasifica por días de retraso en Plazo
+   Crítico / Fuera de Plazo / Dentro de Plazo (umbrales paramétricos).
+   Destinatarios dinámicos: fijos del mantenedor + Jefes Comerciales +
+   ejecutivos con pendientes; CC Gerente General + Patricio Escobar. */
+async function buildFundantesPendientes() {
+  const [[cfg]] = await pool.query(
+    "SELECT params, texto, destinatarios FROM correos_programados WHERE codigo='fundantes_pendientes_equipo'");
+  let fueraDesde = 8, criticoDesde = 20;
+  try {
+    const p = cfg && cfg.params ? (typeof cfg.params === 'string' ? JSON.parse(cfg.params) : cfg.params) : null;
+    if (p && Number(p.fuera_desde?.valor) > 0) fueraDesde = Number(p.fuera_desde.valor);
+    if (p && Number(p.critico_desde?.valor) > 0) criticoDesde = Number(p.critico_desde.valor);
+  } catch (_) {}
+
+  const FINS = ['AUTOFIN', 'UNIDAD DE CREDITO'];   // brokerage (misma lista de Seguimiento Fundantes)
+  const [ops] = await pool.query(`
+    SELECT c.num_op, c.id_financiera, c.automotora, c.ejecutivo,
+           DATE_FORMAT(c.fecha_otorgado,'%d-%m-%Y') AS fecha_otorgado,
+           COALESCE(c.saldo_precio,0) AS saldo_precio,
+           DATEDIFF(CURDATE(), c.fecha_otorgado) AS dias,
+           COALESCE(fs.estado,'PENDIENTE') AS estado
+      FROM creditos c LEFT JOIN fundantes_seg fs ON fs.id_credito = c.id
+     WHERE c.fecha_otorgado IS NOT NULL AND UPPER(COALESCE(c.estado_credito,''))='OTORGADO'
+       AND UPPER(c.financiera) IN (?)
+       AND COALESCE(fs.estado,'PENDIENTE') <> 'CERRADO'
+     ORDER BY dias DESC, c.num_op`, [FINS]);
+
+  const catDe = d => d >= criticoDesde ? 'CRITICO' : d >= fueraDesde ? 'FUERA' : 'DENTRO';
+  const CAT = {
+    CRITICO: { lbl: 'PLAZO CRÍTICO', color: '#b91c1c', bg: '#fef2f2' },
+    FUERA:   { lbl: 'FUERA DE PLAZO', color: '#b45309', bg: '#fffbeb' },
+    DENTRO:  { lbl: 'DENTRO DE PLAZO', color: '#15803d', bg: '#f0fdf4' },
+  };
+  const EST = { PENDIENTE: 'Pendiente', RECHAZADO: 'Rechazado', ENVIADO: 'Enviado a validación' };
+  let totalM = 0; const porEj = new Map();
+  for (const o of ops) {
+    o.cat = catDe(Number(o.dias) || 0); totalM += Number(o.saldo_precio) || 0;
+    const k = keyEj(o.ejecutivo || 'SIN EJECUTIVO');
+    if (!porEj.has(k)) porEj.set(k, { nombre: o.ejecutivo || 'Sin ejecutivo', CRITICO: 0, FUERA: 0, DENTRO: 0, total: 0, monto: 0 });
+    const e = porEj.get(k); e[o.cat]++; e.total++; e.monto += Number(o.saldo_precio) || 0;
+  }
+  const nCrit = ops.filter(o => o.cat === 'CRITICO').length;
+  const nFuera = ops.filter(o => o.cat === 'FUERA').length;
+  const pivote = [...porEj.values()].sort((a, b) => b.CRITICO - a.CRITICO || b.FUERA - a.FUERA || b.total - a.total);
+
+  // ── Destinatarios dinámicos ──
+  const fijos = String((cfg && cfg.destinatarios) || '').split(/[,;]/).map(s => s.trim()).filter(Boolean);
+  const [jefes] = await pool.query(
+    `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+      WHERE p.nombre='Jefe Comercial' AND u.estado='activo' AND u.email LIKE '%@%'`);
+  const [usrs] = await pool.query(
+    `SELECT u.email, TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1),' ',SUBSTRING_INDEX(TRIM(u.apellido),' ',1))) AS nom
+       FROM usuarios u WHERE u.estado='activo' AND u.email LIKE '%@%'`);
+  const emailDe = new Map(usrs.map(u => [keyEj(u.nom), u.email]));
+  const toSet = new Set(fijos.map(s => s.toLowerCase()));
+  jefes.forEach(j => toSet.add(j.email.toLowerCase()));
+  for (const e of pivote) { const m = emailDe.get(keyEj(e.nombre)); if (m) toSet.add(m.toLowerCase()); }
+  const [ccs] = await pool.query(
+    `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+      WHERE p.nombre='Gerente General' AND u.estado='activo' AND u.email LIKE '%@%'`);
+  const ccSet = new Set(ccs.map(c => c.email.toLowerCase()));
+  ccSet.add('patricio.escobar@autofacilchile.cl');
+  for (const c of ccSet) toSet.delete(c);   // quien va en copia no se repite en Para
+
+  // ── HTML ──
+  const intro = esc(String((cfg && cfg.texto) || '').trim()).replace(/\n/g, '<br>');
+  const th = 'color:#fff;padding:7px 10px;font-size:10.5px;font-weight:700;text-transform:uppercase;background:#2f6fd0;white-space:nowrap';
+  const td = 'padding:6px 10px;border-bottom:1px solid #eef2f7;color:#334155;white-space:nowrap';
+  const filasPiv = pivote.map(e => `<tr>
+      <td style="${td}">${esc(titulo(e.nombre))}</td>
+      <td style="${td};text-align:center;font-weight:800;color:${e.CRITICO ? '#b91c1c' : '#cbd5e1'}">${e.CRITICO || ''}</td>
+      <td style="${td};text-align:center;font-weight:800;color:${e.FUERA ? '#b45309' : '#cbd5e1'}">${e.FUERA || ''}</td>
+      <td style="${td};text-align:center;color:${e.DENTRO ? '#15803d' : '#cbd5e1'}">${e.DENTRO || ''}</td>
+      <td style="${td};text-align:center;font-weight:800">${e.total}</td>
+      <td style="${td};text-align:right">${fmt(e.monto)}</td>
+    </tr>`).join('');
+  const filasDet = ops.map(o => { const c = CAT[o.cat]; return `<tr style="background:${c.bg}">
+      <td style="${td}">${esc(o.num_op)}</td>
+      <td style="${td}">${esc(o.id_financiera || '')}</td>
+      <td style="${td};white-space:normal">${esc(o.automotora || '')}</td>
+      <td style="${td}">${esc(titulo(o.ejecutivo || ''))}</td>
+      <td style="${td};text-align:center">${esc(o.fecha_otorgado || '')}</td>
+      <td style="${td};text-align:right">${fmt(o.saldo_precio)}</td>
+      <td style="${td};text-align:center;font-weight:800;color:${c.color}">${o.dias}</td>
+      <td style="${td};font-size:11px;color:#64748b">${EST[o.estado] || esc(o.estado)}</td>
+      <td style="${td};font-weight:800;color:${c.color}">${c.lbl}</td>
+    </tr>`; }).join('');
+  const kpi = (label, valor, color) => `
+    <td style="padding:12px 10px;background:#f8fafc;border-radius:10px;text-align:center">
+      <div style="font-size:10.5px;color:#64748b;text-transform:uppercase;font-weight:700">${label}</div>
+      <div style="font-size:20px;font-weight:800;color:${color};margin-top:2px">${valor}</div>
+    </td>`;
+  const fechaLarga = new Intl.DateTimeFormat('es-CL', { timeZone: 'America/Santiago', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+  const html = `
+  <div style="background:#eef2f7;padding:24px 12px;font-family:'Segoe UI',Arial,sans-serif">
+    <div style="max-width:760px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 8px 28px rgba(2,32,82,.08)">
+      <div style="padding:18px 28px 12px;background:#fff">
+        <img src="${APP_URL}/img/logo.png" alt="AutoFácil" height="34" style="height:34px;width:auto;display:block">
+      </div>
+      <div style="background:${nCrit ? 'linear-gradient(135deg,#7f1d1d,#b91c1c)' : 'linear-gradient(135deg,#012d70,#0141A2)'};color:#fff;padding:18px 28px">
+        <div style="font-size:18px;font-weight:800;letter-spacing:.2px">📁 Fundantes Pendientes</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.85);margin-top:4px;text-transform:capitalize">${esc(fechaLarga)}</div>
+      </div>
+      <div style="padding:20px 28px">
+        ${intro ? `<p style="font-size:13.5px;color:#1e293b;line-height:1.6;margin:0 0 6px">${intro}</p>` : ''}
+        ${ops.length ? `
+        <table style="width:100%;border-collapse:separate;border-spacing:6px;margin:12px 0 6px"><tr>
+          ${kpi('Operaciones', String(ops.length), '#0f3d8a')}
+          ${kpi('Saldo precio pendiente', fmt(totalM), '#0f3d8a')}
+          ${kpi('Plazo crítico', String(nCrit), nCrit ? '#b91c1c' : '#15803d')}
+          ${kpi('Fuera de plazo', String(nFuera), nFuera ? '#b45309' : '#15803d')}
+        </tr></table>
+        <div style="font-weight:800;color:#0f172a;font-size:13px;margin:14px 0 8px;border-left:4px solid #0141A2;padding-left:10px">Resumen por ejecutivo</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr><th style="${th};text-align:left">Ejecutivo</th><th style="${th};text-align:center">Crítico</th><th style="${th};text-align:center">Fuera de Plazo</th><th style="${th};text-align:center">Dentro de Plazo</th><th style="${th};text-align:center">Total</th><th style="${th};text-align:right">Saldo Precio</th></tr></thead>
+          <tbody>${filasPiv}
+            <tr><td style="padding:7px 10px;font-weight:800;color:#0f3d8a;background:#eff6ff">Total general</td>
+              <td style="padding:7px 10px;text-align:center;font-weight:800;color:#b91c1c;background:#eff6ff">${nCrit}</td>
+              <td style="padding:7px 10px;text-align:center;font-weight:800;color:#b45309;background:#eff6ff">${nFuera}</td>
+              <td style="padding:7px 10px;text-align:center;font-weight:800;color:#15803d;background:#eff6ff">${ops.length - nCrit - nFuera}</td>
+              <td style="padding:7px 10px;text-align:center;font-weight:800;color:#0f3d8a;background:#eff6ff">${ops.length}</td>
+              <td style="padding:7px 10px;text-align:right;font-weight:800;color:#0f3d8a;background:#eff6ff">${fmt(totalM)}</td></tr>
+          </tbody>
+        </table>
+        <div style="font-weight:800;color:#0f172a;font-size:13px;margin:18px 0 8px;border-left:4px solid #0141A2;padding-left:10px">Detalle de operaciones</div>
+        <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr><th style="${th};text-align:left">OP</th><th style="${th};text-align:left">ID Financiera</th><th style="${th};text-align:left">Automotora</th><th style="${th};text-align:left">Ejecutivo</th><th style="${th};text-align:center">F. Otorgado</th><th style="${th};text-align:right">Saldo Precio</th><th style="${th};text-align:center">Retraso (días)</th><th style="${th};text-align:left">Estado</th><th style="${th};text-align:left">Categoría</th></tr></thead>
+          <tbody>${filasDet}</tbody>
+        </table></div>
+        <p style="font-size:11.5px;color:#94a3b8;margin:14px 0 0">Plazo Crítico: ${criticoDesde}+ días de retraso · Fuera de Plazo: ${fueraDesde}–${criticoDesde - 1} · Dentro de Plazo: 0–${fueraDesde - 1} (parámetros del correo). Gestión y carga de documentos en <a href="${APP_URL}/fundantes-seguimiento/" style="color:#0141A2">Seguimiento Fundantes</a>.</p>`
+        : '<p style="font-size:14px;color:#15803d;font-weight:700;margin:14px 0">🎉 ¡Sin fundantes pendientes! Todas las operaciones otorgadas tienen sus fundantes validados.</p>'}
+      </div>
+      <div style="padding:14px 28px;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:11px">
+        Correo automático de AutoFácil · destinatarios: Jefes Comerciales + ejecutivos con pendientes + fijos del mantenedor, CC Gerencia General. Se configura en Mantenedores → Correos Programados.
+      </div>
+    </div>
+  </div>`;
+
+  const ch = chileParts();
+  const dd = String(ch.day).padStart(2, '0'), mm = String(ch.month).padStart(2, '0');
+  const asunto = ops.length
+    ? `📁 Fundantes Pendientes al ${dd}-${mm}: ${ops.length} operación(es) x ${fmt(totalM)}${nCrit ? ' — ⚠ ' + nCrit + ' en plazo crítico' : ''}`
+    : `📁 Fundantes Pendientes al ${dd}-${mm}: sin pendientes 🎉`;
+  return { asunto, html, to: [...toSet].join(','), cc: [...ccSet].join(',') };
+}
+
 const BUILDERS = { informe_ventas_diario: buildInformeVentas, resumen_ejecutivo_ia: buildResumenEjecutivo, alerta_penetracion_seguros: buildAlertaPenetracion, informe_salud_sistema: buildSalud,
   odp_pendientes_diario: buildOdpPendientes,
+  fundantes_pendientes_equipo: buildFundantesPendientes,
   // El pop-up de fundantes NO envía correo: se muestra en pantalla (fundantes-seguimiento
   // lee esta fila). El builder existe solo para que el cron no lo acuse como error.
   popup_fundantes_pendientes: async () => ({ skip: true, estado: 'es un pop-up en pantalla, no un correo' }) };
@@ -809,9 +979,11 @@ async function ejecutarReporte(r, { auto = false } = {}) {
     try { await pool.query('UPDATE correos_programados SET ultimo_estado=? WHERE codigo=?', ['Evaluado, sin envío: ' + (built.estado || 'sin cambios'), r.codigo]); } catch (_) {}
     return { ok: true, skip: true };
   }
-  const to = String(r.destinatarios || '').split(/[,;]/).map(s => s.trim()).filter(Boolean).join(',');
+  // Destinatarios dinámicos: si el builder los calcula (built.to/cc) mandan esos;
+  // si no, rige el campo destinatarios del mantenedor.
+  const to = built.to || String(r.destinatarios || '').split(/[,;]/).map(s => s.trim()).filter(Boolean).join(',');
   if (!to) return { ok: false, error: 'Sin destinatarios configurados' };
-  const res = await enviarCorreo({ to, from: remitentePorClave(r.remitente), subject: built.asunto, html: built.html });
+  const res = await enviarCorreo({ to, cc: built.cc || undefined, from: remitentePorClave(r.remitente), subject: built.asunto, html: built.html });
   const ch = chileParts();
   const estado = res.ok ? `Enviado OK a ${to}` : ('Error: ' + (res.error || ''));
   try {
@@ -857,8 +1029,13 @@ const listar = async (req, res) => {
 
 const actualizar = async (req, res) => {
   try {
-    const { activo, hora, dias, destinatarios, remitente } = req.body || {};
+    const { activo, hora, dias, destinatarios, remitente, texto } = req.body || {};
     const sets = [], vals = [];
+    // Texto editable: solo para correos que nacieron con texto (no se inventa desde la UI)
+    if (texto !== undefined) {
+      const [[cur0]] = await pool.query('SELECT texto FROM correos_programados WHERE codigo=?', [req.params.codigo]);
+      if (cur0 && cur0.texto !== null) { sets.push('texto=?'); vals.push(String(texto).slice(0, 4000)); }
+    }
     if (activo !== undefined) { sets.push('activo=?'); vals.push(activo ? 1 : 0); }
     if (hora !== undefined && /^\d{2}:\d{2}$/.test(hora)) { sets.push('hora=?'); vals.push(hora); }
     if (dias !== undefined) { sets.push('dias=?'); vals.push(String(dias).split(',').map(s => s.trim()).filter(d => /^[1-7]$/.test(d)).join(',')); }
@@ -902,4 +1079,4 @@ const preview = async (req, res) => {
   } catch (e) { console.error('[correos preview]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, actualizar, enviarAhora, preview, _buildSalud: buildSalud, _saludChecks: saludChecks };
+module.exports = { listar, actualizar, enviarAhora, preview, _buildSalud: buildSalud, _saludChecks: saludChecks, _buildFundantesPendientes: buildFundantesPendientes };
