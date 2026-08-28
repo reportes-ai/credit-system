@@ -1945,6 +1945,16 @@ async function asegurarOrdenSaldo(id, reqUsuario) {
     origen: 'SALDO', origen_id: poId, concepto: 'Saldo Precio OP ' + (seg.num_op || ''),
     monto, id_usuario: reqUsuario && reqUsuario.id_usuario, usuario_nombre: loginDe(reqUsuario) });
   await pool.query('UPDATE postventa_ordenes SET num_orden=? WHERE id=?', [numero, poId]);
+  // El asiento de FONDOS RECIBIDOS nació antes que la ODP: al emitirla, se le
+  // completa la trazabilidad en las glosas del libro (mismo formato del egreso).
+  try {
+    await pool.query(`
+      UPDATE ctb_movimientos m
+      JOIN ctb_comprobantes c ON c.id = m.id_comprobante
+      SET m.glosa = LEFT(CONCAT(m.glosa, ' · ', ?), 300)
+      WHERE c.origen='SALDO_FONDOS_RECIBIDOS' AND c.origen_ref = ? AND m.glosa NOT LIKE '%ODP%'`,
+      [numero, `SP-${seg.num_op}-IN`]);
+  } catch (_) {}
   return numero;
 }
 
