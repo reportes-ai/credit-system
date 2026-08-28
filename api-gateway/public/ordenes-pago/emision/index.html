@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
+  <!-- v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -88,7 +88,9 @@
       <div class="fld"><label>Método de pago</label>
         <select id="fMetodo"><option value="">—</option><option>Transferencia</option><option>Cheque</option><option>Efectivo</option><option>Tarjeta</option></select>
       </div>
-      <div class="fld"><!-- spacer --></div>
+      <div class="fld"><label>Cuenta de cargo (contra la que se paga)</label>
+        <select id="fCtaCargo"><option value="">—</option></select>
+      </div>
 
       <div class="fld full"><label>Documento (factura / boleta)</label>
         <input type="file" id="fDoc" accept=".pdf,.jpg,.jpeg,.png,.xml" style="font-size:.84rem">
@@ -121,6 +123,25 @@ const money = n => '$'+Number(Math.round(n)||0).toLocaleString('es-CL');
 const numEl = id => Number(String(document.getElementById(id).value).replace(/\D/g,''))||0;
 function fmtInput(id){ const el=document.getElementById(id); const n=el.value.replace(/\D/g,''); el.value=n? Number(n).toLocaleString('es-CL'):''; }
 let lastBase = 'NETO';   // qué campo escribió el usuario por última vez
+
+// Cuenta corriente de cargo (mantenedor Cuentas Bancarias): desde qué cuenta de
+// la empresa se pagará. Queda en la orden y el asiento acredita ese banco real.
+let CTAS = [];
+async function cargarCtasCargo(){
+  try {
+    const r = await fetch('/api/cuentas-bancarias', { headers:H });
+    const j = await r.json();
+    CTAS = (j.data||[]).filter(c => Number(c.activo) !== 0);
+    document.getElementById('fCtaCargo').innerHTML = '<option value="">—</option>' +
+      CTAS.map(c => `<option value="${c.id_cuenta}">${escH([c.nombre, c.banco, c.numero_cuenta].filter(Boolean).join(' · '))}</option>`).join('');
+  } catch(e){}
+}
+function ctaCargoTxt(){
+  const id = document.getElementById('fCtaCargo').value;
+  const c = CTAS.find(x => String(x.id_cuenta) === String(id));
+  return c ? [c.nombre, c.banco, c.numero_cuenta].filter(Boolean).join(' · ') : '';
+}
+cargarCtasCargo();
 
 let IMPUESTOS = { IVA:19, RETENCION_HONORARIOS:15.25 };
 async function cargarImpuestos(){
@@ -215,6 +236,7 @@ function emitir(){
     { etiqueta:'N° de documento', valor: document.getElementById('fNumDoc').value.trim() },
     { etiqueta:'Fecha del documento', valor: document.getElementById('fFechaDoc').value },
     { etiqueta:'Método de pago', valor: document.getElementById('fMetodo').value },
+    { etiqueta:'Cuenta de cargo', valor: ctaCargoTxt() },
     { etiqueta:'Documento adjunto (factura/boleta)', valor: fDoc ? fDoc.name : '' },
   ]);
   const F = (k,v)=>`<tr><td style="padding:3px 12px 3px 0;color:#64748b;white-space:nowrap">${k}</td><td style="font-weight:600">${escH(v||'—')}</td></tr>`;
@@ -231,6 +253,7 @@ function emitir(){
         ${F('A PAGAR', money(m.pagar))}
         ${F('Transferir a', [prov.banco, prov.numero_cuenta].filter(Boolean).join(' · '))}
         ${F('Método de pago', document.getElementById('fMetodo').value)}
+        ${F('Cuenta de cargo', ctaCargoTxt())}
         ${F('Adjunto', fDoc ? fDoc.name : null)}
       </table>
     </div>
@@ -253,6 +276,7 @@ async function emitirDefinitivo(){
     numero_documento: document.getElementById('fNumDoc').value.trim(),
     fecha_documento: document.getElementById('fFechaDoc').value || null,
     metodo_pago: document.getElementById('fMetodo').value,
+    id_cuenta_bancaria: parseInt(document.getElementById('fCtaCargo').value) || null,
     observaciones: document.getElementById('fObs').value.trim() };
   if (provSel==='__otro') {
     body.proveedor_nombre = document.getElementById('fProvNombre').value.trim();

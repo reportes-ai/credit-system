@@ -763,6 +763,16 @@ const crearOrden = async (req, res) => {
       monto: m.aPagar, id_usuario: (req.usuario || {}).id_usuario || null, usuario_nombre: nombreUsuario(req) });
     await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
 
+    /* Cuenta corriente de cargo declarada EN LA EMISIÓN (para Contabilidad).
+       Queda en el libro central; el pago la hereda y el asiento acredita ese
+       banco real (Cuentas Bancarias). El pagador puede cambiarla al pagar. */
+    const idCtaEmision = parseInt(b.id_cuenta_bancaria, 10) || null;
+    if (idCtaEmision) {
+      const [[cb]] = await pool.query('SELECT id_cuenta FROM cuentas_bancarias WHERE id_cuenta=? AND activo=1', [idCtaEmision]);
+      if (!cb) return res.status(400).json({ success: false, data: null, error: 'La cuenta bancaria indicada no existe o está inactiva' });
+      await pool.query("UPDATE op_correlativos SET id_cuenta_bancaria=? WHERE origen='GENERAL' AND origen_id=?", [idCtaEmision, r.insertId]);
+    }
+
     auditar({ req, accion: 'CREAR', modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: r.insertId, detalle: `Emitió ${numero} a ${provNombre} por $${m.aPagar.toLocaleString('es-CL')}` });
 
     /* Adjunto (factura/boleta) en el MISMO request de la emisión: así el correo
@@ -1069,7 +1079,8 @@ const pagarOrden = async (req, res) => {
     // Cuenta bancaria de cargo (opcional): debe existir y estar activa en el
     // mantenedor Cuentas Bancarias. Sin ella, el asiento usa el banco genérico.
     let ctaBancaria = null;
-    const idCta = parseInt((req.body || {}).id_cuenta_bancaria, 10) || null;
+    // Sin cuenta en el pago, hereda la declarada al emitir la orden.
+    const idCta = parseInt((req.body || {}).id_cuenta_bancaria, 10) || oc.id_cuenta_bancaria || null;
     if (idCta) {
       const [[cb]] = await pool.query(
         'SELECT id_cuenta, nombre, banco, numero_cuenta, cuenta_contable FROM cuentas_bancarias WHERE id_cuenta=? AND activo=1', [idCta]);
