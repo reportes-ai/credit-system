@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v221.12';
+const APP_VERSION = 'v221.13';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -859,6 +859,16 @@ document.addEventListener('DOMContentLoaded', () => {
     e.stopPropagation();
     const d = document.getElementById('afBellDrop');
     const abierto = d.style.display !== 'none';
+    if (!abierto) {
+      /* El panel se posiciona FIJO bajo la campana al abrir: como absoluto dentro
+         de la barra quedaba cortado arriba y flotando sobre el contenido cuando
+         un ancestro tenía overflow/stacking propio (visto en Seguimiento). */
+      const r = document.getElementById('afBellBtn').getBoundingClientRect();
+      d.style.position = 'fixed';
+      d.style.top = Math.round(r.bottom + 8) + 'px';
+      d.style.right = Math.max(8, Math.round(window.innerWidth - r.right)) + 'px';
+      d.style.maxHeight = Math.max(200, window.innerHeight - r.bottom - 24) + 'px';
+    }
     d.style.display = abierto ? 'none' : 'block';
     if (!abierto) {
       try { await fetch('/api/notif/leidas', { method: 'PUT', headers: H }); } catch (e) {}
