@@ -145,7 +145,7 @@
       html += `<optgroup label="Transferencia / Depósito">`;
       act.forEach(c => {
         const banco = c.banco || c.razon_social || 'Cuenta';
-        const tipo = c.tipo_cuenta ? ` (${c.tipo_cuenta})` : '';
+        const tipo = c.nombre ? ` (${c.nombre})` : '';
         html += `<option value="Transferencia ${esc(banco)}|${c.id_cuenta}">🏛 ${esc(banco)}${esc(tipo)} — ${esc(c.numero_cuenta || '')}</option>`;
       });
       html += `</optgroup>`;

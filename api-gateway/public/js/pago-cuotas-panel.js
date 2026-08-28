@@ -324,7 +324,7 @@
     if (S.cuentas.length) {
       h += `<optgroup label="Transferencia / Depósito">`;
       S.cuentas.forEach(c => {
-        const banco = c.banco || c.razon_social || 'Cuenta'; const tipo = c.tipo_cuenta ? ` (${c.tipo_cuenta})` : '';
+        const banco = c.banco || c.razon_social || 'Cuenta'; const tipo = c.nombre ? ` (${c.nombre})` : '';
         h += `<option value="Transferencia ${esc(banco)}|${c.id_cuenta}">🏛 ${esc(banco)}${esc(tipo)} — ${esc(c.numero_cuenta || '')}</option>`;
       });
       h += `</optgroup>`;
