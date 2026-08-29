@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.63 — vigencia desde fecha carta O digitacion (lo mas tarde), igual que el servidor · v4.62 — participacion sugerida desde la TABLA PACTADA del local (motor /api/comision-dealer/tabla); la excepcion compara contra lo pactado · v4.61 — cartola con SECCIONES por local (subtotal por parque/calle) cuando el dealer curso en mas de una ubicacion · v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.64 — excepciones: lo que cuadra con pizarra se resume en "✓ Tasa OK · Comisión OK"; solo lo distinto se detalla · v4.63 — vigencia desde fecha carta O digitacion (lo mas tarde), igual que el servidor · v4.62 — participacion sugerida desde la TABLA PACTADA del local (motor /api/comision-dealer/tabla); la excepcion compara contra lo pactado · v4.61 — cartola con SECCIONES por local (subtotal por parque/calle) cuando el dealer curso en mas de una ubicacion · v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -2543,29 +2543,32 @@ function abrirRevision(id){
   let excBanner = '';
   if (Array.isArray(c.excepciones) && c.excepciones.length) {
     const coms = c.excepcionesComentarios || {};
-    const tasaInfo = c.tasaCredito ? ` · Tasa solicitada: ${String(c.tasaCredito).replace('.',',')}%` : '';
-    const ufInfo = c.montoCreditoUF ? ` · ${parseFloat(c.montoCreditoUF).toLocaleString('es-CL',{maximumFractionDigits:2})} UF (${parseFloat(c.montoCreditoUF)<=200?'≤':'>'}200)` : '';
-    // Dimensión de la excepción: lo que CORRESPONDE por pizarra vs lo solicitado
+    let tasaInfo = '', ufInfo = '';
+    // Dimensión de la excepción: SOLO lo que difiere de pizarra. Lo que cuadra se
+    // resume en "Tasa OK / Comisión OK" (pedido Pato 29-08: sin tanta explicación).
     let dimHTML = '';
     try {
       const uf = parseFloat(c.montoCreditoUF);
       const tasaSol = parseFloat(c.tasaCredito);
-      const lineas = [];
+      const lineas = [], oks = [];
       if (TASAS && !isNaN(uf)) {
         const piz = tope2(parseFloat(uf <= 200 ? (TASAS.tasa_mensual_menor ?? TASAS.tasa_menor) : (TASAS.tasa_mensual_mayor ?? TASAS.tasa_mayor)));
-        if (!isNaN(piz)) {
-          const d = !isNaN(tasaSol) ? (tasaSol - piz) : null;
-          lineas.push(`<b>Tasa pizarra que corresponde:</b> ${piz.toFixed(2).replace('.',',')}%` +
-            (d != null ? ` — solicitada ${tope2(tasaSol).toFixed(2).replace('.',',')}% (<b style="color:${d < 0 ? '#dc2626' : '#16a34a'}">${d >= 0 ? '+' : ''}${d.toFixed(2).replace('.',',')} pts</b>)` : ''));
+        if (!isNaN(piz) && !isNaN(tasaSol)) {
+          const d = tope2(tasaSol) - piz;
+          if (Math.abs(d) < 0.005) oks.push('Tasa OK');
+          else lineas.push(`<b>Tasa pizarra que corresponde:</b> ${piz.toFixed(2).replace('.',',')}%` +
+            ` — solicitada ${tope2(tasaSol).toFixed(2).replace('.',',')}% (<b style="color:${d < 0 ? '#dc2626' : '#16a34a'}">${d >= 0 ? '+' : ''}${d.toFixed(2).replace('.',',')} pts</b>)`);
         }
       }
       const factor = getFactor(c.plazo, c.tipo);
-      if (factor && c.saldo) {
+      if (factor && c.saldo && c.partBruto) {
         const brutoPiz = Math.round(c.saldo * factor);
         const dif = (c.partBruto || 0) - brutoPiz;
-        lineas.push(`<b>Comisión pizarra que corresponde:</b> ${(factor*100).toFixed(2).replace('.',',')}% = ${fmtCLP(brutoPiz)}` +
-          (c.partBruto ? ` — solicitada ${fmtCLP(c.partBruto)} (${c.saldo > 0 ? (c.partBruto/c.saldo*100).toFixed(2).replace('.',',') : '—'}%${dif ? `, <b style="color:${dif > 0 ? '#dc2626' : '#16a34a'}">${dif > 0 ? '+' : ''}${fmtCLP(dif)}</b>` : ''})` : ''));
+        if (!dif) oks.push('Comisión OK');
+        else lineas.push(`<b>Comisión pizarra que corresponde:</b> ${(factor*100).toFixed(2).replace('.',',')}% = ${fmtCLP(brutoPiz)}` +
+          ` — solicitada ${fmtCLP(c.partBruto)} (${c.saldo > 0 ? (c.partBruto/c.saldo*100).toFixed(2).replace('.',',') : '—'}%, <b style="color:${dif > 0 ? '#dc2626' : '#16a34a'}">${dif > 0 ? '+' : ''}${fmtCLP(dif)}</b>)`);
       }
+      if (oks.length) tasaInfo = ` · <span style="color:#16a34a;font-weight:700">✓ ${oks.join(' · ')}</span>`;
       if (lineas.length) dimHTML = `<div style="margin:8px 0 2px;padding:8px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;color:#1e40af;font-size:.8rem">
         <i class="bi bi-rulers me-1"></i>${lineas.join('<br>')}</div>`;
     } catch (e) {}
@@ -2577,7 +2580,7 @@ function abrirRevision(id){
     const selloCodigo = c.codigoExcepcion ? `<div style="margin:8px 0 2px;padding:8px 10px;background:#fefce8;border:1px solid #fde047;border-radius:7px;color:#854d0e;font-size:.82rem;font-weight:700">
       <i class="bi bi-stars me-1"></i>Excepción aprobada por ${c.codigoExcepcionTipo==='GERENCIA'?'autorización de Gerencia':c.codigoExcepcionTipo==='COMODIN'?'Comodín dorado':'código del sistema'} N°${escH(c.codigoExcepcion)}</div>` : '';
     excBanner = `<div style="background:#fff7ed;border:1.5px solid #fed7aa;color:#c2410c;border-radius:9px;padding:10px 14px;font-size:.83rem;margin-bottom:12px">
-      <b><i class="bi bi-exclamation-triangle me-1"></i>EXCEPCIONES SOLICITADAS (${c.excepciones.length})</b>${escH(tasaInfo)}${escH(ufInfo)}${selloCodigo}${dimHTML}${items}</div>`;
+      <b><i class="bi bi-exclamation-triangle me-1"></i>EXCEPCIONES SOLICITADAS (${c.excepciones.length})</b>${tasaInfo}${escH(ufInfo)}${selloCodigo}${dimHTML}${items}</div>`;
   }
   // Informe del Revisor Automático (Unidad): si el motor la revisó y no cuadró,
   // el analista ve exactamente qué falló, con documento vs sistema lado a lado.
