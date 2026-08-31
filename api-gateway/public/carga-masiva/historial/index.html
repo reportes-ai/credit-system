@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Historial — Carga Masiva AutoFácil</title><!-- v6.2 -->
+  <title>Historial — Carga Masiva AutoFácil</title><!-- acceso por matriz (antes solo Administrador hardcodeado) · v6.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -144,7 +144,13 @@
 const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
-if (yo?.perfil !== 'Administrador') { alert('Solo Administradores pueden acceder a esta sección'); window.location.href = '/'; }
+// Acceso por matriz de Perfiles y Permisos (antes: solo Administrador hardcodeado)
+if (yo?.perfil !== 'Administrador') (async () => {
+  try {
+    const j = await (await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } })).json();
+    if (!(j.funcionalidades||[]).includes('cm_historial')) { alert('No tienes permiso para esta sección.'); window.location.href = '/'; }
+  } catch(e){}
+})();
 const H = { Authorization: 'Bearer ' + token };
 
 
