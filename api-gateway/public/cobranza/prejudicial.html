@@ -105,7 +105,7 @@
 </head>
 <body>
 
-<!-- v5.7 -->
+<!-- v5.8 — gestion manual con visita en terreno / visita del cliente + bitacora exportable (Excel e informe PDF) -->
 <div id="af-topnav"></div>
 <script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Cobranza',href:'/cobranza/',icon:'bi-bell-fill'},{label:'Pre-judicial',current:true}]};</script>
 
@@ -692,7 +692,8 @@ function mostrarFormLlamada() {
         <label>Tipo</label>
         <select class="form-select" id="llamadaTipo">
           <option value="LLAMADA">Llamada telefónica</option>
-          <option value="VISITA">Visita presencial</option>
+          <option value="VISITA_TERRENO">Visita en terreno</option>
+          <option value="VISITA_CLIENTE">Visita del cliente (en oficina)</option>
         </select>
       </div>
       <div class="mb-2">
@@ -737,7 +738,7 @@ async function guardarLlamada() {
 
   await registrarGestion({
     tipo_gestion: tipo,
-    canal: tipo === 'VISITA' ? 'PRESENCIAL' : 'TELEFONICA',
+    canal: tipo === 'LLAMADA' ? 'TELEFONICA' : 'PRESENCIAL',
     resultado,
     mensaje,
     fecha_promesa: fecha_promesa || undefined,
@@ -767,20 +768,28 @@ async function registrarGestion(data) {
   }
 }
 
+const TIPO_LBL = { LLAMADA:'Llamada telefónica', VISITA:'Visita presencial', VISITA_TERRENO:'Visita en terreno',
+  VISITA_CLIENTE:'Visita del cliente', WHATSAPP:'WhatsApp', SMS:'SMS', EMAIL:'Email', CARTA:'Carta' };
+let BITACORA_DATA = [];   // última bitácora cargada (para exportar)
 async function cargarBitacora(id_credito) {
   document.getElementById('bitacoraContent').innerHTML = '<div class="spinner"></div>';
   try {
     const r = await fetch(`/api/cobranza/bitacora/${id_credito}`, { headers: { 'Authorization': 'Bearer ' + token } });
     const { success, data } = await r.json();
     if (!success) return;
+    BITACORA_DATA = data || [];
     if (!data.length) {
       document.getElementById('bitacoraContent').innerHTML = '<div class="empty-state">Sin gestiones registradas</div>';
       return;
     }
-    document.getElementById('bitacoraContent').innerHTML = data.map(g => `
+    document.getElementById('bitacoraContent').innerHTML = `
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px">
+        <button class="btn btn-sm btn-outline-success" onclick="bitacoraExcel()"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="bitacoraPDF()"><i class="bi bi-file-earmark-pdf me-1"></i>Informe PDF</button>
+      </div>` + data.map(g => `
       <div class="bitacora-item" style="border-color:${g.confirmado ? '#10b981' : '#94a3b8'}">
         <div style="display:flex;justify-content:space-between">
-          <div class="bitacora-tipo">${esc(g.tipo_gestion)} · ${esc(g.canal)} ${g.confirmado ? '<span style="color:#10b981">✓ confirmado</span>' : ''}</div>
+          <div class="bitacora-tipo">${esc(TIPO_LBL[g.tipo_gestion] || g.tipo_gestion)} · ${esc(g.canal)} ${g.confirmado ? '<span style="color:#10b981">✓ confirmado</span>' : ''}</div>
           <div class="bitacora-fecha">${fmtFechaHora(g.created_at)}</div>
         </div>
         <div style="font-size:0.78rem;color:#64748b">${esc(g.nombre_usuario || "—")} · ${esc(g.resultado)}</div>
@@ -790,6 +799,58 @@ async function cargarBitacora(id_credito) {
   } catch(e) {
     document.getElementById('bitacoraContent').innerHTML = '<div class="text-danger">Error cargando bitácora</div>';
   }
+}
+
+/* ── Exportar bitácora ── */
+function bitacoraExcel() {
+  if (!BITACORA_DATA.length || !creditoActual) return;
+  const filas = BITACORA_DATA.map(g => ({
+    'Fecha': fmtFechaHora(g.created_at), 'Tipo': TIPO_LBL[g.tipo_gestion] || g.tipo_gestion, 'Canal': g.canal,
+    'Resultado': g.resultado, 'Gestor': g.nombre_usuario || '', 'Notas': g.mensaje || '',
+    'Fecha promesa': g.fecha_promesa ? fmtFecha(g.fecha_promesa) : '', 'Monto promesa': g.monto_promesa ? Number(g.monto_promesa) : '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(filas);
+  ws['!cols'] = [{wch:17},{wch:20},{wch:11},{wch:15},{wch:22},{wch:50},{wch:13},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Gestiones');
+  XLSX.writeFile(wb, `gestiones_${creditoActual.num_op || creditoActual.id_credito}.xlsx`);
+}
+function bitacoraPDF() {
+  if (!BITACORA_DATA.length || !creditoActual) return;
+  const c = creditoActual;
+  const filas = BITACORA_DATA.map(g => `<tr>
+      <td>${esc(fmtFechaHora(g.created_at))}</td><td>${esc(TIPO_LBL[g.tipo_gestion] || g.tipo_gestion)}</td>
+      <td>${esc(g.canal)}</td><td>${esc(g.resultado)}</td><td>${esc(g.nombre_usuario || '—')}</td>
+      <td>${esc(g.mensaje || '')}${g.resultado === 'PROMESA_PAGO' ? `<br><b>Promesa: ${esc(fmtFecha(g.fecha_promesa))} — ${fmt(g.monto_promesa)}</b>` : ''}</td>
+    </tr>`).join('');
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Informe de Gestiones — ${esc(c.num_op || '')}</title><style>
+    body{font-family:'Segoe UI',Arial,sans-serif;color:#1e293b;padding:28px;font-size:12px}
+    h2{color:#012d70;margin:0 0 2px} .sub{color:#64748b;font-size:11px;margin-bottom:14px}
+    .ficha{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}
+    .ficha div{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px}
+    .ficha b{display:block;font-size:10px;color:#64748b;text-transform:uppercase}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{background:#012d70;color:#fff;padding:6px 8px;text-align:left}
+    td{padding:6px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+    @media print{ .noprint{display:none} }</style></head><body>
+    <h2>Informe de Gestiones de Cobranza</h2>
+    <div class="sub">Generado el ${new Date().toLocaleString('es-CL')} · AutoFácil Crédito Automotriz</div>
+    <div class="ficha">
+      <div><b>Cliente</b>${esc(c.nombre_cliente || '')}</div>
+      <div><b>RUT</b>${esc(c.rut_cliente || '')}</div>
+      <div><b>Crédito</b>${esc(String(c.num_op || c.id_credito))}</div>
+      <div><b>Gestiones</b>${BITACORA_DATA.length}</div>
+      <div><b>Días de mora</b>${esc(String(c.dias_mora ?? ''))}</div>
+      <div><b>Cuotas en mora</b>${esc(String(c.cuotas_mora ?? ''))}</div>
+      <div><b>Monto en mora</b>${fmt(c.monto_mora)}</div>
+      <div><b>Saldo insoluto</b>${fmt(c.saldo_insoluto)}</div>
+    </div>
+    <table><thead><tr><th>Fecha</th><th>Tipo</th><th>Canal</th><th>Resultado</th><th>Gestor</th><th>Notas</th></tr></thead>
+    <tbody>${filas}</tbody></table>
+    <p class="noprint" style="margin-top:16px;color:#64748b">Usa Imprimir (Ctrl+P) y "Guardar como PDF".</p>
+    <script>setTimeout(()=>window.print(), 400)<\/script></body></html>`);
+  w.document.close();
 }
 
 async function cargarProvisiones() {
@@ -822,6 +883,7 @@ async function cargarProvisiones() {
 
 cargarCartera();
 </script>
+<script src="/js/xlsx.full.min.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>

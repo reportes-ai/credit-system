@@ -37,6 +37,11 @@ require('../../../../shared/migrate').enFila('cobranza', async () => {
         INDEX idx_created (created_at)
       )
     `);
+    // Tipos de gestión manual detallados (pedido Pato 30-08-2026): la visita se
+    // separa en terreno vs cliente que viene a la oficina. 'VISITA' queda por
+    // compatibilidad con las gestiones ya registradas.
+    await conn.query(`ALTER TABLE cobranza_gestiones MODIFY tipo_gestion
+      ENUM('LLAMADA','VISITA','VISITA_TERRENO','VISITA_CLIENTE','WHATSAPP','SMS','EMAIL','CARTA') NOT NULL`).catch(() => {});
     console.log('✓ Cobranza: tabla cobranza_gestiones verificada');
   } catch (err) {
     console.error('✗ Cobranza migración:', err.message);
