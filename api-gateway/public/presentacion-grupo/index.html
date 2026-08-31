@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.5 — lema "NOS ATREVEMOS A INNOVAR EN BUSCA DE LA EXCELENCIA" sobre la vista general -->
+<!-- v1.6 — +2 laminas (28 motores automaticos; continuidad: standby, respaldos, salud) · navegacion con rueda, swipe y Escape=mapa -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -253,10 +253,41 @@
     </div>
   </section>
 
-  <!-- 13 FILOSOFIA -->
-  <section class="step" data-x="20100" data-y="-460" data-s=".95" data-r="0">
+  <!-- 13 MOTORES AUTOMATICOS -->
+  <section class="step" data-x="20100" data-y="-460" data-s=".92" data-r="3">
     <div class="card">
-      <span class="kicker"><span class="num">13</span> Cómo está construido</span>
+      <span class="kicker"><span class="num">13</span> Piloto automático</span>
+      <i class="bi bi-gear-wide-connected bigicon"></i>
+      <h2>28 motores trabajando solos</h2>
+      <ul class="fx cols2">
+        <li><i class="bi bi-envelope-check-fill"></i><span><b>Correos programados</b>: informe de ventas, resumen ejecutivo con IA, ODPs pendientes, fundantes pendientes</span></li>
+        <li><i class="bi bi-bell-fill"></i><span><b>Avisos y alertas</b> paramétricos: la campanita que no se calla hasta que se resuelve</span></li>
+        <li><i class="bi bi-diagram-3-fill"></i><span><b>15 workflows de escalamiento</b> con horas hábiles y jefaturas</span></li>
+        <li><i class="bi bi-clock-history"></i><span>Aprueban comisiones, desisten cartas vencidas, cierran castigos y provisionan — <b>sin que nadie los llame</b></span></li>
+      </ul>
+      <p class="tagline">El sistema persigue los pendientes; las personas deciden.</p>
+    </div>
+  </section>
+
+  <!-- 14 CONTINUIDAD -->
+  <section class="step" data-x="21650" data-y="-860" data-s=".92" data-r="-2">
+    <div class="card">
+      <span class="kicker"><span class="num">14</span> Continuidad y confianza</span>
+      <i class="bi bi-shield-lock-fill bigicon"></i>
+      <h2>Preparado para el peor día</h2>
+      <ul class="fx cols2">
+        <li><i class="bi bi-cloud-check-fill"></i><span><b>Servidor de contingencia</b> desplegado y ensayado: se promueve en minutos si el principal cae</span></li>
+        <li><i class="bi bi-database-fill-lock"></i><span><b>Respaldo nocturno</b> de la base con 30 días de retención</span></li>
+        <li><i class="bi bi-clipboard2-pulse-fill"></i><span><b>Salud del sistema</b>: uptime medido cada 5 min e informe semanal automático</span></li>
+        <li><i class="bi bi-person-fill-lock"></i><span><b>Permisos por perfil</b> auditables, auditoría de cada acción y ambiente de pruebas separado</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 15 FILOSOFIA -->
+  <section class="step" data-x="23200" data-y="-460" data-s=".95" data-r="0">
+    <div class="card">
+      <span class="kicker"><span class="num">15</span> Cómo está construido</span>
       <h2>Tres principios, cero cajas negras</h2>
       <ul class="fx">
         <li><i class="bi bi-sliders"></i><span><b>Paramétrico</b>: tasas, políticas, estados, textos y flujos se cambian desde mantenedores — sin tocar código</span></li>
@@ -267,8 +298,8 @@
     </div>
   </section>
 
-  <!-- 14 CIERRE -->
-  <section class="step" data-x="21700" data-y="-460" data-s="1.05" data-r="0">
+  <!-- 16 CIERRE -->
+  <section class="step" data-x="24800" data-y="-460" data-s="1.05" data-r="0">
     <div style="text-align:center">
       <img src="/img/logo-bs.png" style="height:120px;background:#fff;border-radius:16px;padding:12px 28px;margin-bottom:24px;box-shadow:0 18px 50px rgba(0,0,0,.35)">
       <h1 style="font-size:3rem">De la prospección al balance.<br>Un solo sistema. Hecho en casa.</h1>
@@ -282,7 +313,7 @@
   </section>
 
   <!-- VISTA GENERAL (última: el mapa completo) -->
-  <section class="step" data-x="10850" data-y="-560" data-s="9" data-r="0" data-overview style="width:10px;height:10px"></section>
+  <section class="step" data-x="12400" data-y="-560" data-s="9" data-r="0" data-overview style="width:10px;height:10px"></section>
 
 </div></div>
 
@@ -316,7 +347,7 @@ function mostrar(i) {
   const x = +p.dataset.x, y = +p.dataset.y, s = +p.dataset.s || 1, r = +p.dataset.r || 0;
   // Ajuste de escala para que el paso quepa en pantalla (base 1000px de ancho útil)
   const fit = Math.min(innerWidth / 1150, innerHeight / 800);
-  const z = ('overview' in p.dataset) ? Math.min(innerWidth / 24000, innerHeight / 4200) : fit / s;
+  const z = ('overview' in p.dataset) ? Math.min(innerWidth / 27200, innerHeight / 4200) : fit / s;
   canvas.style.transform = `scale(${z}) rotate(${-r}deg) translate(${-x}px,${-y}px)`;
   document.getElementById('lema').classList.toggle('ver', 'overview' in p.dataset);
   document.querySelector('#barra > div').style.width = ((idx) / (pasos.length - 1) * 100) + '%';
@@ -329,9 +360,25 @@ addEventListener('keydown', e => {
   if (['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)) { e.preventDefault(); ir(1); }
   if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)) { e.preventDefault(); ir(-1); }
   if (e.key === 'Home') mostrar(0);
+  if (e.key === 'Escape') mostrar(pasos.length - 1);   // vista general (el mapa)
   if (e.key === 'f' || e.key === 'F') fs();
 });
 addEventListener('click', e => { if (!e.target.closest('#hud')) ir(1); });
+// Rueda del mouse / trackpad: avanzar y retroceder (con freno para no saltarse pasos)
+let wheelLock = 0;
+addEventListener('wheel', e => {
+  const t = Date.now();
+  if (t - wheelLock < 900 || Math.abs(e.deltaY) < 12) return;
+  wheelLock = t; ir(e.deltaY > 0 ? 1 : -1);
+}, { passive: true });
+// Swipe en pantallas táctiles
+let touchX = null;
+addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });
+addEventListener('touchend', e => {
+  if (touchX == null) return;
+  const dx = e.changedTouches[0].clientX - touchX; touchX = null;
+  if (Math.abs(dx) > 60) ir(dx < 0 ? 1 : -1);
+}, { passive: true });
 addEventListener('resize', () => mostrar(idx));
 document.querySelectorAll('.card').forEach(c =>
   c.insertAdjacentHTML('afterbegin', '<div class="brand"><img src="/img/logo-bs.png"></div>'));
