@@ -93,6 +93,7 @@ def construir():
     vineta(doc, 'el estado de cuenta mensual de comisiones de cada dealer y cada parque: se emite, se envía, el canal factura el total exacto y la orden de pago cierra el circuito. Cuadratura estricta: si la factura no calza, no avanza.', bold_hasta='Cartolas: ')
     vineta(doc, 'la plata del vehículo que pasa por AutoFácil hacia el dealer, con SLA por categoría (24/48/72 horas hábiles) y seguimiento en vivo en Tesorería.', bold_hasta='Saldos Precio: ')
     vineta(doc, 'toda salida de plata con correlativo único, doble control y segregación de funciones: quien emite no paga.', bold_hasta='Órdenes de Pago: ')
+    vineta(doc, 'los movimientos de las cuentas corrientes de la empresa se cargan desde las cartolas del banco y se cruzan solos contra los pagos del sistema; lo que no calza queda en una cola para revisar.', bold_hasta='Conciliación Bancaria: ')
     vineta(doc, 'el anticipo de comisiones de los dealers Super Partner, renovado mes a mes con cadena de aprobación.', bold_hasta='Plan Liquidez: ')
     h2(doc, '3.5 La cartera propia: recaudar')
     vineta(doc, 'el cajero busca el crédito, cobra cuotas individuales o en lote, y el comprobante sale timbrado. La mora y los gastos son los del motor único. Cierre de caja con cuadratura diaria.', bold_hasta='Cajas: ')
@@ -118,7 +119,12 @@ def construir():
     vineta(doc, 'piso, incentivos y bonos por venta de seguros se calculan solos y van directo a la liquidación, con variables versionadas y bitácora.', bold_hasta='Comisiones: ')
     vineta(doc, 'la Academia enseña cada módulo a su ritmo, los cursos formales quedan en la ficha, el test vocacional apoya la selección, y los concursos hacen del aprendizaje un juego.', bold_hasta='Capacitación: ')
     vineta(doc, 'canal de denuncias confidencial con plazos legales (Ley Karin) y encuestas de clima anónimas con resultados agregados.', bold_hasta='Compliance y clima: ')
-    h2(doc, '3.10 Soporte y gobierno del sistema')
+    h2(doc, '3.10 La dirección: el negocio en vivo')
+    vineta(doc, 'colocaciones, rentabilidad, mora y avance contra presupuesto en vivo, con vistas por perfil y una pantalla estilo sala de control para la oficina.', bold_hasta='Dashboard y Cuadro de Mando: ')
+    vineta(doc, 'reportes Tailor Made más un constructor visual de consultas estilo Access: el usuario arma su cruce de datos sin pedirle nada a un programador.', bold_hasta='Reportería a medida: ')
+    vineta(doc, 'cada mañana la IA redacta la narrativa de gestión — ventas de ayer, ritmo del mes, ejecutivos caídos, alertas — sobre las cifras reales del sistema.', bold_hasta='Resumen Ejecutivo Diario: ')
+    vineta(doc, 'informes automáticos por horario (ventas, órdenes de pago pendientes, fundantes pendientes) con días, hora, destinatarios y texto configurables en su mantenedor.', bold_hasta='Correos programados: ')
+    h2(doc, '3.11 Soporte y gobierno del sistema')
     vineta(doc, 'perfiles y funcionalidades definen quién ve y hace qué. La matriz se administra en pantalla; el Administrador ve todo; los permisos sensibles se validan en el servidor.', bold_hasta='Usuarios y permisos: ')
     vineta(doc, 'tickets de TI con SLA y escalamiento, compras internas con workflow de aprobación por niveles, y 15 flujos de escalamiento que suben solos por la jefatura cuando algo no se atiende.', bold_hasta='Soporte interno: ')
     vineta(doc, 'campanitas y correos paramétricos: qué evento avisa, a quién y con qué texto se configura, no se programa.', bold_hasta='Avisos: ')
@@ -127,7 +133,7 @@ def construir():
 
     # ── 4. Cierre ───────────────────────────────────────────────────────────
     h1(doc, '4. Dónde estamos y hacia dónde va')
-    p(doc, 'Business Suite pasó de proyecto a columna vertebral de la operación: 30 usuarios diarios, '
+    p(doc, 'Business Suite pasó de proyecto a columna vertebral de la operación: cerca de 30 usuarios activos cada día hábil, '
            'la red completa de dealers, la contabilidad construyéndose sola y los procesos de '
            'personas dentro del sistema. Lo que sigue es profundidad: cerrar el reemplazo total del '
            'sistema contable externo (emisión electrónica ante el SII), extender el doble factor a '

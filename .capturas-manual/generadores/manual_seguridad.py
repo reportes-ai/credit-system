@@ -97,8 +97,8 @@ def construir():
     h1(doc, '6. Redundancia y contingencia: cuando algo se cae')
     h2(doc, '6.1 Los datos')
     tabla(doc, ('Qué', 'Respaldo', 'Retención'),
-          (('Base de datos', 'Respaldo automático del proveedor + volcado nocturno propio (02:17) a artefacto privado', '1 día + 30 días'),
-           ('Documentos', 'Bucket de Google Cloud, fuera de la base', 'Permanente'),
+          (('Base de datos', 'Respaldo automático del proveedor + volcado nocturno propio (02:17) a GitHub + tercera copia nocturna en Google (regla de las tres copias)', '1 día + 30 días + 90 días'),
+           ('Documentos', 'Bucket de Google Cloud (versionado) + bucket espejo en otra región + paquete semanal a GitHub', 'Permanente'),
            ('Código', 'Repositorio Git con historial completo', 'Permanente'),
            ('Configuración', 'Vive en la base (mantenedores) → viaja con el respaldo', '30 días')),
           (3.6, 8.6, 4.3))
