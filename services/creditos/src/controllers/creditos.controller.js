@@ -241,6 +241,11 @@ const create = async (req, res) => {
     const saldo = saldo_precio || (valor_vehiculo && pie ? (valor_vehiculo - pie) : null);
     const pct   = (valor_vehiculo && saldo) ? saldo / valor_vehiculo : null;
 
+    // estado_eval acompaña al estado del ingreso: solo 'OTORGADO' cuando el
+    // crédito entra ya cursado (uso clásico del formulario). Antes iba OTORGADO
+    // fijo y una op EN_ANALISIS aparecía otorgada en el dashboard (op 26081410).
+    const estIni  = String(estado || 'INGRESO').toUpperCase();
+    const evalIni = (estIni === 'OTORGADO' || estIni === 'INGRESO') ? 'OTORGADO' : 'PENDIENTE';
     const [r] = await pool.query(`
       INSERT INTO creditos
         (num_op, numero_credito, financiera,
@@ -257,7 +262,7 @@ const create = async (req, res) => {
          rut_dealer, vendedor, comdea_real,
          created_at, updated_at)
       VALUES (?,?,?,
-              'OTORGADO',?,
+              ?,?,
               ?,?,?,
               ?,DATE_FORMAT(COALESCE(?, NOW()), '%Y-%m-01'),
               ?,?,?,?,?,
@@ -271,7 +276,7 @@ const create = async (req, res) => {
               NOW(), NOW())
     `, [
       numOpVal, numero_credito, fin,
-      estado || 'INGRESO',
+      evalIni, estado || 'INGRESO',
       id_cotizacion || null, id_usuario, id_cliente_resolved,
       fecha_otorgamiento || null, fecha_otorgamiento || null,
       valor_vehiculo || null, pie || null, saldo || null, pct || null, monto_financiado || null,
