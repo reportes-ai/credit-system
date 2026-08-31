@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.6 — +2 laminas (28 motores automaticos; continuidad: standby, respaldos, salud) · navegacion con rueda, swipe y Escape=mapa -->
+<!-- v1.7 — logo AutoFacil BS bajo el mapa de la vista general · v1.6 — +2 laminas (28 motores automaticos; continuidad: standby, respaldos, salud) · navegacion con rueda, swipe y Escape=mapa -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -40,6 +40,12 @@
           color:#e0f2ff; text-shadow:0 4px 30px rgba(0,0,0,.45), 0 0 40px rgba(0,154,254,.35);
           opacity:0; transform:translateY(-16px); transition:opacity .9s ease .35s, transform .9s ease .35s; pointer-events:none; }
   #lema.ver { opacity:1; transform:none; }
+  /* Logo bajo el mapa (solo en la vista general) */
+  #logoMapa { position:fixed; bottom:16vh; left:0; right:0; z-index:40; text-align:center; pointer-events:none;
+              opacity:0; transform:translateY(16px); transition:opacity .9s ease .5s, transform .9s ease .5s; }
+  #logoMapa img { height:clamp(60px, 10vh, 110px); background:#fff; border-radius:14px; padding:10px 26px;
+                  box-shadow:0 18px 50px rgba(0,0,0,.4); }
+  #logoMapa.ver { opacity:1; transform:none; }
 
   /* ── HUD ── */
   #hud { position:fixed; left:0; right:0; bottom:0; display:flex; align-items:center; gap:14px; padding:14px 22px; z-index:50; color:rgba(255,255,255,.65); font-size:.8rem; }
@@ -319,6 +325,7 @@
 
 <!-- Lema sobre la VISTA GENERAL (no viaja con el lienzo: va fijo, arriba) -->
 <div id="lema">NOS ATREVEMOS A INNOVAR EN BUSCA DE LA EXCELENCIA</div>
+<div id="logoMapa"><img src="/img/logo-bs.png"></div>
 
 <div id="hud">
   <img id="logoHud" src="/img/logo-bs.png">
@@ -350,6 +357,7 @@ function mostrar(i) {
   const z = ('overview' in p.dataset) ? Math.min(innerWidth / 27200, innerHeight / 4200) : fit / s;
   canvas.style.transform = `scale(${z}) rotate(${-r}deg) translate(${-x}px,${-y}px)`;
   document.getElementById('lema').classList.toggle('ver', 'overview' in p.dataset);
+  document.getElementById('logoMapa').classList.toggle('ver', 'overview' in p.dataset);
   document.querySelector('#barra > div').style.width = ((idx) / (pasos.length - 1) * 100) + '%';
   document.getElementById('cont').textContent = (idx + 1) + ' / ' + pasos.length;
 }
