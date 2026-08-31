@@ -5890,3 +5890,33 @@ function _reExportar(){
     a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   });
 }
+
+/* ── Detalle Operaciones Otorgadas: exportar Excel y captura (pedido Pato 31-08) ── */
+function exportDetalleXLSX(sel, tituloId) {
+  try {
+    const tbl = document.querySelector(sel);
+    if (!tbl || !tbl.rows.length) { alert('No hay datos para exportar.'); return; }
+    const ws = XLSX.utils.table_to_sheet(tbl, { raw: false });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Detalle');
+    const lbl = (document.getElementById(tituloId)?.textContent || 'Detalle')
+      .replace(/[^\wáéíóúñÁÉÍÓÚÑ -]/g, '').trim().replace(/\s+/g, '_');
+    XLSX.writeFile(wb, lbl + '.xlsx');
+  } catch (e) { alert('No se pudo exportar: ' + e.message); }
+}
+
+async function capturaDetalleWSP(sel, tituloId) {
+  try {
+    const tbl = document.querySelector(sel);
+    if (!tbl || !tbl.rows.length) { alert('No hay datos para capturar.'); return; }
+    const cont = tbl.closest('.scroll-t') || tbl;
+    // Capturar la tabla COMPLETA (sin el scroll): clonarla fuera del contenedor
+    const cv = await html2canvas(tbl, { scale: 2, backgroundColor: '#ffffff' });
+    const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    alert('📸 Captura copiada — pégala en WhatsApp con Ctrl+V');
+  } catch (e) {
+    console.error('[captura detalle]', e);
+    alert('No se pudo copiar la captura: ' + e.message);
+  }
+}
