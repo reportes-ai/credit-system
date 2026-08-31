@@ -1492,7 +1492,8 @@ exports.probarPlantillaEnvio = async (req, res) => {
 
     // DATOS FALSOS: usa el mapeo de la secuencia si existe; si no, ejemplos genéricos
     const FAKE = { nombre: 'Juan Prueba Pérez', rut: '11.111.111-1', num_op: '99999',
-      dias_mora: 15, cuotas_mora: 2, monto_mora: 250000, saldo_insoluto: 4500000 };
+      dias_mora: 15, cuotas_mora: 2, monto_mora: 250000, saldo_insoluto: 4500000,
+      numero_cuota: 7, fecha_venc_cuota: '05-09-2026', monto_cuota: 159400 };
     let params = [];
     const [[tipoRow]] = await pool.query('SELECT mapa_variables FROM wsp_plantillas_tipo WHERE nombre_plantilla=?', [nombre]);
     const mapa = Array.isArray(tipoRow?.mapa_variables) ? tipoRow.mapa_variables : [];

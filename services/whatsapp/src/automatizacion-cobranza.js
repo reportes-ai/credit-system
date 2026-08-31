@@ -145,10 +145,16 @@ const CAMPOS = {
   monto_mora:       d => CLP(d.monto_mora),
   saldo_insoluto:   d => CLP(d.saldo_insoluto),
   numero_operacion: d => String(d.num_op || ''),
+  // Datos de la cuota impaga más antigua (para avisos tipo "vence la cuota N°X el día Y")
+  numero_cuota:     d => String(d.numero_cuota || ''),
+  fecha_venc_cuota: d => d.fecha_venc_cuota || '',
+  monto_cuota:      d => CLP(d.monto_cuota),
 };
 const CAMPOS_LABEL = {
   nombre: 'Nombre del cliente', rut: 'RUT', dias_mora: 'Días de mora', cuotas_mora: 'N° cuotas en mora',
   monto_mora: 'Monto en mora ($)', saldo_insoluto: 'Saldo insoluto ($)', numero_operacion: 'N° de operación',
+  numero_cuota: 'N° de la cuota (impaga más antigua)', fecha_venc_cuota: 'Día de vencimiento de la cuota',
+  monto_cuota: 'Monto de la cuota ($)',
 };
 
 /* ── Secuencia activa de plantillas COBRANZA, en orden ── */
@@ -170,6 +176,19 @@ async function universoMora() {
       `SELECT rut, COALESCE(telefono_movil, telefono) telefono FROM clientes WHERE rut IN (?)`, [ruts]);
     tels.forEach(t => { telPorRut[t.rut] = t.telefono; });
   }
+  // Cuota impaga más antigua de cada crédito (N°, vencimiento, valor) para las variables de cuota
+  const cuotaPorCredito = {};
+  const ids = creditos.map(c => c.id_credito || c.id).filter(Boolean);
+  if (ids.length) {
+    const [cuotas] = await pool.query(
+      `SELECT cc.id_credito, cc.numero_cuota, DATE_FORMAT(cc.fecha_vencimiento,'%d-%m-%Y') fv, cc.valor_cuota
+         FROM cuotas_credito cc
+         JOIN (SELECT id_credito, MIN(fecha_vencimiento) fmin FROM cuotas_credito
+                WHERE estado_cuota <> 'PAGADA' AND id_credito IN (?) GROUP BY id_credito) x
+           ON x.id_credito = cc.id_credito AND x.fmin = cc.fecha_vencimiento
+        WHERE cc.estado_cuota <> 'PAGADA'`, [ids]);
+    cuotas.forEach(q => { if (!cuotaPorCredito[q.id_credito]) cuotaPorCredito[q.id_credito] = q; });
+  }
   return creditos.map(c => ({
     id_credito: c.id_credito, num_op: c.num_op, rut: c.rut_cliente, nombre: c.nombre_cliente,
     telefono: telPorRut[c.rut_cliente] || null,
@@ -178,6 +197,9 @@ async function universoMora() {
     monto_mora: Math.round(Number(c.monto_mora) || 0),
     dias_mora: Number(c.dias_mora) || 0,
     saldo_insoluto: Math.round(Number(c.saldo_insoluto) || 0),
+    numero_cuota: (cuotaPorCredito[c.id_credito || c.id] || {}).numero_cuota || null,
+    fecha_venc_cuota: (cuotaPorCredito[c.id_credito || c.id] || {}).fv || null,
+    monto_cuota: Math.round(Number((cuotaPorCredito[c.id_credito || c.id] || {}).valor_cuota) || 0),
   }));
 }
 

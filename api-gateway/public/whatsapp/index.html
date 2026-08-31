@@ -6,7 +6,7 @@
   <link rel="apple-touch-icon" href="/whatsapp/apple-touch-icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WhatsApp — AutoFácil</title>
-  <!-- v1.7 — clientes por username/BSUID: bandeja muestra @username cuando no hay telefono -->
+  <!-- v1.8 — variables de cuota en plantillas de cobranza (N° cuota, dia de vencimiento, monto cuota) · v1.7 — clientes por username/BSUID: bandeja muestra @username cuando no hay telefono -->
   <!-- PWA DEDICADA: app propia "AF WhatsApp" (manifest y scope /whatsapp/, distinta del Business Suite) -->
   <link rel="manifest" href="/whatsapp/manifest.json">
   <meta name="theme-color" content="#075E54">
@@ -483,6 +483,7 @@
   const CAMPOS_COBRANZA = [
     ['nombre','Nombre del cliente'],['rut','RUT'],['dias_mora','Días de mora'],['cuotas_mora','N° cuotas en mora'],
     ['monto_mora','Monto en mora ($)'],['saldo_insoluto','Saldo insoluto ($)'],['numero_operacion','N° de operación'],
+    ['numero_cuota','N° de la cuota (impaga más antigua)'],['fecha_venc_cuota','Día de vencimiento de la cuota'],['monto_cuota','Monto de la cuota ($)'],
   ];
   function nVarsOf(p){ const cuerpo=(p.components||[]).find(c=>c.type==='BODY')?.text||''; return (cuerpo.match(/\{\{\d+\}\}/g)||[]).length; }
   async function cargarPlantillas(){
