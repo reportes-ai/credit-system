@@ -55,9 +55,15 @@ exports.getVencimientos = async (req, res) => {
     );
     let diasUF = ufRow && ufRow.ultima_fecha ? Number(ufRow.dias_atraso) : 999;
     // Antes de alegar, INTENTAR actualizar (pedido Pato 01-09-2026: el popup
-    // acusaba "UF desactualizada" cuando bastaba un clic en Actualizar). Con
-    // freno de 1 hora para no golpear la CMF en cada login.
-    if (diasUF > 0) {
+    // acusaba "UF desactualizada" cuando bastaba un clic en Actualizar). Vale
+    // para UF, UTM y dólar (la sincronización trae los cuatro indicadores).
+    // Con freno de 1 hora para no golpear la CMF en cada login.
+    let utmFalta = false;
+    try {
+      const [[u]] = await pool.query("SELECT DATE_FORMAT(MAX(fecha),'%Y-%m') ym FROM utm");
+      utmFalta = !u || !u.ym || u.ym < new Date().toISOString().slice(0, 7);
+    } catch (_) {}
+    if (diasUF > 0 || utmFalta) {
       try {
         const [[th]] = await pool.query("SELECT valor FROM indicadores_estado WHERE clave='sync_intento_alerta'");
         const hace = th && th.valor ? (Date.now() - Date.parse(th.valor)) : Infinity;

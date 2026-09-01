@@ -58,9 +58,11 @@ async function sincronizar(opts = {}) {
   // primeros días, por huecos). INSERT IGNORE deduplica; no restringir al mes
   // en curso (pedido Pato 01-09-2026: quedó cargada solo hasta el 31-08).
   const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  // El dólar no tiene valores futuros (es el observado del día), pero el mes
+  // anterior va siempre: rellena huecos si algún día falló la corrida.
   const MESES_POR_TABLA = {
     uf:    [[py, pm], [y, m], [ny, nm]],
-    dolar: dia <= 5 ? [[py, pm], [y, m]] : [[y, m]],
+    dolar: [[py, pm], [y, m]],
   };
   for (const [rec, tab] of [['uf', 'uf'], ['dolar', 'dolar']]) {
     let nuevos = 0, total = 0, ok = false, lastErr = null;
@@ -81,7 +83,9 @@ async function sincronizar(opts = {}) {
   // respaldo); INSERT IGNORE deduplica. Esto evita depender de la publicación tardía del mes.
   for (const [rec, tab] of [['utm', 'utm'], ['ipc', 'ipc']]) {
     let nuevos = 0, total = 0, ok = false, lastErr = null;
-    for (const yy of [y, py]) {
+    // Desde noviembre se pide también el AÑO SIGUIENTE: la UTM de enero se
+    // publica en diciembre y no debe quedar fuera por el corte de año.
+    for (const yy of (m >= 11 ? [y, py, y + 1] : [y, py])) {
       try { const r = await syncTabla(rec, tab, yy, null, true); nuevos += r.nuevos; total += r.total; ok = true; }
       catch (e) { lastErr = e; }
     }
@@ -127,7 +131,7 @@ async function sincronizar(opts = {}) {
   console.log('[indicadores]', JSON.stringify(out));
   // Un fallo de red (ej. "socket hang up") NO puede esperar 24h al próximo tick:
   // reintento a los 30 min, solo para las corridas automáticas del scheduler.
-  if (opts.auto && (out.uf?.error || out.dolar?.error)) programarReintento();
+  if (opts.auto && (out.uf?.error || out.dolar?.error || out.utm?.error || out.ipc?.error)) programarReintento();
   return out;
 }
 
