@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.29 — selector "Cuenta de cargo" al registrar el pago (mantenedor Cuentas Bancarias): queda en la orden y el asiento acredita ese banco real; el detalle muestra "desde <cuenta>". v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.30 — boton Excel: descarga los casos filtrados con montos con formato y nombre de archivo segun filtros. v1.29 — selector "Cuenta de cargo" al registrar el pago (mantenedor Cuentas Bancarias): queda en la orden y el asiento acredita ese banco real; el detalle muestra "desde <cuenta>". v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -87,6 +87,7 @@
       <label style="font-size:.8rem;color:#475569">Desde <input type="date" id="fDesde" onchange="cargar()"></label>
       <label style="font-size:.8rem;color:#475569">Hasta <input type="date" id="fHasta" onchange="cargar()"></label>
       <button class="btn-ghost" onclick="limpiar()"><i class="bi bi-x-circle me-1"></i>Limpiar</button>
+      <button class="btn-ghost" style="color:#15803d;border-color:#bbf7d0" onclick="exportarExcel()" title="Descarga las órdenes del filtro actual"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button>
       <div style="flex:1"></div>
       <a class="btn-af" href="/ordenes-pago/emision/" style="text-decoration:none"><i class="bi bi-plus-lg me-1"></i>Nueva orden</a>
     </div>
@@ -269,6 +270,32 @@ async function cargar(){
   } catch(e) {
     tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#b91c1c;padding:24px">Error al cargar.</td></tr>';
   }
+}
+
+/* Exporta los casos FILTRADOS con números reales (formato $) y el nombre del
+   archivo armado con los filtros activos. */
+async function exportarExcel(){
+  if (!DATA.length) return toast('No hay órdenes para exportar');
+  if (!window.XLSX) await new Promise((ok,bad)=>{ const s=document.createElement('script'); s.src='/js/xlsx.full.min.js'; s.onload=ok; s.onerror=bad; document.head.appendChild(s); });
+  const aoa = [['N° Orden','Tipo','Fecha emisión','Proveedor / Dealer','Concepto','Documento','Monto','Estado','Fecha pago','Emitida por']];
+  DATA.forEach(o => aoa.push([
+    o.numero||'', o.origen_label||o.origen||'', fdate(o.fecha_emision), o.proveedor_nombre||'',
+    o.concepto||'', o.documento||'', Number(o.monto)||0, o.estado||'',
+    o.estado==='PAGADA' ? fdate(o.fecha_pago) : '', o.usuario_nombre||'' ]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  for (let r=1; r<aoa.length; r++){ const cell = ws[XLSX.utils.encode_cell({r, c:6})]; if (cell) cell.z = '$#,##0'; }
+  ws['!cols'] = aoa[0].map((_,c)=>({ wch: Math.min(45, Math.max(...aoa.map(f=>String(f[c]??'').length))+2) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ordenes de Pago');
+  // Nombre del archivo según los filtros activos
+  const est = document.getElementById('fEstado').value;
+  const tipo = { COMISION:'Comisiones', SALDO:'SaldosPrecio', PARQUE:'Parques', GENERAL:'Otros' }[ORIGEN] || 'Todas';
+  const d = document.getElementById('fDesde').value, h = document.getElementById('fHasta').value;
+  const q = document.getElementById('q').value.trim();
+  const partes = ['ODP', tipo, est ? est.toLowerCase() : 'todas'];
+  if (d || h) partes.push((d||'inicio')+'_a_'+(h||'hoy'));
+  if (q) partes.push(q.replace(/[^\wáéíóúñÁÉÍÓÚÑ-]+/g,'_').slice(0,30));
+  XLSX.writeFile(wb, partes.join('_') + '.xlsx');
 }
 
 function pintaChips(rs, total){
