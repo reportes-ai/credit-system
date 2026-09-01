@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <!-- v1.4 — navbar migrada al componente topnav  ·  antes: v1.2 — recordatorio por nivel + panel de destinos del workflow -->
+  <!-- v1.5 — botón "Solo asignados": ver únicamente los artículos marcados del perfil · v1.4 — navbar migrada al componente topnav  ·  antes: v1.2 — recordatorio por nivel + panel de destinos del workflow -->
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -68,6 +68,7 @@
             <button class="btn btn-sm btn-outline-danger" onclick="bulkFiltro(false)" title="Desmarca todos los del filtro/categoría actual"><i class="bi bi-x-circle me-1"></i>Quitar TODO el filtro</button>
             <button class="btn btn-sm btn-outline-success" onclick="bulkPagina(true)"><i class="bi bi-check2 me-1"></i>Asignar esta página</button>
             <button class="btn btn-sm btn-outline-danger" onclick="bulkPagina(false)"><i class="bi bi-x me-1"></i>Quitar esta página</button>
+            <button class="btn btn-sm btn-outline-primary" id="btnSolo" onclick="toggleSolo()" title="Muestra únicamente los artículos asignados a este perfil (incluye los marcados sin guardar)"><i class="bi bi-eye me-1"></i>Solo asignados</button>
             <span class="muted" style="font-size:.8rem"><i class="bi bi-shop me-1"></i>Proveedor: <a href="https://www.dimeiggs.cl" target="_blank" rel="noopener">Dimeiggs</a> · <a href="https://www.dimeiggs.cl" target="_blank" rel="noopener">dimeiggs.cl</a></span>
             <span class="muted" id="artInfo" style="margin-left:auto;align-self:center"></span>
             <span id="sucio" style="display:none;color:#b45309;font-weight:600;font-size:.8rem">● sin guardar</span>
@@ -253,26 +254,54 @@
       }
       updArtInfo(); marcarSucio(); buscarArt(0);
     }
+    // Vista "Solo asignados": pagina el catálogo completo por detrás y se queda
+    // solo con lo marcado (incluye cambios locales sin guardar).
+    let SOLO = false;
+    function toggleSolo() {
+      SOLO = !SOLO;
+      const b = document.getElementById('btnSolo');
+      b.classList.toggle('btn-primary', SOLO); b.classList.toggle('btn-outline-primary', !SOLO);
+      b.innerHTML = SOLO ? '<i class="bi bi-eye-fill me-1"></i>Viendo solo asignados' : '<i class="bi bi-eye me-1"></i>Solo asignados';
+      buscarArt(0);
+    }
     async function buscarArt(offset) {
       const idp = document.getElementById('selPerfil').value;
       if (!idp) { document.getElementById('tbodyArt').innerHTML = '<tr><td colspan="6" class="text-center py-4 muted">Selecciona un perfil para asignar artículos.</td></tr>'; return; }
       pagOffset = offset;
       const q = encodeURIComponent(document.getElementById('qArt').value.trim());
       const cat = encodeURIComponent(document.getElementById('selCat').value);
+      if (SOLO) {
+        let rows = [], off = 0, total = 1;
+        while (off < total && off < 10000) {
+          const j = await api(`/api/compras/catalogo?q=${q}&categoria=${cat}&limit=500&offset=${off}`);
+          if (!j?.success) break;
+          total = j.data.total;
+          rows = rows.concat((j.data.items || []).filter(a => asignados.has(a.id)));
+          off += 500;
+        }
+        pagTotal = rows.length; pagRows = rows; pagOffset = 0;
+        pintarFilasArt();
+        document.getElementById('pagInfo').textContent = `${fmt(rows.length)} asignado(s)`;
+        document.getElementById('btnPrev').disabled = true;
+        document.getElementById('btnNext').disabled = true;
+        return;
+      }
       const j = await api(`/api/compras/catalogo?q=${q}&categoria=${cat}&limit=${pagLimit}&offset=${pagOffset}`);
       if (!j?.success) return;
       pagTotal = j.data.total; pagRows = j.data.items;
+      const desde = pagTotal ? pagOffset+1 : 0, hasta = Math.min(pagOffset+pagLimit, pagTotal);
+      document.getElementById('pagInfo').textContent = `${desde}–${hasta} de ${fmt(pagTotal)}`;
+      document.getElementById('btnPrev').disabled = pagOffset<=0;
+      document.getElementById('btnNext').disabled = hasta>=pagTotal;
+    }
+    function pintarFilasArt() {
       document.getElementById('tbodyArt').innerHTML = pagRows.length ? pagRows.map(a => `
         <tr>
           <td><input type="checkbox" class="form-check-input" ${asignados.has(a.id)?'checked':''} onchange="toggleArt(${a.id}, this.checked)"></td>
           <td>${esc(a.nombre)}</td><td>${esc(a.marca||'')}</td>
           <td class="muted" style="font-size:.78rem">${esc((a.categoria||'').split('/').slice(0,2).join(' › '))}</td>
           <td class="text-end">$${fmt(a.precio)}</td><td class="text-end">${fmt(a.stock)}</td>
-        </tr>`).join('') : '<tr><td colspan="6" class="text-center py-4 muted">Sin artículos. ¿Sincronizaste el catálogo?</td></tr>';
-      const desde = pagTotal ? pagOffset+1 : 0, hasta = Math.min(pagOffset+pagLimit, pagTotal);
-      document.getElementById('pagInfo').textContent = `${desde}–${hasta} de ${fmt(pagTotal)}`;
-      document.getElementById('btnPrev').disabled = pagOffset<=0;
-      document.getElementById('btnNext').disabled = hasta>=pagTotal;
+        </tr>`).join('') : `<tr><td colspan="6" class="text-center py-4 muted">${SOLO ? 'Este perfil no tiene artículos asignados con el filtro actual.' : 'Sin artículos. ¿Sincronizaste el catálogo?'}</td></tr>`;
     }
     function paginar(d){ const next = pagOffset + d*pagLimit; if (next>=0 && next<pagTotal) buscarArt(next); }
     // Marcar/desmarcar = SOLO local; se persiste con "Grabar modificaciones"
