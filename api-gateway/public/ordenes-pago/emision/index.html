@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
+  <!-- v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -60,6 +60,9 @@
       <div class="fld"><label>Categoría</label>
         <input id="fCategoria" list="catList" maxlength="80" placeholder="Ej: Arriendo, Servicios, Insumos…">
         <datalist id="catList"><option>Arriendo</option><option>Servicios Básicos</option><option>Honorarios</option><option>Insumos</option><option>Marketing</option><option>Tecnología</option><option>Mantención</option><option>Otros</option></datalist>
+      </div>
+      <div class="fld"><label>Centro de Costo</label>
+        <select id="fCentroCosto"><option value="">— Sin asignar —</option></select>
       </div>
       <div class="fld"><label>Tipo de Documento *</label>
         <select id="fTipoDoc" onchange="onTipo()">
@@ -273,6 +276,7 @@ async function emitirDefinitivo(){
     monto_bruto: numEl('fBruto'),
     monto_neto: numEl('fNeto'),
     categoria: document.getElementById('fCategoria').value.trim(),
+    centro_costo: document.getElementById('fCentroCosto').value,
     numero_documento: document.getElementById('fNumDoc').value.trim(),
     fecha_documento: document.getElementById('fFechaDoc').value || null,
     metodo_pago: document.getElementById('fMetodo').value,
@@ -308,6 +312,13 @@ function fail(m){ const e=document.getElementById('errMsg'); e.textContent=m; e.
 function nueva(){ location.reload(); }
 
 cargarProv();
+// Centros de costo (mantenedor /mantenedores/centros-costo/) — a qué área se imputa el gasto
+(async()=>{ try {
+  const j = await (await fetch('/api/centros-costo', { headers:H })).json();
+  const sel = document.getElementById('fCentroCosto');
+  sel.innerHTML = '<option value="">— Sin asignar —</option>' +
+    (j.data||[]).map(c=>`<option value="${c.nombre}">${c.codigo} · ${c.nombre}</option>`).join('');
+} catch(e){} })();
 cargarImpuestos();
 </script>
 <script src="/js/odp-preemision.js"></script>

@@ -838,10 +838,10 @@ const crearOrden = async (req, res) => {
     const fechaEmision = fdate(b.fecha_emision) || require('../../../../shared/fecha-chile').hoyISO(); // día de Chile, no UTC
     const [r] = await pool.query(
       `INSERT INTO ordenes_pago
-        (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento, numero_documento, fecha_documento,
+        (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, centro_costo, tipo_documento, numero_documento, fecha_documento,
          tratamiento, monto_bruto, monto_neto, impuesto_pct, impuesto_monto, monto, destino, fecha_emision, metodo_pago, estado, observaciones, id_usuario, usuario_nombre)
-       VALUES (?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?,?, 'EMITIDA', ?,?,?)`,
-      [idProv, provNombre, provRut, concepto, norm(b.categoria) || null, tipoDoc,
+       VALUES (?,?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?,?, 'EMITIDA', ?,?,?)`,
+      [idProv, provNombre, provRut, concepto, norm(b.categoria) || null, norm(b.centro_costo) || null, tipoDoc,
        norm(b.numero_documento) || null, fdate(b.fecha_documento),
        m.clase, m.bruto, m.neto, m.pct, m.imp, m.aPagar, destino, fechaEmision, norm(b.metodo_pago) || null,
        norm(b.observaciones) || null, (req.usuario || {}).id_usuario || null, nombreUsuario(req)]);

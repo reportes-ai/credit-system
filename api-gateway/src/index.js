@@ -322,6 +322,7 @@ app.use('/api/workflow-estados',  require('../../services/mantenedores/src/route
 app.use('/api/tipos-documento',      require('../../services/mantenedores/src/routes/tipos-documento.routes'));
 app.use('/api/plantillas-documento', require('../../services/mantenedores/src/routes/plantillas.routes'));
 app.use('/api/cuentas-bancarias',    require('../../services/mantenedores/src/routes/cuentas-bancarias.routes'));
+app.use('/api/centros-costo',        require('../../services/mantenedores/src/routes/centros-costo.routes'));
 app.use('/api/parques-comisiones',   require('../../services/mantenedores/src/routes/parques.routes'));
 app.use('/api/correos-plantillas',   require('../../services/mantenedores/src/routes/correos-plantillas.routes'));
 app.use('/api/sql-console',               require('../../services/mantenedores/src/routes/sql-console.routes'));
@@ -575,6 +576,7 @@ const PAGINAS = [
   ['/creditos/documentos', 'creditos/documentos.html'],
   ['/mantenedores/pagares', 'mantenedores/pagares/index.html'],
   ['/mantenedores/cuentas-bancarias', 'mantenedores/cuentas-bancarias/index.html'],
+  ['/mantenedores/centros-costo', 'mantenedores/centros-costo/index.html'],
   ['/mantenedores/parques', 'mantenedores/parques/index.html'],
   ['/mantenedores/dealers-mapa', 'mantenedores/dealers-mapa/index.html'],
   ['/dealers-visitas', 'dealers-visitas/index.html'],

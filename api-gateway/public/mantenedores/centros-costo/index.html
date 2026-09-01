@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Centros de Costo — Mantenedores</title>
+  <!-- v1.0 — mantenedor Centros de Costo: lista oficial de áreas para imputar compras y gastos; renombrar arrastra usuarios y ODP -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; }
+    .main { padding:28px 34px; max-width:980px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; } .page-banner i { font-size:2.2rem; opacity:.9; } .page-banner h2 { margin:0; font-size:1.25rem; font-weight:700; } .page-banner p { margin:2px 0 0; opacity:.85; font-size:.84rem; }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:22px; margin-bottom:18px; }
+    table { width:100%; border-collapse:collapse; font-size:.86rem; }
+    th { text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; padding:8px 10px; border-bottom:2px solid #e2e8f0; }
+    td { padding:9px 10px; border-bottom:1px solid #f1f5f9; }
+    td input { border:1px solid #cbd5e1; border-radius:7px; padding:6px 9px; font-size:.84rem; width:100%; box-sizing:border-box; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:9px 16px; font-weight:700; font-size:.85rem; cursor:pointer; }
+    .btn-min { background:#fff; border:1.5px solid #e2e8f0; border-radius:7px; padding:5px 10px; font-size:.78rem; cursor:pointer; }
+    .badge-off { font-size:.64rem; background:#fee2e2; color:#991b1b; border-radius:10px; padding:2px 8px; font-weight:800; }
+    .afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:16px 20px; font-size:.83rem; color:#475569; }
+    .afecta ul { margin:8px 0 0; padding-left:18px; } .afecta a { color:var(--navy); }
+    .toast { position:fixed; bottom:22px; right:22px; background:#16a34a; color:#fff; border-radius:10px; padding:12px 20px; font-weight:700; display:none; z-index:999; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Centros de Costo',icon:'bi-diagram-2',current:true}]};</script>
+<div class="main">
+  <div class="page-banner"><i class="bi bi-diagram-2"></i><div><h2>Centros de Costo</h2><p>Las áreas de la empresa a las que se imputan las compras y los gastos. Una sola lista oficial: la usan Usuarios, Órdenes de Pago y Compras.</p></div></div>
+
+  <div class="card-box">
+    <table>
+      <thead><tr><th style="width:90px">Código</th><th>Nombre</th><th>Responsable</th><th style="width:70px">Orden</th><th style="width:90px">Personas</th><th style="width:70px">Activo</th><th style="width:150px"></th></tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+    <div style="margin-top:14px"><button class="btn-navy" onclick="agregar()"><i class="bi bi-plus-lg me-1"></i>Agregar centro de costo</button></div>
+    <div style="font-size:.74rem;color:#94a3b8;margin-top:10px">Renombrar un centro arrastra automáticamente a las personas y órdenes de pago que lo usan. Uno con personas o gastos asociados no se elimina: se desactiva.</div>
+  </div>
+
+  <div class="afecta">
+    <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+    <ul>
+      <li><b>Centro de costo de cada persona</b> → se asigna en <a href="/usuarios/">Usuarios</a> (campo Centro de Costo de la ficha); las <b>compras de Soporte</b> se imputan al centro de costo de quien pide.</li>
+      <li><b>Órdenes de Pago de proveedores</b> → el campo Centro de Costo al <a href="/ordenes-pago/emision/">emitir la ODP</a> imputa el gasto al área.</li>
+      <li><b>Activo</b> → un centro desactivado deja de ofrecerse en los selectores, pero su historia se conserva.</li>
+    </ul>
+  </div>
+</div>
+<div class="toast" id="toast">✓ Guardado</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token=sessionStorage.getItem('token'), yo=JSON.parse(sessionStorage.getItem('usuario')||'null');
+  if(!token||!yo) location.href='/login.html';
+  const H={Authorization:'Bearer '+token,'Content-Type':'application/json'};
+  const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  let CCS=[];
+
+  async function cargar(){
+    const j=await(await fetch('/api/centros-costo?todos=1',{headers:H})).json();
+    CCS=j.data||[]; pintar();
+  }
+  function fila(c,i){
+    return `<tr>
+      <td><b style="color:#012d70">${esc(c.codigo)}</b></td>
+      <td><input id="n${i}" value="${esc(c.nombre)}"></td>
+      <td><input id="r${i}" value="${esc(c.responsable||'')}" placeholder="opcional"></td>
+      <td><input id="o${i}" type="number" value="${c.orden}"></td>
+      <td style="text-align:center">${c.personas||0}</td>
+      <td style="text-align:center"><input type="checkbox" id="a${i}" class="form-check-input" ${c.activo?'checked':''}></td>
+      <td style="text-align:right">
+        <button class="btn-min" style="color:#0141A2;border-color:#bfdbfe" onclick="guardar(${i})"><i class="bi bi-check-lg"></i> Guardar</button>
+        <button class="btn-min" style="color:#b91c1c" onclick="borrar(${i})"><i class="bi bi-trash"></i></button>
+      </td></tr>`;
+  }
+  function pintar(){ document.getElementById('tb').innerHTML=CCS.map(fila).join(''); }
+  async function guardar(i){
+    const c=CCS[i];
+    const j=await(await fetch('/api/centros-costo/'+encodeURIComponent(c.codigo),{method:'PUT',headers:H,body:JSON.stringify({
+      nombre:document.getElementById('n'+i).value, responsable:document.getElementById('r'+i).value,
+      orden:document.getElementById('o'+i).value, activo:document.getElementById('a'+i).checked?1:0 })})).json();
+    if(!j.success)return alert(j.error||'Error');
+    toast(); cargar();
+  }
+  async function borrar(i){
+    const c=CCS[i];
+    if(!confirm('¿Eliminar el centro de costo '+c.codigo+' — '+c.nombre+'?'))return;
+    const j=await(await fetch('/api/centros-costo/'+encodeURIComponent(c.codigo),{method:'DELETE',headers:H})).json();
+    if(!j.success)return alert(j.error||'Error');
+    if(j.data&&j.data.desactivado)alert(j.data.motivo);
+    cargar();
+  }
+  async function agregar(){
+    const codigo=prompt('Código del centro de costo (ej: CC-07):'); if(!codigo)return;
+    const nombre=prompt('Nombre del área (ej: TECNOLOGIA):'); if(!nombre)return;
+    const j=await(await fetch('/api/centros-costo',{method:'POST',headers:H,body:JSON.stringify({codigo,nombre})})).json();
+    if(!j.success)return alert(j.error||'Error');
+    toast(); cargar();
+  }
+  function toast(){ const t=document.getElementById('toast'); t.style.display='block'; setTimeout(()=>t.style.display='none',2000); }
+  cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
