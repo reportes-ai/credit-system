@@ -51,6 +51,19 @@ require('../../../../shared/migrate').migrar('centros-costo-seed-2026-09', async
   }
 });
 
+/* Seed una vez (01-09-2026): centro de costo por cada PARQUE con oficina
+   (los parques ACTIVOS del mantenedor Parques) — el arriendo, la comisión y
+   los gastos de esas oficinas se imputan a su propio centro. */
+require('../../../../shared/migrate').migrar('centros-costo-parques-2026-09', async () => {
+  const [parques] = await pool.query('SELECT nombre FROM parques_comisiones WHERE activo=1 ORDER BY orden').catch(() => [[]]);
+  let n = 10;
+  for (const p of parques) {
+    n++;
+    await pool.query('INSERT IGNORE INTO centros_costo (codigo, nombre, orden) VALUES (?,?,?)',
+      ['CC-P' + String(n - 10).padStart(2, '0'), String(p.nombre).toUpperCase(), n]);
+  }
+});
+
 const ok  = (res, data) => res.json({ success: true, data, error: null });
 const err = (res, e, s = 500) => res.status(s).json({ success: false, data: null, error: e?.message || e });
 

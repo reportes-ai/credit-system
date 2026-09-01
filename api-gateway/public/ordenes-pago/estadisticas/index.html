@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Estadísticas de Compra — AutoFácil</title>
-  <!-- v1.2 — navbar migrada al componente topnav -->
+  <!-- v1.3 — tabla Gasto por Centro de Costo mes a mes con Δ vs mes anterior (mantenedor Centros de Costo) · v1.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -68,6 +68,20 @@
         <tbody id="tbody"><tr><td style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
       </table>
     </div>
+  </div>
+
+  <div class="card-af">
+    <div style="font-size:.78rem;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:6px">
+      <i class="bi bi-diagram-2 me-1"></i>Gasto por Centro de Costo — mes a mes
+      <a href="/mantenedores/centros-costo/" style="font-size:.7rem;text-transform:none;font-weight:600;margin-left:8px">mantenedor</a>
+    </div>
+    <div class="wrap-tab">
+      <table id="tablaCC">
+        <thead><tr id="theadCC"></tr></thead>
+        <tbody id="tbodyCC"><tr><td style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+    <div style="font-size:.72rem;color:#94a3b8;margin-top:8px">La columna <b>Δ vs mes anterior</b> compara el último mes con movimiento contra el anterior. Las órdenes sin centro de costo asignado se agrupan al final — se completan al emitir la ODP.</div>
   </div>
 </div>
 
@@ -149,6 +163,52 @@ function pinta(d){
     totMes.map(v=>`<td class="r">${v?fmtMon(v):'·'}</td>`).join('') +
     `<td class="r">${fmtMon(granTotal)}</td></tr>`;
   document.getElementById('tbody').innerHTML = html;
+  pintaCC(d);
+}
+
+/* Pivot centro de costo × mes, con Δ del último mes con movimiento vs el anterior */
+function pintaCC(d){
+  const ccs = {};
+  const totMes = new Array(12).fill(0);
+  let gran = 0;
+  (d.centros||[]).forEach(f=>{
+    const m=(f.mes||1)-1;
+    if(!ccs[f.centro]) ccs[f.centro]=new Array(12).fill(0);
+    ccs[f.centro][m]+=Number(f.total||0);
+    totMes[m]+=Number(f.total||0);
+    gran+=Number(f.total||0);
+  });
+  // "(sin centro de costo)" siempre al final
+  const nombres = Object.keys(ccs).sort((a,b)=>{
+    const sa=a.startsWith('(sin'), sb=b.startsWith('(sin');
+    if(sa!==sb) return sa?1:-1;
+    return ccs[b].reduce((x,y)=>x+y,0)-ccs[a].reduce((x,y)=>x+y,0);
+  });
+  // Último mes con movimiento y el anterior (para el Δ)
+  let mUlt=-1; for(let i=11;i>=0;i--) if(totMes[i]){ mUlt=i; break; }
+  const mPrev = mUlt>0 ? mUlt-1 : -1;
+  const delta = v => { if(v==null) return '·';
+    const s=v>0?'+':''; const c=v>0?'#b91c1c':(v<0?'#15803d':'#64748b');
+    return `<span style="color:${c};font-weight:700">${s}${fmtK(Math.abs(v))==='$0'?'0':(s||'-').replace('-','−')+fmtK(Math.abs(v)).slice(1)}</span>`; };
+  document.getElementById('theadCC').innerHTML =
+    '<th class="prov">Centro de Costo</th>' + MESES.map(m=>`<th class="r">${m}</th>`).join('') +
+    `<th class="r">Total</th><th class="r">Δ ${mUlt>=0?MESES[mUlt]:''} vs ${mPrev>=0?MESES[mPrev]:'—'}</th>`;
+  if(!nombres.length){
+    document.getElementById('tbodyCC').innerHTML='<tr><td colspan="15" style="text-align:center;color:#94a3b8;padding:24px">Sin gastos con centro de costo en '+d.anio+'.</td></tr>';
+    return;
+  }
+  let html = nombres.map(nom=>{
+    const arr=ccs[nom], tot=arr.reduce((x,y)=>x+y,0);
+    const dv = (mUlt>=0&&mPrev>=0) ? arr[mUlt]-arr[mPrev] : null;
+    return `<tr><td class="prov">${escH(nom)}</td>`+
+      arr.map(v=>`<td class="r ${v?'':'z'}">${v?fmtMon(v):'·'}</td>`).join('')+
+      `<td class="r"><b>${fmtMon(tot)}</b></td><td class="r">${delta(dv)}</td></tr>`;
+  }).join('');
+  const dTot = (mUlt>=0&&mPrev>=0) ? totMes[mUlt]-totMes[mPrev] : null;
+  html += `<tr class="tot"><td class="prov">TOTAL</td>`+
+    totMes.map(v=>`<td class="r">${v?fmtMon(v):'·'}</td>`).join('')+
+    `<td class="r">${fmtMon(gran)}</td><td class="r">${delta(dTot)}</td></tr>`;
+  document.getElementById('tbodyCC').innerHTML = html;
 }
 
 cargar();

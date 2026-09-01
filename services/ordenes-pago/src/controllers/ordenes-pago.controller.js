@@ -987,7 +987,16 @@ const estadisticas = async (req, res) => {
         GROUP BY proveedor, mes
         ORDER BY proveedor`, [anio]);
 
-    res.json({ success: true, data: { anio, anios, filas: rows }, error: null });
+    // Gasto por CENTRO DE COSTO (mismo año, mes a mes) — mantenedor Centros de Costo
+    const [ccRows] = await pool.query(
+      `SELECT COALESCE(NULLIF(TRIM(centro_costo),''),'(sin centro de costo)') centro, MONTH(fecha_emision) mes,
+              SUM(monto) total, COUNT(*) n
+         FROM ordenes_pago
+        WHERE estado<>'ANULADA' AND YEAR(fecha_emision)=?
+        GROUP BY centro, mes
+        ORDER BY centro`, [anio]);
+
+    res.json({ success: true, data: { anio, anios, filas: rows, centros: ccRows }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
   }
