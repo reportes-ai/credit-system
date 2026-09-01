@@ -245,6 +245,9 @@ const num = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : nu
 require('../../../../shared/migrate').enFila('compras-config', async () => {
   await pool.query('CREATE TABLE IF NOT EXISTS compras_config (clave VARCHAR(40) PRIMARY KEY, valor VARCHAR(100) NOT NULL)').catch(() => {});
   await pool.query("INSERT IGNORE INTO compras_config (clave, valor) VALUES ('dia_cierre','10')").catch(() => {});
+  // De momento TODO se despacha a Casa Matriz (pedido Pato 01-09-2026). Paramétrico:
+  // con '0' vuelve la elección de dirección por usuario.
+  await pool.query("INSERT IGNORE INTO compras_config (clave, valor) VALUES ('despacho_solo_cm','1')").catch(() => {});
 });
 
 // GET /api/compras/cierre → { fecha_cierre, cerrado, dia }
@@ -497,12 +500,25 @@ const misCategorias = async (req, res) => {
 };
 
 // GET /api/compras/mi-config → dirección asignada + centro de costo + direcciones activas (para el selector)
+// ¿El despacho está fijado a Casa Matriz? (compras_config.despacho_solo_cm — hoy '1')
+async function despachoSoloCM() {
+  try {
+    const [[r]] = await pool.query("SELECT valor FROM compras_config WHERE clave='despacho_solo_cm'");
+    return r ? r.valor === '1' : false;
+  } catch (_) { return false; }
+}
+async function casaMatriz() {
+  const [[cm]] = await pool.query('SELECT id, nombre FROM compras_direcciones WHERE es_casa_matriz=1 AND activo=1 ORDER BY id LIMIT 1');
+  return cm || null;
+}
+
 const miConfig = async (req, res) => {
   try {
     const uid = req.usuario.id_usuario;
     const [[cfg]] = await pool.query('SELECT id_direccion, centro_costo FROM compras_usuario_config WHERE id_usuario=? LIMIT 1', [uid]);
     const [direcciones] = await pool.query('SELECT id, nombre, es_casa_matriz FROM compras_direcciones WHERE activo=1 ORDER BY es_casa_matriz DESC, orden, nombre');
-    res.json({ success: true, data: { id_direccion: cfg?.id_direccion ?? null, centro_costo: cfg?.centro_costo ?? null, direcciones }, error: null });
+    const soloCM = await despachoSoloCM();
+    res.json({ success: true, data: { id_direccion: cfg?.id_direccion ?? null, centro_costo: cfg?.centro_costo ?? null, direcciones, despacho_solo_cm: soloCM, casa_matriz: soloCM ? await casaMatriz() : null }, error: null });
   } catch (e) { err(res, e); }
 };
 
@@ -516,6 +532,11 @@ const crearPedido = async (req, res) => {
       `SELECT u.id_perfil, TRIM(CONCAT(u.nombre,' ',u.apellido)) AS nombre, cfg.id_direccion AS cfgDir, cfg.centro_costo
        FROM usuarios u LEFT JOIN compras_usuario_config cfg ON cfg.id_usuario=u.id_usuario WHERE u.id_usuario=? LIMIT 1`, [uid]);
     if (!u) return res.status(400).json({ success: false, data: null, error: 'Usuario no encontrado' });
+    // Despacho fijado a Casa Matriz (paramétrico: compras_config.despacho_solo_cm)
+    if (await despachoSoloCM()) {
+      const cm = await casaMatriz();
+      if (cm) idDir = cm.id;
+    }
     if (!idDir) idDir = u.cfgDir || null;
     if (!idDir) return res.status(400).json({ success: false, data: null, error: 'Elige una dirección de despacho' });
     const [[d]] = await pool.query('SELECT id FROM compras_direcciones WHERE id=? AND activo=1 LIMIT 1', [idDir]);

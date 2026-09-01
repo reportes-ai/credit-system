@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Compras de Oficina — AutoFácil</title>
-  <!-- v1.3 — banner con fecha de cierre del pedido mensual (dia 10 o habil siguiente; con ODC generada informa el cierre del mes siguiente) -->
+  <!-- v1.4 — despacho fijo a Casa Matriz (parametrico compras_config.despacho_solo_cm) · v1.3 — banner con fecha de cierre del pedido mensual (dia 10 o habil siguiente; con ODC generada informa el cierre del mes siguiente) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -133,8 +133,16 @@
       if (jc?.success) document.getElementById('cat').innerHTML = '<option value="">Todas las categorías</option>' + jc.data.map(c=>`<option value="${esc(c.categoria)}">${esc(c.categoria)} (${c.n})</option>`).join('');
       const jm = await api('/api/compras/mi-config');
       if (jm?.success) {
-        const dirs = jm.data.direcciones||[];
-        document.getElementById('selDir').innerHTML = '<option value="">— elige dirección —</option>' + dirs.map(d=>`<option value="${d.id}" ${jm.data.id_direccion==d.id?'selected':''}>${esc(d.nombre)}${d.es_casa_matriz?' (Casa Matriz)':''}</option>`).join('');
+        const sel = document.getElementById('selDir');
+        if (jm.data.despacho_solo_cm && jm.data.casa_matriz) {
+          // Despacho fijo a Casa Matriz (paramétrico compras_config.despacho_solo_cm)
+          sel.innerHTML = `<option value="${jm.data.casa_matriz.id}" selected>${esc(jm.data.casa_matriz.nombre)} (Casa Matriz)</option>`;
+          sel.disabled = true;
+          sel.title = 'Por ahora todo se despacha a Casa Matriz';
+        } else {
+          const dirs = jm.data.direcciones||[];
+          sel.innerHTML = '<option value="">— elige dirección —</option>' + dirs.map(d=>`<option value="${d.id}" ${jm.data.id_direccion==d.id?'selected':''}>${esc(d.nombre)}${d.es_casa_matriz?' (Casa Matriz)':''}</option>`).join('');
+        }
         if (jm.data.centro_costo) document.getElementById('ccWrap').innerHTML = `<span class="cc-chip">CC: ${esc(jm.data.centro_costo)}</span>`;
       }
       buscar(0);
