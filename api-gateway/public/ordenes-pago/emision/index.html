@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
+  <!-- v2.2 — banco/cuenta del proveedor solo criticos con pago por Transferencia (cheque/efectivo/tarjeta no los exigen) · v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -103,7 +103,7 @@
       <div class="fld"><label>Fecha del documento</label><input id="fFechaDoc" type="date"></div>
 
       <div class="fld"><label>Método de pago</label>
-        <select id="fMetodo"><option value="">—</option><option>Transferencia</option><option>Cheque</option><option>Efectivo</option><option>Tarjeta</option></select>
+        <select id="fMetodo" onchange="onProvChange()"><option value="">—</option><option>Transferencia</option><option>Cheque</option><option>Efectivo</option><option>Tarjeta</option></select>
       </div>
       <div class="fld"><label>Cuenta de cargo (contra la que se paga)</label>
         <select id="fCtaCargo"><option value="">—</option></select>
@@ -227,8 +227,10 @@ function onProvChange(){
   document.getElementById('boxProvNombre').style.display = otro?'':'none';
   document.getElementById('boxProvRut').style.display = otro?'':'none';
   // Proveedor registrado sin banco/cuenta → ofrecer completar los datos acá mismo
+  // (solo si el pago es por Transferencia: cheque/efectivo/tarjeta no los necesitan)
+  const met = document.getElementById('fMetodo').value;
   const p = (!otro && v) ? PROVS.find(x=>String(x.id)===String(v)) : null;
-  const falta = p && (!(p.banco||'').trim() || !(p.numero_cuenta||'').trim());
+  const falta = p && (met === 'Transferencia' || !met) && (!(p.banco||'').trim() || !(p.numero_cuenta||'').trim());
   document.getElementById('boxProvBanco').style.display = falta ? '' : 'none';
   if (falta) {
     document.getElementById('fProvBanco').value = p.banco||'';
@@ -271,10 +273,15 @@ function emitir(){
   const fDoc = document.getElementById('fDoc').files && document.getElementById('fDoc').files[0];
   const tipoDoc = document.getElementById('fTipoDoc').value;
   const m = calcDoc(tipoDoc, lastBase, monto);
+  // Banco/cuenta del proveedor solo son CRÍTICOS si se paga por TRANSFERENCIA:
+  // con cheque, efectivo o tarjeta no se necesitan datos de transferencia.
+  const esTransf = document.getElementById('fMetodo').value === 'Transferencia' || !document.getElementById('fMetodo').value;
   const faltas = AF_ODP_PRE.check([
     { etiqueta:'RUT del proveedor', valor: prov.rut },
-    { etiqueta:'Banco del proveedor (dato de transferencia)', valor: prov.banco, critico:true },
-    { etiqueta:'N° de cuenta del proveedor (dato de transferencia)', valor: prov.numero_cuenta, critico:true },
+    ...(esTransf ? [
+      { etiqueta:'Banco del proveedor (dato de transferencia)', valor: prov.banco, critico:true },
+      { etiqueta:'N° de cuenta del proveedor (dato de transferencia)', valor: prov.numero_cuenta, critico:true },
+    ] : []),
     { etiqueta:'Categoría', valor: document.getElementById('fCategoria').value.trim() },
     { etiqueta:'N° de documento', valor: document.getElementById('fNumDoc').value.trim() },
     { etiqueta:'Fecha del documento', valor: document.getElementById('fFechaDoc').value },
