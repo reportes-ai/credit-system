@@ -117,6 +117,7 @@ const SELECT_GESTION = `
     COALESCE(cl.rut,             '')    AS rut_cliente,
     COALESCE(cl.nombre_completo, '')   AS nombre_cliente,
     COALESCE(ob.financiera, 'AUTOFACIL')                       AS financiera,
+    COALESCE(ob.producto, '')                                  AS producto,
     -- ETAPA (originación). Para propios cursados la etapa se congela en OTORGADO;
     -- las palabras de cartera que históricamente se guardaron en ob.estado
     -- (VIGENTE/EN MORA/…) se reinterpretan como OTORGADO (su etapa real).

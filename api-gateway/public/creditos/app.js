@@ -457,6 +457,8 @@ async function exportarCreditosExcel() {
     const out = rows.map(c => ({
       'N° OP': c.num_op || c.numero_credito || '', 'RUT': c.rut_cliente || '', 'Cliente': c.nombre_cliente || '',
       'Financiera': c.financiera || '', 'ID Financiera': c.id_financiera || '',
+      'Producto': c.producto || '',
+      'Corfo': (c.producto || '').toUpperCase().includes('CORFO') ? 'SI' : 'NO',
       'Fecha': fmtF(c.fecha_otorgamiento || c.created_at), 'Monto Financiado': +c.monto_financiado || 0,
       'Saldo Precio': +c.saldo_precio || 0,
       'Marca': c.marca || '', 'Modelo': c.modelo || '', 'Año': c.anio || '', 'Patente': c.patente || '',
