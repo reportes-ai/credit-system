@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v2.2 — banco/cuenta del proveedor solo criticos con pago por Transferencia (cheque/efectivo/tarjeta no los exigen) · v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
+  <!-- v2.3 — "Se paga a: banco · tipo · cuenta" visible bajo el proveedor al elegirlo · v2.2 — banco/cuenta del proveedor solo criticos con pago por Transferencia (cheque/efectivo/tarjeta no los exigen) · v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -51,6 +51,7 @@
     <div class="grid2">
       <div class="fld full"><label>Proveedor *</label>
         <select id="fProv" onchange="onProvChange()"><option value="">Cargando…</option></select>
+        <div id="provCuentaInfo" style="display:none;margin-top:6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 12px;font-size:.82rem;color:#1e40af"></div>
       </div>
       <div class="fld" id="boxProvNombre" style="display:none"><label>Nombre del proveedor (no registrado) *</label><input id="fProvNombre" maxlength="200"></div>
       <div class="fld" id="boxProvRut" style="display:none"><label>RUT (opcional)</label><input id="fProvRut" maxlength="20" placeholder="76.123.456-7" oninput="onRut()"></div>
@@ -231,6 +232,12 @@ function onProvChange(){
   const met = document.getElementById('fMetodo').value;
   const p = (!otro && v) ? PROVS.find(x=>String(x.id)===String(v)) : null;
   const falta = p && (met === 'Transferencia' || !met) && (!(p.banco||'').trim() || !(p.numero_cuenta||'').trim());
+  // Cuenta de PAGO del proveedor a la vista (a dónde se le transfiere)
+  const info = document.getElementById('provCuentaInfo');
+  if (p && (p.banco||'').trim() && (p.numero_cuenta||'').trim()) {
+    info.innerHTML = `<i class="bi bi-bank me-1"></i>Se paga a: <b>${escH(p.banco)}</b> · ${escH(p.tipo_cuenta||'Cuenta Corriente')} <b>${escH(p.numero_cuenta)}</b>`;
+    info.style.display = '';
+  } else info.style.display = 'none';
   document.getElementById('boxProvBanco').style.display = falta ? '' : 'none';
   if (falta) {
     document.getElementById('fProvBanco').value = p.banco||'';
