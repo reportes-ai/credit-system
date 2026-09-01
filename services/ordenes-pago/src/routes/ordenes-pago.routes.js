@@ -14,6 +14,7 @@ const puedeVer = requireFunc('ordenes_pago_ver', 'ordenes_pago_emitir', 'ordenes
 // Proveedores
 router.get('/proveedores',        verifyToken, puedeVer, c.listarProveedores);
 router.post('/proveedores',       verifyToken, requireFunc('ordenes_pago_proveedores'), c.crearProveedor);
+router.put('/proveedores/:id/datos-transferencia', verifyToken, requireFunc('ordenes_pago_emitir', 'ordenes_pago_proveedores'), c.datosTransferencia);
 router.put('/proveedores/:id',    verifyToken, requireFunc('ordenes_pago_proveedores'), c.actualizarProveedor);
 router.delete('/proveedores/:id', verifyToken, requireFunc('ordenes_pago_proveedores'), c.eliminarProveedor);
 

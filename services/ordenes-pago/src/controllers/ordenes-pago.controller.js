@@ -332,6 +332,25 @@ const crearProveedor = async (req, res) => {
 };
 
 /* PUT /api/ordenes-pago/proveedores/:id */
+/* PUT /api/ordenes-pago/proveedores/:id/datos-transferencia {banco, tipo_cuenta, numero_cuenta}
+   Completar SOLO los datos de pago desde la Emisión de ODP: un proveedor creado
+   al vuelo (desde una orden o una compra) nace sin banco/cuenta y frenaba la
+   emisión sin forma de arreglarlo ahí mismo. Lo puede hacer quien emite. */
+const datosTransferencia = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const banco = norm(req.body.banco), tipo = norm(req.body.tipo_cuenta), num = norm(req.body.numero_cuenta);
+    if (!banco || !num) return res.status(400).json({ success: false, data: null, error: 'Banco y N° de cuenta son requeridos' });
+    const [[p]] = await pool.query('SELECT id, nombre FROM proveedores WHERE id=?', [id]);
+    if (!p) return res.status(404).json({ success: false, data: null, error: 'Proveedor no encontrado' });
+    await pool.query('UPDATE proveedores SET banco=?, tipo_cuenta=?, numero_cuenta=? WHERE id=?',
+      [banco, tipo || 'Cuenta Corriente', num, id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'ordenes-pago', entidad: 'proveedor', entidad_id: String(id),
+      detalle: `Completó datos de transferencia de ${p.nombre}: ${banco} · ${tipo || 'Cuenta Corriente'} ${num} (desde Emisión de ODP)` });
+    res.json({ success: true, data: { id }, error: null });
+  } catch (e) { console.error('[proveedor datos-transferencia]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 const actualizarProveedor = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -1368,7 +1387,7 @@ const miCajaOP = async (req, res) => {
 };
 
 module.exports = {
-  listarProveedores, crearProveedor, actualizarProveedor, eliminarProveedor,
+  listarProveedores, crearProveedor, actualizarProveedor, eliminarProveedor, datosTransferencia,
   listarOrdenes, getOrden, getDocumento, crearOrden, cambiarEstadoOrden, estadisticas, enviarCorreoOrden,
   pagarOrden, miCajaOP, anularOrdenPostventa,
   getComprasAPagar, enviarComprasAPago, deshacerEnvioCompras, getFondosCompras, setFondosCompras,

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
+  <!-- v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -54,6 +54,20 @@
       </div>
       <div class="fld" id="boxProvNombre" style="display:none"><label>Nombre del proveedor (no registrado) *</label><input id="fProvNombre" maxlength="200"></div>
       <div class="fld" id="boxProvRut" style="display:none"><label>RUT (opcional)</label><input id="fProvRut" maxlength="20" placeholder="76.123.456-7" oninput="onRut()"></div>
+
+      <!-- Proveedor SIN datos de transferencia (creado al vuelo): completarlos acá mismo -->
+      <div class="fld full" id="boxProvBanco" style="display:none">
+        <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:12px 14px">
+          <div style="font-size:.8rem;font-weight:800;color:#9a3412;margin-bottom:8px"><i class="bi bi-exclamation-triangle me-1"></i>Este proveedor no tiene datos de transferencia — complétalos y quedan guardados en su ficha:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end">
+            <div><label>Banco *</label><input id="fProvBanco" maxlength="100" placeholder="Ej: Banco de Chile"></div>
+            <div><label>Tipo de cuenta</label>
+              <select id="fProvTipoCta"><option>Cuenta Corriente</option><option>Cuenta Vista</option><option>Cuenta de Ahorro</option></select></div>
+            <div><label>N° de cuenta *</label><input id="fProvNumCta" maxlength="50"></div>
+            <button type="button" class="btn-ghost" style="border-color:#0141A2;color:#0141A2;font-weight:700" onclick="guardarDatosProv()"><i class="bi bi-floppy me-1"></i>Guardar en ficha</button>
+          </div>
+        </div>
+      </div>
 
       <div class="fld full"><label>Concepto *</label><input id="fConcepto" maxlength="300" placeholder="Ej: Arriendo oficina junio 2026"></div>
 
@@ -212,6 +226,32 @@ function onProvChange(){
   const otro = v==='__otro';
   document.getElementById('boxProvNombre').style.display = otro?'':'none';
   document.getElementById('boxProvRut').style.display = otro?'':'none';
+  // Proveedor registrado sin banco/cuenta → ofrecer completar los datos acá mismo
+  const p = (!otro && v) ? PROVS.find(x=>String(x.id)===String(v)) : null;
+  const falta = p && (!(p.banco||'').trim() || !(p.numero_cuenta||'').trim());
+  document.getElementById('boxProvBanco').style.display = falta ? '' : 'none';
+  if (falta) {
+    document.getElementById('fProvBanco').value = p.banco||'';
+    document.getElementById('fProvNumCta').value = p.numero_cuenta||'';
+    if (p.tipo_cuenta) document.getElementById('fProvTipoCta').value = p.tipo_cuenta;
+  }
+}
+async function guardarDatosProv(){
+  const id = document.getElementById('fProv').value;
+  const banco = document.getElementById('fProvBanco').value.trim();
+  const num = document.getElementById('fProvNumCta').value.trim();
+  if (!banco || !num) return alert('Banco y N° de cuenta son requeridos.');
+  try {
+    const r = await fetch(`/api/ordenes-pago/proveedores/${id}/datos-transferencia`, {
+      method:'PUT', headers:{...H,'Content-Type':'application/json'},
+      body: JSON.stringify({ banco, tipo_cuenta: document.getElementById('fProvTipoCta').value, numero_cuenta: num })});
+    const j = await r.json();
+    if (!j.success) return alert(j.error||'No se pudo guardar');
+    await cargarProv();
+    document.getElementById('fProv').value = id;
+    onProvChange();
+    alert('✓ Datos de transferencia guardados en la ficha del proveedor');
+  } catch(e){ alert('Error de conexión'); }
 }
 
 /* PRE-EMISIÓN: popup con la orden y los datos que faltan, ANTES de emitir. */
