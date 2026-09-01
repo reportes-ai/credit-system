@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <!-- v1.4 — workflow de aprobacion: firmas por nivel, hoja por sucursal con nro de pedido -->
+  <!-- v1.5 — resumen por centro de costo en pendientes; detalle del pedido con "Mes pasado" por producto; orden con consolidado por codigo; ODP automatica al aprobarse la OC · v1.4 — workflow de aprobacion: firmas por nivel, hoja por sucursal con nro de pedido -->
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -51,6 +51,7 @@
               <button class="btn btn-sm btn-outline-primary" onclick="consolidar('SEPARADO')"><i class="bi bi-diagram-2 me-1"></i>Separar por sucursal</button>
             </div>
           </div>
+          <div id="resumenCC" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
           <div class="table-responsive">
             <table class="table table-hover align-middle">
               <thead><tr>
@@ -163,33 +164,52 @@
           <td class="text-end">${fmt(p.total)}</td>
           <td><span class="muted" title="${esc((p.items||[]).map(i=>i.cantidad+'× '+i.nombre).join(', '))}">${(p.items||[]).length} ítem(s)</span></td>
         </tr>`).join('') : '<tr><td colspan="8" class="text-center py-4 muted">No hay pedidos pendientes.</td></tr>';
+      // Resumen agrupado por CENTRO DE COSTO (el del pedido = el del solicitante)
+      const cc = {};
+      peds.forEach(p => { const k = p.centro_costo || '(sin centro de costo)'; cc[k] = cc[k] || { n:0, total:0 }; cc[k].n++; cc[k].total += Number(p.total)||0; });
+      document.getElementById('resumenCC').innerHTML = Object.entries(cc)
+        .sort((a,b)=>b[1].total-a[1].total)
+        .map(([k,v]) => `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px">
+          <div style="font-size:.68rem;text-transform:uppercase;font-weight:800;color:#64748b">${esc(k)}</div>
+          <div style="font-weight:800;color:#0141A2">${fmt(v.total)} <span class="muted" style="font-weight:400;font-size:.76rem">· ${v.n} pedido(s)</span></div>
+        </div>`).join('');
     }
     /* ── DETALLE DE UN PEDIDO (corregir antes de consolidar) ── */
-    let PED = null;
-    function verPedido(id){
+    let PED = null, MES_ANT = {};
+    async function verPedido(id){
       PED = peds.find(p=>p.id===id); if(!PED) return;
       document.getElementById('dlgPedTit').textContent = `Pedido #${PED.id}`;
       document.getElementById('dlgPedInfo').innerHTML =
-        `${esc(PED.usuario_nombre||'')} · ${esc(PED.direccion||'—')}${PED.es_casa_matriz?' (CM)':''} · ${new Date(PED.fecha).toLocaleDateString('es-CL')}${PED.observacion?` · <i>${esc(PED.observacion)}</i>`:''}`;
+        `${esc(PED.usuario_nombre||'')} · ${esc(PED.direccion||'—')}${PED.es_casa_matriz?' (CM)':''} · CC: <b>${esc(PED.centro_costo||'—')}</b> · ${new Date(PED.fecha).toLocaleDateString('es-CL')}${PED.observacion?` · <i>${esc(PED.observacion)}</i>`:''}`;
+      MES_ANT = {};
       pintarPed();
       document.getElementById('dlgPed').showModal();
+      // Historia: cuánto del mismo producto pidió esta persona el mes pasado
+      try {
+        const j = await api(`/api/compras/admin/pedidos/${PED.id}/mes-anterior`);
+        if (j?.success) { MES_ANT = j.data.porArticulo || {}; if (PED) pintarPed(); }
+      } catch(e){}
     }
     function pintarPed(){
       const its = PED.items||[];
       document.getElementById('dlgPedBody').innerHTML = `
         <table class="table table-sm align-middle" style="font-size:.84rem">
-          <thead><tr><th>Producto</th><th class="text-end">Precio</th><th style="width:92px">Cant.</th><th class="text-end">Subtotal</th><th></th></tr></thead>
-          <tbody>${its.map(i=>`
+          <thead><tr><th>Producto</th><th class="text-end">Precio</th><th style="width:92px">Cant.</th><th class="text-end" title="Cuánto de este producto pidió la misma persona el mes calendario anterior">Mes pasado</th><th class="text-end">Subtotal</th><th></th></tr></thead>
+          <tbody>${its.map(i=>{
+            const ant = MES_ANT[i.id_articulo];
+            const sube = ant != null && Number(i.cantidad) > Number(ant);
+            return `
             <tr>
               <td>${esc(i.nombre||'')}</td>
               <td class="text-end">${fmt(i.precio_unit)}</td>
               <td><input type="number" min="1" class="form-control form-control-sm" value="${i.cantidad}" style="width:78px"
                     onchange="itemCant(${i.id}, this)"></td>
+              <td class="text-end" style="color:${ant==null?'#cbd5e1':(sube?'#b45309':'#64748b')};font-weight:${sube?'700':'400'}">${ant==null?'—':ant+' un.'}</td>
               <td class="text-end">${fmt(i.subtotal)}</td>
               <td><button class="btn btn-sm btn-outline-danger" title="Sacar del pedido" onclick="itemQuitar(${i.id})"><i class="bi bi-trash"></i></button></td>
-            </tr>`).join('')}
+            </tr>`;}).join('')}
           </tbody>
-          <tfoot><tr><th colspan="3" class="text-end">Total</th><th class="text-end">${fmt(PED.total)}</th><th></th></tr></tfoot>
+          <tfoot><tr><th colspan="4" class="text-end">Total</th><th class="text-end">${fmt(PED.total)}</th><th></th></tr></tfoot>
         </table>`;
     }
     async function itemCant(itemId, inp){
@@ -308,9 +328,16 @@
             <button class="btn btn-sm btn-success" onclick="decidirOrden(${o.id},'APROBAR')"><i class="bi bi-check-lg me-1"></i>Aprobar</button>
             <button class="btn btn-sm btn-outline-danger" onclick="decidirOrden(${o.id},'RECHAZAR')"><i class="bi bi-x-lg me-1"></i>Rechazar</button>
           </div>` : ''}`;
+      // Consolidado por CÓDIGO de producto (lo que se pide al proveedor)
+      const itemsAgr = j.data.items||[];
+      const agrupado = itemsAgr.length ? `
+        <h6 style="font-weight:700;margin:12px 0 4px;color:#0141A2"><i class="bi bi-upc-scan me-1"></i>Consolidado por producto</h6>
+        <table class="table table-sm" style="margin-bottom:6px"><thead><tr><th>Código</th><th>Producto</th><th class="text-end">Cantidad</th><th class="text-end">Subtotal</th></tr></thead>
+        <tbody>${itemsAgr.map(it=>`<tr><td class="muted">${esc(it.sku||'—')}</td><td>${esc(it.nombre)}</td><td class="text-end"><b>${it.cantidad}</b></td><td class="text-end">${fmt(it.subtotal)}</td></tr>`).join('')}</tbody></table>` : '';
       document.getElementById('dlgOrdBody').innerHTML = `
         <p class="muted" style="margin:0 0 8px;font-size:.85rem">${o.modo==='SEPARADO'?'Por sucursal':'Consolidada a Casa Matriz'} · Destino: <b>${esc(o.destino||'')}</b> · Total <b>${fmt(o.total)}</b> · ${peds.length} pedido(s)</p>
         ${firmasHTML}
+        ${agrupado}
         ${hojas || '<p class="muted">Sin ítems.</p>'}
         <table class="table table-sm"><tbody><tr><th class="text-end" style="border:none">TOTAL ORDEN</th><th class="text-end" style="border:none;width:130px">${fmt(o.total)}</th></tr></tbody></table>
         <h6 style="font-weight:700;margin:14px 0 6px"><i class="bi bi-clipboard-check me-1"></i>Pedido para Dimerc (copiar y pegar)</h6>
@@ -323,7 +350,10 @@
       if (!confirm(accion==='APROBAR' ? `¿Aprobar la orden #${id}?` : `¿RECHAZAR la orden #${id}? Los pedidos vuelven a pendientes.`)) return;
       const j = await api(`/api/compras/admin/ordenes/${id}/decidir`, { method:'POST', body: JSON.stringify({ accion, comentario: com }) });
       if (!j?.success) { toast(j?.error||'Error', false); return; }
-      toast(accion==='APROBAR' ? (j.data.nivel_actual ? `Aprobada — pasa al nivel ${j.data.nivel_actual}` : 'Aprobada — lista para comprar') : 'Rechazada: pedidos vuelven al pool');
+      toast(accion==='APROBAR'
+        ? (j.data.nivel_actual ? `Aprobada — pasa al nivel ${j.data.nivel_actual}`
+          : 'Aprobada — lista para comprar' + (j.data.odps && j.data.odps.length ? ` · ODP generada: ${j.data.odps.join(', ')}` : ''))
+        : 'Rechazada: pedidos vuelven al pool');
       document.getElementById('dlgOrd').close();
       cargarOrdenes(); cargarPed();
     }

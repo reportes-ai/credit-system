@@ -557,7 +557,7 @@ const adminPedidos = async (req, res) => {
        WHERE p.estado=? ORDER BY p.fecha DESC LIMIT 500`, [estado]);
     if (peds.length) {
       const [its] = await pool.query(
-        'SELECT id, id_pedido, sku, nombre, precio_unit, cantidad, subtotal FROM compras_pedido_items WHERE id_pedido IN (?)',
+        'SELECT id, id_pedido, id_articulo, sku, nombre, precio_unit, cantidad, subtotal FROM compras_pedido_items WHERE id_pedido IN (?)',
         [peds.map(p => p.id)]);
       const by = {};
       for (const it of its) (by[it.id_pedido] = by[it.id_pedido] || []).push(it);
@@ -719,6 +719,87 @@ const adminOrdenDetalle = async (req, res) => {
   } catch (e) { err(res, e); }
 };
 
+/* ── GET /api/compras/admin/pedidos/:id/mes-anterior ─────────────────────────
+   Cuánto de CADA producto pidió el MISMO usuario el mes calendario anterior —
+   contexto para que el Asistente corrija cantidades con historia a la vista. */
+const adminPedidoMesAnterior = async (req, res) => {
+  try {
+    const id = num(req.params.id);
+    const [[p]] = await pool.query('SELECT id_usuario FROM compras_pedidos WHERE id=?', [id]);
+    if (!p) return res.status(404).json({ success: false, data: null, error: 'Pedido no encontrado' });
+    const [rows] = await pool.query(`
+      SELECT i.id_articulo, SUM(i.cantidad) cantidad
+        FROM compras_pedido_items i
+        JOIN compras_pedidos pe ON pe.id = i.id_pedido
+       WHERE pe.id_usuario = ?
+         AND pe.fecha >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
+         AND pe.fecha <  DATE_FORMAT(CURDATE(), '%Y-%m-01')
+       GROUP BY i.id_articulo`, [p.id_usuario]);
+    const porArticulo = {};
+    rows.forEach(r => { porArticulo[r.id_articulo] = Number(r.cantidad) || 0; });
+    res.json({ success: true, data: { porArticulo }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+/* ── ODP AUTOMÁTICA al aprobarse la Orden de Compra (Máxima 4: todo movimiento
+   de dinero se registra). Una ODP por PROVEEDOR presente en la orden (los
+   artículos PRISA a PRISA; el resto al proveedor del catálogo, Dimerc), con el
+   detalle del pedido y las firmas de la OC en las observaciones. Monto
+   referencial de catálogo (IVA incluido) — se ajusta al recibir la factura.
+   Best-effort: si falla, la aprobación NO se cae (queda en el log). */
+async function generarODPCompras(idOrden, req) {
+  const nom = `${req.usuario.nombre || ''} ${req.usuario.apellido || ''}`.trim() || req.usuario.email;
+  const [items] = await pool.query(`
+    SELECT i.sku, i.nombre, SUM(i.cantidad) cantidad, SUM(i.subtotal) subtotal,
+           COALESCE(a.codigo_ref,'') codigo_ref
+      FROM compras_pedido_items i
+      JOIN compras_pedidos pe ON pe.id = i.id_pedido AND pe.id_orden = ?
+      LEFT JOIN compras_articulos a ON a.id = i.id_articulo
+     GROUP BY i.sku, i.nombre, a.codigo_ref ORDER BY i.nombre`, [idOrden]);
+  if (!items.length) return [];
+  const [firmas] = await pool.query(
+    "SELECT usuario, nivel, nivel_nombre, fecha FROM compras_orden_firmas WHERE id_orden=? AND accion='APROBAR' ORDER BY fecha", [idOrden]);
+  const grupos = {};
+  for (const it of items) {
+    const prov = it.codigo_ref === 'PRISA' ? 'PRISA' : 'DIMERC';
+    (grupos[prov] = grupos[prov] || []).push(it);
+  }
+  const odps = [];
+  for (const [provNom, its] of Object.entries(grupos)) {
+    let [[prov]] = await pool.query('SELECT id, nombre, rut FROM proveedores WHERE UPPER(nombre) LIKE ? LIMIT 1', ['%' + provNom + '%']);
+    if (!prov) {
+      const [np] = await pool.query('INSERT INTO proveedores (nombre, activo) VALUES (?,1)', [provNom]);
+      prov = { id: np.insertId, nombre: provNom, rut: null };
+    }
+    const total = its.reduce((s, i) => s + Number(i.subtotal || 0), 0);
+    const neto = Math.round(total / 1.19), imp = total - neto;
+    const detalle = its.map(i => `${i.cantidad} x ${i.nombre}${i.sku ? ` [${i.sku}]` : ''}`).join('\n');
+    const firmasTxt = firmas.map(f => `${f.usuario} — ${f.nivel_nombre || ('nivel ' + f.nivel)} (${new Date(f.fecha).toLocaleDateString('es-CL')})`).join(' · ');
+    const obs = `Generada automáticamente al aprobarse la Orden de Compra #${idOrden}.` +
+      `\nAprobaciones de la OC: ${firmasTxt || '—'}` +
+      `\n\nDETALLE DEL PEDIDO (por código de producto):\n${detalle}` +
+      `\n\nMonto referencial de catálogo (IVA incluido): ajustar con la factura del proveedor.`;
+    const [r] = await pool.query(`
+      INSERT INTO ordenes_pago
+        (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento,
+         tratamiento, monto_bruto, monto_neto, impuesto_pct, impuesto_monto, monto,
+         fecha_emision, estado, observaciones, id_usuario, usuario_nombre)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,CURDATE(),'EMITIDA',?,?,?)`,
+      [prov.id, prov.nombre, prov.rut, `Insumos oficina — Orden de Compra #${idOrden} (${prov.nombre})`, 'Insumos',
+       'Factura', 'IVA', total, neto, 19, imp, total, obs, req.usuario.id_usuario, nom]);
+    const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
+    const { numero } = await emitirCorrelativo({
+      origen: 'GENERAL', origen_id: r.insertId,
+      concepto: `Insumos oficina — Orden de Compra #${idOrden} — ${prov.nombre}`,
+      monto: total, id_usuario: req.usuario.id_usuario, usuario_nombre: nom });
+    await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
+    auditar({ req, accion: 'CREAR', modulo: 'compras', entidad: 'orden_pago', entidad_id: String(r.insertId),
+      detalle: `ODP ${numero} generada automáticamente al aprobarse la Orden de Compra #${idOrden} (${prov.nombre}, ${its.length} producto(s), $${total.toLocaleString('es-CL')})` });
+    odps.push(numero);
+  }
+  return odps;
+}
+
 /* ── POST /api/compras/admin/ordenes/:id/decidir { accion, comentario } ──────
    Firma del nivel actual. APROBAR pasa al siguiente nivel activo (o deja la
    orden ABIERTA, lista para comprar). RECHAZAR devuelve los pedidos al pool. */
@@ -770,9 +851,12 @@ const adminOrdenDecidir = async (req, res) => {
         mensaje: `La orden #${id} completó todas las firmas: lista para comprar.`,
         href: '/soporte/compras-admin/?orden=' + id }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
     }
+    // Orden aprobada por TODOS los niveles → nace su Orden de Pago (Máxima 4)
+    let odps = null;
+    if (!sig) { try { odps = await generarODPCompras(id, req); } catch (e) { console.error('[compras ODP auto]', e.message); } }
     auditar({ req, accion: 'EDITAR', modulo: 'compras', entidad: 'orden', entidad_id: String(id),
       detalle: `APROBÓ la orden #${id} en "${nivCfg ? nivCfg.nombre : 'nivel ' + o.nivel_actual}"${sig ? ' → pasa al nivel ' + sig : ' → orden ABIERTA (lista para comprar)'}` });
-    res.json({ success: true, data: { estado: sig ? 'EN_APROBACION' : 'ABIERTA', nivel_actual: sig }, error: null });
+    res.json({ success: true, data: { estado: sig ? 'EN_APROBACION' : 'ABIERTA', nivel_actual: sig, odps }, error: null });
   } catch (e) { err(res, e); }
 };
 
@@ -918,7 +1002,7 @@ module.exports = {
   direccionesList, direccionCrear, direccionEditar, direccionEliminar,
   usuariosConfig, usuarioConfigSet,
   misArticulos, misCategorias, miConfig, crearPedido, misPedidos,
-  adminPedidos, adminItemEditar, adminItemEliminar, consolidar, adminOrdenes, adminOrdenDetalle, adminOrdenEstado,
+  adminPedidos, adminPedidoMesAnterior, adminItemEditar, adminItemEliminar, consolidar, adminOrdenes, adminOrdenDetalle, adminOrdenEstado,
   adminOrdenDecidir, nivelesGet, nivelesSet, revisionBandeja, revisionDetalle,
   reporteMensual,
 };

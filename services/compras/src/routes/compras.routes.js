@@ -39,6 +39,7 @@ router.get('/mis-pedidos',    verifyToken, usar, c.misPedidos);
 // ── Administración / consolidación de pedidos ──
 const admin = requireFunc('compras_admin');
 router.get('/admin/pedidos',            verifyToken, admin, c.adminPedidos);
+router.get('/admin/pedidos/:id/mes-anterior', verifyToken, admin, c.adminPedidoMesAnterior);
 router.put('/admin/pedidos/:id/items/:itemId',    verifyToken, admin, c.adminItemEditar);
 router.delete('/admin/pedidos/:id/items/:itemId', verifyToken, admin, c.adminItemEliminar);
 router.post('/admin/consolidar',        verifyToken, admin, c.consolidar);
