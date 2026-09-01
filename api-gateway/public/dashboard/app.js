@@ -5896,7 +5896,38 @@ function exportDetalleXLSX(sel, tituloId) {
   try {
     const tbl = document.querySelector(sel);
     if (!tbl || !tbl.rows.length) { alert('No hay datos para exportar.'); return; }
-    const ws = XLSX.utils.table_to_sheet(tbl, { raw: false });
+    /* Celda a celda, NUNCA table_to_sheet: los montos es-CL ("974.250") los
+       interpretaba con punto decimal (974.25) y otros quedaban como texto —
+       el reclamo de Juan Manuel (01-09-2026). Acá cada celda se convierte a
+       NÚMERO real: montos con formato miles, porcentajes como fracción con
+       formato %, y el texto queda texto. */
+    const aoa = [], fmts = [];   // valores + formato por celda
+    for (const tr of tbl.rows) {
+      const fila = [], ffila = [];
+      for (const td of tr.cells) {
+        const t = (td.textContent || '').trim();
+        let v = t, f = null;
+        if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) {                 // 17.000.000 → 17000000
+          v = Number(t.replace(/\./g, '')); f = '#,##0';
+        } else if (/^-?\$\s?\d{1,3}(\.\d{3})*$/.test(t)) {     // $1.300.000
+          v = Number(t.replace(/[^\d-]/g, '')); f = '$#,##0';
+        } else if (/^-?\d+(,\d+)?\s?%$/.test(t)) {             // 16,1% → 0.161 con formato %
+          v = Number(t.replace('%', '').replace(',', '.').trim()) / 100; f = '0.0%';
+        } else if (/^-?\d+(,\d+)?$/.test(t) && t !== '') {     // 48 · 3,5 → número
+          v = Number(t.replace(',', '.'));
+        }
+        fila.push(v); ffila.push(f);
+      }
+      aoa.push(fila); fmts.push(ffila);
+    }
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    for (let r = 0; r < fmts.length; r++) for (let c = 0; c < fmts[r].length; c++) {
+      if (!fmts[r][c]) continue;
+      const cell = ws[XLSX.utils.encode_cell({ r, c })];
+      if (cell && typeof cell.v === 'number') cell.z = fmts[r][c];
+    }
+    // Ancho de columnas según el encabezado y el contenido
+    ws['!cols'] = aoa[0].map((_, c) => ({ wch: Math.min(30, Math.max(...aoa.map(f => String(f[c] ?? '').length)) + 2) }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Detalle');
     const lbl = (document.getElementById(tituloId)?.textContent || 'Detalle')
