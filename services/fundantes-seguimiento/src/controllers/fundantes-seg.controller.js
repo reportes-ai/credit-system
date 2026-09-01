@@ -614,6 +614,12 @@ const devolver = async (req, res) => {
    por qué se demoró cada operación (la bitácora guarda el detalle). */
 const devueltos = async (req, res) => {
   try {
+    // Visibilidad por ejecutivo: un Ejecutivo Comercial ve solo SUS devueltos
+    // (mismo criterio que Pendientes e Historial).
+    const vis = await ejecutivosVisibles(req);
+    const filtroEjec = vis.all ? '' : ' AND UPPER(COALESCE(c.ejecutivo,\'\')) IN (?)';
+    const params = vis.all ? [] : [(vis.lista || []).map(x => String(x).toUpperCase())];
+    if (!vis.all && !params[0].length) return res.json({ success: true, data: [], error: null });
     const [rows] = await pool.query(`
       SELECT c.id AS id_credito, c.num_op, c.id_financiera, c.financiera, c.ejecutivo,
              cl.rut AS rut_cliente,
@@ -628,8 +634,8 @@ const devueltos = async (req, res) => {
         FROM fundantes_seg fs
         JOIN creditos c   ON c.id = fs.id_credito
         LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
-       WHERE fs.devuelto_fin = 1
-       ORDER BY fs.devuelto_at DESC`);
+       WHERE fs.devuelto_fin = 1${filtroEjec}
+       ORDER BY fs.devuelto_at DESC`, params);
     res.json({ success: true, data: rows, error: null });
   } catch (e) { console.error('[fundantes devueltos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
