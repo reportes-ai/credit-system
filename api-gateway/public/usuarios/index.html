@@ -731,14 +731,8 @@
             </div>
             <div class="col-md-4">
               <label class="form-label">Centro de Costo</label>
-              <input type="text" id="uCentroCosto" class="form-control" list="listaCentros" placeholder="Seleccionar o escribir...">
-              <datalist id="listaCentros">
-                <option value="COMERCIAL"></option>
-                <option value="OPERACIONES"></option>
-                <option value="RIESGO"></option>
-                <option value="FINANZAS"></option>
-                <option value="ADMINISTRACION Y FINANZAS"></option>
-              </datalist>
+              <!-- La lista sale del mantenedor Centros de Costo (el mantenedor manda, no una copia local) -->
+              <select id="uCentroCosto" class="form-select"><option value="">— Sin asignar —</option></select>
             </div>
             <div class="col-md-4">
               <label class="form-label">Teléfono</label>
@@ -994,6 +988,32 @@
       return r.json();
     }
 
+    // ── Centros de Costo: la lista sale del mantenedor (/mantenedores/centros-costo/) ──
+    let _ccListos = null;
+    async function cargarCentrosCosto() {
+      if (_ccListos) return _ccListos;
+      _ccListos = (async () => {
+        try {
+          const j = await api('GET', '/api/centros-costo');
+          const sel = document.getElementById('uCentroCosto');
+          sel.innerHTML = '<option value="">— Sin asignar —</option>' +
+            (j?.data || []).map(c => `<option value="${c.nombre}">${c.codigo} · ${c.nombre}</option>`).join('');
+        } catch (e) {}
+      })();
+      return _ccListos;
+    }
+    async function setCentroCosto(valor) {
+      await cargarCentrosCosto();
+      const sel = document.getElementById('uCentroCosto');
+      // Valor histórico que ya no está en el mantenedor: se agrega para no perderlo al guardar
+      if (valor && ![...sel.options].some(o => o.value === valor)) {
+        const o = document.createElement('option'); o.value = valor; o.textContent = valor + ' (histórico)';
+        sel.appendChild(o);
+      }
+      sel.value = valor || '';
+    }
+    cargarCentrosCosto();
+
     // ── TABS ──────────────────────────────────────────────────
     function switchTab(tab) {
       ['usuarios', 'suspendidos', 'permisos', 'miclave', 'seguridad', 'mails', 'vercomo'].forEach(t => {
@@ -1191,7 +1211,7 @@
           document.getElementById('uNombre').value = u.nombre;
           document.getElementById('uApellido').value = u.apellido;
           document.getElementById('uApellidoM').value = u.apellido_materno || '';
-          document.getElementById('uCentroCosto').value = u.centro_costo || '';
+          setCentroCosto(u.centro_costo || '');
           document.getElementById('uEmail').value = u.email;
           document.getElementById('uTelefono').value = u.telefono || '';
           document.getElementById('uCargo').value = u.cargo || '';
