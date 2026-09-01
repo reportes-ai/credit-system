@@ -642,21 +642,52 @@ async function _recalcTotal(idPedido) {
      WHERE p.id=?`, [idPedido]);
 }
 
-// PUT /api/compras/admin/pedidos/:id/items/:itemId { cantidad }
+// PUT /api/compras/admin/pedidos/:id/items/:itemId { cantidad?, precio_unit? }
+// El PRECIO se corrige en la conciliación (antes de la ODC) contra la factura o
+// lista real del proveedor: actualiza este ítem, el CATÁLOGO (fuente única) y
+// los demás pedidos PENDIENTES que llevan el mismo producto — así toda la ODC
+// del mes sale con el precio real, no con el referencial viejo.
 const adminItemEditar = async (req, res) => {
   try {
     const chk = await _pedidoPendiente(req.params.id);
     if (chk.error) return res.status(400).json({ success: false, data: null, error: chk.error });
-    const cant = parseInt(req.body.cantidad);
-    if (!(cant > 0)) return res.status(400).json({ success: false, data: null, error: 'Cantidad inválida (para sacar el producto usa eliminar)' });
-    const [r] = await pool.query(
-      'UPDATE compras_pedido_items SET cantidad=?, subtotal=ROUND(precio_unit*?) WHERE id=? AND id_pedido=?',
-      [cant, cant, req.params.itemId, req.params.id]);
-    if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Ítem no encontrado' });
+    const [[it]] = await pool.query('SELECT id, id_articulo, cantidad, precio_unit FROM compras_pedido_items WHERE id=? AND id_pedido=?', [req.params.itemId, req.params.id]);
+    if (!it) return res.status(404).json({ success: false, data: null, error: 'Ítem no encontrado' });
+
+    const cambios = [];
+    let cant = it.cantidad, precio = Number(it.precio_unit);
+    if (req.body.cantidad !== undefined) {
+      cant = parseInt(req.body.cantidad);
+      if (!(cant > 0)) return res.status(400).json({ success: false, data: null, error: 'Cantidad inválida (para sacar el producto usa eliminar)' });
+      cambios.push(`cantidad ${it.cantidad} → ${cant}`);
+    }
+    let otrosPedidos = 0;
+    if (req.body.precio_unit !== undefined) {
+      precio = Math.round(Number(req.body.precio_unit));
+      if (!(precio > 0)) return res.status(400).json({ success: false, data: null, error: 'Precio inválido' });
+      if (precio !== Number(it.precio_unit)) {
+        cambios.push(`precio $${Number(it.precio_unit).toLocaleString('es-CL')} → $${precio.toLocaleString('es-CL')}`);
+        // Fuente única: el catálogo toma el precio real conciliado
+        await pool.query('UPDATE compras_articulos SET precio=? WHERE id=?', [precio, it.id_articulo]);
+        // Y los demás pedidos PENDIENTES con el mismo producto se emparejan
+        const [otros] = await pool.query(`
+          UPDATE compras_pedido_items i JOIN compras_pedidos p ON p.id=i.id_pedido AND p.estado='PENDIENTE'
+             SET i.precio_unit=?, i.subtotal=ROUND(?*i.cantidad)
+           WHERE i.id_articulo=? AND i.id<>?`, [precio, precio, it.id_articulo, it.id]);
+        otrosPedidos = otros.affectedRows;
+        if (otrosPedidos) await pool.query(`
+          UPDATE compras_pedidos p SET p.total = (SELECT COALESCE(SUM(subtotal),0) FROM compras_pedido_items WHERE id_pedido=p.id)
+           WHERE p.estado='PENDIENTE'`);
+      }
+    }
+    if (!cambios.length) return res.json({ success: true, data: { id: it.id }, error: null });
+    await pool.query('UPDATE compras_pedido_items SET cantidad=?, precio_unit=?, subtotal=ROUND(?*?) WHERE id=?',
+      [cant, precio, precio, cant, it.id]);
     await _recalcTotal(req.params.id);
     auditar({ req, accion: 'EDITAR', modulo: 'compras', entidad: 'pedido', entidad_id: String(req.params.id),
-      detalle: `Ajustó cantidad del ítem #${req.params.itemId} a ${cant} en el pedido #${req.params.id}` });
-    res.json({ success: true, data: { id: +req.params.itemId, cantidad: cant }, error: null });
+      detalle: `Ajustó el ítem #${it.id} del pedido #${req.params.id}: ${cambios.join(' · ')}` +
+        (cambios.some(c => c.startsWith('precio')) ? ` — precio actualizado en el CATÁLOGO${otrosPedidos ? ` y en ${otrosPedidos} ítem(s) de otros pedidos pendientes` : ''}` : '') });
+    res.json({ success: true, data: { id: it.id, cantidad: cant, precio_unit: precio, otros_items: otrosPedidos }, error: null });
   } catch (e) { err(res, e); }
 };
 

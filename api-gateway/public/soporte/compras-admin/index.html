@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <!-- v1.5 — resumen por centro de costo en pendientes; detalle del pedido con "Mes pasado" por producto; orden con consolidado por codigo; ODP automatica al aprobarse la OC · v1.4 — workflow de aprobacion: firmas por nivel, hoja por sucursal con nro de pedido -->
+  <!-- v1.6 — conciliacion de precio unitario en el detalle del pedido: actualiza el catalogo y los demas pedidos pendientes · v1.5 — resumen por centro de costo en pendientes; detalle del pedido con "Mes pasado" por producto; orden con consolidado por codigo; ODP automatica al aprobarse la OC · v1.4 — workflow de aprobacion: firmas por nivel, hoja por sucursal con nro de pedido -->
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -201,7 +201,9 @@
             return `
             <tr>
               <td>${esc(i.nombre||'')}</td>
-              <td class="text-end">${fmt(i.precio_unit)}</td>
+              <td class="text-end"><input type="number" min="1" class="form-control form-control-sm text-end" value="${Math.round(i.precio_unit)}" style="width:92px;display:inline-block"
+                    title="Precio unitario conciliado: al cambiarlo se actualiza el CATÁLOGO y los demás pedidos pendientes con este producto"
+                    onchange="itemPrecio(${i.id}, this)"></td>
               <td><input type="number" min="1" class="form-control form-control-sm" value="${i.cantidad}" style="width:78px"
                     onchange="itemCant(${i.id}, this)"></td>
               <td class="text-end" style="color:${ant==null?'#cbd5e1':(sube?'#b45309':'#64748b')};font-weight:${sube?'700':'400'}">${ant==null?'—':ant+' un.'}</td>
@@ -221,6 +223,17 @@
       PED = peds.find(p=>p.id===PED.id);
       if (PED) pintarPed(); else document.getElementById('dlgPed').close();
       toast('Cantidad actualizada');
+    }
+    // Conciliación de PRECIO (antes de la ODC): actualiza catálogo + pedidos pendientes
+    async function itemPrecio(itemId, inp){
+      const precio = Math.round(parseFloat(inp.value));
+      if (!(precio>0)) { toast('Precio inválido', false); pintarPed(); return; }
+      const j = await api(`/api/compras/admin/pedidos/${PED.id}/items/${itemId}`, { method:'PUT', body: JSON.stringify({ precio_unit: precio }) });
+      if (!j?.success) { toast(j?.error||'Error', false); pintarPed(); return; }
+      await cargarPed();
+      PED = peds.find(p=>p.id===PED.id);
+      if (PED) pintarPed();
+      toast(`Precio actualizado (catálogo${j.data.otros_items?` + ${j.data.otros_items} ítem(s) de otros pedidos`:''})`);
     }
     async function itemQuitar(itemId){
       const it = (PED.items||[]).find(i=>i.id===itemId);
