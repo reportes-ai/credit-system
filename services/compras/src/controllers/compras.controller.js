@@ -237,6 +237,39 @@ function puedeFirmarNivel(req, nivelCfg) {
 const err = (res, e) => { console.error('[compras]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
 const num = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
 
+/* ════════════ CIERRE MENSUAL DEL PEDIDO ════════════
+   El pedido de compras cierra el día 10 (paramétrico) o el hábil siguiente de
+   cada mes: ese día el Asistente consolida y genera la ODC. Generada la ODC del
+   mes (o pasada la fecha), la página de pedidos informa el cierre del MES
+   SIGUIENTE — lo que se pida después entra al ciclo siguiente. */
+require('../../../../shared/migrate').enFila('compras-config', async () => {
+  await pool.query('CREATE TABLE IF NOT EXISTS compras_config (clave VARCHAR(40) PRIMARY KEY, valor VARCHAR(100) NOT NULL)').catch(() => {});
+  await pool.query("INSERT IGNORE INTO compras_config (clave, valor) VALUES ('dia_cierre','10')").catch(() => {});
+});
+
+// GET /api/compras/cierre → { fecha_cierre, cerrado, dia }
+const cierrePedidos = async (req, res) => {
+  try {
+    const [[cfg]] = await pool.query("SELECT valor FROM compras_config WHERE clave='dia_cierre'").catch(() => [[null]]);
+    const dia = Math.min(28, Math.max(1, parseInt(cfg?.valor, 10) || 10));
+    const hoyStr = require('../../../../shared/fecha-chile').hoyISO();   // día de Chile, no UTC
+    const [y, m] = hoyStr.split('-').map(Number);
+    const habilDesde = (yy, mm) => {   // día `dia` del mes, corrido a lunes-viernes
+      const d = new Date(Date.UTC(yy, mm - 1, dia));
+      while ([0, 6].includes(d.getUTCDay())) d.setUTCDate(d.getUTCDate() + 1);
+      return d.toISOString().slice(0, 10);
+    };
+    const cierreMes = habilDesde(y, m);
+    // Cerrado del mes: ya existe la ODC del mes en curso (una orden no rechazada/anulada)
+    const [[odc]] = await pool.query(
+      "SELECT id FROM compras_ordenes WHERE estado NOT IN ('RECHAZADA','ANULADA') AND DATE_FORMAT(fecha,'%Y-%m') = ? LIMIT 1",
+      [hoyStr.slice(0, 7)]);
+    const cerrado = !!odc || hoyStr > cierreMes;
+    const fecha_cierre = cerrado ? habilDesde(m === 12 ? y + 1 : y, m === 12 ? 1 : m + 1) : cierreMes;
+    res.json({ success: true, data: { fecha_cierre, cerrado, dia }, error: null });
+  } catch (e) { err(res, e); }
+};
+
 /* ════════════ CATÁLOGO ════════════ */
 
 // Búsqueda insensible a MAYÚSCULAS y ACENTOS (la colación de la BD es case-sensitive,
@@ -997,7 +1030,7 @@ const revisionDetalle = async (req, res) => {
 };
 
 module.exports = {
-  catalogo, categorias, catalogoIds, sincronizar,
+  catalogo, categorias, catalogoIds, sincronizar, cierrePedidos,
   perfiles, articuloPerfilGet, articuloPerfilSet,
   direccionesList, direccionCrear, direccionEditar, direccionEliminar,
   usuariosConfig, usuarioConfigSet,

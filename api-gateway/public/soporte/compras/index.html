@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Compras de Oficina — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 — banner con fecha de cierre del pedido mensual (dia 10 o habil siguiente; con ODC generada informa el cierre del mes siguiente) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -53,7 +53,7 @@
 
   <div class="wrap">
     <div class="col-cat">
-      <div class="banner"><i class="bi bi-bag"></i><div><h2>Compras de Oficina</h2><p>Elige tus artículos, la cantidad y la dirección de despacho</p></div></div>
+      <div class="banner"><i class="bi bi-bag"></i><div><h2>Compras de Oficina</h2><p>Elige tus artículos, la cantidad y la dirección de despacho</p><div id="cierreInfo" style="margin-top:6px"></div></div></div>
       <div class="toolbar">
         <input type="text" id="q" placeholder="Buscar artículo…" style="flex:1;min-width:200px" oninput="liveBuscar()" onkeydown="if(event.key==='Enter')buscar(0)">
         <select id="cat" onchange="buscar(0)"><option value="">Todas las categorías</option></select>
@@ -111,6 +111,22 @@
     const CART = {};                 // id → {id,nombre,precio,sku,cantidad}
     let off=0, lim=60, tot=0, rows=[], searchTimer=null;
     function liveBuscar() { clearTimeout(searchTimer); searchTimer = setTimeout(() => buscar(0), 300); }
+
+    // Fecha de cierre del pedido mensual (día 10 o hábil siguiente; generada la
+    // ODC del mes, se informa el cierre del mes siguiente)
+    async function cargarCierre() {
+      try {
+        const j = await api('/api/compras/cierre');
+        if (!j?.success) return;
+        const { fecha_cierre, cerrado } = j.data;
+        const [y,m,d] = fecha_cierre.split('-').map(Number);
+        const f = new Date(y, m-1, d).toLocaleDateString('es-CL', { weekday:'long', day:'numeric', month:'long' });
+        document.getElementById('cierreInfo').innerHTML = cerrado
+          ? `<span style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);border-radius:9px;padding:3px 12px;font-size:.8rem"><i class="bi bi-calendar-x me-1"></i>El pedido de este mes ya se cerró — lo que pidas entra al próximo cierre: <b>${f}</b></span>`
+          : `<span style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);border-radius:9px;padding:3px 12px;font-size:.8rem"><i class="bi bi-calendar-check me-1"></i>Cierre del pedido de este mes: <b>${f}</b></span>`;
+      } catch(e){}
+    }
+    cargarCierre();
 
     async function init() {
       const jc = await api('/api/compras/mis-categorias');
