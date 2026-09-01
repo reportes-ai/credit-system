@@ -286,6 +286,27 @@ Orden de pago N° {ODP} · confirmada por {QUIEN}.`,
     variables: '{PARQUE} {PERIODO} {ARRIENDO} {COMISION} {OPS} {TOTAL} {ODP} {QUIEN}',
   },
   {
+    codigo: 'compras_pedido_aprobado',
+    ambito: 'Compras de Oficina',
+    nombre: 'Pedido de materiales aprobado → al SOLICITANTE',
+    descripcion: 'Se manda automáticamente a CADA persona que hizo un pedido cuando la Orden de Compra del mes completa todas sus firmas. Lleva el detalle producto por producto con la cantidad solicitada y la aprobada, y dónde retirar.',
+    asunto: 'Tu pedido de materiales fue aprobado ✔',
+    cuerpo: `Hola {nombre}:
+
+Tu pedido de materiales de oficina fue APROBADO. Este es el detalle:
+
+{detalle}
+
+Tus productos estarán disponibles en los próximos días en {despacho}.
+
+Saludos,
+Administración`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'Cada usuario que hizo un pedido incluido en la Orden de Compra aprobada',
+    variables: '{nombre} {detalle} {despacho}',
+  },
+  {
     codigo: 'cliente_comprobante_cuota',
     ambito: 'Cobranza',
     nombre: 'Comprobante de pago de cuotas → al CLIENTE',

@@ -248,6 +248,10 @@ require('../../../../shared/migrate').enFila('compras-config', async () => {
   // De momento TODO se despacha a Casa Matriz (pedido Pato 01-09-2026). Paramétrico:
   // con '0' vuelve la elección de dirección por usuario.
   await pool.query("INSERT IGNORE INTO compras_config (clave, valor) VALUES ('despacho_solo_cm','1')").catch(() => {});
+  // Cantidad SOLICITADA original: el Asistente puede corregir `cantidad` antes de
+  // consolidar; esta columna conserva lo pedido para el correo "solicitado vs aprobado".
+  await pool.query('ALTER TABLE compras_pedido_items ADD COLUMN IF NOT EXISTS cantidad_solicitada INT NULL').catch(() => {});
+  await pool.query('UPDATE compras_pedido_items SET cantidad_solicitada = cantidad WHERE cantidad_solicitada IS NULL').catch(() => {});
 });
 
 // GET /api/compras/cierre → { fecha_cierre, cerrado, dia }
@@ -571,8 +575,8 @@ const crearPedido = async (req, res) => {
        VALUES (?,?,?,?,'PENDIENTE',?,?)`, [uid, u.nombre, idDir, u.centro_costo || null, total, obs]);
     const pid = r.insertId;
     await pool.query(
-      'INSERT INTO compras_pedido_items (id_pedido, id_articulo, sku, nombre, precio_unit, cantidad, subtotal) VALUES ?',
-      [filas.map(f => [pid, ...f])]);
+      'INSERT INTO compras_pedido_items (id_pedido, id_articulo, sku, nombre, precio_unit, cantidad, subtotal, cantidad_solicitada) VALUES ?',
+      [filas.map(f => [pid, ...f, f[4]])]);   // cantidad_solicitada = cantidad original
     auditar({ req, accion: 'CREAR', modulo: 'compras', entidad: 'pedido', entidad_id: pid, detalle: `Pedido de compra #${pid}: ${filas.length} ítem(s), total $${total}`, meta: { items: filas.length, total, id_direccion: idDir } });
     res.status(201).json({ success: true, data: { id: pid, total, items: filas.length }, error: null });
   } catch (e) { err(res, e); }
@@ -854,6 +858,36 @@ async function generarODPCompras(idOrden, req) {
   return odps;
 }
 
+/* ── Correo a cada solicitante cuando su pedido queda APROBADO (la OC completó
+   las firmas). Detalle producto a producto: cantidad solicitada vs aprobada
+   (la aprobada es la corregida por el Asistente antes de consolidar). Texto
+   paramétrico en Correos del Sistema (compras_pedido_aprobado). Best-effort. */
+async function notificarPedidosAprobados(idOrden) {
+  const [peds] = await pool.query(`
+    SELECT p.id, p.id_usuario, p.usuario_nombre, u.email, COALESCE(d.nombre,'Casa Matriz') despacho
+      FROM compras_pedidos p
+      JOIN usuarios u ON u.id_usuario = p.id_usuario
+      LEFT JOIN compras_direcciones d ON d.id = p.id_direccion
+     WHERE p.id_orden = ?`, [idOrden]);
+  if (!peds.length) return;
+  const [its] = await pool.query(
+    'SELECT id_pedido, nombre, cantidad, COALESCE(cantidad_solicitada, cantidad) solicitada FROM compras_pedido_items WHERE id_pedido IN (?) ORDER BY nombre',
+    [peds.map(p => p.id)]);
+  const byPed = {};
+  for (const it of its) (byPed[it.id_pedido] = byPed[it.id_pedido] || []).push(it);
+  const plant = require('../../../../shared/plantillas-correo');
+  for (const p of peds) {
+    if (!p.email) continue;
+    const lineas = (byPed[p.id] || []).map(i =>
+      `· ${i.nombre} — solicitado: ${i.solicitada} · aprobado: ${i.cantidad}${Number(i.cantidad) !== Number(i.solicitada) ? ' (ajustado)' : ''}`);
+    if (!lineas.length) continue;
+    await plant.enviar({
+      codigo: 'compras_pedido_aprobado', to: [p.email],
+      datos: { nombre: String(p.usuario_nombre || '').split(' ')[0], detalle: lineas.join('\n'), despacho: p.despacho },
+    });
+  }
+}
+
 /* ── POST /api/compras/admin/ordenes/:id/decidir { accion, comentario } ──────
    Firma del nivel actual. APROBAR pasa al siguiente nivel activo (o deja la
    orden ABIERTA, lista para comprar). RECHAZAR devuelve los pedidos al pool. */
@@ -906,8 +940,12 @@ const adminOrdenDecidir = async (req, res) => {
         href: '/soporte/compras-admin/?orden=' + id }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
     }
     // Orden aprobada por TODOS los niveles → nace su Orden de Pago (Máxima 4)
+    // y cada solicitante recibe el correo "tu pedido fue aprobado" con su detalle.
     let odps = null;
-    if (!sig) { try { odps = await generarODPCompras(id, req); } catch (e) { console.error('[compras ODP auto]', e.message); } }
+    if (!sig) {
+      try { odps = await generarODPCompras(id, req); } catch (e) { console.error('[compras ODP auto]', e.message); }
+      notificarPedidosAprobados(id).catch(e => console.error('[compras correo aprobado]', e.message));
+    }
     auditar({ req, accion: 'EDITAR', modulo: 'compras', entidad: 'orden', entidad_id: String(id),
       detalle: `APROBÓ la orden #${id} en "${nivCfg ? nivCfg.nombre : 'nivel ' + o.nivel_actual}"${sig ? ' → pasa al nivel ' + sig : ' → orden ABIERTA (lista para comprar)'}` });
     res.json({ success: true, data: { estado: sig ? 'EN_APROBACION' : 'ABIERTA', nivel_actual: sig, odps }, error: null });
