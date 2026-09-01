@@ -138,11 +138,26 @@
       s.style.cssText = 'position:absolute;top:-40px;left:' + (Math.random() * 100) + '%;font-size:' + (15 + Math.random() * 20) + 'px;animation:afRkCaer ' + (3 + Math.random() * 2.6) + 's linear ' + (Math.random() * 2.8) + 's infinite;pointer-events:none';
       ov.appendChild(s);
     }
-    if (d.musica) fanfarria(d.melodia); // si el navegador bloquea el audio, suena al hacer clic
+    // Música: "The Final Bell" (Rocky) en MP3; si el archivo o el autoplay
+    // fallan, cae a la fanfarria WebAudio de siempre.
+    let audioEl = null;
+    function sonar() {
+      try {
+        audioEl = audioEl || new Audio('/audio/ranking-final-bell.mp3');
+        audioEl.volume = 0.85;
+        const pr = audioEl.play();
+        if (pr && pr.catch) pr.catch(() => fanfarria(d.melodia));
+      } catch (_) { fanfarria(d.melodia); }
+    }
+    function apagar() {   // fade-out suave al cerrar
+      if (!audioEl) return;
+      const a = audioEl, t = setInterval(() => { a.volume = Math.max(0, a.volume - 0.08); if (!a.volume) { clearInterval(t); a.pause(); } }, 120);
+    }
+    if (d.musica) sonar(); // si el navegador bloquea el autoplay, suena al hacer clic
     let sono = false;
     document.getElementById('afRankBtn').onclick = function () {
-      if (d.musica && !sono) { sono = true; fanfarria(d.melodia); this.textContent = '🎺 ¡A romperla este mes!'; setTimeout(() => ov.remove(), 11500); return; }
-      ov.remove();
+      if (d.musica && !sono) { sono = true; sonar(); this.textContent = '🎺 ¡A romperla este mes!'; setTimeout(() => { apagar(); setTimeout(() => ov.remove(), 1300); }, 14000); return; }
+      apagar(); setTimeout(() => ov.remove(), 300);
     };
   }
 
