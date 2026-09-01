@@ -251,6 +251,8 @@ require('../../../../shared/migrate').enFila('compras-config', async () => {
   // Cantidad SOLICITADA original: el Asistente puede corregir `cantidad` antes de
   // consolidar; esta columna conserva lo pedido para el correo "solicitado vs aprobado".
   await pool.query('ALTER TABLE compras_pedido_items ADD COLUMN IF NOT EXISTS cantidad_solicitada INT NULL').catch(() => {});
+  // Precio conciliado a mano: el sync de Dimeiggs no lo pisa (ver compras-sync.js)
+  await pool.query('ALTER TABLE compras_articulos ADD COLUMN IF NOT EXISTS precio_manual TINYINT(1) NOT NULL DEFAULT 0').catch(() => {});
   await pool.query('UPDATE compras_pedido_items SET cantidad_solicitada = cantidad WHERE cantidad_solicitada IS NULL').catch(() => {});
 });
 
@@ -667,8 +669,9 @@ const adminItemEditar = async (req, res) => {
       if (!(precio > 0)) return res.status(400).json({ success: false, data: null, error: 'Precio inválido' });
       if (precio !== Number(it.precio_unit)) {
         cambios.push(`precio $${Number(it.precio_unit).toLocaleString('es-CL')} → $${precio.toLocaleString('es-CL')}`);
-        // Fuente única: el catálogo toma el precio real conciliado
-        await pool.query('UPDATE compras_articulos SET precio=? WHERE id=?', [precio, it.id_articulo]);
+        // Fuente única: el catálogo toma el precio real conciliado, y queda
+        // marcado precio_manual para que el sync del proveedor no lo pise
+        await pool.query('UPDATE compras_articulos SET precio=?, precio_manual=1 WHERE id=?', [precio, it.id_articulo]);
         // Y los demás pedidos PENDIENTES con el mismo producto se emparejan
         const [otros] = await pool.query(`
           UPDATE compras_pedido_items i JOIN compras_pedidos p ON p.id=i.id_pedido AND p.estado='PENDIENTE'

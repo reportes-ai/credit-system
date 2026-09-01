@@ -71,7 +71,10 @@ async function sincronizarCatalogo() {
            VALUES (?,?,?,?,?,?,?,?,?,1,NOW())
            ON DUPLICATE KEY UPDATE
              codigo_ref=VALUES(codigo_ref), nombre=VALUES(nombre), marca=VALUES(marca),
-             categoria=VALUES(categoria), precio=VALUES(precio), stock=VALUES(stock),
+             categoria=VALUES(categoria),
+             -- precio_manual=1: precio CONCILIADO por Administración (contra factura real)
+             -- en Administrar Compras — el sync no lo pisa (pedido Pato 01-09-2026)
+             precio=IF(COALESCE(precio_manual,0)=1, precio, VALUES(precio)), stock=VALUES(stock),
              imagen=VALUES(imagen), link=VALUES(link), activo=1, fecha_sync=NOW()`,
           [a.sku, a.codigo_ref, a.nombre, a.marca, a.categoria, a.precio, a.stock, a.imagen, a.link]);
         upserts++;
