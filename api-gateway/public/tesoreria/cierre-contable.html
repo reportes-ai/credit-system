@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — breadcrumb Inicio › Tesorería › Cierre Contable -->
+<!-- v1.2 — Saldos Precio: los pagados en el Seguimiento (SALDO PRECIO PAGADO) salen solos del informe; checkbox solo para historicos · v1.1 — breadcrumb Inicio › Tesorería › Cierre Contable -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -105,7 +105,7 @@
 
   <!-- 3 SALDOS PRECIO -->
   <div class="tab-body" id="tb-saldos" style="display:none">
-    <div class="nota no-print"><i class="bi bi-info-circle"></i> El pago del saldo precio al concesionario aún no se registra en el sistema: marca aquí los ya pagados (checkbox) y quedan fuera del informe. La marca es permanente entre meses.</div>
+    <div class="nota no-print"><i class="bi bi-info-circle"></i> Los saldos con <b>SALDO PRECIO PAGADO</b> en el Seguimiento de Post Venta salen solos del informe (el pago ya se registra en el sistema). El checkbox es solo para <b>casos históricos</b> pagados antes de que existiera el Seguimiento; la marca es permanente entre meses.</div>
     <div class="panel">
       <h5><i class="bi bi-cash-stack"></i> Saldos precio pendientes de pago al cierre
         <span style="margin-left:auto" class="no-print"><button class="btnx btn-verde" onclick="xlsSaldos()"><i class="bi bi-file-earmark-excel"></i> Excel</button></span>

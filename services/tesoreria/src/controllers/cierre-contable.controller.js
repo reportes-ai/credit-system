@@ -146,7 +146,16 @@ async function saldosPendientes(mes, cierre) {
     LEFT JOIN cierre_saldos_pagados p ON p.num_op = c.num_op
     WHERE c.estado='OTORGADO' AND c.origen IS NULL AND c.saldo_precio > 0
       AND c.mes <= ? AND p.num_op IS NULL
-    ORDER BY c.mes, c.num_op`, [cierre]);
+      /* El pago del saldo YA se registra en el sistema: si el Seguimiento de
+         Post Venta tiene SALDO PRECIO PAGADO a la fecha de cierre, la op sale
+         sola del informe (fuente única). El checkbox manual queda para los
+         casos históricos anteriores al Seguimiento. */
+      AND NOT EXISTS (
+        SELECT 1 FROM postventa_seguimiento s
+        JOIN postventa_etapas e ON e.id_seguimiento = s.id
+         AND e.track='SALDO' AND e.etapa='SALDO PRECIO PAGADO' AND DATE(e.fecha) <= ?
+        WHERE s.num_op = c.num_op)
+    ORDER BY c.mes, c.num_op`, [cierre, cierre]);
   const ops = rows.map(r => ({ ...r, saldo_precio: +r.saldo_precio || 0 }));
   return { ops, totales: { n: ops.length, saldo: ops.reduce((a, o) => a + o.saldo_precio, 0) } };
 }
