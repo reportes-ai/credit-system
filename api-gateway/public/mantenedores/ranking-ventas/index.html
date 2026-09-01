@@ -38,6 +38,7 @@
     <div class="row">
       <div class="col-md-6"><div class="fld"><label>Melodía</label>
         <select id="melodia" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:9px 11px;font-size:.88rem">
+          <option value="final_bell">🔔 The Final Bell — Rocky (audio real)</option>
           <option value="rocky">🥊 Rocky — Gonna Fly Now (extendida)</option>
           <option value="corta">🎺 Fanfarria breve de trompetas</option>
           <option value="olimpica">🔥 Fanfarria olímpica</option>
@@ -97,7 +98,13 @@
     d.melodia=document.getElementById('melodia').value;
     conPopup(()=>window.AF_RANKING.probar(d));
   }
-  function escuchar(){ conPopup(()=>window.AF_RANKING.fanfarria(document.getElementById('melodia').value)); }
+  let _audioTest=null;
+  function escuchar(){
+    const m=document.getElementById('melodia').value;
+    if(_audioTest){ _audioTest.pause(); _audioTest=null; }
+    if(m==='final_bell'){ _audioTest=new Audio('/audio/ranking-final-bell.mp3'); _audioTest.play(); return; }
+    conPopup(()=>window.AF_RANKING.fanfarria(m));
+  }
   function conPopup(go){
     if(window.AF_RANKING) return go();
     const s=document.createElement('script'); s.src='/js/ranking-popup.js'; s.onload=go; document.head.appendChild(s);

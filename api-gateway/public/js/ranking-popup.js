@@ -142,6 +142,7 @@
     // fallan, cae a la fanfarria WebAudio de siempre.
     let audioEl = null;
     function sonar() {
+      if (d.melodia !== 'final_bell') { fanfarria(d.melodia); return; }
       try {
         audioEl = audioEl || new Audio('/audio/ranking-final-bell.mp3');
         audioEl.volume = 0.85;
