@@ -131,7 +131,7 @@ async function sincronizar(opts = {}) {
   console.log('[indicadores]', JSON.stringify(out));
   // Un fallo de red (ej. "socket hang up") NO puede esperar 24h al próximo tick:
   // reintento a los 30 min, solo para las corridas automáticas del scheduler.
-  if (opts.auto && (out.uf?.error || out.dolar?.error || out.utm?.error || out.ipc?.error)) programarReintento();
+  if (opts.auto && (out.uf?.error || out.dolar?.error || out.utm?.error || out.ipc?.error || out.tmc?.error)) programarReintento();
   return out;
 }
 

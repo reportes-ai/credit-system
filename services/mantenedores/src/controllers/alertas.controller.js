@@ -118,7 +118,7 @@ exports.getVencimientos = async (req, res) => {
     } catch (_) { /* tabla utm aún no disponible */ }
 
     // ── Tasas de interés ─────────────────────────────────────────────────
-    const [[tasaVigente]] = await pool.query(
+    let [[tasaVigente]] = await pool.query(
       `SELECT id_tasa, fecha_desde, fecha_hasta,
               DATEDIFF(CURDATE(), fecha_hasta) AS dias_vencida
        FROM tasas
@@ -126,13 +126,35 @@ exports.getVencimientos = async (req, res) => {
        ORDER BY fecha_hasta DESC
        LIMIT 1`
     );
-    const [[ultimaTasa]] = await pool.query(
+    let [[ultimaTasa]] = await pool.query(
       `SELECT id_tasa, fecha_desde, fecha_hasta,
               DATEDIFF(CURDATE(), fecha_hasta) AS dias_vencida
        FROM tasas
        ORDER BY fecha_hasta DESC
        LIMIT 1`
     );
+    // Sin tasa vigente: antes de alegar, INTENTAR traer la TMC del período desde
+    // la CMF (mismo criterio que UF/UTM; freno de 1 hora). Se llama directo a
+    // sincronizarTMC para saltar el gate del día 13: si la tasa ya venció, hay
+    // que buscarla ahora, no esperar la fecha del calendario.
+    if (!tasaVigente) {
+      try {
+        const [[th]] = await pool.query("SELECT valor FROM indicadores_estado WHERE clave='sync_intento_tmc'");
+        const hace = th && th.valor ? (Date.now() - Date.parse(th.valor)) : Infinity;
+        if (hace > 60 * 60 * 1000) {
+          await pool.query(
+            "INSERT INTO indicadores_estado (clave, valor) VALUES ('sync_intento_tmc', ?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)",
+            [new Date().toISOString()]);
+          await require('../tmc-sync').sincronizarTMC();
+          [[tasaVigente]] = await pool.query(
+            `SELECT id_tasa, fecha_desde, fecha_hasta, DATEDIFF(CURDATE(), fecha_hasta) AS dias_vencida
+             FROM tasas WHERE fecha_hasta >= CURDATE() ORDER BY fecha_hasta DESC LIMIT 1`);
+          [[ultimaTasa]] = await pool.query(
+            `SELECT id_tasa, fecha_desde, fecha_hasta, DATEDIFF(CURDATE(), fecha_hasta) AS dias_vencida
+             FROM tasas ORDER BY fecha_hasta DESC LIMIT 1`);
+        }
+      } catch (_) { /* si la CMF no responde, el aviso sale igual */ }
+    }
 
     if (!tasaVigente) {
       // No hay ninguna tasa vigente hoy
