@@ -48,12 +48,30 @@ exports.getVencimientos = async (req, res) => {
     const diasDe = (k, def)  => (cfg[k] && cfg[k].dias_aviso != null) ? Number(cfg[k].dias_aviso) : def;
 
     // ── UF ──────────────────────────────────────────────────────────────
-    const [[ufRow]] = await pool.query(
+    let [[ufRow]] = await pool.query(
       `SELECT MAX(fecha) AS ultima_fecha,
               DATEDIFF(CURDATE(), MAX(fecha)) AS dias_atraso
        FROM uf`
     );
-    const diasUF = ufRow && ufRow.ultima_fecha ? Number(ufRow.dias_atraso) : 999;
+    let diasUF = ufRow && ufRow.ultima_fecha ? Number(ufRow.dias_atraso) : 999;
+    // Antes de alegar, INTENTAR actualizar (pedido Pato 01-09-2026: el popup
+    // acusaba "UF desactualizada" cuando bastaba un clic en Actualizar). Con
+    // freno de 1 hora para no golpear la CMF en cada login.
+    if (diasUF > 0) {
+      try {
+        const [[th]] = await pool.query("SELECT valor FROM indicadores_estado WHERE clave='sync_intento_alerta'");
+        const hace = th && th.valor ? (Date.now() - Date.parse(th.valor)) : Infinity;
+        if (hace > 60 * 60 * 1000) {
+          await pool.query(
+            "INSERT INTO indicadores_estado (clave, valor) VALUES ('sync_intento_alerta', ?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)",
+            [new Date().toISOString()]);
+          await require('../indicadores-sync').sincronizar();
+          [[ufRow]] = await pool.query(
+            `SELECT MAX(fecha) AS ultima_fecha, DATEDIFF(CURDATE(), MAX(fecha)) AS dias_atraso FROM uf`);
+          diasUF = ufRow && ufRow.ultima_fecha ? Number(ufRow.dias_atraso) : 999;
+        }
+      } catch (_) { /* si la CMF no responde, el aviso sale igual */ }
+    }
     if (diasUF > 0 && diasUF >= diasDe('uf', 1) && habil('uf')) {
       alertas.push({
         tipo:      'uf',

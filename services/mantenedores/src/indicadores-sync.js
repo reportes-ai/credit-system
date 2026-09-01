@@ -53,10 +53,28 @@ async function sincronizar(opts = {}) {
   const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1;
   const out = {};
 
-  // Diarios: UF y dólar
+  // Diarios: UF y dólar. La UF se publica el día 9 con los valores HASTA el día
+  // 10 del mes siguiente → se pide también el MES SIGUIENTE (y el anterior los
+  // primeros días, por huecos). INSERT IGNORE deduplica; no restringir al mes
+  // en curso (pedido Pato 01-09-2026: quedó cargada solo hasta el 31-08).
+  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  const MESES_POR_TABLA = {
+    uf:    [[py, pm], [y, m], [ny, nm]],
+    dolar: dia <= 5 ? [[py, pm], [y, m]] : [[y, m]],
+  };
   for (const [rec, tab] of [['uf', 'uf'], ['dolar', 'dolar']]) {
-    try { out[tab] = await syncTabla(rec, tab, y, m, false); await setEstado('sync_' + tab, ''); await setEstado('sync_' + tab + '_ts', new Date().toISOString()); }
-    catch (e) { out[tab] = { error: e.message }; await setEstado('sync_' + tab, eMsg(tab.toUpperCase(), e)); if (e.code !== 'NOCMF') console.error('[indicadores]', tab, e.message); }
+    let nuevos = 0, total = 0, ok = false, lastErr = null;
+    for (const [yy, mm2] of MESES_POR_TABLA[tab]) {
+      try { const r = await syncTabla(rec, tab, yy, mm2, false); nuevos += r.nuevos; total += r.total; ok = true; }
+      catch (e) { lastErr = e; }
+    }
+    if (ok) { out[tab] = { nuevos, total }; await setEstado('sync_' + tab, ''); await setEstado('sync_' + tab + '_ts', new Date().toISOString()); }
+    else {
+      const e = lastErr || new Error('sin datos');
+      out[tab] = { error: e.message };
+      await setEstado('sync_' + tab, eMsg(tab.toUpperCase(), e));
+      if (e.code !== 'NOCMF') console.error('[indicadores]', tab, e.message);
+    }
   }
   // Mensuales: UTM e IPC → se piden por AÑO (/recurso/AAAA trae TODOS los meses publicados del
   // año, según doc CMF), no mes a mes. Se trae el año en curso y el anterior (cubre enero y da
@@ -107,11 +125,22 @@ async function sincronizar(opts = {}) {
 
   await setEstado('sync_ultima', new Date().toISOString());
   console.log('[indicadores]', JSON.stringify(out));
+  // Un fallo de red (ej. "socket hang up") NO puede esperar 24h al próximo tick:
+  // reintento a los 30 min, solo para las corridas automáticas del scheduler.
+  if (opts.auto && (out.uf?.error || out.dolar?.error)) programarReintento();
   return out;
 }
 
+let _retryTimer = null;
+function programarReintento() {
+  if (_retryTimer) return;
+  _retryTimer = setTimeout(() => { _retryTimer = null; sincronizar({ auto: true }).catch(() => {}); }, 30 * 60 * 1000);
+  if (_retryTimer.unref) _retryTimer.unref();
+  console.log('[indicadores] reintento programado en 30 min (fallo de red)');
+}
+
 // Al arrancar: puesta al día (force). Luego cada 24h.
-programar('indicadores-sync', () => sincronizar(), 24 * 60 * 60 * 1000,
-  { arranqueMs: 15000, arranqueFn: () => sincronizar({ force: true }) });
+programar('indicadores-sync', () => sincronizar({ auto: true }), 24 * 60 * 60 * 1000,
+  { arranqueMs: 15000, arranqueFn: () => sincronizar({ force: true, auto: true }) });
 
 module.exports = { sincronizar };
