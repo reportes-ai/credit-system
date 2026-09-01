@@ -246,9 +246,17 @@ const create = async (req, res) => {
     // fijo y una op EN_ANALISIS aparecía otorgada en el dashboard (op 26081410).
     const estIni  = String(estado || 'INGRESO').toUpperCase();
     const evalIni = (estIni === 'OTORGADO' || estIni === 'INGRESO') ? 'OTORGADO' : 'PENDIENTE';
+    // El producto clasifica el crédito (NCNU del cruce de seguros filtra por su texto:
+    // "CORFO"/"UNIDAD"). Un ingreso manual sin producto quedaba vacío y entraba al NCNU
+    // a ciegas → default convencional con la misma nomenclatura de Trinidad.
+    const finUp = String(fin || '').toUpperCase();
+    const productoVal = String(req.body.producto || '').trim() ||
+      (['AUTOFIN', 'UNIDAD DE CREDITO'].includes(finUp)
+        ? (finUp === 'AUTOFIN' ? 'AUTOFIN' : 'UNIDAD') + (nombre_parque ? ' - PARQUE' : '') + ' - CREDITO CONVENCIONAL'
+        : null);
     const [r] = await pool.query(`
       INSERT INTO creditos
-        (num_op, numero_credito, financiera,
+        (num_op, numero_credito, financiera, producto,
          estado_eval, estado,
          id_cotizacion, id_usuario, id_cliente,
          fecha_otorgado, mes,
@@ -261,7 +269,7 @@ const create = async (req, res) => {
          ejecutivo, observaciones, datos_json, id_financiera,
          rut_dealer, vendedor, comdea_real,
          created_at, updated_at)
-      VALUES (?,?,?,
+      VALUES (?,?,?,?,
               ?,?,
               ?,?,?,
               ?,DATE_FORMAT(COALESCE(?, NOW()), '%Y-%m-01'),
@@ -275,7 +283,7 @@ const create = async (req, res) => {
               ?,?,?,
               NOW(), NOW())
     `, [
-      numOpVal, numero_credito, fin,
+      numOpVal, numero_credito, fin, productoVal,
       evalIni, estado || 'INGRESO',
       id_cotizacion || null, id_usuario, id_cliente_resolved,
       fecha_otorgamiento || null, fecha_otorgamiento || null,
