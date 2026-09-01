@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Revisión Comisiones — AutoFácil</title><!-- v5.24 -->
+  <title>Revisión Comisiones — AutoFácil</title><!-- v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -206,6 +206,16 @@ let MAPA_SEXOS = {};
 fetch('/api/usuarios/sexos', { headers: H }).then(r=>r.json()).then(j=>{ if(j.success) MAPA_SEXOS = j.data || {}; }).catch(()=>{});
 const estimadoDe = nombre => { const s = MAPA_SEXOS[String(nombre||'').trim().toUpperCase()]; return s==='F' ? 'Estimada' : (s==='M' ? 'Estimado' : 'Estimado/a'); };
 
+/* Marca manual "cliente independiente" (fuera de la base del cruce de cesantía) */
+async function toggleInd(numOp, valor) {
+  if (valor && !confirm('¿Marcar al cliente de la OP '+numOp+' como INDEPENDIENTE?\nLa operación sale de la BASE del cruce de cesantía (el seguro no cubre independientes) y el cálculo se recalcula al tiro.')) return;
+  try {
+    const j = await (await fetch('/api/comisiones/op-independiente', { method:'PUT', headers:H, body: JSON.stringify({ num_op: numOp, independiente: valor }) })).json();
+    if (!j.success) return alert(j.error || 'No se pudo guardar');
+    cargar();
+  } catch(e) { alert('Error de conexión'); }
+}
+
 async function cargar() {
   const mes = document.getElementById('filtroMes').value;
   if (!mes) return;
@@ -390,14 +400,22 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
            <span style="color:#b45309"> ${fmt(aj.modificada)}</span>
            <i class="bi bi-pencil-square" style="color:#b45309;font-size:11px"></i></td>`
       : `<td style="text-align:right;font-weight:600;color:#0141A2">${fmt(c.incentivo_base_credito||0)}</td>`;
+    // CORFO: fuera del NCNU (no mide seguros). IND: cliente independiente — la
+    // cesantía no lo cubre, sale de la BASE del cruce (marca manual, auditada).
+    const esCorfo = (c.producto||'').toUpperCase().includes('CORFO');
+    const esInd = Number(c.cliente_independiente||0)===1;
+    const chipCorfo = esCorfo ? ' <span title="Producto CORFO: fuera del NCNU, no mide seguros" style="font-size:.6rem;font-weight:800;background:#fef3c7;color:#92400e;border-radius:8px;padding:1px 6px">CORFO</span>' : '';
+    const chipInd = esAdmin
+      ? ` <span onclick="toggleInd('${String(c.num_op||'').replace(/'/g,'')}',${esInd?0:1})" title="${esInd?'Cliente INDEPENDIENTE: fuera de la base del cruce de cesantía. Clic para desmarcar.':'Marcar cliente INDEPENDIENTE (lo saca de la base del cruce de cesantía)'}" style="cursor:pointer;font-size:.6rem;font-weight:800;border-radius:8px;padding:1px 6px;${esInd?'background:#7c3aed;color:#fff':'background:#f1f5f9;color:#94a3b8;border:1px dashed #cbd5e1'}">IND</span>`
+      : (esInd ? ' <span title="Cliente independiente: fuera de la base del cruce de cesantía" style="font-size:.6rem;font-weight:800;background:#7c3aed;color:#fff;border-radius:8px;padding:1px 6px">IND</span>' : '');
     return `<tr${aj?' style="background:#fffbeb"':''}>
       <td>${c.num_op||'—'}</td>
-      <td>${c.nombre_cliente||'—'}</td>
+      <td>${c.nombre_cliente||'—'}${chipInd}</td>
       <td>${c.rut_cliente||'—'}</td>
-      <td>${c.financiera||'—'}</td>
+      <td>${c.financiera||'—'}${chipCorfo}</td>
       <td style="text-align:center">${c.plazo||'—'}</td>
       <td style="text-align:right">${fmt(c.monto_financiado)}</td>
-      <td style="text-align:right;color:${(parseFloat(c.seguro_cesantia)||0)>0?'#16a34a':'#9ca3af'}">${(parseFloat(c.seguro_cesantia)||0)>0?'✓ '+fmt(c.seguro_cesantia):'—'}</td>
+      <td style="text-align:right;color:${esInd?'#9ca3af':((parseFloat(c.seguro_cesantia)||0)>0?'#16a34a':'#9ca3af')}">${esInd?'N/A':((parseFloat(c.seguro_cesantia)||0)>0?'✓ '+fmt(c.seguro_cesantia):'—')}</td>
       <td style="text-align:right;color:${(parseFloat(c.seguro_rep_menor)||0)>0?'#16a34a':'#9ca3af'}">${(parseFloat(c.seguro_rep_menor)||0)>0?'✓ '+fmt(c.seguro_rep_menor):'—'}</td>
       ${celBase}
       <td style="text-align:right;font-weight:600;color:${tieneAdicional?'#16a34a':'#9ca3af'}">${tieneAdicional?fmt(c.incentivo_adicional_credito):'—'}</td>
@@ -783,14 +801,16 @@ function generarInforme() {
       const hasCes = (parseFloat(c.seguro_cesantia)||0) > 0;
       const hasRep = (parseFloat(c.seguro_rep_menor)||0) > 0;
       const hasAdl = (c.incentivo_adicional_credito||0) > 0;
+      const indI = Number(c.cliente_independiente||0)===1;
+      const corfoI = (c.producto||'').toUpperCase().includes('CORFO');
       const bg = i%2===0 ? '#f8fafc' : '#fff';
       return `<tr style="background:${bg}">
-        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.num_op||'—'}</td>
-        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.nombre_cliente||'—'}</td>
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.num_op||'—'}${corfoI?' <span style="font-size:9px;font-weight:800;background:#fef3c7;color:#92400e;border-radius:6px;padding:0 4px">CORFO</span>':''}</td>
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.nombre_cliente||'—'}${indI?' <span style="font-size:9px;font-weight:800;background:#7c3aed;color:#fff;border-radius:6px;padding:0 4px">IND</span>':''}</td>
         <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:center;color:#0141A2;font-weight:700">${abrevFin(c.financiera)}</td>
         <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:center">${c.plazo||'—'}c</td>
         <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:right;font-weight:600">${fmtN(c.monto_financiado)}</td>
-        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:center;color:${hasCes?'#16a34a':'#9ca3af'}">${hasCes?'✔ '+fmtN(c.seguro_cesantia):'—'}</td>
+        <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:center;color:${indI?'#9ca3af':(hasCes?'#16a34a':'#9ca3af')}">${indI?'N/A':(hasCes?'✔ '+fmtN(c.seguro_cesantia):'—')}</td>
         <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:center;color:${hasRep?'#16a34a':'#9ca3af'}">${hasRep?'✔ '+fmtN(c.seguro_rep_menor):'—'}</td>
         ${d.cumple_minimo ? `
         <td style="padding:5px 9px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:right;font-weight:700;color:#0141A2">${fmtN(c.incentivo_base_credito||0)}</td>
@@ -1052,7 +1072,7 @@ function generarInforme() {
       </div>
       ${paso1}${paso2}${paso3}${paso4}${paso5}
       <p style="font-size:11.5px;color:#9ca3af;margin:14px 0 0;line-height:1.5">
-        El cruce de seguros se mide sobre créditos AUTOFIN sin CORFO (base NCNU). Los bonos son ajustes sobre el incentivo base total del mes. El monto indicado es el incentivo bruto antes de descuentos previsionales y retenciones tributarias.
+        El cruce de seguros se mide sobre créditos AUTOFIN sin CORFO (base NCNU); en cesantía, los clientes marcados INDEPENDIENTES quedan además fuera de la base (el seguro no los cubre). Los bonos son ajustes sobre el incentivo base total del mes. El monto indicado es el incentivo bruto antes de descuentos previsionales y retenciones tributarias.
       </p>
     </div>`;
   }

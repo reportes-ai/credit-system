@@ -15,6 +15,7 @@ router.get('/variables/bitacora/:id', verifyToken, requireFunc('comisiones_varia
 router.get('/calculo',            verifyToken, requireFunc('comisión_ejecutivos_ver'), ctrl.getCalculo);
 router.get('/ejecutivos',         verifyToken, requireFunc('comisión_ejecutivos_ver'), ctrl.getEjecutivos);
 router.post('/aprobar',           verifyToken, requireFunc('comisiones_revision'),  ctrl.aprobar);
+router.put('/op-independiente',   verifyToken, requireFunc('comisiones_revision'),  ctrl.marcarIndependiente);
 router.post('/ejecutivo-responder', verifyToken,                                   ctrl.ejecutivoResponder);
 router.get('/resumen-config',     verifyToken, requireFunc('comisiones_revision'), ctrl.getResumenConfig);
 router.post('/enviar-resumen',    verifyToken, requireFunc('comisiones_revision'), ctrl.enviarResumen);

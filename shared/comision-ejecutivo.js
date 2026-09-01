@@ -66,16 +66,21 @@ function calcularComision(creditos, vars, mes) {
     !(c.producto || '').toUpperCase().includes('CORFO') &&
     !(c.producto || '').toUpperCase().includes('UNIDAD')
   );
+  // Cesantía: los clientes INDEPENDIENTES no son asegurables (el seguro cubre
+  // cesantía de dependientes) → salen de la BASE del cruce de cesantía. La marca
+  // es manual por operación (creditos.cliente_independiente, desde Revisión).
+  const ncnuCes = ncnu.filter(c => !Number(c.cliente_independiente || 0));
   const conRdh = ncnu.filter(c => (parseFloat(c.seguro_rdh)       || 0) > 0);
-  const conCes = ncnu.filter(c => (parseFloat(c.seguro_cesantia)  || 0) > 0);
+  const conCes = ncnuCes.filter(c => (parseFloat(c.seguro_cesantia)  || 0) > 0);
   const conRep = ncnu.filter(c => (parseFloat(c.seguro_rep_menor) || 0) > 0);
   const ncnu_total    = ncnu.length;
+  const ncnu_ces_base = ncnuCes.length;
   const ncnu_rdh      = conRdh.length;
   const ncnu_cesantia = conCes.length;
   const ncnu_rep      = conRep.length;
 
   const cruce_rdh          = ncnu_total > 0 ? ncnu_rdh      / ncnu_total : 0;
-  const cruce_cesantia     = ncnu_total > 0 ? ncnu_cesantia / ncnu_total : 0;
+  const cruce_cesantia     = ncnu_ces_base > 0 ? ncnu_cesantia / ncnu_ces_base : 0;
   const cruce_reparaciones = ncnu_total > 0 ? ncnu_rep      / ncnu_total : 0;
 
   // Calidad: meta = N créditos UNIDAD DE CRÉDITO en el mes (paramétrico: comisiones_variables.meta_unidad)
@@ -129,7 +134,7 @@ function calcularComision(creditos, vars, mes) {
     pct_24, pct_mas24,
     n_24: ot24.length, n_mas24: otMas24.length,
     incentivo_base,
-    ncnu_total, ncnu_rdh, ncnu_cesantia, ncnu_rep,
+    ncnu_total, ncnu_rdh, ncnu_cesantia, ncnu_rep, ncnu_ces_base,
     cruce_rdh, cruce_cesantia, cruce_reparaciones,
     calidad, calidad_logrado: unidad_logrado, calidad_meta: META_UNIDAD,
     umbral_rdh, umbral_cesantia, umbral_rep,

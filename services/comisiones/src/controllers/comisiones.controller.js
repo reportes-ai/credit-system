@@ -3,6 +3,12 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 /* ── Migraciones ─────────────────────────────────────────────────────────── */
+// Marca manual "cliente independiente" por operación: el seguro de cesantía no
+// cubre independientes → la op sale de la BASE del cruce de cesantía (motor
+// shared/comision-ejecutivo.js). Se marca desde Revisión de Comisiones.
+require('../../../../shared/migrate').enFila('creditos-cliente-independiente', async () => {
+  await pool.query("ALTER TABLE creditos ADD COLUMN IF NOT EXISTS cliente_independiente TINYINT(1) NOT NULL DEFAULT 0").catch(() => {});
+});
 require('../../../../shared/migrate').enFila('comisiones', async () => {
   try {
     await pool.query(`
@@ -541,7 +547,7 @@ async function calcularMes(mes, varsOverride) {
 
     // Trae todos los créditos del mes agrupados por ejecutivo
     const [creditos] = await pool.query(
-      `SELECT ob.ejecutivo, ob.estado_credito, ob.financiera, ob.producto,
+      `SELECT ob.ejecutivo, ob.estado_credito, ob.financiera, ob.producto, ob.cliente_independiente,
               ob.monto_financiado, ob.plazo, ob.seguro_cesantia, ob.seguro_rep_menor,
               ob.seguro_rdh, ob.valor_vehiculo, ob.pie, ob.saldo_precio,
               ob.fecha_otorgado, ob.num_op, ob.id_financiera,
@@ -889,5 +895,20 @@ const setAlertasConfig = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getVariables, putVariables, getVariablesBitacora, getVariablesBitacoraDetalle, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos, getResumenConfig, enviarResumen,
+/* PUT /api/comisiones/op-independiente {num_op, independiente} — marca/desmarca
+   al cliente de la operación como INDEPENDIENTE: sale de la base del cruce de
+   cesantía (el seguro no lo cubre). Manual, auditado, desde Revisión. */
+const marcarIndependiente = async (req, res) => {
+  try {
+    const numOp = String(req.body?.num_op || '').trim();
+    const val = req.body?.independiente ? 1 : 0;
+    if (!numOp) return res.status(400).json({ success: false, data: null, error: 'num_op requerido' });
+    const [r] = await pool.query('UPDATE creditos SET cliente_independiente=? WHERE num_op=?', [val, numOp]);
+    if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    auditar({ req, accion: 'EDITAR', modulo: 'comisiones', entidad: 'credito', detalle: `${val ? 'Marcó' : 'Desmarcó'} cliente INDEPENDIENTE en la OP ${numOp} (cruce de cesantía)` });
+    res.json({ success: true, data: { num_op: numOp, independiente: val }, error: null });
+  } catch (e) { console.error('[comisiones independiente]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getVariables, putVariables, getVariablesBitacora, getVariablesBitacoraDetalle, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos, getResumenConfig, enviarResumen, marcarIndependiente,
   calcularMes };  // motor único: lo reusa Remuneraciones (RRHH) para las comisiones imponibles
