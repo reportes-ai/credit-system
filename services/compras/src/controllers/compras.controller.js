@@ -264,7 +264,8 @@ const cierrePedidos = async (req, res) => {
     const habilDesde = (yy, mm) => {   // día `dia` del mes, corrido a lunes-viernes
       const d = new Date(Date.UTC(yy, mm - 1, dia));
       while ([0, 6].includes(d.getUTCDay())) d.setUTCDate(d.getUTCDate() + 1);
-      return d.toISOString().slice(0, 10);
+      const pad = n => String(n).padStart(2, '0');   // sin toISOString: regla fecha-chile
+      return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
     };
     const cierreMes = habilDesde(y, m);
     // Cerrado del mes: ya existe la ODC del mes en curso (una orden no rechazada/anulada)
