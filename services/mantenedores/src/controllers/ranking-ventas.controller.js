@@ -96,7 +96,10 @@ const popup = async (req, res) => {
     if (!top.length) return res.json({ success: true, data: { mostrar: false }, error: null });
     res.json({ success: true, data: {
       mostrar: true, clave: mesAnt.slice(0, 7), // dedup mensual en el cliente
-      titulo: tpl(cfg.titulo, { mes: label.toUpperCase() }),
+      // El mes va en su propia línea bajo el título (pedido Pato 01-09-2026):
+      // se saca del template y viaja aparte como `mes`.
+      titulo: tpl(cfg.titulo, { mes: '' }).replace(/\s*[—–-]\s*$/, '').trim(),
+      mes: label.toUpperCase(),
       subtitulo: cfg.subtitulo || '', musica: cfg.musica === '1', melodia: cfg.melodia || 'rocky', top,
     }, error: null });
   } catch (e) { console.error('[ranking popup]', e.message); res.status(500).json({ success: false, data: { mostrar: false }, error: 'Error' }); }

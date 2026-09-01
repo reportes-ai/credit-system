@@ -123,6 +123,7 @@
     ov.innerHTML =
       '<div style="background:linear-gradient(160deg,#0a1d4d,#012d70 55%,#0141A2);border-radius:24px;padding:38px 46px 30px;text-align:center;color:#fff;max-width:640px;margin:16px;box-shadow:0 24px 80px rgba(0,0,0,.6);animation:afRkPop .5s ease;position:relative">' +
       '<div style="font-size:1.35rem;font-weight:900;letter-spacing:1px;animation:afRkBrillo 2s ease infinite">' + esc(d.titulo || '🏆 RANKING DE COLOCACIONES') + '</div>' +
+      (d.mes ? '<div style="font-size:1.02rem;font-weight:800;letter-spacing:3px;color:#ffd740;margin-top:4px">' + esc(d.mes) + '</div>' : '') +
       '<div style="font-size:.9rem;opacity:.85;margin-top:6px">' + esc(d.subtitulo || '') + '</div>' +
       '<div style="display:flex;align-items:flex-end;justify-content:center;gap:10px;margin-top:26px;border-bottom:4px solid rgba(255,255,255,.25)">' +
       col(P(1), 2, '🥈', 78, '#c0c7d1', 0.35) + col(P(0), 1, '🏆', 116, '#ffd740', 0.15) + col(P(2), 3, '🥉', 54, '#d29b6c', 0.55) +
