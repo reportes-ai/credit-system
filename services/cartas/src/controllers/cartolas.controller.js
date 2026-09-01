@@ -452,13 +452,13 @@ const enviarCorreoCartola = async (req, res) => {
     const cc = [...new Set([...String(tpl.cc || '').split(','),   // copia fija del mantenedor
       ...(Array.isArray(ejec_cc) ? ejec_cc : []), ...jefes.map(j => j.email)]
       .map(x => String(x).trim().toLowerCase()).filter(Boolean))].join(',');
-    const { enviarCorreo, remitenteComisiones, envolverHTML } = require('../../../../shared/mailer');
+    const { enviarCorreo, remitentePorClave, envolverHTML } = require('../../../../shared/mailer');
     const escH = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const cuerpo = rell(tpl.cuerpo) + (tpl.firma ? '\n\n' + rell(tpl.firma) : '');
     const attachments = pdf_base64
       ? [{ filename: filename || 'cartola.pdf', content: Buffer.from(pdf_base64, 'base64') }] : [];
     const r = await enviarCorreo({
-      from: remitenteComisiones(), to: mail, cc: cc || undefined,
+      from: remitentePorClave(tpl.remitente || 'comisiones'), to: mail, cc: cc || undefined,
       subject: rell(tpl.asunto) || ('Cartola comisiones — ' + dealer),
       html: envolverHTML(escH(cuerpo).replace(/\n/g, '<br>')), text: cuerpo, attachments });
     auditar({ req, accion: 'CORREO_CARTOLA', modulo: 'cartas', entidad: 'cartola_enviada', entidad_id: null,

@@ -321,6 +321,9 @@ require('./migrate').enFila('correos-plantillas', async () => {
   await pool.query('ALTER TABLE correos_plantillas ADD COLUMN IF NOT EXISTS destinatario VARCHAR(200) NULL').catch(() => {});
   // CCO (copia oculta) fija y editable por plantilla — pedido para el comprobante al cliente (26-08-2026)
   await pool.query("ALTER TABLE correos_plantillas ADD COLUMN IF NOT EXISTS cco VARCHAR(500) NOT NULL DEFAULT ''").catch(() => {});
+  // Remitente paramétrico por plantilla (clave de mailer.cuentasRemitente) — pedido Pato 01-09-2026:
+  // las cartolas de dealers y parques salen desde comisiones@, elegible en el mantenedor.
+  await pool.query("ALTER TABLE correos_plantillas ADD COLUMN IF NOT EXISTS remitente VARCHAR(30) NOT NULL DEFAULT 'sistema'").catch(() => {});
   /* INSERT IGNORE: la semilla define el texto ORIGINAL, nunca pisa lo que el
      Administrador haya editado después (ese es el punto de tenerlo en mantenedor). */
   for (const p of SEMILLAS) {
@@ -366,6 +369,14 @@ require('./migrate').migrar('correo-reversa-con-motivo', async () => {
     [p.cuerpo, p.codigo]);
 });
 
+/* Cartolas y avisos de pago a dealers y parques salen desde comisiones@ (pedido
+   Pato 01-09-2026). Se siembra UNA vez; después el remitente lo elige el
+   Administrador en el mantenedor Correos del Sistema. */
+require('./migrate').migrar('correos-remitente-comisiones-2026-09', async () => {
+  await pool.query(
+    "UPDATE correos_plantillas SET remitente='comisiones' WHERE codigo IN ('dealer_cartola_envio','dealer_comision_pagada','dealer_pago_reversado','parque_cartola_envio','parque_pago_aviso')");
+});
+
 /* Los 4 correos de parques nacieron con el cuerpo en HTML crudo: en el
    mantenedor se veían como una maraña de etiquetas. Se pasan a texto plano UNA
    vez, y solo si nadie los editó todavía (siguen idénticos a como se sembraron). */
@@ -407,7 +418,7 @@ async function enviar({ codigo, to = [], cc: ccExtra = [], datos = {}, adjuntos 
     if (!p) return { enviado: false, motivo: 'plantilla inexistente: ' + codigo };
     if (!p.activo) return { enviado: false, motivo: 'plantilla desactivada en el mantenedor' };
 
-    const { enviarCorreo, mailConfigurado, envolverHTML } = require('./mailer');
+    const { enviarCorreo, mailConfigurado, envolverHTML, remitentePorClave } = require('./mailer');
     if (!mailConfigurado()) return { enviado: false, motivo: 'correo no configurado' };
 
     const dest = [...new Set([...(Array.isArray(to) ? to : [to]), ...(await correosDePerfiles(p.para_perfiles))]
@@ -420,6 +431,7 @@ async function enviar({ codigo, to = [], cc: ccExtra = [], datos = {}, adjuntos 
     const cco = String(p.cco || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     const cuerpo = render(p.cuerpo, datos);
     await enviarCorreo({
+      from: remitentePorClave(p.remitente),   // remitente elegido en el mantenedor
       to: dest, cc: cc.length ? cc : undefined, bcc: cco.length ? cco : undefined,
       subject: render(p.asunto, datos),
       html: envolverHTML(aHTML(cuerpo)),
@@ -441,7 +453,7 @@ async function enviar({ codigo, to = [], cc: ccExtra = [], datos = {}, adjuntos 
    Si la plantilla aún no existe, cae a postventa_config y nada se detiene. */
 async function comoTpl(codigo, claveLegado) {
   const p = await obtener(codigo);
-  if (p) return { asunto: p.asunto, cuerpo: p.cuerpo, firma: '', activo: !!p.activo, cc: p.cc || '' };
+  if (p) return { asunto: p.asunto, cuerpo: p.cuerpo, firma: '', activo: !!p.activo, cc: p.cc || '', remitente: p.remitente || 'sistema' };
   if (claveLegado) {
     const [[old]] = await pool.query('SELECT valor FROM postventa_config WHERE clave=?', [claveLegado]).catch(() => [[null]]);
     if (old) { try { return { ...JSON.parse(old.valor), cc: '' }; } catch (_) {} }

@@ -18,7 +18,9 @@ const listar = async (req, res) => {
     const [rows] = await pool.query(
       'SELECT * FROM correos_plantillas ORDER BY ambito, nombre');
     const [perfiles] = await pool.query('SELECT nombre FROM perfiles ORDER BY nombre');
-    res.json({ success: true, data: { rows, perfiles: perfiles.map(p => p.nombre) }, error: null });
+    // Cuentas remitentes habilitadas (verificadas en Brevo) para el select "Sale desde"
+    const remitentes = require('../../../../shared/mailer').cuentasRemitente().map(c => ({ clave: c.clave, label: c.label }));
+    res.json({ success: true, data: { rows, perfiles: perfiles.map(p => p.nombre), remitentes }, error: null });
   } catch (e) { console.error('[correos listar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
@@ -26,7 +28,7 @@ const listar = async (req, res) => {
 const guardar = async (req, res) => {
   try {
     const codigo = String(req.params.codigo || '').trim();
-    const { asunto, cuerpo, para_perfiles, cc, cco, activo } = req.body || {};
+    const { asunto, cuerpo, para_perfiles, cc, cco, activo, remitente } = req.body || {};
     const [[prev]] = await pool.query('SELECT * FROM correos_plantillas WHERE codigo=?', [codigo]);
     if (!prev) return res.status(404).json({ success: false, data: null, error: 'Plantilla no encontrada' });
     if (!String(asunto || '').trim()) return res.status(400).json({ success: false, data: null, error: 'El asunto no puede quedar vacío' });
@@ -36,11 +38,14 @@ const guardar = async (req, res) => {
     const ccoList = String(cco || '').split(',').map(s => s.trim()).filter(Boolean);
     const malos = [...ccList, ...ccoList].filter(m => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m));
     if (malos.length) return res.status(400).json({ success: false, data: null, error: 'Correo inválido en la copia: ' + malos.join(', ') });
+    // Remitente: solo claves habilitadas en el mailer (cuenta verificada, no correo libre)
+    const CTAS = require('../../../../shared/mailer').cuentasRemitente().map(c => c.clave);
+    const remFinal = CTAS.includes(remitente) ? remitente : (prev.remitente || 'sistema');
 
     await pool.query(
-      `UPDATE correos_plantillas SET asunto=?, cuerpo=?, para_perfiles=?, cc=?, cco=?, activo=? WHERE codigo=?`,
+      `UPDATE correos_plantillas SET asunto=?, cuerpo=?, para_perfiles=?, cc=?, cco=?, activo=?, remitente=? WHERE codigo=?`,
       [String(asunto).trim(), String(cuerpo).trim(), String(para_perfiles || '').trim(),
-       ccList.join(', '), ccoList.join(', '), activo ? 1 : 0, codigo]);
+       ccList.join(', '), ccoList.join(', '), activo ? 1 : 0, remFinal, codigo]);
 
     const cambios = [];
     if (prev.asunto !== String(asunto).trim()) cambios.push('asunto');
@@ -48,6 +53,7 @@ const guardar = async (req, res) => {
     if (prev.para_perfiles !== String(para_perfiles || '').trim()) cambios.push(`destinatarios "${prev.para_perfiles}" → "${para_perfiles}"`);
     if (prev.cc !== ccList.join(', ')) cambios.push(`copia "${prev.cc}" → "${ccList.join(', ')}"`);
     if (!!prev.activo !== !!activo) cambios.push(activo ? 'ACTIVADO' : 'DESACTIVADO');
+    if ((prev.remitente || 'sistema') !== remFinal) cambios.push(`remitente "${prev.remitente || 'sistema'}" → "${remFinal}"`);
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'correo_plantilla',
       detalle: `Editó el correo "${prev.nombre}" (${codigo}): ${cambios.join(' · ') || 'sin cambios'}` });
     res.json({ success: true, data: { codigo }, error: null });
@@ -104,10 +110,11 @@ const prueba = async (req, res) => {
       } catch (e) { console.error('[correos prueba pdf]', e.message); }
     }
 
-    const { enviarCorreo, mailConfigurado, envolverHTML } = require('../../../../shared/mailer');
+    const { enviarCorreo, mailConfigurado, envolverHTML, remitentePorClave } = require('../../../../shared/mailer');
     if (!mailConfigurado()) return res.status(400).json({ success: false, data: null, error: 'El correo del sistema no está configurado' });
     // La prueba va SOLO a quien la pide: nunca a los perfiles ni al CC de la plantilla.
     await enviarCorreo({
+      from: remitentePorClave(p.remitente),   // mismo remitente del envío real
       to: [email],
       subject: '[PRUEBA] ' + plantillas.render(p.asunto, EJEMPLO),
       html: envolverHTML(

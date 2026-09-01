@@ -767,7 +767,7 @@ async function reversarPagoCentral(track, ids, usuario, motivo) {
    nada que corregir). Mismo remitente y misma copia que el aviso original. */
 async function notificarReversaPagoDealer(track, idSeguimiento, motivo) {
   try {
-    const { enviarCorreo, remitentePorClave, remitenteComisiones, envolverHTML } = require('../../../../shared/mailer');
+    const { enviarCorreo, remitentePorClave, envolverHTML } = require('../../../../shared/mailer');
     let activo = false, from, ccFijo = '';
     if (track === 'SALDO') {
       const [[tRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_pago_saldo'");
@@ -775,7 +775,7 @@ async function notificarReversaPagoDealer(track, idSeguimiento, motivo) {
       activo = tpl.activo === true; from = remitentePorClave(tpl.remitente); ccFijo = String(tpl.cc_operaciones || '').trim();
     } else {
       const tpl = await require('../../../../shared/plantillas-correo').comoTpl('dealer_comision_pagada', 'correo_comision_pagada');
-      activo = tpl.activo !== false; from = remitenteComisiones(); ccFijo = String(tpl.cc || '').trim();
+      activo = tpl.activo !== false; from = remitentePorClave(tpl.remitente || 'comisiones'); ccFijo = String(tpl.cc || '').trim();
     }
     if (!activo) return;                             // el pago nunca se avisó → nada que corregir
     if (track === 'COMISION') {                      // una factura = un correo: la corrección la manda solo la titular
@@ -1319,11 +1319,11 @@ async function notificarPagoComisionDealer(idSeguimiento) {
       ops,
     };
     const rell = t => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
-    const { enviarCorreo, remitenteComisiones, envolverHTML } = require('../../../../shared/mailer');
+    const { enviarCorreo, remitentePorClave, envolverHTML } = require('../../../../shared/mailer');
     const escH = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const cuerpo = rell(tpl.cuerpo) + (tpl.firma ? '\n\n' + tpl.firma : '');
     await enviarCorreo({
-      from: remitenteComisiones(),
+      from: remitentePorClave(tpl.remitente || 'comisiones'),
       to: d.correo,
       cc: tpl.cc || undefined,              // copia fija del mantenedor
       subject: rell(tpl.asunto) || 'Comisión pagada',
@@ -1341,7 +1341,7 @@ const probarCorreos = async (req, res) => {
   try {
     const to = String(req.body.to || '').trim();
     if (!to) return res.status(400).json({ success: false, data: null, error: 'Destinatarios requeridos' });
-    const { enviarCorreo, remitente, remitenteComisiones, envolverHTML } = require('../../../../shared/mailer');
+    const { enviarCorreo, remitentePorClave, envolverHTML } = require('../../../../shared/mailer');
     const escH = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const aHtml = t => escH(t).replace(/\n/g, '<br>');
     const rell = (t, datos) => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
@@ -1358,11 +1358,11 @@ const probarCorreos = async (req, res) => {
     const cuerpoCta = rell(tCta.cuerpo, dCta) + (tCta.firma ? '\n\n' + rell(tCta.firma, dCta) : '');
     const cuerpoPag = rell(tPag.cuerpo, dPag) + (tPag.firma ? '\n\n' + rell(tPag.firma, dPag) : '');
     const r1 = await enviarCorreo({
-      from: remitente(), to,
+      from: remitentePorClave(tCta.remitente || 'comisiones'), to,
       subject: '[PRUEBA] ' + (rell(tCta.asunto, dCta) || 'Cartola'),
       html: envolverHTML(aHtml(cuerpoCta)), text: cuerpoCta, attachments: adj });
     const r2 = await enviarCorreo({
-      from: remitenteComisiones(), to,
+      from: remitentePorClave(tPag.remitente || 'comisiones'), to,
       subject: '[PRUEBA] ' + (rell(tPag.asunto, dPag) || 'Comisión pagada'),
       html: envolverHTML(aHtml(cuerpoPag)), text: cuerpoPag });
     res.json({ success: r1.ok && r2.ok, data: { cartola: r1, pagada: r2 }, error: (!r1.ok && r1.error) || (!r2.ok && r2.error) || null });

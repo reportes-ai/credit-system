@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v3.1 — campo CCO (copia oculta) editable en cada plantilla de correo · v3.0 — correo ODP a Contabilidad: campo Con copia (CC) parametrico junto al destinatario · v2.9 — navbar migrada al componente topnav · v2.7 — los montos seguidos salen como tabla en el correo · v2.6 — el cuerpo se envia con parrafos de verdad (bug: la prueba lo mandaba todo pegado) · v2.5 — cuerpos en texto plano legible (el motor los pasa a HTML) + cada correo dice a quien va dirigido · v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
+  <!-- v3.2 — "Sale desde": remitente parametrico por plantilla (cuentas habilitadas del mailer); cartolas dealer/parque nacen desde comisiones@ · v3.1 — campo CCO (copia oculta) editable en cada plantilla de correo · v3.0 — correo ODP a Contabilidad: campo Con copia (CC) parametrico junto al destinatario · v2.9 — navbar migrada al componente topnav · v2.7 — los montos seguidos salen como tabla en el correo · v2.6 — el cuerpo se envia con parrafos de verdad (bug: la prueba lo mandaba todo pegado) · v2.5 — cuerpos en texto plano legible (el motor los pasa a HTML) + cada correo dice a quien va dirigido · v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -362,13 +362,14 @@ async function guardar(track){
    Mismo mantenedor, un solo lugar para todos los correos de Post Venta. Cada
    plantilla se guarda por separado: así un error de tipeo en una no arrastra
    a las demás, y la auditoría dice exactamente cuál se tocó. */
-let PLANTS = [], PLANT_PERFILES = [];
+let PLANTS = [], PLANT_PERFILES = [], PLANT_REMITENTES = [];
 
 async function cargarPlantillas(){
   try {
     const j = await (await fetch('/api/correos-plantillas', { headers:H })).json();
     if (!j.success) throw new Error(j.error);
     PLANTS = j.data.rows || []; PLANT_PERFILES = j.data.perfiles || [];
+    PLANT_REMITENTES = j.data.remitentes || [{clave:'sistema',label:'Sistema (afbs@)'}];
     pintarPlantillas();
   } catch(e){
     document.getElementById('plantCont').innerHTML =
@@ -410,6 +411,10 @@ function pintarPlantillas(){
           <select id="plPf${i}" multiple size="4" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:6px;font-size:.82rem">${perfSel}</select>
           <div style="font-size:.7rem;color:#94a3b8;margin-top:3px">Ctrl+clic para varios. Se SUMAN al destinatario de arriba; dejarlo vacío no impide el envío.</div></div>
         <div>
+          <div class="fld"><label>Sale desde (remitente)</label>
+            <select id="plRem${i}" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 9px;font-size:.82rem">${
+              PLANT_REMITENTES.map(c=>`<option value="${escPA(c.clave)}"${(r.remitente||'sistema')===c.clave?' selected':''}>${escP(c.label)}</option>`).join('')
+            }</select></div>
           <div class="fld"><label>Copia (CC) — separados por coma</label>
             <input id="plCc${i}" value="${escPA(r.cc)}" placeholder="ej: operaciones@autofacilchile.cl"></div>
           <div class="fld"><label>Copia oculta (CCO) — separados por coma</label>
@@ -435,6 +440,7 @@ async function guardarPlantilla(i){
     para_perfiles: [...document.getElementById('plPf'+i).selectedOptions].map(o=>o.value).join(','),
     cc: document.getElementById('plCc'+i).value,
     cco: document.getElementById('plCco'+i).value,
+    remitente: document.getElementById('plRem'+i).value,
     activo: document.getElementById('plAc'+i).checked ? 1 : 0,
   };
   try {
