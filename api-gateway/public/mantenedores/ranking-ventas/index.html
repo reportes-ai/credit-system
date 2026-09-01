@@ -92,7 +92,8 @@
   async function probar(){
     const j=await(await fetch('/api/ranking-ventas/popup?test=1',{headers:H})).json(); const d=j.data||{};
     if(!d.mostrar) return alert('No hay créditos otorgados el mes anterior para rankear.');
-    d.titulo=document.getElementById('titulo').value.replace(/\{mes\}/g,(d.titulo.match(/— (.+)$/)||[])[1]||'MES ANTERIOR')||d.titulo;
+    // El mes viaja aparte (d.mes, línea propia bajo el título): del template se quita {mes}
+    d.titulo=(document.getElementById('titulo').value.replace(/\{mes\}/g,'').replace(/\s*[—–-]\s*$/,'').trim())||d.titulo;
     d.subtitulo=document.getElementById('subtitulo').value||d.subtitulo;
     d.musica=document.getElementById('musica').checked;
     d.melodia=document.getElementById('melodia').value;
