@@ -166,11 +166,15 @@
   async function check() {
     try {
       const token = sessionStorage.getItem('token'); if (!token) return;
-      if (localStorage.getItem(hoyKey())) return; // atajo diario
+      // Atajo: máximo 1 consulta por HORA (no por día): el gate de la hora del
+      // primer día devolvía "aún no" en la mañana y el atajo diario bloqueaba
+      // el re-chequeo — a las 12:00 el popup nunca aparecía (bug 01-09-2026).
+      const chkTs = Number(localStorage.getItem(hoyKey()) || 0);
+      if (chkTs && Date.now() - chkTs < 3600e3) return;
       const r = await fetch('/api/ranking-ventas/popup', { headers: { Authorization: 'Bearer ' + token } });
       if (!r.ok) return;
       const j = await r.json(); const d = (j && j.data) || {};
-      localStorage.setItem(hoyKey(), '1');
+      localStorage.setItem(hoyKey(), String(Date.now()));
       if (!d.mostrar) return;
       const k = 'afRankVisto_' + d.clave; // 1 vez por MES (por navegador)
       if (localStorage.getItem(k)) return;
