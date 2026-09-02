@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v2.2 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js): datalist desde AF_BANCOS y normalizacion por AF_BANCO_CANON (alias CHILE/BCI/BBVA...). v2.1 — modo Modificacion precarga los locales adicionales existentes del dealer · v2.0 — multi-local: locales en OTROS parques con tabla de comision POR local (locales_json; al cerrar sella dealer_locales/dealer_comisiones) · v1.36 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
+  <!-- v2.3 — NUEVO ORDEN de poderes del deposito: NO bloquean el envio a autorizacion; se firman y suben DESPUES de autorizada junto con la ficha firmada (obligatorios en Enviar Firmada) · v2.2 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js): datalist desde AF_BANCOS y normalizacion por AF_BANCO_CANON (alias CHILE/BCI/BBVA...). v2.1 — modo Modificacion precarga los locales adicionales existentes del dealer · v2.0 — multi-local: locales en OTROS parques con tabla de comision POR local (locales_json; al cerrar sella dealer_locales/dealer_comisiones) · v1.36 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -334,7 +334,7 @@
   </div>
 
   <div class="card-sec" id="cardPoderes" style="display:none;border:1.5px solid #fca5a5">
-    <h3 style="border-left-color:#dc2626;color:#991b1b"><i class="bi bi-shield-lock me-1"></i> Poderes del depósito (obligatorios)</h3>
+    <h3 style="border-left-color:#dc2626;color:#991b1b"><i class="bi bi-shield-lock me-1"></i> Poderes del depósito (se firman y suben DESPUÉS de la autorización)</h3>
     <div class="card-body">
       <p class="hint" id="poderesHint" style="margin-top:0">El RUT de la cuenta es <b>distinto</b> al del concesionario (depósito a un tercero). Descarga el <b>Poder Simple</b>, hazlo firmar por el Representante Legal y adjúntalo junto con los <b>Poderes del Representante Legal</b>.</p>
       <button class="btn btn-light" type="button" onclick="descargarPoderSimple()" style="margin-bottom:12px"><i class="bi bi-download"></i> Descargar Poder Simple</button>
@@ -437,7 +437,7 @@ function aplicarEstadoUI(estado, f){
   const b=$('estadoBanner'); if(!b) return;
   const set=(bg,col,html)=>{ b.style.display='block'; b.style.background=bg; b.style.color=col; b.innerHTML=html; };
   if(estado==='PEND_AUTORIZACION') set('#fef9c3','#854d0e','<i class="bi bi-hourglass-split me-1"></i>En autorización'+(f&&f.nivel_actual_nombre?' — nivel: <b>'+escH(f.nivel_actual_nombre)+'</b>':'')+'. No editable hasta autorizar o rechazar.');
-  else if(estado==='AUTORIZADA') set('#dbeafe','#1e40af','<i class="bi bi-printer me-1"></i><b>Autorizada.</b> Imprime la ficha (trae las autorizaciones en letra chica), hazla firmar, súbela y pulsa "Enviar firmada".');
+  else if(estado==='AUTORIZADA') set('#dbeafe','#1e40af','<i class="bi bi-printer me-1"></i><b>Autorizada.</b> Imprime la ficha (trae las autorizaciones en letra chica)'+(typeof requierePoderes==='function'&&requierePoderes()?' <b>y el Poder Simple</b>':'')+', hazla(s) firmar, sube todo y pulsa "Enviar firmada".'+(typeof requierePoderes==='function'&&requierePoderes()?' Esta cuenta deposita a un tercero: los <b>poderes firmados</b> son obligatorios en este paso.':''));
   else if(estado==='PEND_CIERRE') set('#fde68a','#92400e','<i class="bi bi-hourglass-split me-1"></i>Ficha firmada enviada — en revisión de cierre por Operaciones/Crédito.');
   else if(estado==='APROBADA') set('#dcfce7','#166534','<i class="bi bi-check-circle me-1"></i>Aprobada — el dealer ya está en el sistema.');
   else b.style.display='none';
@@ -445,6 +445,9 @@ function aplicarEstadoUI(estado, f){
 async function onEnviarFirmada(){
   if(!fileB64 && !TIENE_FICHA){ toast('Sube la ficha firmada (PDF o foto) primero.', true); return; }
   if(nArch('CEDULA')<1){ toast('Adjunta la(s) cédula(s) de identidad de los firmantes junto con la ficha firmada.', true); return; }
+  // Poderes del depósito: se firman después de la autorización y van junto con la ficha firmada
+  if(requierePoderes() && nArch('PODER_SIMPLE')<1){ toast('Adjunta el Poder Simple FIRMADO (descárgalo con el botón de esta ficha) — la cuenta deposita a un tercero.', true); return; }
+  if(requierePoderes() && nArch('PODER_REP_LEGAL')<1){ toast('Adjunta los Poderes del Representante Legal junto con la ficha firmada.', true); return; }
   if(fileB64){
     try{ const ru=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivo',{method:'POST',headers:H,body:JSON.stringify({archivo_nombre:nombreFichaArchivo(),mime_type:fileMime,archivo_data:fileB64})});
       const ju=await ru.json(); if(!ju.success) throw new Error(ju.error||'Error al subir'); fileB64=null; TIENE_FICHA=true;
@@ -750,8 +753,8 @@ async function cargarInformes(){
   if(!FICHA_ID) return;
   try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivos',{headers:H}); const j=await r.json(); if(!j.success)return;
     for(const cat of Object.keys(CAT_UI)){
-      // CEDULA se sube junto con la firmada: editable también en AUTORIZADA/PEND_CIERRE
-      const bloqueado = !['BORRADOR','RECHAZADA'].includes(ESTADO) && !(cat==='CEDULA' && ['AUTORIZADA','PEND_CIERRE'].includes(ESTADO));
+      // CEDULA y PODERES se suben junto con la firmada: editables también en AUTORIZADA/PEND_CIERRE
+      const bloqueado = !['BORRADOR','RECHAZADA'].includes(ESTADO) && !(['CEDULA','PODER_SIMPLE','PODER_REP_LEGAL'].includes(cat) && ['AUTORIZADA','PEND_CIERRE'].includes(ESTADO));
       const cont=$(CAT_UI[cat].list); if(!cont) continue;
       const rows=(j.data||[]).filter(a=>a.categoria===cat);
       cont.innerHTML = rows.map(a=>`<div class="filerow"><i class="bi bi-file-earmark-text fi"></i>
@@ -768,9 +771,10 @@ function actualizarTercero(){
   const req = requierePoderes();
   $('cardPoderes').style.display = req ? '' : 'none';
   const h=$('poderesHint');
-  if(req && h) h.innerHTML = esTercero()
-    ? 'El RUT de la cuenta es <b>distinto</b> al del concesionario (depósito a un tercero). Descarga el <b>Poder Simple</b>, hazlo firmar por el Representante Legal y adjúntalo junto con los <b>Poderes del Representante Legal</b>.'
-    : 'Estás <b>modificando el depósito</b> del dealer (banco / cuenta / RUT). Descarga el <b>Poder Simple</b>, hazlo firmar por el Representante Legal y adjúntalo junto con los <b>Poderes del Representante Legal</b>.';
+  if(req && h) h.innerHTML = (esTercero()
+    ? 'El RUT de la cuenta es <b>distinto</b> al del concesionario (depósito a un tercero).'
+    : 'Estás <b>modificando el depósito</b> del dealer (banco / cuenta / RUT).')
+    + ' Puedes enviar la ficha a autorización SIN los poderes: <b>una vez AUTORIZADA</b>, descarga el <b>Poder Simple</b>, hazlo firmar por el Representante Legal y súbelo junto con los <b>Poderes del Rep. Legal</b> y la ficha firmada. Quien cierra validará los documentos.';
 }
 // El aviso de depósito a tercero ahora es la sección inline "Depósito a tercero —
 // Poderes" (se muestra sola al ingresar un RUT distinto). Ya no se usa el popup;
@@ -854,8 +858,9 @@ async function gateExcepciones(){
 async function onGuardar(){ if(!(await gateExcepciones())) return; if(!(await gateTercero())) return; await guardar(false); }
 async function onEnviar(){
   const errs=validarEnvio();
-  if(requierePoderes() && nArch('PODER_SIMPLE')<1) errs.push('Falta: Poder Simple firmado'+(esTercero()?' (cuenta de tercero)':' (cambiaste el depósito del dealer)'));
-  if(requierePoderes() && nArch('PODER_REP_LEGAL')<1) errs.push('Falta: Poderes del Representante Legal'+(esTercero()?' (cuenta de tercero)':' (cambiaste el depósito del dealer)'));
+  // Los PODERES ya no bloquean el envío (02-09-2026): se firman DESPUÉS de la
+  // autorización y se suben junto con la ficha firmada — nadie firma algo que
+  // podría rechazarse.
   mostrarErrsEnvio(errs);
   if(errs.length){ if(esTercero()) await gateTercero(); return; }
   if(!(await gateExcepciones())) return;

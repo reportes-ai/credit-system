@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.25 — boton Portal (demo) en Editar Dealer: abre el portal real en modo demostracion; bloqueado si el dealer ya se registro · v1.24 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js). v1.23 — multi-local: locales con tabla POR local en el modal Editar Dealer (solo lectura) y en la vista de ficha (LOCALES ADICIONALES) · v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
+  <!-- v1.26 — al CERRAR una ficha con deposito a tercero, quien cierra valida los poderes adjuntos (confirmacion + candado server-side docs_validados) · v1.25 — boton Portal (demo) en Editar Dealer: abre el portal real en modo demostracion; bloqueado si el dealer ya se registro · v1.24 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js). v1.23 — multi-local: locales con tabla POR local en el modal Editar Dealer (solo lectura) y en la vista de ficha (LOCALES ADICIONALES) · v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -576,7 +576,18 @@ function autorizar(id){
     : '¿Autorizar este nivel de la ficha?';
   if(confirm(msg)) accion(id,'autorizar',{},'Nivel autorizado ✓.');
 }
-function cerrar(id){
+async function cerrar(id){
+  // Depósito a tercero / cambio de depósito: quien cierra VALIDA los poderes
+  // adjuntos (se firmaron después de la autorización — flujo 02-09-2026).
+  let conPoderes=false;
+  try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+id+'/archivos',{headers:H}); const j=await r.json();
+    conPoderes=(j.data||[]).some(a=>['PODER_SIMPLE','PODER_REP_LEGAL'].includes(a.categoria)); }catch(e){}
+  if(conPoderes){
+    if(!confirm('Esta ficha deposita a un TERCERO o cambia el depósito.\n\n¿Revisaste los poderes adjuntos (Poder Simple firmado + Poderes del Rep. Legal) y los VALIDAS como correctos?\n\nAceptar = documentos validados.')) return;
+    if(!confirm('¿Cerrar la ficha firmada y crear/actualizar el dealer en el sistema?')) return;
+    accion(id,'cerrar',{docs_validados:1},'Dealer creado/actualizado ✓ — poderes validados (se notificó al ejecutivo).');
+    return;
+  }
   if(confirm('¿Cerrar la ficha firmada y crear/actualizar el dealer en el sistema?'))
     accion(id,'cerrar',{},'Dealer creado/actualizado ✓ (se notificó al ejecutivo).');
 }

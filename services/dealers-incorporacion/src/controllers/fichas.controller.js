@@ -494,7 +494,10 @@ const CATEGORIAS = ['EMPRESA', 'SOCIOS', 'SOCIO1', 'SOCIO2', 'SOCIO3', 'PODER_SI
 // hasta 6 archivos (rep. legal + socios, anverso/reverso).
 const MAX_POR_CATEGORIA = cat => (cat === 'CEDULA' ? 6 : 3);
 const puedeTocarArchivos = (estado, cat) =>
-  ['BORRADOR', 'RECHAZADA'].includes(estado) || (cat === 'CEDULA' && ['AUTORIZADA', 'PEND_CIERRE'].includes(estado));
+  ['BORRADOR', 'RECHAZADA'].includes(estado) ||
+  // Cédulas Y PODERES se suben junto con la ficha firmada, DESPUÉS de la
+  // autorización (nadie firma antes de que la ficha esté aprobada — 02-09-2026)
+  (['CEDULA', 'PODER_SIMPLE', 'PODER_REP_LEGAL'].includes(cat) && ['AUTORIZADA', 'PEND_CIERRE'].includes(estado));
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 
 // Comentario de excepción válido: ≥10 caracteres y al menos un espacio (no se avisan las reglas al usuario).
@@ -961,14 +964,11 @@ const enviar = async (req, res) => {
     const [cats] = await pool.query('SELECT categoria, COUNT(*) n FROM dealer_ficha_archivos WHERE id_ficha=? GROUP BY categoria', [req.params.id]);
     const porCat = Object.fromEntries(cats.map(c => [c.categoria, c.n]));
     const informes = await procesarInformesFicha(f, porCat, req.usuario);
-    // Poderes obligatorios: cuenta de tercero o modificación que cambia el depósito.
-    const cuentaTercero = f.rut_cuenta && normRut(f.rut_cuenta) !== normRut(f.rut);
-    const depCambio = await depositoCambioVsDealer(f);
-    if (cuentaTercero || depCambio) {
-      const motivo = cuentaTercero ? 'La cuenta es de un tercero' : 'Modificaste el depósito del dealer';
-      if (!porCat.PODER_SIMPLE)    return res.status(400).json({ success: false, data: null, error: `${motivo}: debes cargar el Poder Simple firmado antes de enviar` });
-      if (!porCat.PODER_REP_LEGAL) return res.status(400).json({ success: false, data: null, error: `${motivo}: debes cargar los Poderes del Representante Legal antes de enviar` });
-    }
+    /* Poderes del depósito (cuenta de tercero / cambio de depósito): desde el
+       02-09-2026 NO bloquean el envío — nadie firma nada antes de que la ficha
+       esté aprobada (¿para qué hacer firmar algo que quizás se rechace?). Se
+       exigen al subir la FICHA FIRMADA (enviarFirmada) y quien cierra valida
+       los documentos adjuntos. */
 
     const diferencias = await calcularDiferencias(f);
     const especial = await esEspecial(f);
@@ -1089,6 +1089,16 @@ const enviarFirmada = async (req, res) => {
     // Las cédulas de identidad de los firmantes van JUNTO con la ficha firmada (obligatorio).
     const [[{ nCed }]] = await pool.query("SELECT COUNT(*) nCed FROM dealer_ficha_archivos WHERE id_ficha=? AND categoria='CEDULA'", [f.id]);
     if (!nCed) return res.status(400).json({ success: false, data: null, error: 'Debes adjuntar la(s) cédula(s) de identidad de los firmantes junto con la ficha firmada' });
+    // Poderes del depósito: firmados DESPUÉS de la autorización, se suben acá.
+    const cuentaTercero = f.rut_cuenta && normRut(f.rut_cuenta) !== normRut(f.rut);
+    const depCambio = await depositoCambioVsDealer(f);
+    if (cuentaTercero || depCambio) {
+      const [pods] = await pool.query("SELECT categoria, COUNT(*) n FROM dealer_ficha_archivos WHERE id_ficha=? AND categoria IN ('PODER_SIMPLE','PODER_REP_LEGAL') GROUP BY categoria", [f.id]);
+      const pc = Object.fromEntries(pods.map(x => [x.categoria, x.n]));
+      const motivo = cuentaTercero ? 'La cuenta es de un tercero' : 'El depósito del dealer cambió';
+      if (!pc.PODER_SIMPLE)    return res.status(400).json({ success: false, data: null, error: `${motivo}: adjunta el Poder Simple FIRMADO junto con la ficha firmada (descárgalo desde esta misma ficha)` });
+      if (!pc.PODER_REP_LEGAL) return res.status(400).json({ success: false, data: null, error: `${motivo}: adjunta los Poderes del Representante Legal junto con la ficha firmada` });
+    }
     const fichaBuf = await almacen.obtener({ ruta: f.doc_ruta, blob: f.ficha_data });
     // Verifica la firma + compara el documento con los datos ingresados (para el analista).
     const firma = await verificarFirma(fichaBuf, f.ficha_mime);
@@ -1326,6 +1336,19 @@ const cerrar = async (req, res) => {
     if (!['PEND_CIERRE', 'TOMADA'].includes(f.estado))
       return res.status(400).json({ success: false, data: null, error: 'La ficha no está en revisión de cierre' });
     if (!f.ficha_data && !f.doc_ruta) return res.status(400).json({ success: false, data: null, error: 'No hay ficha firmada para cerrar' });
+    /* Poderes del depósito: quien CIERRA debe validarlos (se firman y suben
+       después de la autorización — flujo 02-09-2026). Doble candado: que los
+       archivos existan Y que el revisor declare que los revisó. */
+    const cierreTercero = f.rut_cuenta && normRut(f.rut_cuenta) !== normRut(f.rut);
+    const cierreDepCambio = await depositoCambioVsDealer(f);
+    if (cierreTercero || cierreDepCambio) {
+      const [pods] = await pool.query("SELECT categoria FROM dealer_ficha_archivos WHERE id_ficha=? AND categoria IN ('PODER_SIMPLE','PODER_REP_LEGAL') GROUP BY categoria", [f.id]);
+      const tiene = new Set(pods.map(x => x.categoria));
+      if (!tiene.has('PODER_SIMPLE') || !tiene.has('PODER_REP_LEGAL'))
+        return res.status(400).json({ success: false, data: null, error: 'Faltan los poderes del depósito (Poder Simple y/o Poderes del Rep. Legal): el ejecutivo debe subirlos junto con la ficha firmada' });
+      if (!req.body || !req.body.docs_validados)
+        return res.status(400).json({ success: false, data: null, error: 'Esta ficha deposita a un tercero: debes revisar los poderes adjuntos y marcar "Documentos validados" para cerrar' });
+    }
 
     // ENTIDAD PARQUE: mismo circuito, distinto final — se crea el parque, no un dealer.
     if (f.entidad === 'PARQUE') {
