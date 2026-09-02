@@ -84,7 +84,26 @@ def construir():
     vineta(doc, 'en Power: 1 marcación por agente libre. Punto.', bold_hasta='Regla base: ')
     vineta(doc, 'en Predictivo: ratio = f(contactabilidad última hora, duración media de llamada, agentes conectados), recalculado cada 30–60 segundos, con techo por la tasa de abandono objetivo (≤3%). Si el abandono sube, el ratio baja solo.', bold_hasta='Ratio dinámico: ')
     vineta(doc, 'toda llamada, intento y abandono queda en el log del Dialer — el reporte de cumplimiento sale de ahí.', bold_hasta='Trazabilidad: ')
-    h2(doc, '4.3 Seguridad y datos')
+    h2(doc, '4.4 Detección de tonos y voz (AMD) — el problema más complejo, resuelto por capas')
+    p(doc, 'Distinguir en segundos si contestó una persona, un contestador, un fax o un tono de red es lo '
+           'más difícil de un discador — y donde mueren los desarrollos caseros. AF Dialer NO construye '
+           'procesamiento de señal propio: lo resuelve en tres capas, igual que las plataformas enterprise '
+           'modernas.')
+    tabla(doc, ('Capa', 'Qué detecta', 'Cómo se resuelve'),
+          (('1. Tonos de red', 'Ocupado, número fuera de servicio (tonos SIT), fax, congestión, no contesta; DTMF (teclas)', 'Viene RESUELTO en la señalización del proveedor: llega como estado de la llamada. Cero desarrollo propio.'),
+           ('2. AMD clásico (humano vs contestador)', 'Silencio inicial, duración del saludo ("¿aló?" corto y silencio = humano; parlamento largo y corrido = máquina), detección del beep', 'Integrado en el CPaaS (~US$ 0,0075 por llamada, modo asíncrono) con ~85–90% de acierto; en Asterisk, la aplicación AMD() con los mismos parámetros. Fase 1: comprado, no construido.'),
+           ('3. AMD con IA (fase 2–3)', 'Clasificación por CONTENIDO: streaming de los primeros segundos a un modelo de voz — "deje su mensaje después del tono" es máquina; "¿aló, quién habla?" es humano. Detecta además el fin del beep para dejar mensajes grabados en el momento exacto', 'Modelos de audio en tiempo real (VAD + transcripción parcial): 95%+ de acierto. Es donde un discador propio de hoy supera a las licencias enterprise antiguas.')),
+          (3.4, 5.9, 7.0))
+    regla(doc, 'Principio de diseño: el pacing NO espera certeza. Conecta al agente con la clasificación '
+               'probabilística y el agente confirma en un segundo — el AMD tiene que ser bueno, no perfecto. '
+               'Perseguir el 100% de acierto es el error clásico de los discadores caseros.')
+    h2(doc, '4.5 Asterisk: cuándo y por qué (la decisión de la fase 3)')
+    p(doc, 'Asterisk (o FreeSWITCH) es la central open source con troncal SIP local — la alternativa al '
+           'CPaaS. No es un "sí o no", es un "cuándo", y el número que gatilla la decisión sale del piloto:')
+    vineta(doc, 'minuto a móvil ~50–80% más barato que el CPaaS, cero licencias, números de la telefónica local (mejor contactabilidad), AMD y grabación propios.', bold_hasta='A favor: ')
+    vineta(doc, 'es infraestructura que ADMINISTRAR (va contra la filosofía sin-fierros): seguridad SIP crítica (el fraude telefónico por centrales mal aseguradas es el ataque N°1 del rubro), WebRTC a configurar a mano, contrato y enrolamiento con la telefónica local, y dependencia de alguien que sepa operarla.', bold_hasta='En contra: ')
+    vineta(doc, 'si el piloto en CPaaS factura sobre ~US$ 600–800/mes en minutos, la troncal SIP se paga sola y se monta en fase 3 SIN tocar el Dialer Core — la capa de voz es intercambiable por diseño. Si el consumo es bajo, el CPaaS se queda y nunca se administró una central.', bold_hasta='Regla de decisión: ')
+    h2(doc, '4.6 Seguridad y datos')
     vineta(doc, 'el Dialer guarda SOLO lo mínimo del contacto (nombre, teléfono, referencia externa); la ficha completa vive en la app cliente. Grabaciones en bucket con retención y acceso auditado.')
     vineta(doc, 'API keys por app cliente, webhooks firmados, usuarios de agente propios del Dialer o federados desde la Suite.')
 
