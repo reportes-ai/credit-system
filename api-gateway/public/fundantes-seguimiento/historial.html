@@ -7,7 +7,7 @@
   <title>Historial de Fundantes — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.0 -->
+  <!-- v1.1 — acceso ejecutivos solo lectura: ven SUS operaciones (visibilidad server-side) y el boton Devolver solo aparece con permiso validar/operaciones -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
@@ -76,6 +76,17 @@ const H = { Authorization:'Bearer '+token };
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fDT = s => s ? new Date(s).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
 let DATA = [];
+/* Ejecutivos: SOLO VER sus operaciones (el server ya filtra por visibilidad).
+   El botón Devolver aparece únicamente con permiso de validar/operaciones. */
+let PUEDE_DEVOLVER = false;
+(async()=>{ try {
+  const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+  if (yo && yo.perfil === 'Administrador') { PUEDE_DEVOLVER = true; render(); return; }
+  const j = await (await fetch('/api/auth/mis-permisos', { headers:H })).json();
+  const fs = (j && j.funcionalidades) || [];
+  PUEDE_DEVOLVER = fs.includes('fundantes_validar') || fs.includes('fundantes_operaciones');
+  render();
+} catch(e){} })();
 
 function persona(p){ return p ? `<div>${fDT(p.fecha)}</div><div class="sub">${esc(p.persona||'')}</div>` : '<span class="sub">—</span>'; }
 function resultado(r){
@@ -125,7 +136,7 @@ function render(){
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-outline-primary" style="font-size:.72rem;padding:3px 8px" onclick="verDocs(${r.id_credito}, '${esc(r.num_op)}')"><i class="bi bi-eye"></i> Ver</button>
         <a class="btn btn-sm btn-outline-success" style="font-size:.72rem;padding:3px 8px" href="/api/fundantes-seguimiento/${r.id_credito}/zip?token=${encodeURIComponent(token)}"><i class="bi bi-download"></i> ZIP</a>
-        <button class="btn btn-sm btn-outline-warning" style="font-size:.72rem;padding:3px 8px" title="La financiera devolvió los fundantes: vuelve a Pendientes" onclick="devolver(${r.id_credito}, '${esc(r.num_op)}')"><i class="bi bi-arrow-counterclockwise"></i> Devolver</button>
+        ${PUEDE_DEVOLVER ? `<button class="btn btn-sm btn-outline-warning" style="font-size:.72rem;padding:3px 8px" title="La financiera devolvió los fundantes: vuelve a Pendientes" onclick="devolver(${r.id_credito}, '${esc(r.num_op)}')"><i class="bi bi-arrow-counterclockwise"></i> Devolver</button>` : ''}
       </td>
     </tr>`).join('');
 }
