@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v1.3 — navbar migrada al componente topnav -->
+  <!-- v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -247,6 +247,7 @@ function pintarLiq(l, d){
           ${cab('HABERES')}
           ${fila('Sueldo base'+((d.dias??30)!==30?` (${d.dias}/30)`:''), d.sueldo_base)}
           ${fila('Comisiones', d.comisiones)}
+          ${d.feriado_variable>0?fila(`Feriado renta variable art. 71 (${d.feriado_var_dias} día/s, prom. 3 meses)`, d.feriado_variable):''}
           ${fila('Otros imponibles', d.otros_imponibles)}
           ${fila('Gratificación legal (tope 4,75 IMM/12)', d.gratificacion)}
           ${sub('Total imponible', d.total_imponible)}

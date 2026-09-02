@@ -552,10 +552,15 @@ function calcLiquidacion(inp, ind) {
   // Días trabajados: sueldo proporcional en 30avos (ausencias/ingresos parciales)
   const dias = inp.dias == null || inp.dias === '' ? 30 : Math.max(0, Math.min(30, Number(inp.dias)));
   const sueldo = R(R(inp.sueldo_base) * dias / 30), comisiones = R(inp.comisiones), otrosImp = R(inp.otros_imponibles);
+  /* Feriado con renta VARIABLE (art. 71 CT): los días de vacaciones del mes se
+     pagan además con el promedio de lo ganado en variables (comisiones) en los
+     últimos 3 meses ENTEROS trabajados — la comisión del mes cae porque la
+     persona no vendió estando de vacaciones, y este haber lo compensa. */
+  const feriadoVar = R(inp.feriado_variable);
   const colacion = R(inp.colacion), movilizacion = R(inp.movilizacion), otrosNoImp = R(inp.otros_no_imponibles);
   const otrosDesc = R(inp.otros_descuentos);
 
-  const baseGrat = sueldo + comisiones + otrosImp;
+  const baseGrat = sueldo + comisiones + feriadoVar + otrosImp;
   // Gratificación legal art. 50: 25% mensual con tope (4,75 IMM)/12
   const topeGrat = R(ind.rem_grat_tope_imm * ind.rem_imm / 12);
   const gratificacion = Math.min(R(baseGrat * 0.25), topeGrat);
@@ -592,7 +597,7 @@ function calcLiquidacion(inp, ind) {
   const aporteAfcEmp = R(baseAfc * ((esIndef ? ind.rem_afc_emp_pct : ind.rem_afc_emp_pfijo_pct) || 0) / 100);
   const aporteMutual = R(baseCotiz * (ind.rem_mutual_pct || 0) / 100);
   return {
-    dias, sueldo_base: sueldo, comisiones, otros_imponibles: otrosImp, gratificacion,
+    dias, sueldo_base: sueldo, comisiones, feriado_variable: feriadoVar, feriado_var_dias: inp.feriado_var_dias || 0, otros_imponibles: otrosImp, gratificacion,
     total_imponible: imponible, base_cotizacion: baseCotiz,
     colacion, movilizacion, otros_no_imponibles: otrosNoImp,
     total_haberes: totalHaberes,
@@ -648,6 +653,48 @@ async function licenciasDelMes(mes) {
   return m;
 }
 
+/* ── Feriado con renta variable (art. 71 CT) — pedido Pato 02-09-2026 ─────────
+   Por colaborador con VACACIONES APROBADAS que tocan el mes: días corridos de
+   feriado dentro del mes (convención 30avos) × promedio diario de la renta
+   VARIABLE (comisiones) de las últimas 3 liquidaciones EMITIDAS de meses
+   enteros. Sin variable en esos meses → 0 (renta fija: el sueldo ya paga). */
+async function feriadoVariableDelMes(mes) {
+  const out = {};
+  try {
+    const [vacs] = await pool.query(
+      `SELECT id_usuario, fecha_desde, fecha_hasta FROM rh_vacaciones
+        WHERE estado='APROBADA' AND id_usuario IS NOT NULL
+          AND fecha_desde <= LAST_DAY(CONCAT(?, '-01')) AND fecha_hasta >= CONCAT(?, '-01')`, [mes, mes]);
+    if (!vacs.length) return out;
+    const ini = mes + '-01', finStr = mes + '-31';
+    const diasPorU = {};
+    for (const v of vacs) {
+      const d = isoF(v.fecha_desde) > ini ? isoF(v.fecha_desde) : ini;
+      const h = isoF(v.fecha_hasta) < finStr ? isoF(v.fecha_hasta) : finStr;
+      if (h >= d) diasPorU[v.id_usuario] = (diasPorU[v.id_usuario] || 0) +
+        Math.min(30, Number(h.slice(8, 10))) - Math.min(30, Number(d.slice(8, 10))) + 1;
+    }
+    for (const [idU, diasVac] of Object.entries(diasPorU)) {
+      // Promedio de la VARIABLE de las últimas 3 liquidaciones emitidas ANTERIORES al mes
+      const [liqs] = await pool.query(
+        `SELECT detalle FROM rh_liquidaciones WHERE id_usuario=? AND estado='EMITIDA' AND mes < ?
+          ORDER BY mes DESC LIMIT 3`, [idU, mes]);
+      if (!liqs.length) continue;
+      let suma = 0, n = 0;
+      for (const l of liqs) {
+        try { const det = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {});
+          suma += Number(det.comisiones) || 0; n++; } catch (_) {}
+      }
+      if (!n) continue;
+      const promedio = suma / n;
+      if (promedio <= 0) continue;                       // renta fija: no aplica
+      const monto = Math.round(promedio / 30 * Math.min(30, diasVac));
+      if (monto > 0) out[idU] = { monto, dias: Math.min(30, diasVac), promedio: Math.round(promedio) };
+    }
+  } catch (e) { console.error('[remuneraciones feriado variable]', e.message); }
+  return out;
+}
+
 /* ── Comisiones aprobadas: sin aprobación de Operaciones no se emite el mes ── */
 async function comisionesSinAprobar(mes, comis) {
   const conComision = Object.entries(comis).filter(([, monto]) => monto > 0).map(([nom]) => nom);
@@ -690,6 +737,7 @@ const getMes = async (req, res) => {
     const adics = await adicionalesDelMes(mes);
     const descs = await descuentosDelMes(mes);
     const lics = await licenciasDelMes(mes);
+    const ferVar = await feriadoVariableDelMes(mes);
 
     // Todo viene de su fuente: días (ficha ingreso + licencias), comisiones
     // (motor de comisiones), otros haberes (Adicionales), otros descuentos
@@ -707,6 +755,8 @@ const getMes = async (req, res) => {
         dias: diasTrabajadosMes(mes, e.fecha_ingreso, lics[e.id_usuario], e.fecha_baja),
         colacion: e.colacion, movilizacion: e.movilizacion,
         comisiones: comis[String(e.nombre_corto).trim()] || 0,
+        feriado_variable: ferVar[e.id_usuario]?.monto || 0,
+        feriado_var_dias: ferVar[e.id_usuario]?.dias || 0,
         otros_imponibles: adics[e.id_usuario]?.imp || 0,
         otros_no_imponibles: adics[e.id_usuario]?.noimp || 0,
         otros_descuentos: descs[e.id_usuario] || 0,
@@ -734,6 +784,7 @@ const guardar = async (req, res) => {
     const adics = await adicionalesDelMes(mes);
     const descs = await descuentosDelMes(mes);
     const lics = await licenciasDelMes(mes);
+    const ferVar = await feriadoVariableDelMes(mes);
     let n = 0;
     for (const f of filas) {
       const [[emp]] = await pool.query(
@@ -751,6 +802,8 @@ const guardar = async (req, res) => {
         dias: diasTrabajadosMes(mes, emp.fecha_ingreso, lics[emp.id_usuario], emp.fecha_baja),
         colacion: emp.colacion, movilizacion: emp.movilizacion,
         comisiones: comis[String(emp.nombre_corto).trim()] || 0,
+        feriado_variable: ferVar[emp.id_usuario]?.monto || 0,
+        feriado_var_dias: ferVar[emp.id_usuario]?.dias || 0,
         otros_imponibles: adics[emp.id_usuario]?.imp || 0,
         otros_no_imponibles: adics[emp.id_usuario]?.noimp || 0,
         otros_descuentos: descs[emp.id_usuario] || 0,
