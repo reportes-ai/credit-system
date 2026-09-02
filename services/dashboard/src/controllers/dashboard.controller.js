@@ -648,7 +648,10 @@ exports.getDotacionEjecutivos = async (req, res) => {
         const baja = e.fecha_baja ? new Date(e.fecha_baja) : null;
         if (ing && ing > fin) continue;                    // aún no entraba
         if (baja && baja < ini) continue;                  // ya se había ido
-        if (!baja && e.estado !== 'activo' && ym >= new Date().toISOString().slice(0, 7)) continue;
+        /* Inactivo SIN fecha de baja = ficha sucia (ex-ejecutivos históricos):
+           no se cuenta en NINGÚN mes. Contarlos solo en los históricos inflaba
+           el promedio y hundía el factor (130→108 el 02-09-2026). */
+        if (!baja && e.estado !== 'activo') continue;
         const antig = ing ? (y - ing.getFullYear()) * 12 + (m - 1 - ing.getMonth()) : 12;
         peso += rampa(antig); n++;
       }

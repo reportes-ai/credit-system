@@ -3240,11 +3240,14 @@ function buildVProy2() {
     fetch('/api/dashboard/dotacion-ejecutivos', { headers: { Authorization: 'Bearer ' + (sessionStorage.getItem('token') || '') } })
       .then(r => r.json()).then(j => {
         if (j.success && j.data) {
-          const pesos = mesesHist.slice(-MESES_TREND).map(mh => j.data.meses[mh]).filter(v => v > 0);
-          const avg = pesos.length ? pesos.reduce((a, b) => a + b, 0) / pesos.length : 0;
-          let f = (avg > 0 && j.data.actual > 0) ? j.data.actual / avg : 1;
-          f = Math.min(1.5, Math.max(0.7, f));            // techo defensivo ±50/−30%
-          window.__proyDotInfo = { actual: j.data.actual, n: j.data.actual_n, avg: Math.round(avg * 100) / 100 };
+          /* Base = el ÚLTIMO cierre (no el promedio): la tendencia ya extrapola
+             el crecimiento jun→ago; el factor solo corrige el delta del equipo
+             ACTUAL contra el mes más reciente (si no, se contaba doble). */
+          const pesosUlt = mesesHist.slice(-MESES_TREND).map(mh => j.data.meses[mh]).filter(v => v > 0);
+          const base = pesosUlt.length ? pesosUlt[pesosUlt.length - 1] : 0;
+          let f = (base > 0 && j.data.actual > 0) ? j.data.actual / base : 1;
+          f = Math.min(1.3, Math.max(0.75, f));           // techo defensivo
+          window.__proyDotInfo = { actual: j.data.actual, n: j.data.actual_n, avg: Math.round(base * 100) / 100 };
           window.__proyDotFactor = f;
           if (Math.abs(f - 1) > 0.005) buildVProy2();     // re-render con el ajuste
         } else window.__proyDotFactor = 1;
@@ -3343,7 +3346,7 @@ function buildVProy2() {
   const notaDot = () => {
     const i = window.__proyDotInfo;
     if (!i || Math.abs(fDot - 1) <= 0.005) return '';
-    return ` <b>Ajuste por dotación:</b> el remanente del mes se escala ×${fDot.toFixed(2)} — equipo actual ${i.n} ejecutivo(s) con peso ${i.actual} (los nuevos rampean 30/60/85/100%) vs peso promedio ${i.avg} de los meses de la tendencia.`;
+    return ` <b>Ajuste por dotación:</b> el remanente del mes se escala ×${fDot.toFixed(2)} — equipo actual ${i.n} ejecutivo(s) con peso ${i.actual} (los nuevos rampean 30/60/85/100%) vs peso ${i.avg} del último cierre.`;
   };
 
   // ── Tabla comparativa de métodos (monto) ──
