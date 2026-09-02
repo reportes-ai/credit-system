@@ -17,6 +17,7 @@ router.post('/permisos',    verifyToken, configurar, ctrl.savePermisos);
 router.get('/presupuesto',  verifyToken, ctrl.getPresupuesto);
 router.get('/seguros-historico', verifyToken, verDash, ctrl.getSegurosHistorico);
 router.get('/clima-correlacion', verifyToken, verDash, ctrl.getClimaCorrelacion);
+router.get('/dotacion-ejecutivos', verifyToken, verDash, ctrl.getDotacionEjecutivos);
 router.post('/presupuesto', verifyToken, configurar, ctrl.savePresupuesto);
 router.get('/parametros',   verifyToken, ctrl.getParametros);                  // los lee todo usuario del dashboard
 router.post('/parametros',  verifyToken, requireFunc('mant_dashboard_param'), ctrl.saveParametros);

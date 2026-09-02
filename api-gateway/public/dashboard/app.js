@@ -3223,7 +3223,33 @@ function buildVProy2() {
   const pcQ = projCurva(tot.q, medQ), ptQ = trend('q');
   const pcM = projCurva(tot.m, medM), ptM = trend('m');
   const pcF = projCurva(tot.f, medM), ptF = trend('f');
-  const mzQ = mezcla(pcQ, ptQ), mzM = mezcla(pcM, ptM), mzF = mezcla(pcF, ptF);
+  /* ── AJUSTE POR DOTACIÓN (pedido Pato 02-09-2026): la curva y la tendencia
+     asumen el MISMO equipo comercial de los meses históricos. Si entró gente
+     (o se fue), el remanente del mes se escala por el factor de dotación:
+     peso del equipo actual / peso promedio de los meses de la tendencia,
+     con RAMPA para los nuevos (mes 1 ≈ 30% de un veterano —3-4 ops—, mes 2
+     60%, mes 3 85%, luego 100%). Solo se ajusta lo que FALTA del mes: lo ya
+     vendido es un hecho. */
+  const fDot = window.__proyDotFactor || 1;
+  const conDot = (v, actual) => v == null ? v : actual + (v - actual) * fDot;
+  const mzQ = conDot(mezcla(pcQ, ptQ), tot.q),
+        mzM = conDot(mezcla(pcM, ptM), tot.m),
+        mzF = conDot(mezcla(pcF, ptF), tot.f);
+  if (window.__proyDotFactor == null && !window.__proyDotReq) {
+    window.__proyDotReq = 1;
+    fetch('/api/dashboard/dotacion-ejecutivos', { headers: { Authorization: 'Bearer ' + (sessionStorage.getItem('token') || '') } })
+      .then(r => r.json()).then(j => {
+        if (j.success && j.data) {
+          const pesos = mesesHist.slice(-MESES_TREND).map(mh => j.data.meses[mh]).filter(v => v > 0);
+          const avg = pesos.length ? pesos.reduce((a, b) => a + b, 0) / pesos.length : 0;
+          let f = (avg > 0 && j.data.actual > 0) ? j.data.actual / avg : 1;
+          f = Math.min(1.5, Math.max(0.7, f));            // techo defensivo ±50/−30%
+          window.__proyDotInfo = { actual: j.data.actual, n: j.data.actual_n, avg: Math.round(avg * 100) / 100 };
+          window.__proyDotFactor = f;
+          if (Math.abs(f - 1) > 0.005) buildVProy2();     // re-render con el ajuste
+        } else window.__proyDotFactor = 1;
+      }).catch(() => { window.__proyDotFactor = 1; });
+  }
   // Banda del monto con p25/p75 de la curva (solo informativa)
   const rgM = medM > 0.04 ? [tot.m / Math.min(p75M, 1), tot.m / Math.max(p25M, 0.04)] : null;
 
@@ -3311,7 +3337,14 @@ function buildVProy2() {
   renderTablaProy2(mzQ, mzM, mzF);
   renderPulsoProy2(rows, mesAct, mzQ);
   document.getElementById('proy2-nota').innerHTML =
-    `<i class="bi bi-info-circle me-1"></i>Mezcla = ${(w*100).toFixed(0)}% curva hábil (mediana de ${curvasM.length} meses) + ${((1-w)*100).toFixed(0)}% tendencia (regresión de los últimos ${MESES_TREND} cierres). La distribución por institución mezcla el avance real del mes (peso ${(w*100).toFixed(0)}%) con la participación histórica de los últimos ${mesesShare.length} cierres (peso ${((1-w)*100).toFixed(0)}%): a inicios de mes manda la historia, al cierre mandan los datos reales.`;
+    `<i class="bi bi-info-circle me-1"></i>Mezcla = ${(w*100).toFixed(0)}% curva hábil (mediana de ${curvasM.length} meses) + ${((1-w)*100).toFixed(0)}% tendencia (regresión de los últimos ${MESES_TREND} cierres). La distribución por institución mezcla el avance real del mes (peso ${(w*100).toFixed(0)}%) con la participación histórica de los últimos ${mesesShare.length} cierres (peso ${((1-w)*100).toFixed(0)}%): a inicios de mes manda la historia, al cierre mandan los datos reales.${notaDot()}`;
+
+  // Nota del ajuste por dotación (solo si hay factor distinto de 1)
+  const notaDot = () => {
+    const i = window.__proyDotInfo;
+    if (!i || Math.abs(fDot - 1) <= 0.005) return '';
+    return ` <b>Ajuste por dotación:</b> el remanente del mes se escala ×${fDot.toFixed(2)} — equipo actual ${i.n} ejecutivo(s) con peso ${i.actual} (los nuevos rampean 30/60/85/100%) vs peso promedio ${i.avg} de los meses de la tendencia.`;
+  };
 
   // ── Tabla comparativa de métodos (monto) ──
   const renderMetodos = (extraFila) => {
@@ -3335,9 +3368,10 @@ function buildVProy2() {
       const r = await fetch('/api/dashboard/clima-correlacion', { headers: H }).then(x => x.json());
       const p = r.success && r.data && r.data.proyeccion;
       if (!p || p.q_restante_exacto == null) return;
-      const clQ = tot.q + p.q_restante_exacto;
-      const clM = tot.m + (p.m_restante || 0);
-      const clF = tot.m > 0 ? tot.f + (p.m_restante || 0) * (tot.f / tot.m) : tot.f;
+      // El modelo clima también proyecta con el rendimiento histórico → mismo ajuste por dotación al remanente
+      const clQ = tot.q + p.q_restante_exacto * fDot;
+      const clM = tot.m + (p.m_restante || 0) * fDot;
+      const clF = tot.m > 0 ? tot.f + (p.m_restante || 0) * fDot * (tot.f / tot.m) : tot.f;
       // FINAL: promedio de la mezcla estadística y el modelo clima/calendario —
       // dos familias independientes (top-down vs bottom-up), el promedio es más robusto.
       const fQ = mzQ ? (mzQ + clQ) / 2 : clQ;
@@ -3358,7 +3392,7 @@ function buildVProy2() {
         <tr><td>Clima + calendario</td><td>${fM(clM)}</td><td>${Math.round(clQ)}</td><td>${fM(clF)}</td><td style="font-size:.74rem;color:#64748b">día a día lo que queda del mes: feriados, lluvia/seco (pronóstico) y sáb/dom con su rendimiento histórico</td></tr>
         <tr style="background:#eff6ff"><td><b>Final (recomendada)</b></td><td><b>${fM(fMz)}</b></td><td><b>${Math.round(fQ)}</b></td><td><b>${fM(fF)}</b></td><td style="font-size:.74rem;color:#64748b">promedio entre la mezcla estadística (${mzQ ? Math.round(mzQ) : '—'} ops) y el modelo clima/calendario (${Math.round(clQ)} ops)</td></tr>`);
       document.getElementById('proy2-nota').innerHTML =
-        `<i class="bi bi-info-circle me-1"></i><b>Proyección final</b> = promedio entre la <b>mezcla estadística</b> (${(w*100).toFixed(0)}% curva hábil + ${((1-w)*100).toFixed(0)}% tendencia) y el <b>modelo clima/calendario</b>, que proyecta día a día lo que queda del mes con feriados, pronóstico de lluvia y el rendimiento histórico de sábados y domingos. La distribución por institución es proporcional al avance real de cada una.`;
+        `<i class="bi bi-info-circle me-1"></i><b>Proyección final</b> = promedio entre la <b>mezcla estadística</b> (${(w*100).toFixed(0)}% curva hábil + ${((1-w)*100).toFixed(0)}% tendencia) y el <b>modelo clima/calendario</b>, que proyecta día a día lo que queda del mes con feriados, pronóstico de lluvia y el rendimiento histórico de sábados y domingos. La distribución por institución mezcla el avance real con la participación histórica.${notaDot()}`;
     } catch (e) { /* sin clima: queda la mezcla */ }
   })();
 

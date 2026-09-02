@@ -625,3 +625,46 @@ require('../../../../shared/migrate').enFila('dashboard-parametros', async () =>
     console.log('[dashboard-parametros] mantenedor listo');
   } catch (e) { console.error('[dashboard-parametros migration]', e.message); }
 });
+
+/* ── GET /api/dashboard/dotacion-ejecutivos ──────────────────────────────────
+   Peso de la DOTACIÓN comercial por mes, con rampa de productividad para la
+   gente nueva (pedido Pato 02-09-2026): un ejecutivo en su 1er mes rinde ~30%
+   de un veterano (3-4 ops), 2° mes 60%, 3° 85%, después 100%. La Proyección
+   Pro usa actual/históricos para ajustar el remanente del mes cuando el
+   equipo creció o se achicó — la tendencia de 3 cierres asume equipo igual. */
+exports.getDotacionEjecutivos = async (req, res) => {
+  try {
+    const [ejes] = await pool.query(`
+      SELECT u.fecha_ingreso, u.estado, u.fecha_baja
+      FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
+      WHERE p.nombre IN ('Ejecutivo Comercial','Ejecutivo Remoto')`);
+    const rampa = mesesAntig => mesesAntig <= 0 ? 0.3 : mesesAntig === 1 ? 0.6 : mesesAntig === 2 ? 0.85 : 1;
+    const pesoEnMes = (ym) => {   // 'YYYY-MM'
+      const [y, m] = ym.split('-').map(Number);
+      const ini = new Date(y, m - 1, 1), fin = new Date(y, m, 0);
+      let peso = 0, n = 0;
+      for (const e of ejes) {
+        const ing = e.fecha_ingreso ? new Date(e.fecha_ingreso) : null;
+        const baja = e.fecha_baja ? new Date(e.fecha_baja) : null;
+        if (ing && ing > fin) continue;                    // aún no entraba
+        if (baja && baja < ini) continue;                  // ya se había ido
+        if (!baja && e.estado !== 'activo' && ym >= new Date().toISOString().slice(0, 7)) continue;
+        const antig = ing ? (y - ing.getFullYear()) * 12 + (m - 1 - ing.getMonth()) : 12;
+        peso += rampa(antig); n++;
+      }
+      return { peso: Math.round(peso * 100) / 100, n };
+    };
+    const hoy = new Date();
+    const meses = {};
+    for (let i = 8; i >= 1; i--) {
+      const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      meses[ym] = pesoEnMes(ym).peso;
+    }
+    const act = pesoEnMes(`${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`);
+    res.json({ success: true, data: { actual: act.peso, actual_n: act.n, meses }, error: null });
+  } catch (e) {
+    console.error('[dashboard dotacion]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
