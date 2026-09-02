@@ -3232,6 +3232,12 @@ function buildVProy2() {
      vendido es un hecho. */
   const fDot = window.__proyDotFactor || 1;
   const conDot = (v, actual) => v == null ? v : actual + (v - actual) * fDot;
+  // Nota del ajuste por dotación (solo si hay factor distinto de 1)
+  const notaDot = () => {
+    const i = window.__proyDotInfo;
+    if (!i || Math.abs(fDot - 1) <= 0.005) return '';
+    return ` <b>Ajuste por dotación:</b> el remanente del mes se escala ×${fDot.toFixed(2)} — equipo actual ${i.n} ejecutivo(s) con peso ${i.actual} (los nuevos rampean 30/60/85/100%) vs peso ${i.avg} del último cierre.`;
+  };
   const mzQ = conDot(mezcla(pcQ, ptQ), tot.q),
         mzM = conDot(mezcla(pcM, ptM), tot.m),
         mzF = conDot(mezcla(pcF, ptF), tot.f);
@@ -3341,13 +3347,6 @@ function buildVProy2() {
   renderPulsoProy2(rows, mesAct, mzQ);
   document.getElementById('proy2-nota').innerHTML =
     `<i class="bi bi-info-circle me-1"></i>Mezcla = ${(w*100).toFixed(0)}% curva hábil (mediana de ${curvasM.length} meses) + ${((1-w)*100).toFixed(0)}% tendencia (regresión de los últimos ${MESES_TREND} cierres). La distribución por institución mezcla el avance real del mes (peso ${(w*100).toFixed(0)}%) con la participación histórica de los últimos ${mesesShare.length} cierres (peso ${((1-w)*100).toFixed(0)}%): a inicios de mes manda la historia, al cierre mandan los datos reales.${notaDot()}`;
-
-  // Nota del ajuste por dotación (solo si hay factor distinto de 1)
-  const notaDot = () => {
-    const i = window.__proyDotInfo;
-    if (!i || Math.abs(fDot - 1) <= 0.005) return '';
-    return ` <b>Ajuste por dotación:</b> el remanente del mes se escala ×${fDot.toFixed(2)} — equipo actual ${i.n} ejecutivo(s) con peso ${i.actual} (los nuevos rampean 30/60/85/100%) vs peso ${i.avg} del último cierre.`;
-  };
 
   // ── Tabla comparativa de métodos (monto) ──
   const renderMetodos = (extraFila) => {
