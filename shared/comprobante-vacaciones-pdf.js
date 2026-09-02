@@ -29,8 +29,9 @@ function generarComprobanteVacacionesPDF({ solicitud = {}, colaborador = {}, fir
     // Encabezado con logo
     doc.rect(0, 0, doc.page.width, 6).fill(AZUL);
     try {
-      const logo = require('path').join(__dirname, '..', 'api-gateway', 'public', 'img', 'logo-bs-mail.png');
-      if (require('fs').existsSync(logo)) doc.image(logo, X, 24, { height: 30 });
+      // logo.png es el limpio con fondo transparente (el -bs-mail trae una tarjeta blanca con borde)
+      const logo = require('path').join(__dirname, '..', 'api-gateway', 'public', 'img', 'logo.png');
+      if (require('fs').existsSync(logo)) doc.image(logo, X, 26, { height: 26 });
     } catch (_) {}
     doc.fillColor(AZUL_OSC).font('Helvetica-Bold').fontSize(19).text('COMPROBANTE DE VACACIONES', X, 64, { width: W, align: 'center' });
     doc.fillColor(GRIS).font('Helvetica').fontSize(10).text('AutoFácil Crédito Automotriz — Recursos Humanos', { width: W, align: 'center' });
