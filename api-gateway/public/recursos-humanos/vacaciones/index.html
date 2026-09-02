@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vacaciones — RRHH</title>
-  <!-- v1.7 — cartola rediseñada + saldos por línea jerárquica + ajustes con firma -->
+  <!-- v1.8 — badge con N pendientes en la Bandeja, saldo del solicitante por fila, y RECEPCION RRHH: firma FES, comprobante PDF verificable archivado en la carpeta digital · v1.7 — cartola rediseñada + saldos por línea jerárquica + ajustes con firma -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx-style.min.js" defer></script>
   <style>
@@ -162,12 +162,28 @@
     if(!j.success)return alert(j.error); alert(`Solicitud enviada (${j.data.dias} día/s)`); document.getElementById('fC').value=''; tab('mias'); }
   async function cargar(){ const tb=document.getElementById('tb'); tb.innerHTML='<tr><td colspan="6" class="empty">Cargando…</td></tr>';
     const j=await(await fetch('/api/rrhh/vacaciones?vista='+VISTA,{headers:H})).json(); const rows=j.data?.solicitudes||[]; ES_RRHH=j.data?.es_rrhh; const ES_JEFE=j.data?.es_jefe;
-    document.getElementById('t3').style.display=(ES_RRHH||ES_JEFE)?'':'none'; document.getElementById('t4').style.display=ES_RRHH?'':'none'; cargarPendientes();
+    document.getElementById('t3').style.display=(ES_RRHH||ES_JEFE)?'':'none'; document.getElementById('t4').style.display=ES_RRHH?'':'none';
+    // Badge de la pestaña: pendientes de aprobar + (RRHH) aprobadas por recepcionar
+    { const b=document.getElementById('bandejaCount'); const c=(j.data?.pendientes||0)+(j.data?.por_recepcionar||0);
+      if(c>0){b.textContent=c;b.style.display='';}else b.style.display='none'; }
     document.getElementById('thAcc').textContent = VISTA==='bandeja'?'Acción':'';
     if(!rows.length){tb.innerHTML='<tr><td colspan="6" class="empty">Sin solicitudes.</td></tr>';return;}
-    tb.innerHTML=rows.map(s=>`<tr><td>${esc(s.nombre||'')}</td><td>${fd(s.fecha_desde)}</td><td>${fd(s.fecha_hasta)}</td><td><b>${s.dias}</b></td>
-      <td><span class="pill ${s.estado}">${s.estado}</span>${s.motivo_rechazo?`<div style="font-size:.7rem;color:#b91c1c">${esc(s.motivo_rechazo)}</div>`:''}</td>
-      <td>${(VISTA==='bandeja'&&s.estado==='PENDIENTE')?`<button class="btn-mini ok" onclick="resolver(${s.id},'APROBADA')">Aprobar</button> <button class="btn-mini no" onclick="resolver(${s.id},'RECHAZADA')">Rechazar</button>`:''}</td></tr>`).join('');
+    const co=n=>n==null?'—':String(n).replace('.',',');
+    tb.innerHTML=rows.map(s=>{
+      const porRecep = VISTA==='bandeja' && ES_RRHH && s.estado==='APROBADA' && !s.recepcion_fecha;
+      return `<tr><td>${esc(s.nombre||'')}${VISTA==='bandeja'&&s.saldo_disponible!=null?`<div style="font-size:.72rem;color:#0141A2">saldo: <b>${co(s.saldo_disponible)}</b> día(s) hábil(es)</div>`:''}</td>
+      <td>${fd(s.fecha_desde)}</td><td>${fd(s.fecha_hasta)}</td><td><b>${s.dias}</b></td>
+      <td><span class="pill ${s.estado}">${s.estado}</span>${s.recepcion_fecha?`<div style="font-size:.68rem;color:#16a34a"><i class="bi bi-patch-check-fill"></i> Recepcionada RRHH · folio ${esc(s.codigo_verificacion||'')}</div>`:(s.estado==='APROBADA'?'<div style="font-size:.68rem;color:#b45309">por recepcionar (RRHH)</div>':'')}${s.motivo_rechazo?`<div style="font-size:.7rem;color:#b91c1c">${esc(s.motivo_rechazo)}</div>`:''}</td>
+      <td>${(VISTA==='bandeja'&&s.estado==='PENDIENTE')?`<button class="btn-mini ok" onclick="resolver(${s.id},'APROBADA')">Aprobar</button> <button class="btn-mini no" onclick="resolver(${s.id},'RECHAZADA')">Rechazar</button>`:''}
+      ${porRecep?`<button class="btn-mini ok" style="background:#0141A2" onclick="recepcionar(${s.id})"><i class="bi bi-inbox-fill"></i> Recepcionar</button>`:''}</td></tr>`;}).join('');
+  }
+  /* RRHH cierra el flujo: firma FES + comprobante PDF con folio verificable en la carpeta digital */
+  async function recepcionar(id){
+    if(!confirm('¿Recepcionar esta solicitud aprobada?\n\nSe firmará electrónicamente (FES), se generará el comprobante PDF con la cadena de firmas y quedará archivado en la carpeta digital del colaborador.'))return;
+    const j=await(await fetch(`/api/rrhh/vacaciones/${id}/recepcionar`,{method:'POST',headers:HJ})).json();
+    if(!j.success)return alert(j.error);
+    alert('Recepcionada ✓ — folio '+j.data.codigo+'. El comprobante quedó en la carpeta digital del colaborador.');
+    cargar();
   }
   async function resolver(id,estado){ let mot=null; if(estado==='RECHAZADA'){ mot=prompt('Motivo del rechazo:')||''; }
     const j=await(await fetch(`/api/rrhh/vacaciones/${id}/resolver`,{method:'POST',headers:HJ,body:JSON.stringify({estado,motivo_rechazo:mot})})).json();

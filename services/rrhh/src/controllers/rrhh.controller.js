@@ -28,6 +28,15 @@ require('../../../../shared/migrate').enFila('rrhh', async () => {
         INDEX idx_usuario (id_usuario), INDEX idx_estado (estado)
       )`);
   } catch (e) { console.error('[rh_vacaciones migration]', e.message); }
+  // Recepción por RRHH tras la aprobación (cierre del flujo, pedido Pato 02-09-2026):
+  // firma FES de RRHH + comprobante PDF verificable archivado en la carpeta digital.
+  for (const sql of [
+    'ALTER TABLE rh_vacaciones ADD COLUMN IF NOT EXISTS recepcion_por INT NULL',
+    'ALTER TABLE rh_vacaciones ADD COLUMN IF NOT EXISTS recepcion_nombre VARCHAR(200) NULL',
+    'ALTER TABLE rh_vacaciones ADD COLUMN IF NOT EXISTS recepcion_fecha DATETIME NULL',
+    'ALTER TABLE rh_vacaciones ADD COLUMN IF NOT EXISTS codigo_verificacion VARCHAR(30) NULL',
+    'ALTER TABLE rh_vacaciones ADD COLUMN IF NOT EXISTS id_documento INT NULL',
+  ]) await pool.query(sql).catch(() => {});
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS rh_antiguedad (
@@ -210,11 +219,100 @@ const listarVacaciones = async (req, res) => {
       else { where = "WHERE v.estado='PENDIENTE' AND u.id_supervisor=?"; params.push(u.id_usuario); }
     }
     else if (vista === 'historicas') where = "WHERE v.estado<>'PENDIENTE'";
+    // Bandeja de RRHH: además de las pendientes, las APROBADAS aún no recepcionadas (cierre del flujo)
+    if (vista === 'bandeja' && rrhh) where = "WHERE (v.estado='PENDIENTE' OR (v.estado='APROBADA' AND v.recepcion_fecha IS NULL))";
     const [rows] = await pool.query(
       `SELECT v.* FROM rh_vacaciones v LEFT JOIN usuarios u ON u.id_usuario=v.id_usuario
         ${where} ORDER BY FIELD(v.estado,'PENDIENTE','APROBADA','RECHAZADA'), v.created_at DESC LIMIT 300`, params);
-    res.json({ success: true, data: { solicitudes: rows, es_rrhh: rrhh, es_jefe: esJefe }, error: null });
+    // Saldo de vacaciones del SOLICITANTE en cada fila de la bandeja (motor vac-cuenta)
+    if (vista === 'bandeja') {
+      const { saldoCuenta } = require('./vac-cuenta.controller');
+      const cache = {};
+      for (const r of rows) {
+        try {
+          if (r.id_usuario && cache[r.id_usuario] === undefined) cache[r.id_usuario] = (await saldoCuenta(r.id_usuario))?.disponibles ?? null;
+          r.saldo_disponible = r.id_usuario ? cache[r.id_usuario] : null;
+        } catch (_) { r.saldo_disponible = null; }
+      }
+    }
+    // Contadores para el badge de la pestaña (según lo que ESTE usuario puede resolver)
+    let pendientes = 0, por_recepcionar = 0;
+    try {
+      if (rrhh) {
+        const [[p]] = await pool.query("SELECT COUNT(*) n FROM rh_vacaciones WHERE estado='PENDIENTE'");
+        const [[q]] = await pool.query("SELECT COUNT(*) n FROM rh_vacaciones WHERE estado='APROBADA' AND recepcion_fecha IS NULL");
+        pendientes = p.n; por_recepcionar = q.n;
+      } else if (esJefe) {
+        const [[p]] = await pool.query("SELECT COUNT(*) n FROM rh_vacaciones v JOIN usuarios us ON us.id_usuario=v.id_usuario WHERE v.estado='PENDIENTE' AND us.id_supervisor=?", [u.id_usuario]);
+        pendientes = p.n;
+      }
+    } catch (_) {}
+    res.json({ success: true, data: { solicitudes: rows, es_rrhh: rrhh, es_jefe: esJefe, pendientes, por_recepcionar }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ── POST /vacaciones/:id/recepcionar — RRHH cierra el flujo (pedido Pato 02-09-2026):
+   firma FES rol RRHH + folio verificable + comprobante PDF con las TRES firmas
+   archivado en la carpeta digital del colaborador (rh_documentos). ── */
+const recepcionarVacaciones = async (req, res) => {
+  try {
+    const u = req.usuario || {};
+    if (!(await esRRHH(u.id_usuario))) return res.status(403).json({ success: false, data: null, error: 'Solo RRHH recepciona' });
+    const [[s]] = await pool.query('SELECT * FROM rh_vacaciones WHERE id=?', [req.params.id]);
+    if (!s) return res.status(404).json({ success: false, data: null, error: 'Solicitud no encontrada' });
+    if (s.estado !== 'APROBADA') return res.status(400).json({ success: false, data: null, error: 'Solo se recepcionan solicitudes APROBADAS' });
+    if (s.recepcion_fecha) return res.status(400).json({ success: false, data: null, error: 'Ya fue recepcionada' });
+
+    const crypto = require('crypto');
+    const isoF = d => (typeof d === 'string' ? d : new Date(d).toISOString()).slice(0, 10);
+    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim().slice(0, 45);
+    const [[uf]] = await pool.query('SELECT cargo FROM usuarios WHERE id_usuario=?', [u.id_usuario]);
+    // 1. Firma FES de RRHH (cierra la cadena trabajador → empleador → RRHH)
+    const hash = crypto.createHash('sha256').update(JSON.stringify({
+      id: s.id, id_usuario: s.id_usuario, fecha_desde: isoF(s.fecha_desde), fecha_hasta: isoF(s.fecha_hasta), dias: s.dias, recepcion: true })).digest('hex');
+    await pool.query(`INSERT IGNORE INTO rh_firmas (entidad, entidad_id, rol, id_usuario, nombre, cargo, ip, hash_doc)
+      VALUES ('VACACIONES', ?, 'RRHH', ?, ?, ?, ?, ?)`, [s.id, u.id_usuario, nombreDe(u), uf?.cargo || '', ip, hash]);
+
+    // 2. Folio verificable (QR /verificar/<codigo>)
+    const [[emp]] = await pool.query('SELECT nombre, apellido, rut, cargo FROM usuarios WHERE id_usuario=?', [s.id_usuario]);
+    const nombreEmp = s.nombre || [emp?.nombre, emp?.apellido].filter(Boolean).join(' ');
+    const { registrarVerificable } = require('../../../../shared/verificacion');
+    const codigo = await registrarVerificable({
+      tipo: 'COMPROBANTE_VACACIONES', ref_tabla: 'rh_vacaciones', ref_id: s.id,
+      rut: emp?.rut || null, nombre: nombreEmp,
+      datos: { fecha_desde: isoF(s.fecha_desde), fecha_hasta: isoF(s.fecha_hasta), dias: s.dias, aprobado_por: s.resuelto_nombre },
+      emitido_por: nombreDe(u),
+      firmante: { id: u.id_usuario, nombre: nombreDe(u), cargo: uf?.cargo || u.perfil_nombre || null, ip },
+    });
+
+    // 3. PDF con la cadena completa de firmas → carpeta digital del colaborador
+    const [firmas] = await pool.query(
+      "SELECT rol, nombre, cargo, hash_doc, ip, created_at fecha FROM rh_firmas WHERE entidad='VACACIONES' AND entidad_id=? ORDER BY FIELD(rol,'TRABAJADOR','EMPLEADOR','RRHH')", [s.id]);
+    const habiles = require('../../../../shared/feriados').diasHabilesEntre(isoF(s.fecha_desde), isoF(s.fecha_hasta));
+    let saldo = null; try { saldo = await require('./vac-cuenta.controller').saldoCuenta(s.id_usuario); } catch (_) {}
+    const { generarComprobanteVacacionesPDF } = require('../../../../shared/comprobante-vacaciones-pdf');
+    const buffer = await generarComprobanteVacacionesPDF({
+      solicitud: { ...s, dias_habiles: habiles }, colaborador: { nombre: nombreEmp, rut: emp?.rut, cargo: emp?.cargo },
+      firmas, codigo, saldo });
+    let idDoc = null;
+    try {
+      const nombreArchivo = `Comprobante-Vacaciones-${isoF(s.fecha_desde)}-${codigo}.pdf`;
+      const d = await require('../../../../shared/almacen-docs').colocar({ ambito: 'rrhh-documentos', clave: s.id_usuario, buffer, mime: 'application/pdf', nombre: nombreArchivo });
+      const [rd] = await pool.query(
+        'INSERT INTO rh_documentos (id_usuario, tipo, nombre_archivo, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes, subido_por) VALUES (?,?,?,?,?,?,?,?,?)',
+        [s.id_usuario, 'VACACIONES', nombreArchivo, 'application/pdf', d.blob, d.storage, d.ruta, d.bytes, 'Sistema (recepción RRHH)']);
+      idDoc = rd.insertId;
+    } catch (e) { console.error('[vacaciones comprobante→carpeta]', e.message); }
+
+    await pool.query('UPDATE rh_vacaciones SET recepcion_por=?, recepcion_nombre=?, recepcion_fecha=NOW(), codigo_verificacion=?, id_documento=? WHERE id=?',
+      [u.id_usuario, nombreDe(u), codigo, idDoc, s.id]);
+    if (s.id_usuario) notificar([s.id_usuario], { tipo: 'RH_VACACIONES',
+      titulo: '🌴 Vacaciones recepcionadas por RRHH',
+      mensaje: `Tu comprobante (folio ${codigo}) quedó en tu carpeta digital`, href: '/recursos-humanos/mi-ficha/' });
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'vacaciones', entidad_id: s.id,
+      detalle: `RRHH recepcionó las vacaciones #${s.id} de ${nombreEmp} — folio ${codigo}, comprobante PDF en la carpeta digital` });
+    res.json({ success: true, data: { codigo, id_documento: idDoc }, error: null });
+  } catch (e) { console.error('[rrhh recepcionarVacaciones]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 const resolverVacaciones = async (req, res) => {
   try {
@@ -591,6 +689,6 @@ const pendientes = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: { count: 0 }, error: 'Error' }); }
 };
 
-module.exports = { crearVacaciones, listarVacaciones, resolverVacaciones, crearAntiguedad, listarAntiguedad, resolverAntiguedad, pendientes,
+module.exports = { crearVacaciones, listarVacaciones, resolverVacaciones, recepcionarVacaciones, crearAntiguedad, listarAntiguedad, resolverAntiguedad, pendientes,
   certEstado, certEmitir, certHistorial, listarEmpleados, cumpleEstado, cumpleHoy, getConfigApi, setConfigApi,
   cumplesProximos, getConfig };

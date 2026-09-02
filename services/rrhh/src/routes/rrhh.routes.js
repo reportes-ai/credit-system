@@ -11,6 +11,7 @@ router.get('/pendientes', verifyToken, requireFunc('rh_ver', 'rh_vacaciones', 'r
 router.get('/vacaciones',          verifyToken, requireFunc('rh_vacaciones', 'rh_aprobar'), ctrl.listarVacaciones);
 router.post('/vacaciones',         verifyToken, requireFunc('rh_vacaciones'), ctrl.crearVacaciones);
 router.post('/vacaciones/:id/resolver', verifyToken, requireFunc('rh_aprobar'), ctrl.resolverVacaciones);
+router.post('/vacaciones/:id/recepcionar', verifyToken, requireFunc('rh_aprobar'), ctrl.recepcionarVacaciones);
 
 // Antigüedad
 router.get('/antiguedad',          verifyToken, requireFunc('rh_antiguedad', 'rh_aprobar'), ctrl.listarAntiguedad);
