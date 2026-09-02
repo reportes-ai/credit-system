@@ -20,7 +20,7 @@ def construir():
     p(doc, 'El sistema que administra el negocio completo de AutoFácil:', size=12, align=WD_ALIGN_PARAGRAPH.CENTER, color=GRIS)
     p(doc, 'de la prospección del cliente a la contabilidad, en una sola plataforma.', size=12, align=WD_ALIGN_PARAGRAPH.CENTER, color=GRIS)
     for _ in range(6): doc.add_paragraph()
-    p(doc, 'Versión 1.0 · Agosto 2026', size=11, align=WD_ALIGN_PARAGRAPH.CENTER, color=GRIS_SUAVE)
+    p(doc, 'Versión 1.1 · Septiembre 2026', size=11, align=WD_ALIGN_PARAGRAPH.CENTER, color=GRIS_SUAVE)
     p(doc, 'AutoFácil Crédito Automotriz', size=10, align=WD_ALIGN_PARAGRAPH.CENTER, color=GRIS_SUAVE)
 
     # ── 1. Qué es ───────────────────────────────────────────────────────────
@@ -124,7 +124,11 @@ def construir():
     vineta(doc, 'reportes Tailor Made más un constructor visual de consultas estilo Access: el usuario arma su cruce de datos sin pedirle nada a un programador.', bold_hasta='Reportería a medida: ')
     vineta(doc, 'cada mañana la IA redacta la narrativa de gestión — ventas de ayer, ritmo del mes, ejecutivos caídos, alertas — sobre las cifras reales del sistema.', bold_hasta='Resumen Ejecutivo Diario: ')
     vineta(doc, 'informes automáticos por horario (ventas, órdenes de pago pendientes, fundantes pendientes) con días, hora, destinatarios y texto configurables en su mantenedor.', bold_hasta='Correos programados: ')
-    h2(doc, '3.11 Soporte y gobierno del sistema')
+    h2(doc, '3.11 El gasto: compras y centros de costo')
+    vineta(doc, 'cada colaborador pide sus materiales de un catálogo con fotos y códigos del proveedor; el ciclo cierra el día 10, Administración concilia cantidades y precios, la orden de compra pasa por firmas y, al aprobarse, nacen solas la orden de pago y el correo a cada solicitante con lo aprobado.', bold_hasta='Compras de Oficina: ')
+    vineta(doc, 'cada compra y gasto queda imputado al área que lo genera (organigrama + parques con oficina), con el reporte mensual comparativo del gasto por centro.', bold_hasta='Centros de Costo: ')
+    vineta(doc, 'proveedores con ficha y datos de transferencia, correlativo único de órdenes de pago, segregación de funciones (quien emite no paga) y contabilización automática.', bold_hasta='Órdenes de Pago: ')
+    h2(doc, '3.12 Soporte y gobierno del sistema')
     vineta(doc, 'perfiles y funcionalidades definen quién ve y hace qué. La matriz se administra en pantalla; el Administrador ve todo; los permisos sensibles se validan en el servidor.', bold_hasta='Usuarios y permisos: ')
     vineta(doc, 'tickets de TI con SLA y escalamiento, compras internas con workflow de aprobación por niveles, y 15 flujos de escalamiento que suben solos por la jefatura cuando algo no se atiende.', bold_hasta='Soporte interno: ')
     vineta(doc, 'campanitas y correos paramétricos: qué evento avisa, a quién y con qué texto se configura, no se programa.', bold_hasta='Avisos: ')
