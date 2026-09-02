@@ -673,7 +673,8 @@ const pendientes = async (req, res) => {
     const u = req.usuario || {}; const rrhh = await esRRHH(u.id_usuario);
     let vac = 0, ant = 0, esJefe = false;
     if (rrhh) {
-      const [[a]] = await pool.query("SELECT COUNT(*) c FROM rh_vacaciones WHERE estado='PENDIENTE'");
+      // RRHH: pendientes de aprobar + aprobadas POR RECEPCIONAR (cierre del flujo)
+      const [[a]] = await pool.query("SELECT COUNT(*) c FROM rh_vacaciones WHERE estado='PENDIENTE' OR (estado='APROBADA' AND recepcion_fecha IS NULL)");
       const [[b]] = await pool.query("SELECT COUNT(*) c FROM rh_antiguedad WHERE estado='PENDIENTE'");
       vac = a.c; ant = b.c;
     } else {
