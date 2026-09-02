@@ -3280,22 +3280,38 @@ function buildVProy2() {
     } catch (e) { kv.textContent = '—'; ks.textContent = 'sin datos suficientes'; }
   })();
 
-  // ── Tabla por institución (repartida proporcional al actual) ──
-  const parte = (total, a, t) => t > 0 ? total * (a / t) : 0;
+  // ── Tabla por institución: reparto MEZCLADO (avance real ⨯ participación histórica) ──
+  // A inicios de mes el avance real es mala muestra (2 ops el día 2 proyectaban
+  // UNIDAD = 0 el mes entero — caso 02-09-2026): se mezcla la participación
+  // histórica (últimos MESES_TREND cierres) con la del mes, usando el MISMO peso
+  // w de curva/tendencia — al inicio manda la historia, al final mandan los datos.
+  const histInst = { AUTOFIN: { q: 0, m: 0, f: 0 }, UNIDAD: { q: 0, m: 0, f: 0 } };
+  const mesesShare = mesesHist.slice(-MESES_TREND);
+  rows.filter(r => mesesShare.includes(r.mes)).forEach(r => {
+    const k = (r.institucion || '').includes('UNIDAD') ? 'UNIDAD' : 'AUTOFIN';
+    histInst[k].q += 1; histInst[k].m += r.monto_financiado; histInst[k].f += (r.rentab_afa || 0) + (r.com_seguros || 0);
+  });
+  const shareMix = (met, k) => {
+    const hT = histInst.AUTOFIN[met] + histInst.UNIDAD[met];
+    const sHist = hT > 0 ? histInst[k][met] / hT : (k === 'AUTOFIN' ? 1 : 0);
+    const aT = tot[met];
+    const sAct = aT > 0 ? act[k][met] / aT : sHist;
+    return w * sAct + (1 - w) * sHist;
+  };
   const renderTablaProy2 = (pQ, pM, pF) => {
-    const fila = (nom, a) => `<tr><td><b>${nom}</b></td>
-      <td>${a.q}</td><td><b>${pQ ? Math.round(parte(pQ, a.q, tot.q)) : '—'}</b></td>
-      <td>${fM(a.m)}</td><td><b>${pM ? fM(parte(pM, a.m, tot.m)) : '—'}</b></td>
-      <td>${fM(a.f)}</td><td><b>${pF ? fM(parte(pF, a.f, tot.f)) : '—'}</b></td></tr>`;
+    const fila = (nom, k) => { const a = act[k]; return `<tr><td><b>${nom}</b></td>
+      <td>${a.q}</td><td><b>${pQ ? Math.round(pQ * shareMix('q', k)) : '—'}</b></td>
+      <td>${fM(a.m)}</td><td><b>${pM ? fM(pM * shareMix('m', k)) : '—'}</b></td>
+      <td>${fM(a.f)}</td><td><b>${pF ? fM(pF * shareMix('f', k)) : '—'}</b></td></tr>`; };
     document.getElementById('t-proy2').innerHTML = `
       <thead><tr><th>Financiera</th><th>Q hoy</th><th>Q cierre</th><th>Monto hoy</th><th>Monto cierre</th><th>Fact. hoy</th><th>Fact. cierre</th></tr></thead>
-      <tbody>${fila('AUTOFIN', act.AUTOFIN)}${fila('UNIDAD', act.UNIDAD)}</tbody>
+      <tbody>${fila('AUTOFIN', 'AUTOFIN')}${fila('UNIDAD', 'UNIDAD')}</tbody>
       <tfoot><tr><td><b>Total</b></td><td>${tot.q}</td><td><b>${pQ ? Math.round(pQ) : '—'}</b></td><td>${fM(tot.m)}</td><td><b>${pM ? fM(pM) : '—'}</b></td><td>${fM(tot.f)}</td><td><b>${pF ? fM(pF) : '—'}</b></td></tr></tfoot>`;
   };
   renderTablaProy2(mzQ, mzM, mzF);
   renderPulsoProy2(rows, mesAct, mzQ);
   document.getElementById('proy2-nota').innerHTML =
-    `<i class="bi bi-info-circle me-1"></i>Mezcla = ${(w*100).toFixed(0)}% curva hábil (mediana de ${curvasM.length} meses) + ${((1-w)*100).toFixed(0)}% tendencia (regresión de los últimos ${MESES_TREND} cierres). La distribución por institución es proporcional al avance real de cada una.`;
+    `<i class="bi bi-info-circle me-1"></i>Mezcla = ${(w*100).toFixed(0)}% curva hábil (mediana de ${curvasM.length} meses) + ${((1-w)*100).toFixed(0)}% tendencia (regresión de los últimos ${MESES_TREND} cierres). La distribución por institución mezcla el avance real del mes (peso ${(w*100).toFixed(0)}%) con la participación histórica de los últimos ${mesesShare.length} cierres (peso ${((1-w)*100).toFixed(0)}%): a inicios de mes manda la historia, al cierre mandan los datos reales.`;
 
   // ── Tabla comparativa de métodos (monto) ──
   const renderMetodos = (extraFila) => {
