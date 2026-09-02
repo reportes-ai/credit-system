@@ -20,7 +20,7 @@ def construir():
     p(doc, 'Qué viaja tal cual, qué se adapta y qué se apaga — con arquitectura por nodo,', size=12, align=WD_ALIGN_PARAGRAPH.CENTER, color=GRIS)
     p(doc, 'costos de operación, tiempos con holgura y el levantamiento previo por país.', size=12, align=WD_ALIGN_PARAGRAPH.CENTER, color=GRIS)
     for _ in range(6): doc.add_paragraph()
-    p(doc, 'Versión 1.0 · Septiembre 2026', size=11, align=WD_ALIGN_PARAGRAPH.CENTER, color=GRIS_SUAVE)
+    p(doc, 'Versión 1.1 · Septiembre 2026', size=11, align=WD_ALIGN_PARAGRAPH.CENTER, color=GRIS_SUAVE)
     p(doc, 'AutoFácil Crédito Automotriz — documento de trabajo para el Grupo', size=10, align=WD_ALIGN_PARAGRAPH.CENTER, color=GRIS_SUAVE)
 
     h1(doc, 'Índice')
@@ -142,10 +142,33 @@ def construir():
     vineta(doc, 'integraciones locales fase 2 (buró de crédito, facturación electrónica SRI/SIN): cada una con su contrato local; se cotizan tras el levantamiento.', bold_hasta='Fase 2: ')
     h2(doc, '6.3 El costo real')
     p(doc, 'La inversión dominante es TIEMPO: el levantamiento, la localización y el acompañamiento de la '
-           'marcha blanca. PLACEHOLDER')
+           'marcha blanca. El desarrollo lo realiza el equipo que construyó la Suite, sin necesidad de contratar una fábrica de software externa; sí requiere dedicación protegida durante las fases 1–3 y '
+           'una contraparte local con horas comprometidas.')
 
-    # ── 7. Riesgos ──
-    h1(doc, '7. Riesgos y mitigaciones')
+    # ── 7. Marco contable y regulatorio ──
+    h1(doc, '7. Marco contable y regulatorio (IFRS / Basilea)')
+    p(doc, 'El módulo de contabilidad de la Suite es AGNÓSTICO del marco normativo: el plan de cuentas, '
+           'las reglas de centralización y las provisiones son 100% paramétricos. No hay que "convertir" '
+           'el sistema a una norma: se siembra el plan local y sus reglas durante el levantamiento, con '
+           'validación de un contador local.')
+    h2(doc, '7.1 IFRS (NIIF) — norma de presentación contable')
+    tabla(doc, ('País', 'Marco vigente', 'Implicancia para el nodo'),
+          (('Chile', 'IFRS / IFRS-PyME', 'El plan de cuentas y las políticas actuales ya están en esta lógica'),
+           ('Ecuador', 'IFRS (obligatorio, Superintendencia de Compañías)', 'El plan de cuentas chileno viaja casi directo — la mejor noticia contable del proyecto'),
+           ('Bolivia', 'Normas contables locales (Consejo Técnico Nacional); si la empresa es entidad financiera regulada, manda el manual de cuentas de la ASFI', 'El plan de cuentas se siembra según la norma local; validación de contador boliviano en la semana 3–4 del levantamiento')),
+          (2.2, 6.8, 7.5))
+    h2(doc, '7.2 Basilea — regulación de capital (no de contabilidad)')
+    p(doc, 'Basilea aplica a BANCOS y financieras REGULADAS, no a una empresa de crédito automotriz no '
+           'bancaria. La pregunta clave del levantamiento es si la empresa de cada país está bajo '
+           'supervisión del regulador financiero (ASFI en Bolivia, Superintendencia de Bancos en Ecuador):')
+    vineta(doc, 'exigencias de capital mínimo, provisiones por riesgo de crédito NORMADAS por el regulador (tramos dados, no elegidos) y reportes periódicos obligatorios. El alcance del nodo crece y debe cotizarse en el levantamiento.', bold_hasta='Si está regulada: ')
+    vineta(doc, 'las provisiones automáticas de la Suite (tramos de mora paramétricos) se calibran a la política interna del grupo, igual que en Chile.', bold_hasta='Si no está regulada: ')
+    regla(doc, 'Las provisiones automáticas, el plan de cuentas y las reglas contables de la Suite son '
+               'configurables por diseño: sirven bajo IFRS, bajo norma local boliviana o bajo tramos de un '
+               'regulador — cambia la SIEMBRA, no el sistema.')
+
+    # ── 8. Riesgos ──
+    h1(doc, '8. Riesgos y mitigaciones')
     tabla(doc, ('Riesgo', 'Mitigación'),
           (('Contraparte local con poca disponibilidad', 'Documento de alcance firmado + contraparte nombrada ANTES de partir; hitos quincenales con la gerencia'),
            ('Reglas de negocio no documentadas que aparecen tarde', 'Holguras del plan + UAT con casos reales antes de la marcha blanca'),
@@ -155,8 +178,8 @@ def construir():
            ('Datos históricos locales', 'Migración tipo INDEXA/AFA ya probada en Chile: se cotiza en el levantamiento según el formato de origen')),
           (7.0, 9.5))
 
-    # ── 8. Siguientes pasos ──
-    h1(doc, '8. Siguientes pasos propuestos')
+    # ── 9. Siguientes pasos ──
+    h1(doc, '9. Siguientes pasos propuestos')
     paso(doc, 1, 'Acordar el alcance del viaje', 'Qué empresa parte (propuesta: Ecuador, por su economía dolarizada), fechas del levantamiento y quién será la contraparte local en cada país.')
     paso(doc, 2, 'Preparar el kit de levantamiento', 'Cuestionarios por área (producto, operación, normativa, contabilidad) para que las 3–4 semanas rindan.')
     paso(doc, 3, 'Demo formal al equipo local', 'Presentación de la Suite en operación, con datos de demostración, a las personas que la operarán en cada país.')
