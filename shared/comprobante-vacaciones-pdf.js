@@ -26,8 +26,12 @@ function generarComprobanteVacacionesPDF({ solicitud = {}, colaborador = {}, fir
     doc.on('error', reject);
     const X = doc.page.margins.left, W = doc.page.width - X * 2;
 
-    // Encabezado
+    // Encabezado con logo
     doc.rect(0, 0, doc.page.width, 6).fill(AZUL);
+    try {
+      const logo = require('path').join(__dirname, '..', 'api-gateway', 'public', 'img', 'logo-bs-mail.png');
+      if (require('fs').existsSync(logo)) doc.image(logo, X, 24, { height: 30 });
+    } catch (_) {}
     doc.fillColor(AZUL_OSC).font('Helvetica-Bold').fontSize(19).text('COMPROBANTE DE VACACIONES', X, 64, { width: W, align: 'center' });
     doc.fillColor(GRIS).font('Helvetica').fontSize(10).text('AutoFácil Crédito Automotriz — Recursos Humanos', { width: W, align: 'center' });
     doc.moveDown(0.4);
@@ -70,11 +74,23 @@ function generarComprobanteVacacionesPDF({ solicitud = {}, colaborador = {}, fir
       doc.y = y0 + 52;
     }
 
-    // Verificación
+    // Verificación con QR (motor qrcode-generator, el mismo de las cartas)
     doc.moveDown(1);
+    const urlVerif = `https://afbs.autofacilchile.cl/verificar/${codigo || ''}`;
+    try {
+      const qrGen = require('../api-gateway/public/js/qrcode-generator.js');
+      const q = qrGen(0, 'M'); q.addData(urlVerif); q.make();
+      const n = q.getModuleCount(), cell = 76 / n, qx = X + W / 2 - 38, qy = doc.y + 6;
+      doc.rect(qx - 4, qy - 4, 84, 84).fill('#ffffff').strokeColor(LINEA).lineWidth(0.7).stroke();
+      doc.fillColor('#000000');
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++)
+        if (q.isDark(r, c)) doc.rect(qx + c * cell, qy + r * cell, cell + 0.2, cell + 0.2).fill();
+      doc.y = qy + 84;
+    } catch (e) { /* sin QR: queda la URL en texto */ }
+    doc.moveDown(0.4);
     doc.fillColor(GRIS).font('Helvetica').fontSize(8.5).text(
       `Documento generado automáticamente por AutoFácil Business Suite al recepcionar RRHH la solicitud. ` +
-      `Verifique su autenticidad en https://afbs.autofacilchile.cl/verificar/${codigo || ''}`, X, doc.y, { width: W, align: 'center' });
+      `Verifique su autenticidad escaneando el código QR o en ${urlVerif}`, X, doc.y, { width: W, align: 'center' });
 
     doc.end();
   });
