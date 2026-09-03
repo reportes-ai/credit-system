@@ -81,6 +81,9 @@ require('../../../../shared/migrate').enFila('pagos-recurrentes', async () => {
     await pool.query('ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS id_pago_recurrente INT NULL');
     // Propuesto: detectado desde la historia contable, nace PAUSADO hasta que alguien lo revise y lo encienda.
     await pool.query('ALTER TABLE tesoreria_pagos_recurrentes ADD COLUMN IF NOT EXISTS propuesto TINYINT(1) NOT NULL DEFAULT 0');
+    // Día de pago (1-31): cada vencimiento cae ese día del mes (el 31 se acomoda al último día del mes corto).
+    await pool.query('ALTER TABLE tesoreria_pagos_recurrentes ADD COLUMN IF NOT EXISTS dia_pago TINYINT NULL');
+    await pool.query('UPDATE tesoreria_pagos_recurrentes SET dia_pago = DAY(fecha_proximo_pago) WHERE dia_pago IS NULL');
 
     // Card en Tesorería + permisos (anti-hardcode: módulos y cards salen de la BD)
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Tesorería' OR ruta LIKE '/tesoreria%' LIMIT 1");
@@ -135,6 +138,14 @@ function renderGlosa(glosa, vencISO) {
     .replace(/\{ANIO\}/gi, String(y));
 }
 
+// 'YYYY-MM-DD' con el día de pago del mes; un 31 en mes corto cae en el último día.
+function conDia(iso, dia) {
+  const d = parseInt(dia); if (!(d >= 1 && d <= 31)) return iso;
+  const [y, m] = String(iso).slice(0, 10).split('-').map(Number);
+  const ultimo = new Date(y, m, 0).getDate();
+  return `${y}-${String(m).padStart(2, '0')}-${String(Math.min(d, ultimo)).padStart(2, '0')}`;
+}
+
 const fmtCLP = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
 const fmtOrigen = (n, mon) => mon === 'CLP' ? fmtCLP(n) : `${Number(n).toLocaleString('es-CL', { maximumFractionDigits: 4 })} ${mon}`;
 
@@ -176,7 +187,7 @@ async function generarUno(p, hoyISO, req) {
   const meses = PERIODICIDADES[p.periodicidad] || 1;
   await pool.query(
     'UPDATE tesoreria_pagos_recurrentes SET fecha_ultima_generacion=?, fecha_proximo_pago=? WHERE id=?',
-    [venc, fc.sumarMeses(venc, meses), p.id]);
+    [venc, conDia(fc.sumarMeses(venc, meses), p.dia_pago), p.id]);
   const [lg] = await pool.query(
     `INSERT INTO tesoreria_pagos_recurrentes_log (id_pago, fecha_vencimiento, moneda, monto_origen, tipo_cambio, monto_clp, id_orden_pago, numero_odp)
      VALUES (?,?,?,?,?,?,?,?)`, [p.id, venc, p.moneda, p.monto_origen, tc, montoCLP, r.insertId, numero]);
@@ -265,12 +276,14 @@ function validar(b) {
   const monto = Number(String(b.monto_origen).replace(',', '.'));
   if (!(monto > 0)) return 'El monto debe ser mayor a 0';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.fecha_proximo_pago || ''))) return 'Fecha del próximo pago inválida';
+  const dia = parseInt(b.dia_pago); if (!(dia >= 1 && dia <= 31)) return 'El día de pago debe estar entre 1 y 31';
   if (b.fecha_ultimo_pago && !/^\d{4}-\d{2}-\d{2}$/.test(String(b.fecha_ultimo_pago))) return 'Fecha del último pago inválida';
   return null;
 }
+// El próximo pago se acomoda al día de pago elegido (el mes lo pone la fecha, el día lo pone dia_pago).
 const campos = b => [norm(b.apodo), norm(b.descripcion) || null, String(b.periodicidad).toUpperCase(), parseInt(b.id_proveedor),
   b.tipo_pago, b.tipo_documento || 'Factura', norm(b.glosa), b.moneda, Number(String(b.monto_origen).replace(',', '.')),
-  b.fecha_ultimo_pago || null, b.fecha_proximo_pago];
+  b.fecha_ultimo_pago || null, conDia(b.fecha_proximo_pago, b.dia_pago), parseInt(b.dia_pago)];
 
 exports.crear = async (req, res) => {
   try {
@@ -280,7 +293,7 @@ exports.crear = async (req, res) => {
     const u = req.usuario || {};
     const [r] = await pool.query(
       `INSERT INTO tesoreria_pagos_recurrentes (apodo, descripcion, periodicidad, id_proveedor, tipo_pago, tipo_documento, glosa, moneda, monto_origen,
-         fecha_ultimo_pago, fecha_proximo_pago, creado_por, creado_nombre) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         fecha_ultimo_pago, fecha_proximo_pago, dia_pago, creado_por, creado_nombre) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [...campos(b), u.id_usuario || null, [u.nombre, u.apellido].filter(Boolean).join(' ')]);
     auditar({ req, accion: 'CREAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(r.insertId),
       detalle: `Inscribió pago recurrente «${norm(b.apodo)}» (${String(b.periodicidad).toUpperCase()}, ${b.monto_origen} ${b.moneda}, próximo ${b.fecha_proximo_pago})` });
@@ -294,7 +307,7 @@ exports.editar = async (req, res) => {
     // Editar un propuesto también lo confirma (alguien lo revisó).
     const [r] = await pool.query(
       `UPDATE tesoreria_pagos_recurrentes SET apodo=?, descripcion=?, periodicidad=?, id_proveedor=?, tipo_pago=?, tipo_documento=?, glosa=?, moneda=?, monto_origen=?,
-         fecha_ultimo_pago=?, fecha_proximo_pago=?, propuesto=0 WHERE id=?`, [...campos(b), id]);
+         fecha_ultimo_pago=?, fecha_proximo_pago=?, dia_pago=?, propuesto=0 WHERE id=?`, [...campos(b), id]);
     if (!r.affectedRows) return fail(res, 'Pago recurrente no encontrado', 404);
     auditar({ req, accion: 'EDITAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(id), detalle: `Editó «${norm(b.apodo)}»` });
     ok(res, { id });

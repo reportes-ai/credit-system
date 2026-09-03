@@ -94,7 +94,7 @@
     <h5><i class="bi bi-list-check"></i> Pagos inscritos
       <span style="margin-left:auto;font-size:.72rem;color:#94a3b8;font-weight:600">El motor revisa cada 6 horas; lo que vence hoy se emite hoy.</span></h5>
     <div style="overflow:auto"><table id="tabla">
-      <thead><tr><th>Apodo</th><th>Proveedor</th><th>Periodicidad</th><th>Tipo</th><th class="num">Monto origen</th><th>Glosa</th><th>Último pago</th><th>Próximo pago</th><th>Última ODP</th><th>Estado</th><th></th></tr></thead>
+      <thead><tr><th>Apodo</th><th>Proveedor</th><th>Periodicidad</th><th>Día</th><th>Tipo</th><th class="num">Monto origen</th><th>Glosa</th><th>Último pago</th><th>Próximo pago</th><th>Última ODP</th><th>Estado</th><th></th></tr></thead>
       <tbody id="tbody"><tr><td colspan="11" class="vacio">Cargando…</td></tr></tbody>
     </table></div>
   </div>
@@ -116,8 +116,9 @@
   <div class="dlg-head"><i class="bi bi-arrow-repeat"></i><span id="dlgTitulo">Inscribir pago recurrente</span></div>
   <div class="dlg-body">
     <div class="grid">
-      <div class="g2"><label>Apodo / nickname del pago *</label><input id="fApodo" maxlength="80" placeholder="Ej: Arriendo oficina Kennedy"></div>
+      <div><label>Apodo / nickname del pago *</label><input id="fApodo" maxlength="80" placeholder="Ej: Arriendo oficina Kennedy"></div>
       <div><label>Periodicidad *</label><select id="fPer"></select></div>
+      <div><label>Día de pago (1-31) *</label><input type="number" id="fDia" min="1" max="31" placeholder="Ej: 5" oninput="ajustarProx()"></div>
       <div><label>Tipo de pago (ODP) *</label><select id="fTipo"></select></div>
       <div class="g4"><label>Descripción</label><input id="fDesc" maxlength="300" placeholder="Para qué es este pago (opcional)"></div>
 
@@ -137,7 +138,7 @@
       <div><label>Tipo de documento</label><select id="fDoc"></select></div>
       <div><label>Moneda *</label><select id="fMon" onchange="previa()"></select></div>
       <div><label>Monto en moneda de origen *</label><input id="fMonto" inputmode="decimal" placeholder="0" oninput="previa()"></div>
-      <div><label>Próximo pago *</label><input type="date" id="fProx" onchange="previa()"></div>
+      <div><label>Próximo pago *</label><input type="date" id="fProx" onchange="ajustarProx()"></div>
       <div><label>Último pago</label><input type="date" id="fUlt"></div>
       <div class="g4"><div class="previa" id="previa">Vista previa: completa moneda, monto y glosa.</div></div>
     </div>
@@ -194,6 +195,7 @@ function render(){
       <td><b>${escH(p.apodo)}</b>${p.descripcion?`<div style="font-size:.7rem;color:#64748b">${escH(p.descripcion)}</div>`:''}</td>
       <td>${escH(p.proveedor_nombre||'—')}<div style="font-size:.7rem;color:#64748b">${escH(p.proveedor_rut||'')}</div></td>
       <td>${escH(p.periodicidad)}</td>
+      <td class="num">${p.dia_pago||'—'}</td>
       <td>${escH(p.tipo_pago)}</td>
       <td class="num"><b>${fmtOrigen(p.monto_origen, p.moneda)}</b></td>
       <td style="max-width:220px">${escH(p.glosa)}</td>
@@ -258,9 +260,17 @@ function previa(){
   }, 300);
 }
 
+/* Próximo pago: el mes lo pone la fecha, el día lo pone "Día de pago" (31 cae en el último día del mes corto). */
+function ajustarProx(){
+  const dia = parseInt(document.getElementById('fDia').value), f = document.getElementById('fProx').value;
+  if (!(dia>=1 && dia<=31) || !f) return;
+  const [y,m] = f.split('-').map(Number); const ult = new Date(y, m, 0).getDate();
+  document.getElementById('fProx').value = `${y}-${String(m).padStart(2,'0')}-${String(Math.min(dia,ult)).padStart(2,'0')}`;
+  previa();
+}
 /* ── Alta / edición ── */
 function limpiar(){
-  ['fApodo','fDesc','fGlosa','fMonto','fProvQ','fProvId','fUlt'].forEach(id=>document.getElementById(id).value='');
+  ['fApodo','fDesc','fGlosa','fMonto','fProvQ','fProvId','fUlt','fDia'].forEach(id=>document.getElementById(id).value='');
   setProv(null); document.getElementById('provList').style.display='none';
   document.getElementById('fProx').value = hoyISO();
   document.getElementById('fDoc').value = 'Factura'; document.getElementById('fMon').value = 'CLP';
@@ -276,6 +286,7 @@ function abrirEditar(id){
   document.getElementById('fDoc').value = p.tipo_documento||'Factura'; document.getElementById('fGlosa').value = p.glosa;
   document.getElementById('fMon').value = p.moneda; document.getElementById('fMonto').value = Number(p.monto_origen);
   document.getElementById('fProx').value = String(p.fecha_proximo_pago||'').slice(0,10);
+  document.getElementById('fDia').value = p.dia_pago || Number(String(p.fecha_proximo_pago||'').slice(8,10)) || '';
   document.getElementById('fUlt').value = p.fecha_ultimo_pago ? String(p.fecha_ultimo_pago).slice(0,10) : '';
   document.getElementById('fProvId').value = p.id_proveedor; document.getElementById('fProvQ').value = p.proveedor_nombre||'';
   setProv({ rut:p.proveedor_rut, banco:p.banco, tipo_cuenta:p.tipo_cuenta, numero_cuenta:p.numero_cuenta, email:p.proveedor_email });
@@ -288,6 +299,7 @@ async function guardar(){
     tipo_documento: document.getElementById('fDoc').value, id_proveedor: document.getElementById('fProvId').value,
     glosa: document.getElementById('fGlosa').value.trim(), moneda: document.getElementById('fMon').value,
     monto_origen: document.getElementById('fMonto').value, fecha_proximo_pago: document.getElementById('fProx').value,
+    dia_pago: document.getElementById('fDia').value,
     fecha_ultimo_pago: document.getElementById('fUlt').value || null,
   };
   if (!body.id_proveedor) { toast('Elige el proveedor de la lista'); return; }
