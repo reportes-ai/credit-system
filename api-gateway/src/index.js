@@ -603,6 +603,7 @@ const PAGINAS = [
   ['/tesoreria/caja', 'tesoreria/caja.html'],
   ['/tesoreria/aplicacion-fondos', 'tesoreria/aplicacion-fondos.html'],
   ['/tesoreria/cierre-contable', 'tesoreria/cierre-contable.html'],
+  ['/tesoreria/pagos-recurrentes', 'tesoreria/pagos-recurrentes.html'],
   ['/tesoreria/cajas', 'tesoreria/cajas.html'],
   ['/tesoreria/cierre-caja', 'tesoreria/cierre-caja.html'],
   ['/tesoreria/cuentas-transitorias', 'tesoreria/cuentas-transitorias.html'],
