@@ -108,6 +108,8 @@
       <li><b>Cuenta de cargo</b> → sale del mantenedor <a href="/mantenedores/cuentas-bancarias/">Cuentas Bancarias</a> filtrado por la moneda del pago (USD → cuentas en dólares; pesos, UF y UTM → cuentas en pesos). Queda declarada en la ODP y el asiento del pago acredita ese banco; el cajero puede cambiarla al pagar. Vacía = la elige el cajero.</li>
       <li><b>Tipo de documento</b> → define IVA / retención con el mismo motor de la emisión manual de ODP; el monto inscrito es lo que se paga (bruto).</li>
       <li><b>El pago</b> se registra desde la <a href="/ordenes-pago/historial/">Caja</a> como cualquier ODP (segregación de funciones incluida) y es ese flujo el que contabiliza el egreso.</li>
+      <li><b>Arriendos de parques</b> → los arriendos fijos del mantenedor <a href="/mantenedores/parques/">Arriendos y Comisiones Parque y Calle</a> se pagan por acá el día 6 de cada mes; con eso la cartola y la ODP de <a href="/postventa/comisiones-parques/">Comisiones Parques</a> salen SOLO con las comisiones (interruptor <code>parques_arriendo_recurrente</code> en la configuración de Post Venta; los meses ya congelados no cambian).</li>
+      <li><b>Respaldos que llegan después</b> → la factura o cuenta se adjunta a la ODP desde el Historial con "Adjuntar respaldo", en cualquier estado, incluso pagada.</li>
       <li><b>Pausar</b> detiene la generación sin borrar la historia; el log de cada generación (tipo de cambio usado, ODP, correos) queda en el ícono <i class="bi bi-clock-history"></i>.</li>
     </ul>
   </div>

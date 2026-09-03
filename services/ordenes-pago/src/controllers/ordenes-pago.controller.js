@@ -937,6 +937,39 @@ const crearOrden = async (req, res) => {
   }
 };
 
+/* POST /api/ordenes-pago/ordenes/:id/adjunto — respaldo (factura/boleta/cuenta) a una
+   orden YA emitida, en cualquier estado, incluso PAGADA. :id = op_correlativos.id.
+   Los pagos recurrentes (arriendos, servicios) muchas veces se pagan antes de que
+   llegue el documento; el respaldo se cuelga después y se ve en vivo en el documento
+   aunque esté congelado (getDocumento lee los adjuntos siempre en vivo). */
+const adjuntarRespaldo = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const b = req.body || {};
+    if (!b.base64) return res.status(400).json({ success: false, data: null, error: 'Falta el archivo' });
+    const [[oc]] = await pool.query('SELECT id, numero, origen, origen_id FROM op_correlativos WHERE id=?', [id]);
+    if (!oc) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+    let origen = null, ref = null;
+    if (oc.origen === 'GENERAL') { origen = 'ODP'; ref = oc.origen_id; }
+    else if (oc.origen === 'PARQUE') { origen = 'PARQUE'; ref = oc.origen_id; }
+    else if (oc.origen === 'COMISION') {
+      const [[po]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes_comision WHERE id=?', [oc.origen_id]);
+      if (po) { origen = 'COMISION'; ref = po.id_seguimiento; }
+    }
+    if (!origen) return res.status(400).json({ success: false, data: null, error: 'Esta orden no admite respaldo adjunto' });
+    const buffer = Buffer.from(String(b.base64), 'base64');
+    if (buffer.length > 7 * 1024 * 1024) return res.status(400).json({ success: false, data: null, error: 'Máximo 7 MB' });
+    const pv = require('../../../postventa/src/controllers/postventa.controller');
+    const out = await pv.guardarFacturaDoc({ origen, ref_id: ref, nombre: norm(b.nombre) || 'respaldo', mime: norm(b.mime) || null, buffer, usuario: nombreUsuario(req) });
+    auditar({ req, accion: 'CREAR', modulo: 'ordenes-pago', entidad: 'factura_doc', entidad_id: out.id,
+      detalle: `Adjuntó respaldo "${norm(b.nombre) || 'respaldo'}" a ${oc.numero || id} (${Math.round(out.bytes / 1024)} KB)` });
+    res.json({ success: true, data: { id: out.id }, error: null });
+  } catch (e) {
+    console.error('[ordenes-pago adjuntarRespaldo]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* PUT /api/ordenes-pago/ordenes/:id/estado — marcar PAGADA / ANULADA / volver a EMITIDA */
 const cambiarEstadoOrden = async (req, res) => {
   try {
@@ -1403,5 +1436,6 @@ module.exports = {
   listarOrdenes, getOrden, getDocumento, crearOrden, cambiarEstadoOrden, estadisticas, enviarCorreoOrden,
   pagarOrden, miCajaOP, anularOrdenPostventa,
   calcularDoc,   // motor único del impuesto de la ODP (lo reusa Pagos Recurrentes)
+  adjuntarRespaldo,
   getComprasAPagar, enviarComprasAPago, deshacerEnvioCompras, getFondosCompras, setFondosCompras,
 };

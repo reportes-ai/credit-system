@@ -181,9 +181,19 @@ async function opsElegibles(mes /* 'YYYY-MM' */) {
   return creds;
 }
 
+/* ¿El arriendo fijo del parque se paga por Tesorería → Pagos Recurrentes (el día 6 de
+   cada mes) en vez de ir dentro de la cartola/ODP de comisiones? Paramétrico en
+   postventa_config (parques_arriendo_recurrente, '1' = sí). Decisión de Pato 03-09-2026:
+   la ODP de comisiones de parques es SOLO comisiones. Los meses ya congelados no cambian. */
+async function arriendoPorRecurrente() {
+  const [[c]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='parques_arriendo_recurrente'").catch(() => [[null]]);
+  return c ? String(c.valor) === '1' : true;
+}
+
 async function calcularMes(mes /* 'YYYY-MM' */) {
   const [parques] = await pool.query(
     'SELECT nombre, arriendo, comision_pct FROM parques_comisiones WHERE activo=1 ORDER BY orden, nombre');
+  if (await arriendoPorRecurrente()) parques.forEach(p => { p.arriendo = 0; });
   const canon = new Map(parques.map(p => [norm(p.nombre), p.nombre]));
 
   const creds = await opsElegibles(mes);
@@ -468,7 +478,9 @@ const emitir = async (req, res) => {
     const arriendo = Math.round(Number(e.arriendo)), comision = Math.round(Number(e.comision_creditos));
     const total = arriendo + comision;
     const quien = `${req.user?.nombre || ''} ${req.user?.apellido || ''}`.trim() || 'sistema';
-    const concepto = `Comisión Parque ${parque} — ${mes} (arriendo ${CLP(arriendo)} + comisión créditos ${CLP(comision)})`;
+    const concepto = arriendo > 0
+      ? `Comisión Parque ${parque} — ${mes} (arriendo ${CLP(arriendo)} + comisión créditos ${CLP(comision)})`
+      : `Comisión Parque ${parque} — ${mes} (comisión créditos ${CLP(comision)}; arriendo por Pagos Recurrentes)`;
     const odp = await emitirCorrelativo({ origen: 'PARQUE', origen_id: e.id, concepto, monto: total, id_usuario: req.user?.id_usuario, usuario_nombre: quien });
 
     await pool.query("UPDATE parques_pagos_mes SET etapa='OP_EMITIDA', odp_id=?, odp_numero=?, emitida_por=?, fecha_emitida=NOW() WHERE id=?",

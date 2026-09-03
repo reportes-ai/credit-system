@@ -33,6 +33,7 @@ router.get('/ordenes/:id',        verifyToken, puedeVer, c.getOrden);
 router.post('/ordenes',           verifyToken, requireFunc('ordenes_pago_emitir'), c.crearOrden);
 router.put('/ordenes/:id/estado', verifyToken, requireFunc('ordenes_pago_emitir'), c.cambiarEstadoOrden);
 router.post('/ordenes/:id/enviar-correo', verifyToken, requireFunc('ordenes_pago_emitir'), c.enviarCorreoOrden);
+router.post('/ordenes/:id/adjunto',       verifyToken, requireFunc('ordenes_pago_emitir', 'ordenes_pago_historial', 'pagos_recurrentes'), c.adjuntarRespaldo);   // respaldo en cualquier estado, incluso pagada
 router.post('/ordenes/:id/pagar',         verifyToken, c.pagarOrden);   // gate real = Caja Activa (en el controller)
 // Anular una orden de POST VENTA (Saldo Precio / Comisión). El gate real es
 // Administrador + motivo, validado en el controller; `requireFunc` deja fuera

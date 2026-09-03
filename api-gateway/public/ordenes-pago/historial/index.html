@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.31 — filtro TIPO: botones Administrativos/Arriendos (categoria dentro de Otros/GENERAL) · v1.30 — boton Excel: descarga los casos filtrados con montos con formato y nombre de archivo segun filtros. v1.29 — selector "Cuenta de cargo" al registrar el pago (mantenedor Cuentas Bancarias): queda en la orden y el asiento acredita ese banco real; el detalle muestra "desde <cuenta>". v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.32 — boton Adjuntar respaldo en el detalle de CUALQUIER orden, incluso pagada (facturas que llegan despues del pago) · v1.31 — filtro TIPO: botones Administrativos/Arriendos (categoria dentro de Otros/GENERAL) · v1.30 — boton Excel: descarga los casos filtrados con montos con formato y nombre de archivo segun filtros. v1.29 — selector "Cuenta de cargo" al registrar el pago (mantenedor Cuentas Bancarias): queda en la orden y el asiento acredita ese banco real; el detalle muestra "desde <cuenta>". v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -122,6 +122,7 @@
   </div>
 </div>
 
+<input type="file" id="adjFile" accept=".pdf,.jpg,.jpeg,.png,.xml" style="display:none" onchange="adjuntarRespaldo(this)">
 <dialog id="dlg">
   <div class="dlg-head"><span id="dTitulo">Orden</span><i class="bi bi-x-lg" style="cursor:pointer" onclick="document.getElementById('dlg').close()"></i></div>
   <div class="dlg-body" id="dBody"></div>
@@ -360,11 +361,27 @@ async function ver(id){
         ? `<button class="btn-af" disabled style="opacity:.45;cursor:not-allowed" title="Segregación de funciones: quien emite la orden no registra su pago"><i class="bi bi-cash-coin me-1"></i>Pagar (la emitiste tú)</button>`
         : `<button class="btn-af" onclick="pagar(${row.id})"><i class="bi bi-cash-coin me-1"></i>Pagar</button>`)
     : '';
+  // Respaldo (factura/boleta/cuenta) en CUALQUIER estado, incluso pagada: los pagos
+  // recurrentes suelen pagarse antes de que llegue el documento.
+  const adjBtn = (full.estado !== 'ANULADA' && (PUEDE || isAdmin))
+    ? `<button class="btn-ghost" onclick="document.getElementById('adjFile').click()" title="Sube la factura, boleta o cuenta de respaldo (máx. 7 MB); queda en la orden aunque ya esté pagada"><i class="bi bi-paperclip me-1"></i>Adjuntar respaldo</button>` : '';
   foot.innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>
     <button class="btn-ghost" onclick="copiarDoc()"><i class="bi bi-clipboard me-1"></i>Copiar</button>
     <button class="btn-ghost" onclick="descargarDoc()"><i class="bi bi-download me-1"></i>Descargar</button>
-    ${anularBtn}${enviar}${pagarBtn}`;
+    ${adjBtn}${anularBtn}${enviar}${pagarBtn}`;
   document.getElementById('dlg').showModal();
+}
+async function adjuntarRespaldo(inp){
+  const f = inp.files && inp.files[0]; inp.value = ''; if (!f || !VISTA) return;
+  if (f.size > 7 * 1024 * 1024) { toast('El archivo supera 7 MB'); return; }
+  const base64 = await new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = bad; r.readAsDataURL(f); });
+  const row = DATA.find(x => x.numero === VISTA.numero) || {}; const id = row.id;
+  if (!id) { toast('No se pudo identificar la orden'); return; }
+  toast('Subiendo respaldo…');
+  const r = await fetch('/api/ordenes-pago/ordenes/' + id + '/adjunto', { method: 'POST', headers: H, body: JSON.stringify({ nombre: f.name, mime: f.type, base64 }) });
+  const j = await r.json().catch(() => null);
+  if (j && j.success) { toast('Respaldo adjuntado a ' + VISTA.numero); ver(id); }
+  else toast('Error: ' + (j && j.error || 'no se pudo adjuntar'));
 }
 
 async function copiarDoc(){
