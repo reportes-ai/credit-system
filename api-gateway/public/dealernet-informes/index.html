@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
+  <!-- v2.9 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -132,6 +132,7 @@
         <button class="btn-ghost aud-d" data-d="7" onclick="cargarAuditoria(7)">7 días</button>
         <button class="btn-ghost aud-d" data-d="30" onclick="cargarAuditoria(30)">30 días</button>
         <button class="btn-ghost aud-d" data-d="90" onclick="cargarAuditoria(90)">90 días</button>
+        <button class="btn-ghost" style="color:#15803d;margin-left:8px" onclick="exportarAuditoria()" title="Descarga la tabla del período actual con formatos"><i class="bi bi-file-earmark-excel"></i> Excel</button>
       </div>
     </div>
     <div class="muted" style="margin:-4px 0 10px">Informes solicitados por usuario, promedio por día y por tipo. Auto-consultas y consultas a otros usuarios de la empresa: últimos 90 días.</div>
@@ -521,7 +522,31 @@ async function cargarAuditoria(dias=30){
     renderAuditoria(j.data);
   } catch(_){ card.style.display='none'; }
 }
+let _audData = null;
+/* Excel de la auditoría: celda a celda con tipos numéricos y formatos (nunca table_to_sheet:
+   con es-CL "1.234" se vuelve 1,234). Misma tabla que se ve en pantalla + fila TOTAL. */
+async function exportarAuditoria(){
+  const d = _audData; if (!d || !d.porUsuario.length) { alert('No hay datos para exportar.'); return; }
+  if (!window.XLSX) await new Promise((ok,bad)=>{ const s=document.createElement('script'); s.src='/js/xlsx.full.min.js'; s.onload=ok; s.onerror=bad; document.head.appendChild(s); });
+  const tipos = [...new Set(d.porUsuario.flatMap(u=>u.porTipo.map(t=>t.nombre)))];
+  const head = ['Usuario','RUTs únicos','Créditos ingresados','Conversión','Informes ('+d.dias+'d)','Prom./día', ...tipos, 'Costo UF','Costo CLP'];
+  const filas = d.porUsuario.map(u=>{ const byName={}; u.porTipo.forEach(t=>byName[t.nombre]=t.n);
+    return [u.usuario, u.ruts_unicos||0, u.creditos||0, (u.ruts_unicos? (u.creditos||0)/u.ruts_unicos : 0), u.total, u.promedio_dia, ...tipos.map(t=>byName[t]||0), u.costo_uf||0, u.costo_clp||0]; });
+  const tot = ['TOTAL']; for (let c=1;c<head.length;c++) tot.push(filas.reduce((s,f)=>s+Number(f[c]||0),0));
+  tot[3] = tot[1] ? tot[2]/tot[1] : 0; tot[5] = tot[4]/d.dias;
+  const aoa = [head, ...filas, tot];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const fmt = { 3:'0.0%', 5:'0.00', [head.length-2]:'0.0000', [head.length-1]:'$#,##0' };
+  for (let r=1;r<aoa.length;r++) for (const [c,z] of Object.entries(fmt)) { const cell = ws[XLSX.utils.encode_cell({r, c:+c})]; if (cell) cell.z = z; }
+  ws['!cols'] = head.map((h,i)=>({ wch: Math.min(34, Math.max(h.length, ...aoa.map(f=>String(f[i]??'').length))+2) }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Auditoría '+d.dias+'d');
+  const wsA = XLSX.utils.aoa_to_sheet([['Consultas a su propio RUT (90 días)','N'], ...d.autoConsulta.map(x=>[x.usuario,x.n]), [], ['Consultas a RUT de otros usuarios (90 días)','N'], ...d.consultaEmpresa.map(x=>[x.usuario,x.n])]);
+  XLSX.utils.book_append_sheet(wb, wsA, 'Auto-consultas');
+  const hoy = new Date(); const f = hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
+  XLSX.writeFile(wb, 'DealerNet_Auditoria_'+d.dias+'d_'+f+'.xlsx');
+}
 function renderAuditoria(d){
+  _audData = d;
   const tipos = [...new Set(d.porUsuario.flatMap(u=>u.porTipo.map(t=>t.nombre)))];
   const clp = n => '$'+Math.round(Number(n)||0).toLocaleString('es-CL');
   const tCosto = 'Precio UF del tramo del plan contratado ('+(d.plan_uf||'')+' UF, mantenedor DealerNet → Costos) × informes, a la UF de hoy ($'+Math.round(d.uf_hoy||0).toLocaleString('es-CL')+')';

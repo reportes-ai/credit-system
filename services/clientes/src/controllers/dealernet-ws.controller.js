@@ -1051,7 +1051,8 @@ const auditoria = async (req, res) => {
     const usuarios = {};
     for (const r of cons) {
       const k = r.id_usuario != null ? 'u' + r.id_usuario : 'n' + (r.usuario_nombre || '');
-      if (!usuarios[k]) usuarios[k] = { id_usuario: r.id_usuario, usuario: r.usuario_nombre || '—', total: 0, _porTipo: {}, _ruts: new Set() };
+      // Sin id_usuario = lo pidió un motor del sistema (revisor automático, incorporación de dealers sin sesión).
+      if (!usuarios[k]) usuarios[k] = { id_usuario: r.id_usuario, usuario: r.usuario_nombre || (r.id_usuario == null ? 'Sistema (automático)' : '—'), total: 0, _porTipo: {}, _ruts: new Set() };
       // RUTs distintos consultados: mide personas evaluadas, no informes (varios informes por RUT)
       if (r.rut) usuarios[k]._ruts.add(String(r.rut).replace(/[^0-9kK]/g, '').toUpperCase());
       const codigos = String(r.productos || '').split(',').map(s => s.trim()).filter(Boolean);
