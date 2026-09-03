@@ -1311,8 +1311,23 @@ async function notificarPagoComisionDealer(idSeguimiento) {
     if (!d.correo) { console.warn('[postventa aviso pago] dealer sin correo — OP', d.num_op); return; }
     // OPs cubiertas por la factura (titular + réplicas)
     const [reps] = await pool.query(
-      'SELECT num_op FROM postventa_facturas_comision WHERE id_titular=? AND es_replica=1', [idSeguimiento]);
+      'SELECT id_seguimiento, num_op FROM postventa_facturas_comision WHERE id_titular=? AND es_replica=1', [idSeguimiento]);
     const ops = [d.num_op, ...reps.map(r => r.num_op)].filter(Boolean).join(', ') || String(d.num_op || '');
+    // CC dinámico (igual que el aviso de saldo precio): los EJECUTIVOS de cada operación
+    // cubierta por la factura + los Jefes Comerciales, además de la copia fija del mantenedor.
+    const cc = new Set();
+    try {
+      const idsOps = [idSeguimiento, ...reps.map(r => r.id_seguimiento)].filter(Boolean);
+      const [ejs] = await pool.query(
+        `SELECT DISTINCT u.email FROM postventa_seguimiento s
+           JOIN usuarios u ON UPPER(TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,'')))) = UPPER(TRIM(s.ejecutivo))
+          WHERE s.id IN (?) AND u.email IS NOT NULL AND u.estado='activo'`, [idsOps]);
+      ejs.forEach(e => cc.add(String(e.email).toLowerCase()));
+      const [jefes] = await pool.query(
+        `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
+          WHERE p.nombre = 'Jefe Comercial' AND u.estado = 'activo' AND u.email IS NOT NULL`);
+      jefes.forEach(j => cc.add(String(j.email).toLowerCase()));
+    } catch (e) { console.warn('[postventa aviso pago dealer] cc ejecutivos:', e.message); }
     // La plantilla vive en el mantenedor único Correos del Sistema (antes en postventa_config)
     const tpl = await require('../../../../shared/plantillas-correo').comoTpl('dealer_comision_pagada', 'correo_comision_pagada');
     if (tpl.activo === false) return;               // interruptor del mantenedor: aviso desactivado
@@ -1332,7 +1347,7 @@ async function notificarPagoComisionDealer(idSeguimiento) {
     await enviarCorreo({
       from: remitentePorClave(tpl.remitente || 'comisiones'),
       to: d.correo,
-      cc: tpl.cc || undefined,              // copia fija del mantenedor
+      cc: [...new Set([...String(tpl.cc || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean), ...cc])].join(',') || undefined,   // fija del mantenedor + ejecutivos + jefes
       subject: rell(tpl.asunto) || 'Comisión pagada',
       html: envolverHTML(escH(cuerpo).replace(/\n/g, '<br>')),
       text: cuerpo,
