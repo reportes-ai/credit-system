@@ -238,7 +238,7 @@ function render(){
       <td>${escH(r.proveedor_nombre||'—')}</td>
       <td>${escH(r.proveedor_rut||'—')}</td>
       <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${escH(r.concepto||'')}">${escH(r.concepto||'—')}</td>
-      <td>${escH(r.categoria||'—')}</td>
+      <td>${escH(r.categoria||'—')}${r.id_pago_recurrente?' <span title="Generada automáticamente por Tesorería → Pagos Recurrentes" style="background:#ede9fe;color:#5b21b6;border-radius:8px;padding:1px 7px;font-size:.62rem;font-weight:800"><i class="bi bi-arrow-repeat"></i> Recurrente</span>':''}</td>
       <td>${escH([r.tipo_documento, r.numero_documento?('N° '+r.numero_documento):''].filter(Boolean).join(' ')||'—')}</td>
       <td>${escH(r.numero_cuenta||'—')}</td>
       <td>${escH(r.banco||'—')}</td>

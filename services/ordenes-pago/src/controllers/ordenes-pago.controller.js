@@ -184,7 +184,7 @@ const getComprasAPagar = async (req, res) => {
              DATEDIFF(CURDATE(), oc.created_at) AS dias,
              (oc.pagada=1) AS pagado_hoy_flag, oc.enviado_pago, oc.enviado_pago_por,
              op.proveedor_nombre, op.proveedor_rut, op.categoria, op.tipo_documento,
-             op.numero_documento, op.metodo_pago,
+             op.numero_documento, op.metodo_pago, op.id_pago_recurrente,
              p.banco, p.numero_cuenta, p.tipo_cuenta
       FROM op_correlativos oc
       JOIN ordenes_pago op ON op.id = oc.origen_id
