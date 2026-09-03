@@ -105,6 +105,7 @@
       <li><b>Cada pago inscrito</b> → genera automáticamente una Orden de Pago EMITIDA el día del vencimiento en <a href="/ordenes-pago/historial/">Órdenes de Pago → Historial</a> (tipo según el <i>Tipo de pago</i>: Arriendos, Administrativos u Otros), y avisa por correo a Tesorería (plantilla <code>pago_recurrente_odp</code> en <a href="/mantenedores/correos-programados/">Correos del Sistema</a>).</li>
       <li><b>Moneda y monto</b> → la conversión usa la UF del motor único y la UTM / dólar del <a href="/mantenedores/uf/">mantenedor de indicadores</a> del día de emisión. Sin cotización cargada, la orden NO se emite y se reintenta al día siguiente.</li>
       <li><b>Proveedor</b> → RUT, banco y cuenta se leen en vivo de <a href="/ordenes-pago/proveedores/">Proveedores</a> (una sola fuente); el correo del proveedor es el que recibe el aviso de pago (plantilla <code>pago_recurrente_pagado</code>).</li>
+      <li><b>Cuenta de cargo</b> → sale del mantenedor <a href="/mantenedores/cuentas-bancarias/">Cuentas Bancarias</a> filtrado por la moneda del pago (USD → cuentas en dólares; pesos, UF y UTM → cuentas en pesos). Queda declarada en la ODP y el asiento del pago acredita ese banco; el cajero puede cambiarla al pagar. Vacía = la elige el cajero.</li>
       <li><b>Tipo de documento</b> → define IVA / retención con el mismo motor de la emisión manual de ODP; el monto inscrito es lo que se paga (bruto).</li>
       <li><b>El pago</b> se registra desde la <a href="/ordenes-pago/historial/">Caja</a> como cualquier ODP (segregación de funciones incluida) y es ese flujo el que contabiliza el egreso.</li>
       <li><b>Pausar</b> detiene la generación sin borrar la historia; el log de cada generación (tipo de cambio usado, ODP, correos) queda en el ícono <i class="bi bi-clock-history"></i>.</li>
@@ -136,10 +137,11 @@
       <div class="g4"><label>Glosa del pago * <span style="text-transform:none;font-weight:600;color:#94a3b8">variables: {MES} {MES_ANTERIOR} {AÑO} {MES_NUM}</span></label>
         <input id="fGlosa" maxlength="300" placeholder="Ej: Arriendo oficina {MES} {AÑO}" oninput="previa()"></div>
       <div><label>Tipo de documento</label><select id="fDoc"></select></div>
-      <div><label>Moneda *</label><select id="fMon" onchange="previa()"></select></div>
+      <div><label>Moneda *</label><select id="fMon" onchange="filtrarCtas();previa()"></select></div>
       <div><label>Monto en moneda de origen *</label><input id="fMonto" inputmode="decimal" placeholder="0" oninput="previa()"></div>
       <div><label>Próximo pago *</label><input type="date" id="fProx" onchange="ajustarProx()"></div>
       <div><label>Último pago</label><input type="date" id="fUlt"></div>
+      <div class="g2"><label>Cuenta de cargo (se debita de) <span style="text-transform:none;font-weight:600;color:#94a3b8" id="ctaHint"></span></label><select id="fCta"><option value="">— la elige el cajero al pagar —</option></select></div>
       <div class="g4"><div class="previa" id="previa">Vista previa: completa moneda, monto y glosa.</div></div>
     </div>
   </div>
@@ -174,6 +176,7 @@ async function cargar(){
   if (!CAT) { const j = await api('GET','/api/pagos-recurrentes/catalogo'); CAT = j && j.data;
     const opt = (id, arr, sel) => { const s=document.getElementById(id); s.innerHTML = arr.map(v=>`<option${v===sel?' selected':''}>${v}</option>`).join(''); };
     opt('fPer', CAT.periodicidades); opt('fTipo', CAT.tipos_pago); opt('fMon', CAT.monedas); opt('fDoc', CAT.tipos_documento, 'Factura'); }
+  if (!CTAS.length) await cargarCtas();
   const j = await api('GET','/api/pagos-recurrentes'); if(!j) return;
   DATA = j.success ? j.data : [];
   render();
@@ -197,7 +200,7 @@ function render(){
       <td>${escH(p.periodicidad)}</td>
       <td class="num">${p.dia_pago||'—'}</td>
       <td>${escH(p.tipo_pago)}</td>
-      <td class="num"><b>${fmtOrigen(p.monto_origen, p.moneda)}</b></td>
+      <td class="num"><b>${fmtOrigen(p.monto_origen, p.moneda)}</b>${p.cuenta_cargo_nombre?`<div style="font-size:.66rem;color:#64748b;font-weight:400" title="Cuenta de cargo">⇐ ${escH(p.cuenta_cargo_nombre)}</div>`:''}</td>
       <td style="max-width:220px">${escH(p.glosa)}</td>
       <td>${fdate(p.fecha_ultimo_pago)}</td>
       <td>${venc?'<span class="chip c-venc">'+fdate(prox)+' · vence</span>':fdate(prox)}</td>
@@ -260,6 +263,19 @@ function previa(){
   }, 300);
 }
 
+/* Cuenta de cargo: del mantenedor Cuentas Bancarias, filtrada por la moneda del pago
+   (USD → cuentas en dólares; CLP/UF/UTM → cuentas en pesos). Las inactivas se ven marcadas. */
+let CTAS = [];
+async function cargarCtas(){ try { const j = await api('GET','/api/cuentas-bancarias'); CTAS = j && j.data || []; } catch(e){} }
+function filtrarCtas(keep){
+  const mon = document.getElementById('fMon').value, monCta = mon === 'USD' ? 'USD' : 'CLP';
+  const sel = document.getElementById('fCta'); const actual = keep != null ? String(keep) : sel.value;
+  const lista = CTAS.filter(c => String(c.moneda || 'CLP').toUpperCase() === monCta);
+  sel.innerHTML = '<option value="">— la elige el cajero al pagar —</option>' +
+    lista.map(c => `<option value="${c.id_cuenta}" ${Number(c.activo)===0?'disabled':''}>${escH([c.nombre, c.banco, c.numero_cuenta].filter(Boolean).join(' · '))}${Number(c.activo)===0?' (inactiva)':''}</option>`).join('');
+  sel.value = lista.some(c => String(c.id_cuenta) === actual && Number(c.activo) !== 0) ? actual : '';
+  document.getElementById('ctaHint').textContent = `cuentas en ${monCta}` + (mon!=='CLP' && mon!=='USD' ? ` (${mon} se paga en pesos)` : '') + (!lista.some(c=>Number(c.activo)!==0) ? ' — ninguna activa en el mantenedor' : '');
+}
 /* Próximo pago: el mes lo pone la fecha, el día lo pone "Día de pago" (31 cae en el último día del mes corto). */
 function ajustarProx(){
   const dia = parseInt(document.getElementById('fDia').value), f = document.getElementById('fProx').value;
@@ -274,6 +290,7 @@ function limpiar(){
   setProv(null); document.getElementById('provList').style.display='none';
   document.getElementById('fProx').value = hoyISO();
   document.getElementById('fDoc').value = 'Factura'; document.getElementById('fMon').value = 'CLP';
+  filtrarCtas('');
   document.getElementById('previa').textContent = 'Vista previa: completa moneda, monto y glosa.';
 }
 function abrirNuevo(){ editandoId=null; limpiar(); document.getElementById('dlgTitulo').textContent='Inscribir pago recurrente'; dlg.showModal(); }
@@ -285,6 +302,7 @@ function abrirEditar(id){
   document.getElementById('fPer').value = p.periodicidad; document.getElementById('fTipo').value = p.tipo_pago;
   document.getElementById('fDoc').value = p.tipo_documento||'Factura'; document.getElementById('fGlosa').value = p.glosa;
   document.getElementById('fMon').value = p.moneda; document.getElementById('fMonto').value = Number(p.monto_origen);
+  filtrarCtas(p.id_cuenta_bancaria || '');
   document.getElementById('fProx').value = String(p.fecha_proximo_pago||'').slice(0,10);
   document.getElementById('fDia').value = p.dia_pago || Number(String(p.fecha_proximo_pago||'').slice(8,10)) || '';
   document.getElementById('fUlt').value = p.fecha_ultimo_pago ? String(p.fecha_ultimo_pago).slice(0,10) : '';
@@ -300,6 +318,7 @@ async function guardar(){
     glosa: document.getElementById('fGlosa').value.trim(), moneda: document.getElementById('fMon').value,
     monto_origen: document.getElementById('fMonto').value, fecha_proximo_pago: document.getElementById('fProx').value,
     dia_pago: document.getElementById('fDia').value,
+    id_cuenta_bancaria: document.getElementById('fCta').value || null,
     fecha_ultimo_pago: document.getElementById('fUlt').value || null,
   };
   if (!body.id_proveedor) { toast('Elige el proveedor de la lista'); return; }
