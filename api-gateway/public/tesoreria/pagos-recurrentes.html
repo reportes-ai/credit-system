@@ -9,7 +9,14 @@
 <style>
   :root { --navy:#012d70; --accent:#0141A2; --ok:#16a34a; --bad:#dc2626; }
   * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
-  .wrap { margin:20px auto; padding:0 26px 60px; max-width:1350px; }
+  .wrap { margin:20px auto; padding:0 26px 60px; max-width:none; }
+  .sw { position:relative; display:inline-block; width:42px; height:22px; vertical-align:middle; }
+  .sw input { opacity:0; width:0; height:0; }
+  .sw span { position:absolute; inset:0; background:#cbd5e1; border-radius:22px; cursor:pointer; transition:.2s; }
+  .sw span:before { content:''; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+  .sw input:checked + span { background:var(--ok); }
+  .sw input:checked + span:before { transform:translateX(20px); }
+  .c-prop { background:#ede9fe; color:#5b21b6; }
   .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 26px; margin-bottom:16px; display:flex; align-items:center; gap:16px; }
   .banner > i { font-size:2.3rem; opacity:.85; }
   .banner h2 { margin:0 0 3px; font-size:1.2rem; font-weight:700; }
@@ -193,12 +200,14 @@ function render(){
       <td>${fdate(p.fecha_ultimo_pago)}</td>
       <td>${venc?'<span class="chip c-venc">'+fdate(prox)+' · vence</span>':fdate(prox)}</td>
       <td>${escH(p.ultima_odp||'—')}${p.generadas?` <span style="font-size:.66rem;color:#94a3b8">(${p.generadas})</span>`:''}</td>
-      <td><span class="chip ${p.activo?'c-on':'c-off'}">${p.activo?'ACTIVO':'PAUSADO'}</span></td>
+      <td style="white-space:nowrap">
+        <label class="sw" title="${p.activo?'ON — genera órdenes. Clic para apagar':'OFF — no genera. Clic para encender'}"><input type="checkbox" ${p.activo?'checked':''} onchange="activar(${p.id}, this.checked?1:0)"><span></span></label>
+        ${p.propuesto?'<span class="chip c-prop" title="Detectado desde la historia de pagos: revísalo y enciéndelo si corresponde">PROPUESTO</span>':`<span class="chip ${p.activo?'c-on':'c-off'}">${p.activo?'ON':'OFF'}</span>`}
+      </td>
       <td style="white-space:nowrap">
         <button class="icon-btn" title="Editar" onclick="abrirEditar(${p.id})"><i class="bi bi-pencil"></i></button>
         <button class="icon-btn" title="Historial de generaciones" onclick="verLog(${p.id})"><i class="bi bi-clock-history"></i></button>
         ${p.activo?`<button class="icon-btn" title="Generar la orden de este vencimiento ahora" onclick="generar(${p.id})"><i class="bi bi-lightning-charge" style="color:#0141A2"></i></button>`:''}
-        <button class="icon-btn" title="${p.activo?'Pausar':'Reactivar'}" onclick="activar(${p.id},${p.activo?0:1})"><i class="bi ${p.activo?'bi-pause-circle':'bi-play-circle'}"></i></button>
         <button class="icon-btn" title="Eliminar (si tiene historia, se pausa)" onclick="eliminar(${p.id})"><i class="bi bi-trash" style="color:#dc2626"></i></button>
       </td></tr>`; }).join('');
 }
@@ -288,7 +297,7 @@ async function guardar(){
   if (!j || !j.success) { toast('Error: '+(j&&j.error||'no se pudo guardar')); return; }
   dlg.close(); toast(editandoId ? 'Pago actualizado' : 'Pago inscrito'); cargar();
 }
-async function activar(id, activo){ const j = await api('PUT',`/api/pagos-recurrentes/${id}/activo`,{activo}); if(j&&j.success){ toast(activo?'Reactivado':'Pausado'); cargar(); } else toast('Error: '+(j&&j.error)); }
+async function activar(id, activo){ const j = await api('PUT',`/api/pagos-recurrentes/${id}/activo`,{activo}); if(j&&j.success){ toast(activo?'Encendido: genera órdenes al vencimiento':'Apagado: no genera órdenes'); cargar(); } else { toast('Error: '+(j&&j.error)); cargar(); } }
 async function eliminar(id){
   const p = DATA.find(x=>x.id===id); if(!p) return;
   if (!confirm(`¿Eliminar «${p.apodo}»?${p.generadas?'\n\nComo ya generó órdenes, quedará PAUSADO (la historia se conserva).':''}`)) return;

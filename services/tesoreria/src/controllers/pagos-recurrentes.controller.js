@@ -79,6 +79,8 @@ require('../../../../shared/migrate').enFila('pagos-recurrentes', async () => {
       )`);
     // La ODP sabe de qué pago recurrente nació (para el aviso al proveedor al pagarla).
     await pool.query('ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS id_pago_recurrente INT NULL');
+    // Propuesto: detectado desde la historia contable, nace PAUSADO hasta que alguien lo revise y lo encienda.
+    await pool.query('ALTER TABLE tesoreria_pagos_recurrentes ADD COLUMN IF NOT EXISTS propuesto TINYINT(1) NOT NULL DEFAULT 0');
 
     // Card en Tesorería + permisos (anti-hardcode: módulos y cards salen de la BD)
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Tesorería' OR ruta LIKE '/tesoreria%' LIMIT 1");
@@ -289,9 +291,10 @@ exports.crear = async (req, res) => {
 exports.editar = async (req, res) => {
   try {
     const id = parseInt(req.params.id); const b = req.body || {}; const err = validar(b); if (err) return fail(res, err, 400);
+    // Editar un propuesto también lo confirma (alguien lo revisó).
     const [r] = await pool.query(
       `UPDATE tesoreria_pagos_recurrentes SET apodo=?, descripcion=?, periodicidad=?, id_proveedor=?, tipo_pago=?, tipo_documento=?, glosa=?, moneda=?, monto_origen=?,
-         fecha_ultimo_pago=?, fecha_proximo_pago=? WHERE id=?`, [...campos(b), id]);
+         fecha_ultimo_pago=?, fecha_proximo_pago=?, propuesto=0 WHERE id=?`, [...campos(b), id]);
     if (!r.affectedRows) return fail(res, 'Pago recurrente no encontrado', 404);
     auditar({ req, accion: 'EDITAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(id), detalle: `Editó «${norm(b.apodo)}»` });
     ok(res, { id });
@@ -301,9 +304,10 @@ exports.editar = async (req, res) => {
 exports.activar = async (req, res) => {
   try {
     const id = parseInt(req.params.id); const activo = req.body && req.body.activo ? 1 : 0;
-    const [r] = await pool.query('UPDATE tesoreria_pagos_recurrentes SET activo=? WHERE id=?', [activo, id]);
+    // Encender un propuesto es aceptarlo: deja de ser propuesta.
+    const [r] = await pool.query('UPDATE tesoreria_pagos_recurrentes SET activo=?, propuesto=IF(?=1, 0, propuesto) WHERE id=?', [activo, activo, id]);
     if (!r.affectedRows) return fail(res, 'Pago recurrente no encontrado', 404);
-    auditar({ req, accion: activo ? 'ACTIVAR' : 'PAUSAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(id), detalle: activo ? 'Reactivó el pago recurrente' : 'Pausó el pago recurrente (no genera órdenes)' });
+    auditar({ req, accion: activo ? 'ACTIVAR' : 'PAUSAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(id), detalle: activo ? 'Activó el pago recurrente (genera órdenes)' : 'Desactivó el pago recurrente (no genera órdenes)' });
     ok(res, { id, activo });
   } catch (e) { fail(res, e.message); }
 };
