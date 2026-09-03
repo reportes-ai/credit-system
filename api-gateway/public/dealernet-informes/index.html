@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
+  <!-- v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -522,12 +522,12 @@ async function cargarAuditoria(dias=30){
 }
 function renderAuditoria(d){
   const tipos = [...new Set(d.porUsuario.flatMap(u=>u.porTipo.map(t=>t.nombre)))];
-  let h = '<div style="overflow:auto"><table class="tb"><thead><tr><th>Usuario</th><th>Informes ('+d.dias+'d)</th><th>Prom./día</th>'+
+  let h = '<div style="overflow:auto"><table class="tb"><thead><tr><th>Usuario</th><th title="Personas distintas consultadas en el período (varios informes de un mismo RUT cuentan una vez)">RUTs únicos</th><th>Informes ('+d.dias+'d)</th><th>Prom./día</th>'+
     tipos.map(t=>'<th>'+esc(t)+'</th>').join('')+'</tr></thead><tbody>';
-  if(!d.porUsuario.length) h += '<tr><td colspan="'+(3+tipos.length)+'" class="muted">Sin actividad en el período.</td></tr>';
+  if(!d.porUsuario.length) h += '<tr><td colspan="'+(4+tipos.length)+'" class="muted">Sin actividad en el período.</td></tr>';
   h += d.porUsuario.map(u=>{
     const byName={}; u.porTipo.forEach(t=>byName[t.nombre]=t.n);
-    return '<tr><td>'+esc(u.usuario)+'</td><td><b>'+u.total+'</b></td><td>'+u.promedio_dia+'</td>'+
+    return '<tr><td>'+esc(u.usuario)+'</td><td><b>'+(u.ruts_unicos??0)+'</b></td><td><b>'+u.total+'</b></td><td>'+u.promedio_dia+'</td>'+
       tipos.map(t=>'<td>'+(byName[t]||0)+'</td>').join('')+'</tr>';
   }).join('')+'</tbody></table></div>';
   h += '<div class="grid" style="margin-top:14px">';

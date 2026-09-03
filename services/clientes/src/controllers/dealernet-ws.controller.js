@@ -1037,13 +1037,15 @@ const auditoria = async (req, res) => {
     const [prods] = await pool.query('SELECT codigo, nombre FROM dealernet_productos');
     const nombreProd = c => (prods.find(p => String(p.codigo) === String(c)) || {}).nombre || c;
     const [cons] = await pool.query(
-      `SELECT c.id_usuario, c.productos, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) usuario_nombre
+      `SELECT c.id_usuario, c.productos, c.rut, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) usuario_nombre
        FROM dealernet_consultas c LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
        WHERE c.retcode='0' AND c.created_at >= NOW() - INTERVAL ? DAY`, [dias]);
     const usuarios = {};
     for (const r of cons) {
       const k = r.id_usuario != null ? 'u' + r.id_usuario : 'n' + (r.usuario_nombre || '');
-      if (!usuarios[k]) usuarios[k] = { id_usuario: r.id_usuario, usuario: r.usuario_nombre || '—', total: 0, _porTipo: {} };
+      if (!usuarios[k]) usuarios[k] = { id_usuario: r.id_usuario, usuario: r.usuario_nombre || '—', total: 0, _porTipo: {}, _ruts: new Set() };
+      // RUTs distintos consultados: mide personas evaluadas, no informes (varios informes por RUT)
+      if (r.rut) usuarios[k]._ruts.add(String(r.rut).replace(/[^0-9kK]/g, '').toUpperCase());
       const codigos = String(r.productos || '').split(',').map(s => s.trim()).filter(Boolean);
       for (const cod of codigos) {
         usuarios[k]._porTipo[cod] = (usuarios[k]._porTipo[cod] || 0) + 1;
@@ -1051,7 +1053,7 @@ const auditoria = async (req, res) => {
       }
     }
     const porUsuario = Object.values(usuarios)
-      .map(u => ({ id_usuario: u.id_usuario, usuario: u.usuario, total: u.total,
+      .map(u => ({ id_usuario: u.id_usuario, usuario: u.usuario, total: u.total, ruts_unicos: u._ruts.size,
         promedio_dia: +(u.total / dias).toFixed(2),
         porTipo: Object.entries(u._porTipo).map(([codigo, n]) => ({ codigo, nombre: nombreProd(codigo), n })) }))
       .sort((a, b) => b.total - a.total);
