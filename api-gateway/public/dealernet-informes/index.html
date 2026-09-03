@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
+  <!-- v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -525,18 +525,19 @@ function renderAuditoria(d){
   const tipos = [...new Set(d.porUsuario.flatMap(u=>u.porTipo.map(t=>t.nombre)))];
   const clp = n => '$'+Math.round(Number(n)||0).toLocaleString('es-CL');
   const tCosto = 'Precio UF del tramo del plan contratado ('+(d.plan_uf||'')+' UF, mantenedor DealerNet → Costos) × informes, a la UF de hoy ($'+Math.round(d.uf_hoy||0).toLocaleString('es-CL')+')';
-  let h = '<div style="overflow:auto"><table class="tb aud"><thead><tr><th>Usuario</th><th title="Personas distintas consultadas en el período (varios informes de un mismo RUT cuentan una vez)">RUTs únicos</th><th>Informes ('+d.dias+'d)</th><th>Prom./día</th>'+
+  let h = '<div style="overflow:auto"><table class="tb aud"><thead><tr><th>Usuario</th><th title="Personas distintas consultadas en el período (varios informes de un mismo RUT cuentan una vez)">RUTs únicos</th><th title="Créditos ingresados en el período ÷ RUTs únicos consultados: de cada 100 personas evaluadas, cuántas terminaron en crédito">Conversión</th><th>Informes ('+d.dias+'d)</th><th>Prom./día</th>'+
     tipos.map(t=>'<th>'+esc(t)+'</th>').join('')+'<th title="'+esc(tCosto)+'">Costo total</th></tr></thead><tbody>';
-  if(!d.porUsuario.length) h += '<tr><td colspan="'+(5+tipos.length)+'" class="muted">Sin actividad en el período.</td></tr>';
-  const tot = { ruts:0, total:0, costo_uf:0, costo_clp:0, tipos:{} };
+  if(!d.porUsuario.length) h += '<tr><td colspan="'+(6+tipos.length)+'" class="muted">Sin actividad en el período.</td></tr>';
+  const tot = { ruts:0, creditos:0, total:0, costo_uf:0, costo_clp:0, tipos:{} };
+  const conv = (c, r) => r ? '<b>'+(c/r*100).toFixed(1).replace('.',',')+'%</b><div class="muted" style="font-size:.7rem">'+c+' / '+r+'</div>' : '—';
   h += d.porUsuario.map(u=>{
     const byName={}; u.porTipo.forEach(t=>{ byName[t.nombre]=t.n; tot.tipos[t.nombre]=(tot.tipos[t.nombre]||0)+t.n; });
-    tot.ruts += (u.ruts_unicos||0); tot.total += u.total; tot.costo_uf += (u.costo_uf||0); tot.costo_clp += (u.costo_clp||0);
-    return '<tr><td>'+esc(u.usuario)+'</td><td><b>'+(u.ruts_unicos??0)+'</b></td><td><b>'+u.total+'</b></td><td>'+u.promedio_dia+'</td>'+
+    tot.ruts += (u.ruts_unicos||0); tot.creditos += (u.creditos||0); tot.total += u.total; tot.costo_uf += (u.costo_uf||0); tot.costo_clp += (u.costo_clp||0);
+    return '<tr><td>'+esc(u.usuario)+'</td><td><b>'+(u.ruts_unicos??0)+'</b></td><td>'+conv(u.creditos||0, u.ruts_unicos||0)+'</td><td><b>'+u.total+'</b></td><td>'+u.promedio_dia+'</td>'+
       tipos.map(t=>'<td>'+(byName[t]||0)+'</td>').join('')+
       '<td style="white-space:nowrap"><b>'+clp(u.costo_clp)+'</b><div class="muted" style="font-size:.7rem">'+Number(u.costo_uf||0).toFixed(2).replace('.',',')+' UF</div></td></tr>';
   }).join('');
-  if (d.porUsuario.length) h += '<tr style="background:#f8fafc;font-weight:800;border-top:2px solid #e2e8f0"><td>TOTAL</td><td>'+tot.ruts+'</td><td>'+tot.total+'</td><td>'+(tot.total/d.dias).toFixed(2)+'</td>'+
+  if (d.porUsuario.length) h += '<tr style="background:#f8fafc;font-weight:800;border-top:2px solid #e2e8f0"><td>TOTAL</td><td>'+tot.ruts+'</td><td>'+conv(tot.creditos, tot.ruts)+'</td><td>'+tot.total+'</td><td>'+(tot.total/d.dias).toFixed(2)+'</td>'+
     tipos.map(t=>'<td>'+(tot.tipos[t]||0)+'</td>').join('')+'<td style="white-space:nowrap">'+clp(tot.costo_clp)+'<div class="muted" style="font-size:.7rem;font-weight:400">'+tot.costo_uf.toFixed(2).replace('.',',')+' UF</div></td></tr>';
   h += '</tbody></table></div>';
   h += '<div class="grid" style="margin-top:14px">';

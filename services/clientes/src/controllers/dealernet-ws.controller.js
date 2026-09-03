@@ -1060,10 +1060,19 @@ const auditoria = async (req, res) => {
         usuarios[k].total += 1;
       }
     }
+    // Conversión: de los RUTs consultados en el período, cuántos terminaron con un crédito
+    // ingresado en el mismo período (cualquier estado). Se compara por cuerpo del RUT.
+    const [creds] = await pool.query(
+      `SELECT DISTINCT REPLACE(SUBSTRING_INDEX(cl.rut,'-',1),'.','') body
+         FROM creditos cr JOIN clientes cl ON cl.id_cliente = cr.id_cliente
+        WHERE cr.created_at >= NOW() - INTERVAL ? DAY AND cl.rut IS NOT NULL`, [dias]);
+    const conCredito = new Set(creds.map(r => String(r.body)));
     const porUsuario = Object.values(usuarios)
       .map(u => {
         const costo_uf = Object.entries(u._porTipo).reduce((s, [codigo, n]) => s + n * precioProd(codigo), 0);
+        const creditos = [...u._ruts].filter(b => conCredito.has(b.replace(/[^0-9]/g, ''))).length;
         return { id_usuario: u.id_usuario, usuario: u.usuario, total: u.total, ruts_unicos: u._ruts.size,
+          creditos, conversion: u._ruts.size ? +(creditos / u._ruts.size * 100).toFixed(1) : 0,
           promedio_dia: +(u.total / dias).toFixed(2),
           costo_uf: +costo_uf.toFixed(4), costo_clp: Math.round(costo_uf * ufHoy),
           porTipo: Object.entries(u._porTipo).map(([codigo, n]) => ({ codigo, nombre: nombreProd(codigo), n })) };
