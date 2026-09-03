@@ -50,6 +50,7 @@
     table.tb { width:100%; border-collapse:collapse; font-size:.85rem; }
     table.tb th { text-align:left; color:#64748b; font-size:.7rem; text-transform:uppercase; letter-spacing:.4px; padding:7px 8px; border-bottom:2px solid #eef2f7; }
     table.tb td { padding:8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    table.tb.aud th:not(:first-child), table.tb.aud td:not(:first-child) { text-align:center; }
     .badge-dias { font-size:.72rem; font-weight:700; padding:2px 8px; border-radius:11px; white-space:nowrap; }
     .badge-dias.fresh { background:#fee2e2; color:#b91c1c; }   /* < bloqueo */
     .badge-dias.mid { background:#fef3c7; color:#92400e; }      /* bloqueo–vigencia */
@@ -524,8 +525,8 @@ function renderAuditoria(d){
   const tipos = [...new Set(d.porUsuario.flatMap(u=>u.porTipo.map(t=>t.nombre)))];
   const clp = n => '$'+Math.round(Number(n)||0).toLocaleString('es-CL');
   const tCosto = 'Precio UF del tramo del plan contratado ('+(d.plan_uf||'')+' UF, mantenedor DealerNet → Costos) × informes, a la UF de hoy ($'+Math.round(d.uf_hoy||0).toLocaleString('es-CL')+')';
-  let h = '<div style="overflow:auto"><table class="tb"><thead><tr><th>Usuario</th><th title="Personas distintas consultadas en el período (varios informes de un mismo RUT cuentan una vez)">RUTs únicos</th><th>Informes ('+d.dias+'d)</th><th>Prom./día</th>'+
-    tipos.map(t=>'<th>'+esc(t)+'</th>').join('')+'<th style="text-align:right" title="'+esc(tCosto)+'">Costo total</th></tr></thead><tbody>';
+  let h = '<div style="overflow:auto"><table class="tb aud"><thead><tr><th>Usuario</th><th title="Personas distintas consultadas en el período (varios informes de un mismo RUT cuentan una vez)">RUTs únicos</th><th>Informes ('+d.dias+'d)</th><th>Prom./día</th>'+
+    tipos.map(t=>'<th>'+esc(t)+'</th>').join('')+'<th title="'+esc(tCosto)+'">Costo total</th></tr></thead><tbody>';
   if(!d.porUsuario.length) h += '<tr><td colspan="'+(5+tipos.length)+'" class="muted">Sin actividad en el período.</td></tr>';
   const tot = { ruts:0, total:0, costo_uf:0, costo_clp:0, tipos:{} };
   h += d.porUsuario.map(u=>{
@@ -533,10 +534,10 @@ function renderAuditoria(d){
     tot.ruts += (u.ruts_unicos||0); tot.total += u.total; tot.costo_uf += (u.costo_uf||0); tot.costo_clp += (u.costo_clp||0);
     return '<tr><td>'+esc(u.usuario)+'</td><td><b>'+(u.ruts_unicos??0)+'</b></td><td><b>'+u.total+'</b></td><td>'+u.promedio_dia+'</td>'+
       tipos.map(t=>'<td>'+(byName[t]||0)+'</td>').join('')+
-      '<td style="text-align:right;white-space:nowrap"><b>'+clp(u.costo_clp)+'</b><div class="muted" style="font-size:.7rem">'+Number(u.costo_uf||0).toFixed(2).replace('.',',')+' UF</div></td></tr>';
+      '<td style="white-space:nowrap"><b>'+clp(u.costo_clp)+'</b><div class="muted" style="font-size:.7rem">'+Number(u.costo_uf||0).toFixed(2).replace('.',',')+' UF</div></td></tr>';
   }).join('');
   if (d.porUsuario.length) h += '<tr style="background:#f8fafc;font-weight:800;border-top:2px solid #e2e8f0"><td>TOTAL</td><td>'+tot.ruts+'</td><td>'+tot.total+'</td><td>'+(tot.total/d.dias).toFixed(2)+'</td>'+
-    tipos.map(t=>'<td>'+(tot.tipos[t]||0)+'</td>').join('')+'<td style="text-align:right;white-space:nowrap">'+clp(tot.costo_clp)+'<div class="muted" style="font-size:.7rem;font-weight:400">'+tot.costo_uf.toFixed(2).replace('.',',')+' UF</div></td></tr>';
+    tipos.map(t=>'<td>'+(tot.tipos[t]||0)+'</td>').join('')+'<td style="white-space:nowrap">'+clp(tot.costo_clp)+'<div class="muted" style="font-size:.7rem;font-weight:400">'+tot.costo_uf.toFixed(2).replace('.',',')+' UF</div></td></tr>';
   h += '</tbody></table></div>';
   h += '<div class="grid" style="margin-top:14px">';
   h += '<div><div class="rep-h" style="background:#b91c1c">Consultas a su propio RUT (90 días)</div>'+
