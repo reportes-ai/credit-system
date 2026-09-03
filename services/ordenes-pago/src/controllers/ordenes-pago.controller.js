@@ -650,7 +650,7 @@ async function construirDocumento(oc) {
           { label: `Retención honorarios (${pct}%) — se descuenta`, monto: -imp },
         ];
       }
-      if (comBruta) desgloseCom.push({ label: 'Referencia: comisión bruta pactada (IVA incluido)', monto: comBruta });
+      // (la línea "Referencia: comisión bruta pactada" se retiró — no aportaba y confundía)
     }
   }
 

@@ -793,7 +793,6 @@ function abrirEmitirODP(id, track){
       <div class="em-row"><span>${Number(r.fac_emisor_ret)?'Retención — la paga el emisor':`Retención honorarios (${pct}%) — se descuenta`}</span><b>${Number(r.fac_imp_monto)?'− ':''}${fmtCLP(r.fac_imp_monto)}</b></div>` : `
       <div class="em-row"><span>Comisión neta</span><b>${fmtCLP(r.fac_monto)}</b></div>
       <div class="em-row"><span>IVA (${pct}%) — crédito fiscal AutoFácil</span><b>${fmtCLP(r.fac_imp_monto)}</b></div>`;
-    desgloseHTML += `<div class="em-row"><span style="color:#64748b">Referencia: comisión bruta pactada (IVA incl.)</span><b style="color:#64748b">${fmtCLP(base)}</b></div>`;
   }
   document.getElementById('emTitulo').textContent = 'Emitir Orden de Pago — ' + tLabel;
   // PRE-EMISIÓN: hacer notar los datos que faltan antes de emitir (motor AF_ODP_PRE)
