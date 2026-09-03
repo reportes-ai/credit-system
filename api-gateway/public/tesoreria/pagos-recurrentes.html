@@ -138,7 +138,7 @@
         <input id="fGlosa" maxlength="300" placeholder="Ej: Arriendo oficina {MES} {AÑO}" oninput="previa()"></div>
       <div><label>Tipo de documento</label><select id="fDoc"></select></div>
       <div><label>Moneda *</label><select id="fMon" onchange="filtrarCtas();previa()"></select></div>
-      <div><label>Monto en moneda de origen *</label><input id="fMonto" inputmode="decimal" placeholder="0" oninput="previa()"></div>
+      <div><label>Monto en moneda de origen *</label><input id="fMonto" inputmode="decimal" placeholder="0,00" oninput="previa()"></div>
       <div><label>Próximo pago *</label><input type="date" id="fProx" onchange="ajustarProx()"></div>
       <div><label>Último pago</label><input type="date" id="fUlt"></div>
       <div class="g2"><label>Cuenta de cargo (se debita de) <span style="text-transform:none;font-weight:600;color:#94a3b8" id="ctaHint"></span></label><select id="fCta"><option value="">— la elige el cajero al pagar —</option></select></div>
@@ -301,7 +301,9 @@ function abrirEditar(id){
   document.getElementById('fApodo').value = p.apodo; document.getElementById('fDesc').value = p.descripcion||'';
   document.getElementById('fPer').value = p.periodicidad; document.getElementById('fTipo').value = p.tipo_pago;
   document.getElementById('fDoc').value = p.tipo_documento||'Factura'; document.getElementById('fGlosa').value = p.glosa;
-  document.getElementById('fMon').value = p.moneda; document.getElementById('fMonto').value = Number(p.monto_origen);
+  document.getElementById('fMon').value = p.moneda;
+  // Decimales a la chilena (coma): 84,99 — el servidor y la vista previa aceptan coma o punto
+  document.getElementById('fMonto').value = Number(p.monto_origen).toLocaleString('es-CL', { maximumFractionDigits: 4, useGrouping: false });
   filtrarCtas(p.id_cuenta_bancaria || '');
   document.getElementById('fProx').value = String(p.fecha_proximo_pago||'').slice(0,10);
   document.getElementById('fDia').value = p.dia_pago || Number(String(p.fecha_proximo_pago||'').slice(8,10)) || '';
