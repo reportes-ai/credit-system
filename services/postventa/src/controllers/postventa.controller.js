@@ -1,10 +1,11 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
-// "del banco {banco}" con la ficha diciendo "BANCO SANTANDER" salía "del banco BANCO SANTANDER":
+// "del Banco {banco}" con la ficha diciendo "BANCO SANTANDER" salía "del banco BANCO SANTANDER":
 // se quita el "Banco " inicial y se deja en Título (Santander, De Chile, Bci).
 const nombreBanco = b => {
   const s = String(b || '').trim().replace(/^banco\s+/i, '');
-  return s ? s.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase()) : '—';
+  // "de", "del", "y" quedan en minúscula: Banco de Chile, no Banco De Chile
+  return s ? s.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase()).replace(/\s(De|Del|Y)\s/g, m => m.toLowerCase()) : '—';
 };
 const { emitirCorrelativo, pagarCorrelativo, despagarCorrelativo } = require('../../../../shared/ordenes-pago');
 const { auditar } = require('../../../../shared/audit');
@@ -295,7 +296,7 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
       remitente: '',
       cc_operaciones: 'operaciones@autofacilchile.cl',
       asunto: 'Saldo Precio pagado — OP {num_op} ({dealer})',
-      cuerpo: 'Estimados {dealer}:\n\nLes informamos que el Saldo Precio de la operación N° {num_op}, por {monto}, fue pagado el {fecha_pago} mediante transferencia a la {tipo_cuenta} {num_cuenta} del banco {banco}.\n\nCualquier duda, quedamos atentos.',
+      cuerpo: 'Estimados {dealer}:\n\nLes informamos que el Saldo Precio de la operación N° {num_op}, por {monto}, fue pagado el {fecha_pago} mediante transferencia a la {tipo_cuenta} {num_cuenta} del Banco {banco}.\n\nCualquier duda, quedamos atentos.',
       firma: 'Saludos cordiales,\nAutoFácil Crédito Automotriz',
     };
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)',
@@ -470,7 +471,7 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
     // Plantilla del aviso de pago al dealer (sale desde comisiones@ al marcar COMISION PAGADA)
     const CORREO_COM_PAGADA = {
       asunto: 'Comisión pagada — {doc} N° {numero_factura} ({dealer})',
-      cuerpo: 'Estimados {dealer}:\n\nLes informamos que la {doc} N° {numero_factura} ha sido pagada mediante transferencia a la {tipo_cuenta} {num_cuenta} del banco {banco}, de acuerdo a sus instrucciones.\n\nOperación(es): {ops}.',
+      cuerpo: 'Estimados {dealer}:\n\nLes informamos que la {doc} N° {numero_factura} ha sido pagada mediante transferencia a la {tipo_cuenta} {num_cuenta} del Banco {banco}, de acuerdo a sus instrucciones.\n\nOperación(es): {ops}.',
       firma: '',   // la plantilla corporativa ya cierra con "Saludos," + logo
     };
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)',
