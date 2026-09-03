@@ -1,5 +1,11 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+// "del banco {banco}" con la ficha diciendo "BANCO SANTANDER" salía "del banco BANCO SANTANDER":
+// se quita el "Banco " inicial y se deja en Título (Santander, De Chile, Bci).
+const nombreBanco = b => {
+  const s = String(b || '').trim().replace(/^banco\s+/i, '');
+  return s ? s.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase()) : '—';
+};
 const { emitirCorrelativo, pagarCorrelativo, despagarCorrelativo } = require('../../../../shared/ordenes-pago');
 const { auditar } = require('../../../../shared/audit');
 const { ES_ETAPA } = require('../../../../shared/etapa-credito');
@@ -1270,7 +1276,7 @@ async function notificarPagoSaldoDealer(idSeguimiento) {
       fecha_pago: new Date().toLocaleDateString('es-CL', { timeZone: 'America/Santiago' }),
       financiera: d.financiera || '',
       tipo_cuenta: (d.tipo_cuenta || 'cuenta corriente').toLowerCase(),
-      num_cuenta: d.num_cuenta || '—', banco: d.banco || '—',
+      num_cuenta: d.num_cuenta || '—', banco: nombreBanco(d.banco),
     };
     const rell = t => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
     const { enviarCorreo, remitentePorClave, envolverHTML } = require('../../../../shared/mailer');
@@ -1315,7 +1321,7 @@ async function notificarPagoComisionDealer(idSeguimiento) {
       dealer: d.dealer || '',
       tipo_cuenta: (d.tipo_cuenta || 'cuenta corriente').toLowerCase(),
       num_cuenta: d.num_cuenta || '—',
-      banco: d.banco || '—',
+      banco: nombreBanco(d.banco),
       ops,
     };
     const rell = t => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
