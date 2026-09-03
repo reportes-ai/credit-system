@@ -32,6 +32,7 @@
   th { background:#f8fafc; text-align:left; padding:6px 8px; font-size:.6rem; text-transform:uppercase; color:#6b7280; }
   td { padding:7px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
   td.num, th.num { text-align:right; white-space:nowrap; }
+  td.c, th.c { text-align:center; }
   .btnx { border:none; border-radius:9px; padding:8px 16px; font-size:.8rem; font-weight:700; cursor:pointer; }
   .btn-azul { background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
   .btn-verde { background:var(--ok); color:#fff; }
@@ -94,7 +95,7 @@
     <h5><i class="bi bi-list-check"></i> Pagos inscritos
       <span style="margin-left:auto;font-size:.72rem;color:#94a3b8;font-weight:600">El motor revisa cada 6 horas; lo que vence hoy se emite hoy.</span></h5>
     <div style="overflow:auto"><table id="tabla">
-      <thead><tr><th>Apodo</th><th>Proveedor</th><th>Periodicidad</th><th>Día</th><th>Tipo</th><th class="num">Monto origen</th><th>Glosa</th><th>Último pago</th><th>Próximo pago</th><th>Última ODP</th><th>Estado</th><th></th></tr></thead>
+      <thead><tr><th style="min-width:200px">Apodo</th><th style="min-width:180px">Proveedor</th><th class="c">Period.</th><th class="c">Día</th><th>Tipo</th><th class="num">Monto origen</th><th style="min-width:180px">Glosa</th><th class="c">Último pago</th><th class="c">Próximo pago</th><th class="c">Última ODP</th><th class="c">Estado</th><th></th></tr></thead>
       <tbody id="tbody"><tr><td colspan="12" class="vacio">Cargando…</td></tr></tbody>
     </table></div>
   </div>
@@ -197,16 +198,16 @@ function render(){
     const prox = String(p.fecha_proximo_pago||'').slice(0,10);
     const venc = p.activo && prox && prox <= hoy;
     return `<tr>
-      <td><b>${escH(p.apodo)}</b>${p.descripcion?`<div style="font-size:.7rem;color:#64748b">${escH(p.descripcion)}</div>`:''}</td>
-      <td>${escH(p.proveedor_nombre||'—')}<div style="font-size:.7rem;color:#64748b">${escH(p.proveedor_rut||'')}</div></td>
-      <td>${escH(p.periodicidad)}</td>
-      <td class="num">${p.dia_pago||'—'}</td>
+      <td><b>${escH(p.apodo)}</b>${p.descripcion?`<div style="font-size:.7rem;color:#64748b;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escH(p.descripcion)}">${escH(p.descripcion)}</div>`:''}</td>
+      <td style="max-width:220px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escH(p.proveedor_nombre||'')}">${escH(p.proveedor_nombre||'—')}</div><div style="font-size:.7rem;color:#64748b">${escH(p.proveedor_rut||'')}</div></td>
+      <td class="c" style="font-size:.7rem">${escH(p.periodicidad)}</td>
+      <td class="c">${p.dia_pago||'—'}</td>
       <td>${escH(p.tipo_pago)}</td>
       <td class="num"><b>${fmtOrigen(p.monto_origen, p.moneda)}</b>${p.cuenta_cargo_nombre?`<div style="font-size:.66rem;color:#64748b;font-weight:400" title="Cuenta de cargo">⇐ ${escH(p.cuenta_cargo_nombre)}</div>`:''}</td>
-      <td style="max-width:220px">${escH(p.glosa)}</td>
-      <td>${fdate(p.fecha_ultimo_pago)}</td>
-      <td>${venc?'<span class="chip c-venc">'+fdate(prox)+' · vence</span>':fdate(prox)}</td>
-      <td>${escH(p.ultima_odp||'—')}${p.generadas?` <span style="font-size:.66rem;color:#94a3b8">(${p.generadas})</span>`:''}</td>
+      <td style="max-width:240px;font-size:.74rem">${escH(p.glosa)}</td>
+      <td class="c" style="white-space:nowrap">${fdate(p.fecha_ultimo_pago)}</td>
+      <td class="c" style="white-space:nowrap">${venc?'<span class="chip c-venc">'+fdate(prox)+' · vence</span>':fdate(prox)}</td>
+      <td class="c">${escH(p.ultima_odp||'—')}${p.generadas?` <span style="font-size:.66rem;color:#94a3b8">(${p.generadas})</span>`:''}</td>
       <td style="white-space:nowrap">
         <label class="sw" title="${p.activo?'ON — genera órdenes. Clic para apagar':'OFF — no genera. Clic para encender'}"><input type="checkbox" ${p.activo?'checked':''} onchange="activar(${p.id}, this.checked?1:0)"><span></span></label>
         ${p.propuesto?'<span class="chip c-prop" title="Detectado desde la historia de pagos: revísalo y enciéndelo si corresponde">PROPUESTO</span>':`<span class="chip ${p.activo?'c-on':'c-off'}">${p.activo?'ON':'OFF'}</span>`}
