@@ -307,6 +307,53 @@ Administración`,
     variables: '{nombre} {detalle} {despacho}',
   },
   {
+    codigo: 'pago_recurrente_odp',
+    ambito: 'Tesorería',
+    nombre: 'Pago recurrente: Orden de Pago generada → TESORERÍA',
+    descripcion: 'Sale automáticamente el día del vencimiento de un pago inscrito en Tesorería → Pagos Recurrentes, cuando el sistema emite la Orden de Pago al tipo de cambio del día. Lleva el link directo a la orden para pagarla desde la caja.',
+    asunto: 'Orden de Pago {ODP} lista para pagar — {APODO}',
+    cuerpo: `Hola:
+
+Se generó automáticamente la Orden de Pago {ODP} del pago recurrente «{APODO}» ({PERIODICIDAD}), con vencimiento el {VENCIMIENTO}.
+
+Proveedor: {PROVEEDOR} (RUT {RUT})
+Glosa: {GLOSA}
+Monto a pagar: {MONTO}  ·  origen: {ORIGEN}
+
+Queda EMITIDA, pendiente de pago desde la Caja:
+{LINK}
+
+Saludos,
+Business Suite — Pagos Recurrentes`,
+    para_perfiles: 'Tesorero',
+    cc: '',
+    destinatario: 'Los perfiles marcados aquí abajo (Tesorería)',
+    variables: '{APODO} {ODP} {PROVEEDOR} {RUT} {GLOSA} {MONTO} {ORIGEN} {VENCIMIENTO} {PERIODICIDAD} {LINK}',
+  },
+  {
+    codigo: 'pago_recurrente_pagado',
+    ambito: 'Tesorería',
+    nombre: 'Pago recurrente PAGADO → al PROVEEDOR',
+    descripcion: 'Se manda al correo del proveedor (ficha de Proveedores) cuando la Caja paga una Orden de Pago nacida de un pago recurrente. Informa la glosa del período, el monto y la fecha.',
+    asunto: 'Pago realizado — {GLOSA}',
+    cuerpo: `Estimados {PROVEEDOR}:
+
+Les informamos que con fecha {FECHA_PAGO} se realizó el pago correspondiente a:
+
+{GLOSA}
+Monto: {MONTO}
+Referencia interna: Orden de Pago {ODP}
+
+Cualquier consulta, responder a este correo.
+
+Atentamente,
+AutoFácil Crédito Automotriz — Tesorería`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'El correo del proveedor registrado en su ficha (Órdenes de Pago → Proveedores)',
+    variables: '{PROVEEDOR} {GLOSA} {MONTO} {ODP} {FECHA_PAGO}',
+  },
+  {
     codigo: 'cliente_comprobante_cuota',
     ambito: 'Cobranza',
     nombre: 'Comprobante de pago de cuotas → al CLIENTE',

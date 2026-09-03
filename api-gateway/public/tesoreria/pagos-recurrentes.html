@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<!-- v1.0 — Pagos Recurrentes: inscripción de pagos periódicos (arriendos, servicios) con proveedor de la base, moneda de origen (CLP/UF/UTM/USD), glosa con {MES} variable; el motor genera la ODP el día del vencimiento al tipo de cambio del día, avisa a Tesorería y al proveedor al pagarse -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pagos Recurrentes — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; --ok:#16a34a; --bad:#dc2626; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .wrap { margin:20px auto; padding:0 26px 60px; max-width:1350px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 26px; margin-bottom:16px; display:flex; align-items:center; gap:16px; }
+  .banner > i { font-size:2.3rem; opacity:.85; }
+  .banner h2 { margin:0 0 3px; font-size:1.2rem; font-weight:700; }
+  .banner p { margin:0; opacity:.85; font-size:.84rem; }
+  .banner .der { margin-left:auto; display:flex; align-items:center; gap:10px; }
+  .panel { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:14px; }
+  .panel h5 { margin:0 0 10px; font-size:.95rem; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:8px; }
+  label { font-size:.7rem; font-weight:700; color:#374151; display:block; margin-bottom:3px; text-transform:uppercase; }
+  input, select, textarea { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.84rem; font-family:inherit; outline:none; width:100%; }
+  input[readonly] { background:#f8fafc; color:#64748b; }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:.78rem; }
+  th { background:#f8fafc; text-align:left; padding:6px 8px; font-size:.6rem; text-transform:uppercase; color:#6b7280; }
+  td { padding:7px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  td.num, th.num { text-align:right; white-space:nowrap; }
+  .btnx { border:none; border-radius:9px; padding:8px 16px; font-size:.8rem; font-weight:700; cursor:pointer; }
+  .btn-azul { background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
+  .btn-verde { background:var(--ok); color:#fff; }
+  .btn-gris { background:#f1f5f9; color:#475569; }
+  .btn-rojo { background:#fee2e2; color:#b91c1c; }
+  .icon-btn { border:none; background:#f1f5f9; border-radius:7px; width:28px; height:28px; cursor:pointer; color:#475569; margin-left:3px; }
+  .icon-btn:hover { background:#e2e8f0; }
+  .chip { border-radius:8px; padding:2px 8px; font-size:.64rem; font-weight:700; display:inline-block; }
+  .c-on { background:#dcfce7; color:#166534; } .c-off { background:#fee2e2; color:#b91c1c; } .c-venc { background:#fef3c7; color:#92400e; }
+  .vacio { color:#9ca3af; font-size:.83rem; text-align:center; padding:18px; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-bottom:14px; }
+  .kpi { background:#fff; border-radius:12px; padding:12px 14px; box-shadow:0 1px 5px rgba(0,0,0,.06); }
+  .kpi .l { font-size:.62rem; font-weight:800; text-transform:uppercase; color:#64748b; }
+  .kpi .v { font-size:1.15rem; font-weight:800; color:var(--navy); margin-top:2px; }
+  .kpi .s { font-size:.66rem; color:#94a3b8; }
+  dialog { border:none; border-radius:16px; padding:0; width:min(920px,95vw); box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  dialog::backdrop { background:rgba(2,6,23,.45); backdrop-filter:blur(3px); }
+  .dlg-head { background:linear-gradient(135deg,#012d70,#0141A2); color:#fff; padding:14px 20px; font-weight:800; display:flex; align-items:center; gap:10px; }
+  .dlg-body { padding:18px 20px; max-height:72vh; overflow:auto; }
+  .dlg-foot { padding:12px 20px; border-top:1px solid #f1f5f9; display:flex; justify-content:flex-end; gap:8px; }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .g2 { grid-column:span 2; } .g4 { grid-column:span 4; }
+  .prov-list { border:1.5px solid #d1d5db; border-radius:8px; max-height:170px; overflow:auto; background:#fff; margin-top:4px; }
+  .prov-row { padding:6px 10px; font-size:.8rem; cursor:pointer; border-bottom:1px solid #f1f5f9; }
+  .prov-row:hover, .prov-row.sel { background:#eff6ff; }
+  .prov-row small { color:#64748b; }
+  .nota { background:#fffbeb; border:1.5px solid #fde68a; border-radius:10px; padding:10px 14px; font-size:.78rem; color:#92400e; margin-bottom:12px; }
+  .previa { background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:10px; padding:8px 12px; font-size:.78rem; color:#166534; }
+  .afecta { background:#f8fafc; border-left:4px solid var(--accent); border-radius:10px; padding:14px 18px; font-size:.8rem; color:#334155; margin-top:18px; }
+  .afecta h6 { margin:0 0 8px; font-size:.86rem; font-weight:800; color:var(--navy); }
+  .afecta ul { margin:0; padding-left:18px; } .afecta li { margin-bottom:4px; }
+  .afecta a { color:var(--accent); font-weight:600; }
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:10px 18px; border-radius:10px; font-size:.84rem; display:none; z-index:9999; }
+  @media (max-width:800px) { .grid { grid-template-columns:1fr 1fr; } .g2,.g4 { grid-column:span 2; } }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Tesorería', href:'/tesoreria/' },
+  { label:'Pagos Recurrentes', icon:'bi-arrow-repeat', current:true }
+] };</script>
+<div id="af-topnav"></div>
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-arrow-repeat"></i>
+    <div>
+      <h2>Pagos Recurrentes <span class="chip" style="background:#ffffff33;color:#fff">v1.0</span></h2>
+      <p>Arriendos, servicios y cuotas periódicas: la Orden de Pago se genera sola el día del vencimiento, al tipo de cambio del día, y queda lista para pagarse desde la Caja.</p>
+    </div>
+    <div class="der">
+      <button class="btnx btn-gris" onclick="cargar()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+      <button class="btnx btn-azul" onclick="abrirNuevo()"><i class="bi bi-plus-lg"></i> Inscribir pago</button>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="panel">
+    <h5><i class="bi bi-list-check"></i> Pagos inscritos
+      <span style="margin-left:auto;font-size:.72rem;color:#94a3b8;font-weight:600">El motor revisa cada 6 horas; lo que vence hoy se emite hoy.</span></h5>
+    <div style="overflow:auto"><table id="tabla">
+      <thead><tr><th>Apodo</th><th>Proveedor</th><th>Periodicidad</th><th>Tipo</th><th class="num">Monto origen</th><th>Glosa</th><th>Último pago</th><th>Próximo pago</th><th>Última ODP</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="tbody"><tr><td colspan="11" class="vacio">Cargando…</td></tr></tbody>
+    </table></div>
+  </div>
+
+  <div class="afecta">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h6>
+    <ul>
+      <li><b>Cada pago inscrito</b> → genera automáticamente una Orden de Pago EMITIDA el día del vencimiento en <a href="/ordenes-pago/historial/">Órdenes de Pago → Historial</a> (tipo según el <i>Tipo de pago</i>: Arriendos, Administrativos u Otros), y avisa por correo a Tesorería (plantilla <code>pago_recurrente_odp</code> en <a href="/mantenedores/correos-programados/">Correos del Sistema</a>).</li>
+      <li><b>Moneda y monto</b> → la conversión usa la UF del motor único y la UTM / dólar del <a href="/mantenedores/uf/">mantenedor de indicadores</a> del día de emisión. Sin cotización cargada, la orden NO se emite y se reintenta al día siguiente.</li>
+      <li><b>Proveedor</b> → RUT, banco y cuenta se leen en vivo de <a href="/ordenes-pago/proveedores/">Proveedores</a> (una sola fuente); el correo del proveedor es el que recibe el aviso de pago (plantilla <code>pago_recurrente_pagado</code>).</li>
+      <li><b>Tipo de documento</b> → define IVA / retención con el mismo motor de la emisión manual de ODP; el monto inscrito es lo que se paga (bruto).</li>
+      <li><b>El pago</b> se registra desde la <a href="/ordenes-pago/historial/">Caja</a> como cualquier ODP (segregación de funciones incluida) y es ese flujo el que contabiliza el egreso.</li>
+      <li><b>Pausar</b> detiene la generación sin borrar la historia; el log de cada generación (tipo de cambio usado, ODP, correos) queda en el ícono <i class="bi bi-clock-history"></i>.</li>
+    </ul>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <div class="dlg-head"><i class="bi bi-arrow-repeat"></i><span id="dlgTitulo">Inscribir pago recurrente</span></div>
+  <div class="dlg-body">
+    <div class="grid">
+      <div class="g2"><label>Apodo / nickname del pago *</label><input id="fApodo" maxlength="80" placeholder="Ej: Arriendo oficina Kennedy"></div>
+      <div><label>Periodicidad *</label><select id="fPer"></select></div>
+      <div><label>Tipo de pago (ODP) *</label><select id="fTipo"></select></div>
+      <div class="g4"><label>Descripción</label><input id="fDesc" maxlength="300" placeholder="Para qué es este pago (opcional)"></div>
+
+      <div class="g2">
+        <label>Proveedor * <span style="text-transform:none;font-weight:600;color:#94a3b8">(escribe para buscar en la base)</span></label>
+        <input id="fProvQ" placeholder="Nombre o RUT…" oninput="buscarProv()" autocomplete="off">
+        <div class="prov-list" id="provList" style="display:none"></div>
+        <input type="hidden" id="fProvId">
+      </div>
+      <div><label>RUT proveedor</label><input id="fProvRut" readonly></div>
+      <div><label>Banco</label><input id="fProvBanco" readonly></div>
+      <div class="g2"><label>Cuenta</label><input id="fProvCta" readonly></div>
+      <div class="g2"><label>Correo del proveedor (aviso de pago)</label><input id="fProvMail" readonly placeholder="— sin correo en la ficha —"></div>
+
+      <div class="g4"><label>Glosa del pago * <span style="text-transform:none;font-weight:600;color:#94a3b8">variables: {MES} {MES_ANTERIOR} {AÑO} {MES_NUM}</span></label>
+        <input id="fGlosa" maxlength="300" placeholder="Ej: Arriendo oficina {MES} {AÑO}" oninput="previa()"></div>
+      <div><label>Tipo de documento</label><select id="fDoc"></select></div>
+      <div><label>Moneda *</label><select id="fMon" onchange="previa()"></select></div>
+      <div><label>Monto en moneda de origen *</label><input id="fMonto" inputmode="decimal" placeholder="0" oninput="previa()"></div>
+      <div><label>Próximo pago *</label><input type="date" id="fProx" onchange="previa()"></div>
+      <div><label>Último pago</label><input type="date" id="fUlt"></div>
+      <div class="g4"><div class="previa" id="previa">Vista previa: completa moneda, monto y glosa.</div></div>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btnx btn-gris" onclick="dlg.close()">Cancelar</button>
+    <button class="btnx btn-azul" id="btnGuardar" onclick="guardar()"><i class="bi bi-check-lg"></i> Grabar</button>
+  </div>
+</dialog>
+
+<dialog id="dlgLog">
+  <div class="dlg-head"><i class="bi bi-clock-history"></i><span id="logTitulo">Historial de generaciones</span></div>
+  <div class="dlg-body" id="logBody"></div>
+  <div class="dlg-foot"><button class="btnx btn-gris" onclick="dlgLog.close()">Cerrar</button></div>
+</dialog>
+
+<div id="toast"></div>
+
+<script>
+const token = sessionStorage.getItem('token');
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtCLP = n => '$'+Math.round(Number(n)||0).toLocaleString('es-CL');
+const fdate = d => d ? String(d).slice(0,10).split('-').reverse().join('-') : '—';
+const hoyISO = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; clearTimeout(t._t); t._t=setTimeout(()=>t.style.display='none',3500); }
+function chk401(r){ if(r.status===401){ sessionStorage.clear(); location.href='/login.html'; return true; } return false; }
+let CAT = null, DATA = [], editandoId = null, PROVS = [];
+
+async function api(m, url, body){ const r = await fetch(url,{method:m,headers:H,body:body?JSON.stringify(body):undefined}); if(chk401(r)) return null; return r.json(); }
+
+async function cargar(){
+  if (!CAT) { const j = await api('GET','/api/pagos-recurrentes/catalogo'); CAT = j && j.data;
+    const opt = (id, arr, sel) => { const s=document.getElementById(id); s.innerHTML = arr.map(v=>`<option${v===sel?' selected':''}>${v}</option>`).join(''); };
+    opt('fPer', CAT.periodicidades); opt('fTipo', CAT.tipos_pago); opt('fMon', CAT.monedas); opt('fDoc', CAT.tipos_documento, 'Factura'); }
+  const j = await api('GET','/api/pagos-recurrentes'); if(!j) return;
+  DATA = j.success ? j.data : [];
+  render();
+}
+function fmtOrigen(n, mon){ return mon==='CLP' ? fmtCLP(n) : Number(n).toLocaleString('es-CL',{maximumFractionDigits:4})+' '+mon; }
+function render(){
+  const hoy = hoyISO();
+  const act = DATA.filter(p=>p.activo);
+  const kp = [['Pagos activos', act.length, DATA.length-act.length+' pausado(s)'],
+              ['Vencen este mes', act.filter(p=>String(p.fecha_proximo_pago).slice(0,7)===hoy.slice(0,7)).length, 'con próximo pago en el mes'],
+              ['Órdenes generadas', DATA.reduce((s,p)=>s+Number(p.generadas||0),0), 'historial total']];
+  document.getElementById('kpis').innerHTML = kp.map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
+  const tb = document.getElementById('tbody');
+  if (!DATA.length) { tb.innerHTML = '<tr><td colspan="11" class="vacio">No hay pagos inscritos. Usa "Inscribir pago".</td></tr>'; return; }
+  tb.innerHTML = DATA.map(p => {
+    const prox = String(p.fecha_proximo_pago||'').slice(0,10);
+    const venc = p.activo && prox && prox <= hoy;
+    return `<tr>
+      <td><b>${escH(p.apodo)}</b>${p.descripcion?`<div style="font-size:.7rem;color:#64748b">${escH(p.descripcion)}</div>`:''}</td>
+      <td>${escH(p.proveedor_nombre||'—')}<div style="font-size:.7rem;color:#64748b">${escH(p.proveedor_rut||'')}</div></td>
+      <td>${escH(p.periodicidad)}</td>
+      <td>${escH(p.tipo_pago)}</td>
+      <td class="num"><b>${fmtOrigen(p.monto_origen, p.moneda)}</b></td>
+      <td style="max-width:220px">${escH(p.glosa)}</td>
+      <td>${fdate(p.fecha_ultimo_pago)}</td>
+      <td>${venc?'<span class="chip c-venc">'+fdate(prox)+' · vence</span>':fdate(prox)}</td>
+      <td>${escH(p.ultima_odp||'—')}${p.generadas?` <span style="font-size:.66rem;color:#94a3b8">(${p.generadas})</span>`:''}</td>
+      <td><span class="chip ${p.activo?'c-on':'c-off'}">${p.activo?'ACTIVO':'PAUSADO'}</span></td>
+      <td style="white-space:nowrap">
+        <button class="icon-btn" title="Editar" onclick="abrirEditar(${p.id})"><i class="bi bi-pencil"></i></button>
+        <button class="icon-btn" title="Historial de generaciones" onclick="verLog(${p.id})"><i class="bi bi-clock-history"></i></button>
+        ${p.activo?`<button class="icon-btn" title="Generar la orden de este vencimiento ahora" onclick="generar(${p.id})"><i class="bi bi-lightning-charge" style="color:#0141A2"></i></button>`:''}
+        <button class="icon-btn" title="${p.activo?'Pausar':'Reactivar'}" onclick="activar(${p.id},${p.activo?0:1})"><i class="bi ${p.activo?'bi-pause-circle':'bi-play-circle'}"></i></button>
+        <button class="icon-btn" title="Eliminar (si tiene historia, se pausa)" onclick="eliminar(${p.id})"><i class="bi bi-trash" style="color:#dc2626"></i></button>
+      </td></tr>`; }).join('');
+}
+
+/* ── Proveedor: buscador contra la base (una sola fuente) ── */
+let provTimer = null;
+function buscarProv(){
+  clearTimeout(provTimer);
+  const q = document.getElementById('fProvQ').value.trim();
+  document.getElementById('fProvId').value = '';
+  setProv(null);
+  provTimer = setTimeout(async () => {
+    const j = await api('GET','/api/ordenes-pago/proveedores?q='+encodeURIComponent(q)); if(!j) return;
+    PROVS = j.success ? j.data : [];
+    const l = document.getElementById('provList');
+    l.style.display = '';
+    l.innerHTML = PROVS.length ? PROVS.slice(0,40).map(p=>`<div class="prov-row" onclick="elegirProv(${p.id})"><b>${escH(p.nombre)}</b> <small>${escH(p.rut||'sin RUT')}${p.banco?' · '+escH(p.banco):''}</small></div>`).join('')
+                               : '<div class="prov-row" style="color:#94a3b8">Sin resultados — créalo en Órdenes de Pago → Proveedores</div>';
+  }, 250);
+}
+function elegirProv(id){
+  const p = PROVS.find(x=>x.id===id); if(!p) return;
+  document.getElementById('fProvId').value = p.id;
+  document.getElementById('fProvQ').value = p.nombre;
+  document.getElementById('provList').style.display = 'none';
+  setProv(p);
+}
+function setProv(p){
+  document.getElementById('fProvRut').value  = p ? (p.rut||'') : '';
+  document.getElementById('fProvBanco').value = p ? (p.banco||'') : '';
+  document.getElementById('fProvCta').value  = p ? [p.tipo_cuenta, p.numero_cuenta].filter(Boolean).join(' ') : '';
+  document.getElementById('fProvMail').value = p ? (p.email||'') : '';
+}
+
+/* ── Vista previa: tipo de cambio de hoy + glosa renderizada ── */
+let prevTimer = null;
+function previa(){
+  clearTimeout(prevTimer);
+  prevTimer = setTimeout(async () => {
+    const mon = document.getElementById('fMon').value, monto = Number(String(document.getElementById('fMonto').value).replace(',','.'))||0;
+    const glosa = document.getElementById('fGlosa').value, fecha = document.getElementById('fProx').value || hoyISO();
+    const el = document.getElementById('previa');
+    const j = await api('GET', `/api/pagos-recurrentes/previa?moneda=${mon}&glosa=${encodeURIComponent(glosa)}&fecha=${fecha}`);
+    if (!j || !j.success) { el.textContent = 'Vista previa: ' + (j && j.error || 'sin datos'); el.style.color='#b91c1c'; return; }
+    el.style.color = '#166534';
+    const tc = Number(j.data.tipo_cambio);
+    el.innerHTML = `<b>Glosa que saldrá en la ODP:</b> ${escH(j.data.glosa)||'—'}<br><b>Al tipo de cambio de hoy:</b> ${mon==='CLP' ? fmtCLP(monto) : `${fmtOrigen(monto,mon)} × $${tc.toLocaleString('es-CL',{maximumFractionDigits:2})} = <b>${fmtCLP(monto*tc)}</b>`} <span style="color:#64748b">(el día del vencimiento se recalcula con la cotización de ese día)</span>`;
+  }, 300);
+}
+
+/* ── Alta / edición ── */
+function limpiar(){
+  ['fApodo','fDesc','fGlosa','fMonto','fProvQ','fProvId','fUlt'].forEach(id=>document.getElementById(id).value='');
+  setProv(null); document.getElementById('provList').style.display='none';
+  document.getElementById('fProx').value = hoyISO();
+  document.getElementById('fDoc').value = 'Factura'; document.getElementById('fMon').value = 'CLP';
+  document.getElementById('previa').textContent = 'Vista previa: completa moneda, monto y glosa.';
+}
+function abrirNuevo(){ editandoId=null; limpiar(); document.getElementById('dlgTitulo').textContent='Inscribir pago recurrente'; dlg.showModal(); }
+function abrirEditar(id){
+  const p = DATA.find(x=>x.id===id); if(!p) return;
+  editandoId = id; limpiar();
+  document.getElementById('dlgTitulo').textContent = 'Editar — '+p.apodo;
+  document.getElementById('fApodo').value = p.apodo; document.getElementById('fDesc').value = p.descripcion||'';
+  document.getElementById('fPer').value = p.periodicidad; document.getElementById('fTipo').value = p.tipo_pago;
+  document.getElementById('fDoc').value = p.tipo_documento||'Factura'; document.getElementById('fGlosa').value = p.glosa;
+  document.getElementById('fMon').value = p.moneda; document.getElementById('fMonto').value = Number(p.monto_origen);
+  document.getElementById('fProx').value = String(p.fecha_proximo_pago||'').slice(0,10);
+  document.getElementById('fUlt').value = p.fecha_ultimo_pago ? String(p.fecha_ultimo_pago).slice(0,10) : '';
+  document.getElementById('fProvId').value = p.id_proveedor; document.getElementById('fProvQ').value = p.proveedor_nombre||'';
+  setProv({ rut:p.proveedor_rut, banco:p.banco, tipo_cuenta:p.tipo_cuenta, numero_cuenta:p.numero_cuenta, email:p.proveedor_email });
+  previa(); dlg.showModal();
+}
+async function guardar(){
+  const body = {
+    apodo: document.getElementById('fApodo').value.trim(), descripcion: document.getElementById('fDesc').value.trim(),
+    periodicidad: document.getElementById('fPer').value, tipo_pago: document.getElementById('fTipo').value,
+    tipo_documento: document.getElementById('fDoc').value, id_proveedor: document.getElementById('fProvId').value,
+    glosa: document.getElementById('fGlosa').value.trim(), moneda: document.getElementById('fMon').value,
+    monto_origen: document.getElementById('fMonto').value, fecha_proximo_pago: document.getElementById('fProx').value,
+    fecha_ultimo_pago: document.getElementById('fUlt').value || null,
+  };
+  if (!body.id_proveedor) { toast('Elige el proveedor de la lista'); return; }
+  const b = document.getElementById('btnGuardar'); b.disabled = true;
+  const j = editandoId ? await api('PUT','/api/pagos-recurrentes/'+editandoId, body) : await api('POST','/api/pagos-recurrentes', body);
+  b.disabled = false;
+  if (!j || !j.success) { toast('Error: '+(j&&j.error||'no se pudo guardar')); return; }
+  dlg.close(); toast(editandoId ? 'Pago actualizado' : 'Pago inscrito'); cargar();
+}
+async function activar(id, activo){ const j = await api('PUT',`/api/pagos-recurrentes/${id}/activo`,{activo}); if(j&&j.success){ toast(activo?'Reactivado':'Pausado'); cargar(); } else toast('Error: '+(j&&j.error)); }
+async function eliminar(id){
+  const p = DATA.find(x=>x.id===id); if(!p) return;
+  if (!confirm(`¿Eliminar «${p.apodo}»?${p.generadas?'\n\nComo ya generó órdenes, quedará PAUSADO (la historia se conserva).':''}`)) return;
+  const j = await api('DELETE','/api/pagos-recurrentes/'+id); if(j&&j.success){ toast(j.data.pausado?'Pausado (tiene historia)':'Eliminado'); cargar(); } else toast('Error: '+(j&&j.error));
+}
+async function generar(id){
+  const p = DATA.find(x=>x.id===id); if(!p) return;
+  if (!confirm(`¿Generar AHORA la Orden de Pago de «${p.apodo}» para el vencimiento ${fdate(p.fecha_proximo_pago)}?\n\nSe emitirá al tipo de cambio de hoy y se avisará a Tesorería.`)) return;
+  const j = await api('POST',`/api/pagos-recurrentes/${id}/generar`); if(j&&j.success){ toast('Emitida la ODP '+j.data.numero); cargar(); } else toast('Error: '+(j&&j.error));
+}
+async function verLog(id){
+  const p = DATA.find(x=>x.id===id); if(!p) return;
+  document.getElementById('logTitulo').textContent = 'Historial — '+p.apodo;
+  const body = document.getElementById('logBody'); body.innerHTML = '<div class="vacio">Cargando…</div>'; dlgLog.showModal();
+  const j = await api('GET',`/api/pagos-recurrentes/${id}/log`); const rows = j&&j.success ? j.data : [];
+  body.innerHTML = rows.length ? `<table><thead><tr><th>Vencimiento</th><th class="num">Origen</th><th class="num">T. cambio</th><th class="num">CLP</th><th>ODP</th><th>Correos</th><th>Generada</th></tr></thead><tbody>` +
+    rows.map(r=>`<tr><td>${fdate(r.fecha_vencimiento)}</td><td class="num">${fmtOrigen(r.monto_origen,r.moneda)}</td><td class="num">${Number(r.tipo_cambio).toLocaleString('es-CL',{maximumFractionDigits:4})}</td><td class="num"><b>${fmtCLP(r.monto_clp)}</b></td>
+      <td>${r.id_orden_pago?`<a href="/ordenes-pago/historial/?q=${encodeURIComponent(r.numero_odp||'')}" target="_blank">${escH(r.numero_odp||'')}</a>`:'—'}</td>
+      <td style="font-size:.7rem">Tesorería: ${r.mail_tesoreria?'✔':'—'} · Proveedor: ${r.mail_proveedor?'✔ '+fdate(r.mail_proveedor):'—'}</td><td>${fdate(r.created_at)}</td></tr>`).join('') + '</tbody></table>'
+    : '<div class="vacio">Aún no genera órdenes.</div>';
+}
+document.addEventListener('click', e => { if (!e.target.closest('#fProvQ') && !e.target.closest('#provList')) document.getElementById('provList').style.display='none'; });
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -1230,6 +1230,11 @@ const pagarOrden = async (req, res) => {
         const liq = require('../../../dealers-liquidez/src/controllers/hojas.controller');
         if (liq.onOdpPagada) await liq.onOdpPagada(oc.origen_id);
       } catch (e) { console.error('[ordenes-pago hook liquidez]', e.message); }
+      // Hook Pagos Recurrentes: fecha de último pago + aviso al proveedor con la glosa del período.
+      try {
+        const pr = require('../../../tesoreria/src/controllers/pagos-recurrentes.controller');
+        if (pr.onOdpPagada) await pr.onOdpPagada(oc.origen_id);
+      } catch (e) { console.error('[ordenes-pago hook pagos recurrentes]', e.message); }
     } else if (oc.origen === 'SALDO') {
       const [[s]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes WHERE id=?', [oc.origen_id]);
       if (s) {
@@ -1397,5 +1402,6 @@ module.exports = {
   listarProveedores, crearProveedor, actualizarProveedor, eliminarProveedor, datosTransferencia,
   listarOrdenes, getOrden, getDocumento, crearOrden, cambiarEstadoOrden, estadisticas, enviarCorreoOrden,
   pagarOrden, miCajaOP, anularOrdenPostventa,
+  calcularDoc,   // motor único del impuesto de la ODP (lo reusa Pagos Recurrentes)
   getComprasAPagar, enviarComprasAPago, deshacerEnvioCompras, getFondosCompras, setFondosCompras,
 };

@@ -178,6 +178,7 @@ const PLACEMENT_DESCS = {
   'odp-cuotas':'Cola de órdenes de pago de cuotas por depositar',
   'aplicacion-fondos':'Descuento por ítem sobre el prepago, con cadena de firmas',
   'cierre-contable':'Informe mensual de cierre contable para el directorio',
+  'pagos-recurrentes':'Arriendos y pagos periódicos: la Orden de Pago se genera sola el día del vencimiento al tipo de cambio del día',
   'banco-conexiones':'Saldos y cartolas bancarias en línea (Fintoc)',
   'castigos':'Provisiones de riesgo y castigos de saldo con doble firma gerencial',
   'venta-cartera.html':'Venta de créditos AutoFácil a CFC: stock y cuotas del mes',
