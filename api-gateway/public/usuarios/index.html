@@ -678,8 +678,11 @@
           </div>
           <div class="col-md-7">
             <label class="form-label fw-semibold mb-1">Usuarios individuales</label>
-            <div class="search-bar mb-2" style="max-width:320px"><i class="bi bi-search"></i>
-              <input type="text" id="mailBuscaUsuario" class="form-control" placeholder="Buscar usuario..." oninput="filtrarMailUsuarios()">
+            <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+              <div class="search-bar" style="max-width:320px"><i class="bi bi-search"></i>
+                <input type="text" id="mailBuscaUsuario" class="form-control" placeholder="Buscar usuario..." oninput="filtrarMailUsuarios()">
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" onclick="seleccionarInternos()" title="Marca a todos los usuarios internos (los que aparecen en el organigrama; excluye externos)"><i class="bi bi-diagram-3 me-1"></i>Seleccionar internos</button>
             </div>
             <div id="mailUsuarios" class="border rounded p-2" style="max-height:185px;overflow:auto">
               <div class="text-muted text-center py-2" style="font-size:.85rem">Cargando…</div>
@@ -1880,6 +1883,14 @@
       document.querySelectorAll('#mailUsuarios .mail-usuario-row').forEach(r => {
         r.style.display = r.dataset.txt.includes(q) ? '' : 'none';
       });
+    }
+    // Interno = !externo (mismo criterio que la etiqueta EXTERNO del listado de
+    // Usuarios: fuera de envíos masivos, escalamientos, suplencias, directorio y
+    // organigrama). Marca los checkboxes de los internos sin tocar los ya marcados.
+    function seleccionarInternos() {
+      const internos = new Set((_mailUsuarios || []).filter(u => !Number(u.externo || 0)).map(u => u.id_usuario));
+      document.querySelectorAll('#mailUsuarios .mail-usuario').forEach(c => { if (internos.has(+c.value)) c.checked = true; });
+      actualizarResumenMails();
     }
 
     function _mailDestinatarios() {
