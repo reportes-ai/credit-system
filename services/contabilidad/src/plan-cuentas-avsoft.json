@@ -1,0 +1,2117 @@
+[
+ {
+  "codigo": "1101010",
+  "nombre": "CAJA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101020",
+  "nombre": "CAJA CHICA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101030",
+  "nombre": "BANCO SANTANDER",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101040",
+  "nombre": "BANCO CHILE",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101050",
+  "nombre": "BANCO USD SAIBANK",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101060",
+  "nombre": "BANCO SANTANDER USD",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101070",
+  "nombre": "BANCO SANTANDER PESOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101080",
+  "nombre": "BANCO SANTANDER CUENTA CTE 3",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101090",
+  "nombre": "BANCO INTERNACIONAL SP",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101091",
+  "nombre": "BANCO INTERNACIONAL",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101092",
+  "nombre": "BANCO BICE",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101093",
+  "nombre": "BANCO BICE USD",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101094",
+  "nombre": "BANCO INTERNACIONAL USD",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101100",
+  "nombre": "BANCOS EXTERIORES L/P",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101110",
+  "nombre": "DEPOSITO EN TRANSITO",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1101200",
+  "nombre": "TRASPASO DE FONDOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1102010",
+  "nombre": "DEPOSITOS A PLAZO",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1102011",
+  "nombre": "DEPOSITO A PLAZO EN USD",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1103010",
+  "nombre": "FONDOS MUTUOS USD",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1103011",
+  "nombre": "FONDOS MUTUOS CLP",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1103020",
+  "nombre": "INVERSION EN ACCIONES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104010",
+  "nombre": "CONTRATOS PROPIOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104011",
+  "nombre": "CONTRATOS PROPIOS JUDICIALES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104012",
+  "nombre": "CONTRATOS PROPIOS EN COBRANZA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104013",
+  "nombre": "CONTRATOS PROPIOS 2024",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104020",
+  "nombre": "CONTRATOS VENCIDOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104021",
+  "nombre": "CONTRATOS VENCIDOS JUDICIALES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104022",
+  "nombre": "CONTRATOS VENCIDOS EN COBRANZA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104023",
+  "nombre": "CONTRATOS VENCIDOS 2024",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104030",
+  "nombre": "POR COBRAR CUOTAS CLIENTES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104031",
+  "nombre": "GARANTIA CONTRATOS VENDIDOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104032",
+  "nombre": "POR COBRAR CUOTAS CARTERA ADMINISTRADA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104040",
+  "nombre": "FACTURAS POR COBRAR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104050",
+  "nombre": "ESTIMACION DEUDORES INCOBRABLES CV",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104051",
+  "nombre": "ESTIMACION DEUDORES INCOBRABLES X CC",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104052",
+  "nombre": "ESTIMACION DEUDORES INCOBRABLES CPJ",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104053",
+  "nombre": "ESTIMACION DEUDORES INCOBRABLES XC CCA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104060",
+  "nombre": "DIVIDENDOS VENCIDOS POR COBRAR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104070",
+  "nombre": "DIFERENCIAS DE CAJA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104080",
+  "nombre": "BIENES POR DACION EN PAGO",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104081",
+  "nombre": "CUENTAS X COBRAR BIENES EN RECUPERACION",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104082",
+  "nombre": "BIENES RECIBIDOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104083",
+  "nombre": "CTAS X COBRAR BIENES EN RECUPERACION JUD",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104090",
+  "nombre": "VENCIDAS PAGAS EURO CAPITAL",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104100",
+  "nombre": "VENCIDAS PAGADAS PENTA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1104110",
+  "nombre": "INTERESES CUOTAS VENCIDAS POR COBRAR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105010",
+  "nombre": "ANTICIPO REMUNERACIONES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105020",
+  "nombre": "PRESTAMOS EMPLEADOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105030",
+  "nombre": "ANTICIPO CONCESIONARIO",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105040",
+  "nombre": "ANTICIPO PROVEEDORES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105050",
+  "nombre": "FONDO POR RENDIR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105060",
+  "nombre": "RETENCIONES POR COBRAR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105070",
+  "nombre": "CUENTAS POR COBRAR NIMBUS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105071",
+  "nombre": "PRESTAMOS NIMBUS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105072",
+  "nombre": "ESTIMACIONES DEUDORES INCOBRABLES NIMBUS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105080",
+  "nombre": "CUENTAS POR COBRAR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105081",
+  "nombre": "CUENTA POR COBRAR SEG. DESGRAVAMEN",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105082",
+  "nombre": "CUENTA POR COBRAR SCOTIABANK",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105083",
+  "nombre": "ESTIMACION DEUDORES INCOBRABLES CXC",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105084",
+  "nombre": "CUENTA POR COBRAR CORPORACION CFC",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105085",
+  "nombre": "CUENTA POR COBRAR PRALIMOY",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105090",
+  "nombre": "OTROS ACTIVOS CIRCULANTES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105100",
+  "nombre": "FONDO POR RENDIR EUROCAPITAL",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105110",
+  "nombre": "FONDO POR RENDIR FUNCIONARIOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1105120",
+  "nombre": "APORTE DE CAMPAÑAS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106010",
+  "nombre": "DOCUMENTO POR COBRAR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106011",
+  "nombre": "PROD. SEGUROS DEVENGADA NO FAC",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106012",
+  "nombre": "PRODUCCION SEGUROS POR COBRAR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106013",
+  "nombre": "PRODUCCION COMISION POR COBRAR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106014",
+  "nombre": "PRODUCCION GPS POR COBRAR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106020",
+  "nombre": "CUENTAS POR COBRAR VENTA DE CARTERA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106021",
+  "nombre": "RETENCION 1ERA CUOTA VENTA DE CARTERA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106022",
+  "nombre": "CUENTAS POR COBRAR CARTERA DE TERCEROS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106023",
+  "nombre": "FACTURAS POR COBRAR POR REEMBOLSO",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106024",
+  "nombre": "CARTERA ADMINISTRADA CFC POR COBRAR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106025",
+  "nombre": "ANTICIPO SALDO PRECIO GUILLERMO MORALES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1106026",
+  "nombre": "EMBARGO JUDICIAL",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1107010",
+  "nombre": "PRESTAMOS POR COBRAR EE.RR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1107020",
+  "nombre": "CUENTAS POR COBRAR EE.RR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1107021",
+  "nombre": "ANTICIPO POR COBRAR AFA PLUS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1107022",
+  "nombre": "ANTICIPO POR COBRAR RY HOLDING",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1107023",
+  "nombre": "MANDATO ESPECIAL MERCANTIL CON AFA PLUS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1108010",
+  "nombre": "I.V.A CREDITO FISCAL",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1108020",
+  "nombre": "PAGOS PROVISIONALES MENSUALES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1108030",
+  "nombre": "RETENCION CREDITO 4% 0 15 %",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1108040",
+  "nombre": "PPM NETO DETERMINADO",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1108050",
+  "nombre": "REMANENTE I.V.A. C.F.",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1108051",
+  "nombre": "REMANENTE I.V.A. C.F. POR PAGAR",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1201010",
+  "nombre": "INSTALACIONES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1202010",
+  "nombre": "MUEBLES Y UTILES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1203010",
+  "nombre": "EQUIPOS DE COMPUTACIONALES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1203020",
+  "nombre": "LICENCIA DE SOFTWARE",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1203030",
+  "nombre": "VEHICULO",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1301010",
+  "nombre": "DEPRECIACION ACUMULADA INSTALACIONES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1301020",
+  "nombre": "DEPRECIACION ACUMULADA MUEBLES Y UTILES",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1301030",
+  "nombre": "DEPRECIACION ACUMULADA EQUIPOS DE COMPUT",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1301040",
+  "nombre": "DEPRECIACION ACUMULADA VEHICULOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1301050",
+  "nombre": "AMORTIZACION LICENCIA DE SOFTWARE",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1401010",
+  "nombre": "CUENTAS POR COBRAR ENTIDADES RE",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1501010",
+  "nombre": "MUTUOS NIMBUS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601010",
+  "nombre": "CHEQUES PROTESTADOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601011",
+  "nombre": "INGRESOS ADMINISTRATIVOS DIFERI",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601012",
+  "nombre": "COMISIONES POR VENTA DIFERIDAS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601013",
+  "nombre": "COMISIONES DEALER DIFERIDAS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601014",
+  "nombre": "IMPUESTOS DE CONTRATOS DIFERIDOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601015",
+  "nombre": "IVA NO RECUPERADO DIFERIDO",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601016",
+  "nombre": "INGRESOS ADMINISTRATIVOS DIFERI",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601020",
+  "nombre": "COMISIONES DEALER DIFERIDAS 2018",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601021",
+  "nombre": "IMPUESTOS DE CONTRATOS DIFERIDO",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601022",
+  "nombre": "GASTOS NOTARIALES DIFERIDOS 2018",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601023",
+  "nombre": "DISPOSITIVOS SATELITALES DIFERIDO",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601024",
+  "nombre": "SEGURO VEHICULAR DIFERIDO 2018",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601025",
+  "nombre": "IVA NO RECUPERADO DIFERIDO 2018",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601026",
+  "nombre": "COMISIONES DEALER DIFERIDAS 2019",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601027",
+  "nombre": "IVA NO RECUPERADO DIFERIDO 2019",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601028",
+  "nombre": "COMISIONES DEALER DIFERIDAS 2020",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601029",
+  "nombre": "IVA NO RECUPERADO DIFERIDO 2020",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601030",
+  "nombre": "COMISIONES DEALER DIFERIDAS 2021",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601031",
+  "nombre": "IVA NO RECUPERADO DIFERIDO 2021",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1601032",
+  "nombre": "GASTOS PAGADOS POR ANTICIPADO",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1701010",
+  "nombre": "IMPUESTOS DIFERIDOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1801010",
+  "nombre": "GARANTIA DE ARRIENDOS",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1801020",
+  "nombre": "CARTERA ADMINISTRADA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1801030",
+  "nombre": "GASTOS PUESTA EN MARCHA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1801040",
+  "nombre": "GARANTIA CARTERA VENDIDA PENTA",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1801041",
+  "nombre": "GARANTIA CARTERA VENDIDA EUROC",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "1801042",
+  "nombre": "SUSCRIPCION CUOTAS SERIE B",
+  "tipo": "ACTIVO"
+ },
+ {
+  "codigo": "2101010",
+  "nombre": "LINEA DE CREDITO BANCOS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2101020",
+  "nombre": "PRESTAMOS BANCARIOS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2101030",
+  "nombre": "PRESTAMOS BANCARIOS EXTERIOR C.P.",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2101031",
+  "nombre": "DEUDA BANCARIA EXTERIOR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2101040",
+  "nombre": "INSTITUCIONES FINANCIERAS POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2101041",
+  "nombre": "INSTITUCIONES FINANCIERAS EXTERIOR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2101050",
+  "nombre": "PRESTAMO COVID",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102010",
+  "nombre": "FACTURAS POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102011",
+  "nombre": "FACTURAS POR PAGAR 2020",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102012",
+  "nombre": "FACTURAS POR PAGAR DEALER 2020",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102013",
+  "nombre": "FACTURAS POR PAGAR DEALER 2021",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102014",
+  "nombre": "FACTURAS POR PAGAR 2021",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102015",
+  "nombre": "FACTURAS POR PAGAR DEALER 2022",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102016",
+  "nombre": "FACTURAS POR PAGAR 2022",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102017",
+  "nombre": "FACTURAS POR PAGAR DEALER 2023",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102018",
+  "nombre": "FACTURAS POR PAGAR 2023",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102019",
+  "nombre": "FACTURAS POR PAGAR DEALER 2024",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102020",
+  "nombre": "CERTIFICADOS ANOTACIONES VIGENTES",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102021",
+  "nombre": "FACTURAS POR PAGAR 2024",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102022",
+  "nombre": "FACTURAS POR PAGAR 2025",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102023",
+  "nombre": "FACTURAS POR PAGAR DEALER 2025",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102024",
+  "nombre": "FACTURAS POR PAGAR 2026",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102025",
+  "nombre": "FACTURAS POR PAGAR DEALER 2026",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102026",
+  "nombre": "ANTICIPO RECIBIDO POR PAGAR A FUTURAS OP",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102030",
+  "nombre": "POR PAGAR SEGUROS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102031",
+  "nombre": "POR PAGAR GARANTIA MECANICA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102040",
+  "nombre": "CONCESIONARIOS POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102041",
+  "nombre": "CONCESIONARIOS POR PAGAR TRANSITORIA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102042",
+  "nombre": "CONCESIONARIOS CONTRATO",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102050",
+  "nombre": "POR PAGAR GPS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102051",
+  "nombre": "GPS INSTALADOS POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102060",
+  "nombre": "ACREEDORES VARIOS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102061",
+  "nombre": "OTRAS CUENTAS POR PAGAR A PRALIMOY",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102070",
+  "nombre": "IMPUESTOS DE TIMBRES Y ESTAMPILLAS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102080",
+  "nombre": "RECAUDACION POR ADMINISTRIACION",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102090",
+  "nombre": "POR PAGAR SEGURO DE DESGRAVAMEN",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102100",
+  "nombre": "POR PAGAR SEGURO DE CESANTIA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102110",
+  "nombre": "PROVEEDOR EXTRANJERO",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102120",
+  "nombre": "DEPOSITO EN TRANSITO",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102130",
+  "nombre": "POR PAGAR GASTOS NOTARIALES Y PRENDA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102131",
+  "nombre": "POR PAGAR OTROS GASTOS DE PRENDA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102132",
+  "nombre": "GASTOS DE TRANSFERENCIA POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102140",
+  "nombre": "POR PAGAR GASTOS DE ADMINISTRAC",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102141",
+  "nombre": "POR PAGAR LIMITACIONES",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102142",
+  "nombre": "POR PAGAR DELIVERY",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102150",
+  "nombre": "GASTOS DE INSCRIPCION VEHICULO N",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102160",
+  "nombre": "COMISIONES DEALER",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102170",
+  "nombre": "RECAUDACION EURO CAPITAL",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102180",
+  "nombre": "RECAUDACION PENTA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102190",
+  "nombre": "ABONO CLIENTE",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102191",
+  "nombre": "COBRANZA JUDICIAL",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102192",
+  "nombre": "ABONO PARA APLICAR ACREEDORES V",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102200",
+  "nombre": "RECAUDACION AUTOFAST",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102210",
+  "nombre": "RECAUDACION LARRAIN VIAL",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102220",
+  "nombre": "RECAUDACION NUEVO CAPITAL",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102230",
+  "nombre": "RECAUDACION AFA PLUS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102240",
+  "nombre": "POR PAGAR A RY CHILE HOLDING",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102250",
+  "nombre": "POR PAGAR AFA PLUS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102260",
+  "nombre": "RECAUDACION MUNDO CREDITO",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2102270",
+  "nombre": "RECAUDACION AUTOFIN",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2103010",
+  "nombre": "CHEQUES POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2103011",
+  "nombre": "CUENTAS POR PAGAR EN CONVENIO",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2103012",
+  "nombre": "CREDITO POR COMPRA DE VEHICULO",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2103013",
+  "nombre": "TARJETA DE CREDITO CORPORATIVO SANTANDER",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2103020",
+  "nombre": "DOCUMENTOS POR PAGAR EMPRESAS RELACIONAD",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2103030",
+  "nombre": "PRESTAMO EMPRESAS RELACIONADAS C.P.",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2103040",
+  "nombre": "INTERES DIF POR PRESTAMO EMPRESA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2103050",
+  "nombre": "DOCUMENTOS POR PAGAR EN DOLARES",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2103051",
+  "nombre": "INTERESES DOCUMENTOS POR PAGAR EN DOLARE",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2104010",
+  "nombre": "REMUNERACIONES POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2104020",
+  "nombre": "HONORARIOS POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2105010",
+  "nombre": "I.S.P",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2105020",
+  "nombre": "MUTUAL DE SEGURIDAD",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2105030",
+  "nombre": "A.F.P",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2105040",
+  "nombre": "ISAPRES",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2105050",
+  "nombre": "SEGURO DE CESANTIA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2105060",
+  "nombre": "IMPUESTO DE SEGUNDA CATEGORIA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2105070",
+  "nombre": "RETENCION POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2105080",
+  "nombre": "RETENCION 3% PRESTAMO SOLIDARIO",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2105090",
+  "nombre": "RETENCION 3% PRESTAMO SOLIDARIO HONORARI",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2105100",
+  "nombre": "SEGURO SOCIAL",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2105110",
+  "nombre": "RETENCION JUDICIAL ALIMENTOS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106010",
+  "nombre": "PROVISION GASTOS COMUNES",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106011",
+  "nombre": "PROVISION COMISIONES DEALER",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106012",
+  "nombre": "PROVISION COMISIONES PARQUE",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106020",
+  "nombre": "PROVISION GASTOS OPERACIONALES",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106021",
+  "nombre": "PROVISION FONDO MARKETING",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106022",
+  "nombre": "PROVISION POR CESION DE OPERACIONES",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106030",
+  "nombre": "PROVISION DE VACACIONES",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106040",
+  "nombre": "PROVISION INTERESES POR CREDITO",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106050",
+  "nombre": "PROVISION DE GASTOS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106060",
+  "nombre": "COMISIONES EJECUTIVOS POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106070",
+  "nombre": "PROVISION FINIQUITOS POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2106080",
+  "nombre": "PROVISION INTERESES DAP",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2107010",
+  "nombre": "I.V.A DEBITO FISCAL",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2107020",
+  "nombre": "IMPUESTO UNICO TRABAJADORES",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2107030",
+  "nombre": "IMPUESTO SEGUNDA CATEGORIA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2107040",
+  "nombre": "PROVISION IMPUESTO RENTA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2107050",
+  "nombre": "IMPUESTO POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2107060",
+  "nombre": "TESORERIA GRAL DE LA REPUBLICA",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2108010",
+  "nombre": "INGRESOS ANTICIPADOS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2109010",
+  "nombre": "IMPUESTO DIFERIDO",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2109011",
+  "nombre": "INGRESOS ADMINISTRATIVOS DIFERIDOS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2109012",
+  "nombre": "INGRESOS ADMINISTRATIVOS DIFERIDOS 2018",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2109013",
+  "nombre": "INGRESOS ADMINISTRATIVOS DIFERIDOS 2019",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2109014",
+  "nombre": "INGRESOS ADMINISTRATIVOS DIFERIDOS 2020",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2109015",
+  "nombre": "INGRESOS ADMINISTRATIVOS DIFERIDOS 2021",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2109020",
+  "nombre": "OTROS IMPUESTO DIFERIDOS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2109030",
+  "nombre": "PROVISIÓN IMPUESTO DIFERIDO",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2201010",
+  "nombre": "PRESTAMOS BANCARIOS LOCALES C.P.",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2201020",
+  "nombre": "PRESTAMOS BANCARIOS EXTERIOR L.P.",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2201030",
+  "nombre": "CUENTAS POR PAGAR RY",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2210904",
+  "nombre": "LEYES SOCIALES POR PAGAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2601010",
+  "nombre": "OTROS PASIVOS POR REGULARIZAR",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2601020",
+  "nombre": "CARTERA ADMINISTRADA CFC",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2601030",
+  "nombre": "PRESTAMOS EMPRESAS RELACIONADAS L.P.",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2601040",
+  "nombre": "INTERESES POR PRESTAMO EMPRESAS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2601050",
+  "nombre": "TRASPASO POR COMPRA DE DIVISAS",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2601060",
+  "nombre": "POR PAGAR AFA PLUS L.P.",
+  "tipo": "PASIVO"
+ },
+ {
+  "codigo": "2701010",
+  "nombre": "CAPITAL SUSCRITO",
+  "tipo": "PATRIMONIO"
+ },
+ {
+  "codigo": "2701020",
+  "nombre": "APORTE DE CAPITAL POR ENTERAR",
+  "tipo": "PATRIMONIO"
+ },
+ {
+  "codigo": "2702010",
+  "nombre": "RESERVA. REV. CAPITAL PROPIO",
+  "tipo": "PATRIMONIO"
+ },
+ {
+  "codigo": "2703010",
+  "nombre": "RESULTADO ACUMULADOS",
+  "tipo": "PATRIMONIO"
+ },
+ {
+  "codigo": "2704010",
+  "nombre": "OTRAS RESERVAS",
+  "tipo": "PATRIMONIO"
+ },
+ {
+  "codigo": "2704011",
+  "nombre": "RESERVAS FUTURAS CAPITALIZACIONES",
+  "tipo": "PATRIMONIO"
+ },
+ {
+  "codigo": "3001010",
+  "nombre": "INTERESES POR CONTRATOS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001011",
+  "nombre": "INGRESOS POR ADMINISTRACION DE C",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001020",
+  "nombre": "INGRESOS POR COBRANZA",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001021",
+  "nombre": "INGRESOS POR ABONO DE CLIENTE",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001022",
+  "nombre": "ESTIMACIONES DEUDORES INCOBRABLES",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001030",
+  "nombre": "OTROS INGRESOS OPERACIONES DE CREDITO",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001040",
+  "nombre": "INTERESES DE MORA",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001050",
+  "nombre": "INTERESES POR PREPAGO",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001060",
+  "nombre": "INGRESOS POR VENTA DE CONTRATOS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001070",
+  "nombre": "OTROS INGRESOS DE ACTIVIDADES",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001071",
+  "nombre": "OTROS INGRESOS POR REG SALDO PRECIO",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001072",
+  "nombre": "OTROS INGRESOS POR REG VARIAS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001073",
+  "nombre": "COMISION DE PRODUCCION",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001074",
+  "nombre": "COMISION GPS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001075",
+  "nombre": "COMISION SEGUROS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001076",
+  "nombre": "PROVISION PRODUCCION SEGUROS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001077",
+  "nombre": "PROVISION PRODUCCION COMISION",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001078",
+  "nombre": "PROVISION PRODUCCION GPS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001080",
+  "nombre": "INGRESOS ADMINISTRATIVOS 2017",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001081",
+  "nombre": "INGRESOS ADMINISTRATIVOS 2018",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001082",
+  "nombre": "INGRESOS ADMINISTRATIVOS 2019",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001083",
+  "nombre": "INGRESOS ADMINISTRATIVOS 2020",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001084",
+  "nombre": "INGRESOS ADMINISTRATIVOS 2021",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001085",
+  "nombre": "INGRESOS ADMINISTRATIVOS 2022",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001086",
+  "nombre": "INGRESOS ADMINISTRATIVOS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001087",
+  "nombre": "INGRESOS DE PERIODOS ANTERIORES",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001090",
+  "nombre": "INGRESOS POR PREPAGO",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001100",
+  "nombre": "INGRESOS POR PAGOS JUDICIALES",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001110",
+  "nombre": "INGRESO POR ARRIENDO OFICINA",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001120",
+  "nombre": "INGRESOS POR FFMM",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001130",
+  "nombre": "INGRESOS BIENES RECUPERADOS Y EN DACION",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001131",
+  "nombre": "RECUPERO DE CASTIGO EN CLIENTES",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001140",
+  "nombre": "INTERES PRESTAMOS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001150",
+  "nombre": "REAJUSTE CREDITOS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001151",
+  "nombre": "DIFERENCIA DE CAMBIO POSITIVA",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001160",
+  "nombre": "INGRESOS POR REEMBOLSO CLIENTES",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001170",
+  "nombre": "CONDONACIÓN DE DEUDAS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001180",
+  "nombre": "INTERESES PRESTAMOS BANCARIOS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001190",
+  "nombre": "INTERESES OTROS PRESTAMOS",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "3001200",
+  "nombre": "OTROS INGRESOS NO OPERACIONALES",
+  "tipo": "INGRESO"
+ },
+ {
+  "codigo": "4001010",
+  "nombre": "INTERESES PRESTAMOS BANCARIOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001020",
+  "nombre": "INTERESES OTROS PRESTAMOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001030",
+  "nombre": "IMPUESTOS DE TIMBRES Y ESTAMPILLAS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001031",
+  "nombre": "GASTOS NOTARIALES Y PRENDA",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001032",
+  "nombre": "CERTIFICADOS ANOTACIONES VIGENTE",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001033",
+  "nombre": "GASTOS POR DEVOL. GPS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001040",
+  "nombre": "GASTOS BANCARIOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001050",
+  "nombre": "GASTOS COLOCACION DE OPERACIONES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001060",
+  "nombre": "SUELDO BASE",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001061",
+  "nombre": "BONOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001062",
+  "nombre": "SEMANA CORRIDA",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001063",
+  "nombre": "SUELDO ASEGURADO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001064",
+  "nombre": "SUELDO BASE VACACIONES TOMADAS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001070",
+  "nombre": "GRATIFICACION",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001080",
+  "nombre": "VACACIONES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001081",
+  "nombre": "VIATICOS PERSONAL",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001082",
+  "nombre": "GASTOS POR COLACION",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001083",
+  "nombre": "ASIGNACION COLACION",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001084",
+  "nombre": "ASIGNACION MOVILIZACION",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001085",
+  "nombre": "ASIGNACION CELULAR",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001086",
+  "nombre": "ASIGNACION TELETRABAJO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001090",
+  "nombre": "APORTE EMPLEADOR",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001091",
+  "nombre": "SEGURO CESANTIA EMPLEADO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001092",
+  "nombre": "MUTUAL DE SEGURIDAD",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001093",
+  "nombre": "SIS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001094",
+  "nombre": "APORTE EMPLEADOR CAP. INDIVIDUAL",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001095",
+  "nombre": "APORTE EMPLEADOR EX.DE VIDA",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001096",
+  "nombre": "APORTE EMPLEADOR RENTABILIDAD PROTEGIDA",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001100",
+  "nombre": "COMISIONES POR VENTAS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001110",
+  "nombre": "SEGUROS CONTRATADOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001120",
+  "nombre": "COMISIONES DEALER 2017",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001121",
+  "nombre": "COMISIONES DEALER 2018",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001122",
+  "nombre": "COMISIONES DEALER 2019",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001123",
+  "nombre": "COMISIONES POR CONTRATO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001124",
+  "nombre": "COMISIONES DEALER 2020",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001125",
+  "nombre": "COMISIONES DEALER 2021",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001126",
+  "nombre": "COMISIONES DEALER 2022",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001127",
+  "nombre": "COMISIONES DEALER 2023",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001128",
+  "nombre": "COMISIONES DEALER POR FACTURAR",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001130",
+  "nombre": "IMPUESTOS DE CONTRATOS 2017",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001140",
+  "nombre": "INTERESES DE CREDITO POR PREPAGO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001150",
+  "nombre": "GASTOS DE COBRANZA",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001151",
+  "nombre": "GASTOS DE INSCRIP, NOTARIO Y MARTILLERO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001152",
+  "nombre": "PUBLICIDAD WEB",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001160",
+  "nombre": "IMPUESTO POR CREDITOS LOCALES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001161",
+  "nombre": "GASTOS POR VENTAS DE CARTERA",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001162",
+  "nombre": "PENALIDAD",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001163",
+  "nombre": "OTROS GASTOS RECOMPRAS VENTAS DE CARTERA",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001170",
+  "nombre": "PERDIDA BIENES RECUPERADOS Y EN DACION",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001171",
+  "nombre": "PERDIDA COBRANZA JUDICIAL",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001172",
+  "nombre": "OTROS GASTOS DE VENTAS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001180",
+  "nombre": "INTERES Y MULTAS POR OPERACIONES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4001190",
+  "nombre": "ESTIMACIONES DEUDORES INCOBRABLES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002010",
+  "nombre": "REMUNERACIONES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002020",
+  "nombre": "GRATIFICACION",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002030",
+  "nombre": "VACACIONES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002040",
+  "nombre": "APORTE PATRONAL",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002050",
+  "nombre": "FINIQUITO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002060",
+  "nombre": "INDEMNIZACIONES OS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002061",
+  "nombre": "INDEMNIZACIONES VOLUNTARIAS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002070",
+  "nombre": "OTROS BENEFICIOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002080",
+  "nombre": "HONORARIOS PROFESIONALES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002081",
+  "nombre": "HONORARIOS POR COMISIONES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002090",
+  "nombre": "ASESORIAS PROFESIONALES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002091",
+  "nombre": "ASESORIAS PROFESIONALES EXTRANJERAS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002100",
+  "nombre": "ARRIENDOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002110",
+  "nombre": "SERVICIOS BASICOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002120",
+  "nombre": "SEGUROS DE SALUD COMPLEMENTARIO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002130",
+  "nombre": "CORRESPONDENCIA Y ENCOMENDAD",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002140",
+  "nombre": "GASTOS NOTARIALES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002150",
+  "nombre": "VIATICOS Y TRASLADOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002160",
+  "nombre": "MATERIALES DE OFICINA",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002170",
+  "nombre": "FOTOCOPIAS E IMPRESOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002180",
+  "nombre": "GASTOS GENERALES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002181",
+  "nombre": "GASTOS ADMINISTRATIVOS CORREOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002190",
+  "nombre": "PATENTES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002200",
+  "nombre": "I.V.A. NO RECUPERABLE 2017",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002201",
+  "nombre": "I.V.A. NO RECUPERABLE 2018",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002202",
+  "nombre": "I.V.A. NO RECUPERABLE 2019",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002203",
+  "nombre": "I.V.A. NO RECUPERABLE 2020",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002204",
+  "nombre": "I.V.A. NO RECUPERABLE 2021",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002205",
+  "nombre": "I.V.A. NO RECUPERABLE 2022",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002206",
+  "nombre": "I.V.A. NO RECUPERABLE 2023",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002210",
+  "nombre": "TELEFONO Y COMUNICACIONES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002220",
+  "nombre": "INTERNET",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002230",
+  "nombre": "GASTOS BANCARIOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002240",
+  "nombre": "GASTO COMUN EDIFICIO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002250",
+  "nombre": "GASTOS DE PUBLICIDAD Y MARKETING",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002251",
+  "nombre": "GIFTCARD DE CUMPLIMIENTO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002260",
+  "nombre": "GASTOS DE REPRESENTACION",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002270",
+  "nombre": "GASTOS MOVILIZACION",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002280",
+  "nombre": "GASTOS PUESTA EN MARCHA",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002290",
+  "nombre": "ESTADIA Y VIAJES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002300",
+  "nombre": "MANTENCION PLATAFORMA DE CRED",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002301",
+  "nombre": "GASTOS RECHAZADOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002302",
+  "nombre": "BENEFICIO EMPLEADOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002303",
+  "nombre": "CONTRIBUCIONES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002304",
+  "nombre": "HONORARIOS ADMINISTRATIVOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002305",
+  "nombre": "OTROS GASTOS NO OPERACIONALES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4002306",
+  "nombre": "PLATAFORMA CONTABILIDAD",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4003010",
+  "nombre": "DEPRECIACIONES INSTALACIONES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4003020",
+  "nombre": "DEPRECIACIONES MUEBLES Y UTILES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4003030",
+  "nombre": "DEPRECIACIONES EQUIPOS DE COMPUTACION",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4003040",
+  "nombre": "AMORTIZACION ACUMULADA LICENCIA DE SOFTW",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4003050",
+  "nombre": "DEPRECIACION VEHICULO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4101010",
+  "nombre": "INGRESOS FINANCIEROS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4101020",
+  "nombre": "OTROS INGRESOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201010",
+  "nombre": "GASTOS FINANCIEROS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201020",
+  "nombre": "OTROS GASTOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201030",
+  "nombre": "INTERESES Y MULTAS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201031",
+  "nombre": "TRAMITES LEGALES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201032",
+  "nombre": "GASTOS DE VEHICULO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201033",
+  "nombre": "GASTOS EXTRAORDINARIOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201040",
+  "nombre": "GASTOS NO ACEPTADOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201041",
+  "nombre": "GASTOS NO DOCUMENTADOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201050",
+  "nombre": "RESULTADO POR INVERSION EN ACCIONES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201060",
+  "nombre": "GASTOS NO OPERACIONALES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201070",
+  "nombre": "EGRESOS DE PERIODOS ANTERIORES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4201080",
+  "nombre": "IMPUESTO DIFERIDO RENTA",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4301010",
+  "nombre": "CORRECCION MONETARIA ACTIVOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4301020",
+  "nombre": "CORRECCION MONETARIA ACTIVO FI",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4301030",
+  "nombre": "CORRECCION MONETARIA PASIVOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4301040",
+  "nombre": "CORRECCION MONETARIA PATRIMONI",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4301050",
+  "nombre": "REAJUSTE CREDITOS",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4301060",
+  "nombre": "REAJUSTES",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4401010",
+  "nombre": "DIFERENCIA TIPO DE CAMBIO",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "4501010",
+  "nombre": "IMPUESTO A LA RENTA",
+  "tipo": "GASTO"
+ },
+ {
+  "codigo": "7101010",
+  "nombre": "CFC ECUADOR",
+  "tipo": "ORDEN"
+ },
+ {
+  "codigo": "7101020",
+  "nombre": "DEUDORA PENTA FINANCIERO",
+  "tipo": "ORDEN"
+ },
+ {
+  "codigo": "7201010",
+  "nombre": "ACREEDORA CFC ECUADOR",
+  "tipo": "ORDEN"
+ },
+ {
+  "codigo": "7201020",
+  "nombre": "ACREEDORA PENTA FINANCIERO",
+  "tipo": "ORDEN"
+ }
+]

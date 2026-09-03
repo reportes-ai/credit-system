@@ -65,36 +65,19 @@ require('../../../../shared/migrate').enFila('contabilidad-nucleo', async () => 
         INDEX idx_comp (id_comprobante), INDEX idx_cuenta (cuenta), INDEX idx_op (num_op)
       )`);
 
-    // Plan de cuentas semilla (solo si está vacío) — ajustable 100% desde el mantenedor
+    /* Plan de cuentas = el de AVSOFT (423 cuentas, plan-cuentas-avsoft.json, PDF del 03-09-2026).
+       Se siembra con INSERT IGNORE en CADA arranque: el libro diario histórico 2020-2026 usa esos
+       códigos y sin ellos quedaban 146 cuentas sin nombre (15.070 movimientos huérfanos). Lo ya
+       existente nunca se pisa — el mantenedor manda sobre nombre y tipo. Las 4 cuentas de ORDEN
+       (7xxxxxx) se omiten: no tienen movimientos y el mantenedor no conoce ese tipo. */
     const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM ctb_cuentas');
     if (!n) {
-      const P = [ // [codigo, nombre, tipo, imputable]
-        ['1', 'ACTIVO', 'ACTIVO', 0], ['1.1', 'Activo Circulante', 'ACTIVO', 0],
-        ['1.1.01', 'Caja', 'ACTIVO', 1], ['1.1.02', 'Banco', 'ACTIVO', 1],
-        ['1.1.03', 'Colocaciones (créditos)', 'ACTIVO', 1], ['1.1.04', 'Intereses por cobrar', 'ACTIVO', 1],
-        ['1.1.05', 'Deudores varios', 'ACTIVO', 1], ['1.1.06', 'IVA crédito fiscal', 'ACTIVO', 1],
-        ['1.1.07', 'Anticipos al personal', 'ACTIVO', 1], ['1.1.08', 'Cuentas transitorias', 'ACTIVO', 1],
-        ['1.2', 'Activo Fijo', 'ACTIVO', 0], ['1.2.01', 'Muebles y equipos', 'ACTIVO', 1],
-        ['1.2.02', 'Depreciación acumulada', 'ACTIVO', 1],
-        ['2', 'PASIVO', 'PASIVO', 0], ['2.1', 'Pasivo Circulante', 'PASIVO', 0],
-        ['2.1.01', 'Proveedores', 'PASIVO', 1], ['2.1.02', 'Comisiones por pagar dealers', 'PASIVO', 1],
-        ['2.1.03', 'Remuneraciones por pagar', 'PASIVO', 1], ['2.1.04', 'Retenciones previsionales', 'PASIVO', 1],
-        ['2.1.05', 'Impuestos por pagar', 'PASIVO', 1], ['2.1.06', 'IVA débito fiscal', 'PASIVO', 1],
-        ['2.1.07', 'Provisión incobrables', 'PASIVO', 1], ['2.1.08', 'Saldos precio por pagar', 'PASIVO', 1],
-        ['2.2', 'Pasivo Largo Plazo', 'PASIVO', 0], ['2.2.01', 'Préstamos relacionados', 'PASIVO', 1],
-        ['3', 'PATRIMONIO', 'PATRIMONIO', 0],
-        ['3.1.01', 'Capital', 'PATRIMONIO', 1], ['3.1.02', 'Resultados acumulados', 'PATRIMONIO', 1],
-        ['4', 'INGRESOS', 'INGRESO', 0],
-        ['4.1.01', 'Intereses ganados', 'INGRESO', 1], ['4.1.02', 'Comisiones ganadas', 'INGRESO', 1],
-        ['4.1.03', 'Ingresos por seguros', 'INGRESO', 1], ['4.1.04', 'Otros ingresos', 'INGRESO', 1],
-        ['5', 'GASTOS', 'GASTO', 0],
-        ['5.1.01', 'Remuneraciones', 'GASTO', 1], ['5.1.02', 'Comisiones dealers', 'GASTO', 1],
-        ['5.1.03', 'Castigos incobrables', 'GASTO', 1], ['5.1.04', 'Gasto provisión', 'GASTO', 1],
-        ['5.1.05', 'Arriendos', 'GASTO', 1], ['5.1.06', 'Gastos de oficina', 'GASTO', 1],
-        ['5.1.07', 'Gastos bancarios', 'GASTO', 1], ['5.1.08', 'Honorarios', 'GASTO', 1],
-        ['5.1.09', 'Otros gastos', 'GASTO', 1],
-      ];
-      for (const c of P) await pool.query('INSERT IGNORE INTO ctb_cuentas (codigo,nombre,tipo,imputable) VALUES (?,?,?,?)', c);
+      for (const c of [['1','ACTIVO','ACTIVO'],['2','PASIVO','PASIVO'],['27','PATRIMONIO','PATRIMONIO'],['3','INGRESOS','INGRESO'],['4','GASTOS','GASTO']])
+        await pool.query('INSERT IGNORE INTO ctb_cuentas (codigo,nombre,tipo,imputable) VALUES (?,?,?,0)', c);
+    }
+    for (const c of require('../plan-cuentas-avsoft.json')) {
+      if (c.tipo === 'ORDEN') continue;
+      await pool.query('INSERT IGNORE INTO ctb_cuentas (codigo,nombre,tipo,imputable) VALUES (?,?,?,1)', [c.codigo, c.nombre, c.tipo]);
     }
 
     // ── Módulo Contabilidad en el Home ──
