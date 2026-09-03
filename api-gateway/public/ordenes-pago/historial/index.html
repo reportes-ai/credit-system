@@ -169,7 +169,7 @@ let DATA = [], PUEDE = (yo.perfil==='Administrador'), ORIGEN='', MICAJA=null, PA
   addEventListener('DOMContentLoaded', () => document.querySelectorAll('.ofilt')
     .forEach(b => b.classList.toggle('on', (b.dataset.o||'') === o)));
 })();
-const isAdmin = (yo.perfil==='Administrador');   // solo Admin puede anular
+let isAdmin = (yo.perfil==='Administrador');   // se amplía con el permiso ordenes_pago_anular en permisos()
 let HORARIO=null, cajaTimer=null, cajaDeadline=0, cajaModo='';
 async function cargarCaja(){
   try{ const r=await fetch('/api/ordenes-pago/mi-caja',{headers:H}); if(chk401(r))return; const j=await r.json(); const d=j.data||{}; MICAJA=d.caja||null; HORARIO=d.horario||null; }catch(e){}
@@ -208,8 +208,13 @@ function limpiar(){ document.getElementById('q').value=''; document.getElementBy
 function setOrigen(btn){ ORIGEN = btn.dataset.o||''; document.querySelectorAll('.ofilt').forEach(b=>b.classList.toggle('on', b===btn)); cargar(); }
 
 async function permisos(){
-  if (yo.perfil==='Administrador') { PUEDE=true; return; }
-  try { const r=await fetch('/api/auth/mis-permisos?_='+Date.now(),{headers:H}); const j=await r.json(); PUEDE=(j.funcionalidades||[]).includes('ordenes_pago_emitir'); } catch(e){}
+  if (yo.perfil==='Administrador') { PUEDE=true; isAdmin=true; return; }
+  try {
+    const r=await fetch('/api/auth/mis-permisos?_='+Date.now(),{headers:H}); const j=await r.json();
+    const fs = j.funcionalidades||[];
+    PUEDE = fs.includes('ordenes_pago_emitir');
+    isAdmin = fs.includes('ordenes_pago_anular');   // reusa la variable que gatilla los botones "Anular"
+  } catch(e){}
 }
 
 async function cargar(){
@@ -248,10 +253,10 @@ async function cargar(){
       if (o.pagable && MICAJA && o.emitida_por_mi)
         acc += `<button class="icon-btn" title="La emitiste tú: el pago lo registra otra persona" disabled style="opacity:.4;cursor:not-allowed"><i class="bi bi-cash-coin"></i></button>`;
       else if (o.pagable && MICAJA) acc += `<button class="icon-btn" title="Pagar" onclick="pagar(${o.id})"><i class="bi bi-cash-coin" style="color:#16a34a"></i></button>`;
-      if (o.editable && o.estado==='EMITIDA' && isAdmin) acc += `<button class="icon-btn" title="Anular (solo Admin)" onclick="marcar(${o.id},'ANULADA')"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>`;
+      if (o.editable && o.estado==='EMITIDA' && isAdmin) acc += `<button class="icon-btn" title="Anular" onclick="marcar(${o.id},'ANULADA')"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>`;
       // Post Venta: mismo ícono, vía propia — además de anular el número hay que
       // deshacer las etapas del seguimiento para que pueda volver a emitirse.
-      if (o.anulable_pv && isAdmin) acc += `<button class="icon-btn" title="Anular orden de Post Venta (solo Admin)" onclick="anularPV(${o.id})"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>`;
+      if (o.anulable_pv && isAdmin) acc += `<button class="icon-btn" title="Anular orden de Post Venta" onclick="anularPV(${o.id})"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>`;
       return `<tr>
         <td><b>${escH(o.numero||'—')}</b></td>
         <td><span class="tipo-badge tipo-${o.origen}">${escH(o.origen_label)}</span></td>

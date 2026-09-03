@@ -13,6 +13,7 @@ const { auditar } = require('../../../../shared/audit');
 const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ordenes-pago');
 const AVISOS = require('../../../../shared/avisos');   // campanita al anular una orden
 const segregacion = require('../../../../shared/segregacion-pagos');   // quien emite no paga
+const { tieneFunc } = require('../../../../shared/middleware/permisos');
 
 /* ── Migración: tablas + módulo/funcionalidades/permisos (idempotente) ──────── */
 require('../../../../shared/migrate').enFila('ordenes-pago', async () => {
@@ -98,6 +99,7 @@ require('../../../../shared/migrate').enFila('ordenes-pago', async () => {
       ['Historial de Órdenes de Pago',  'ordenes_pago_historial',    '/ordenes-pago/historial/',    'bi-clock-history'],
       ['Base de Proveedores',           'ordenes_pago_proveedores',  '/ordenes-pago/proveedores/',  'bi-shop'],
       ['Estadísticas de Compra',        'ordenes_pago_estadisticas', '/ordenes-pago/estadisticas/', 'bi-bar-chart'],
+      ['Anular Orden de Pago',          'ordenes_pago_anular',       null,                           'bi-x-octagon'],
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono] of funcs) {
@@ -936,9 +938,9 @@ const cambiarEstadoOrden = async (req, res) => {
     const id = parseInt(req.params.id);
     const estado = norm((req.body || {}).estado).toUpperCase();
     if (!ESTADOS.includes(estado)) return res.status(400).json({ success: false, data: null, error: 'Estado inválido' });
-    // Solo el Administrador puede ANULAR órdenes de pago.
-    if (estado === 'ANULADA' && (req.usuario || {}).perfil_nombre !== 'Administrador')
-      return res.status(403).json({ success: false, data: null, error: 'Solo el Administrador puede anular órdenes de pago' });
+    // Anular exige el permiso paramétrico (Admin pasa siempre, vía tieneFunc).
+    if (estado === 'ANULADA' && !(await tieneFunc(req.usuario.id_usuario, 'ordenes_pago_anular')))
+      return res.status(403).json({ success: false, data: null, error: 'No tienes permiso para anular órdenes de pago' });
     /* EL PAGO NO SE REGISTRA POR ACÁ. Esta ruta escribe solo en `ordenes_pago`,
        así que marcar PAGADA desde aquí dejaba el pago fuera del libro central
        (`op_correlativos`): sin egreso de caja, sin snapshot en duro, y el
@@ -1307,8 +1309,8 @@ const anularOrdenPostventa = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const motivo = norm((req.body || {}).motivo);
-    if ((req.usuario || {}).perfil_nombre !== 'Administrador')
-      return res.status(403).json({ success: false, data: null, error: 'Solo el Administrador puede anular órdenes de pago' });
+    if (!(await tieneFunc(req.usuario.id_usuario, 'ordenes_pago_anular')))
+      return res.status(403).json({ success: false, data: null, error: 'No tienes permiso para anular órdenes de pago' });
     if (motivo.length < 10)
       return res.status(400).json({ success: false, data: null, error: 'El motivo es obligatorio y debe explicar por qué se anula (mínimo 10 caracteres)' });
 
