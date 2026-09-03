@@ -1466,8 +1466,11 @@ function abrirCompraPara(){
   document.getElementById('modalBody').innerHTML = `
     <p style="font-size:.83rem;color:#475569;margin-bottom:14px">Para los casos en que se autorice comprar a nombre de una persona natural o jurídica distinta del cliente que solicita el crédito.</p>
     <div class="ff"><label>RUT *</label>
-      <input id="cpRut" placeholder="12.345.678-9" value="${escH(cp.rut||'')}" oninput="fmtRutCP(this)" style="width:100%;margin-bottom:3px">
-      <div id="cpRutMsg" style="font-size:.72rem"></div>
+      <div style="display:flex;gap:6px">
+        <input id="cpRut" placeholder="12.345.678-9" value="${escH(cp.rut||'')}" oninput="fmtRutCP(this)" style="flex:1">
+        <button type="button" class="btn-mini bm-ver" style="padding:7px 12px" onclick="buscarCompraPara()"><i class="bi bi-search"></i> Buscar</button>
+      </div>
+      <div id="cpRutMsg" style="font-size:.72rem;margin-top:3px"></div>
     </div>
     <div class="ff" style="margin-top:10px"><label>Nombres / Razón social *</label><input id="cpNombres" placeholder="Nombres o razón social" value="${escH(cp.nombresRaw||'')}" style="width:100%"></div>
     <div class="ff" style="margin-top:10px"><label>Apellido paterno</label><input id="cpApPat" placeholder="Apellido paterno" value="${escH(cp.apPat||'')}" style="width:100%"></div>
@@ -1493,6 +1496,29 @@ function guardarCompraPara(){
   COMPRA_PARA = { rut: document.getElementById('cpRut').value.trim(), nombre, nombresRaw, apPat, apMat };
   renderCompraParaInfo();
   cerrarModal();
+}
+async function buscarCompraPara(){
+  const msg = document.getElementById('cpRutMsg');
+  const limpio = document.getElementById('cpRut').value.replace(/[^0-9kK]/g,'').toUpperCase();
+  if (limpio.length < 7 || calcularDV(limpio.slice(0,-1)) !== limpio.slice(-1)) {
+    msg.style.color = '#dc2626'; msg.innerHTML = '<i class="bi bi-x-circle"></i> Ingresa un RUT válido antes de buscar'; return;
+  }
+  const rut = document.getElementById('cpRut').value.trim();
+  msg.style.color = '#16a34a'; msg.innerHTML = '<i class="bi bi-hourglass-split"></i> Buscando…';
+  try {
+    const r = await fetch('/api/clientes/rut/'+encodeURIComponent(rut), { headers: hdr() });
+    const j = await r.json();
+    const cl = j.success ? j.data : null;
+    if (cl) {
+      document.getElementById('cpNombres').value = cl.nombres || cl.nombre || cl.nombre_completo || '';
+      document.getElementById('cpApPat').value   = cl.apellido_paterno || cl.apellido_p || '';
+      document.getElementById('cpApMat').value   = cl.apellido_materno || cl.apellido_m || '';
+      msg.innerHTML = '<i class="bi bi-check-circle"></i> Encontrado en Clientes';
+    } else {
+      msg.style.color = '#d97706';
+      msg.innerHTML = '<i class="bi bi-exclamation-triangle"></i> No está en Clientes — digita los datos a mano (puede ser una empresa)';
+    }
+  } catch(e) { msg.style.color = '#dc2626'; msg.innerHTML = '<i class="bi bi-x-circle"></i> Error al buscar'; }
 }
 
 async function buscarCliente(){
