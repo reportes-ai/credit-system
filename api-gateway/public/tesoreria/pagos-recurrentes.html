@@ -95,7 +95,7 @@
       <span style="margin-left:auto;font-size:.72rem;color:#94a3b8;font-weight:600">El motor revisa cada 6 horas; lo que vence hoy se emite hoy.</span></h5>
     <div style="overflow:auto"><table id="tabla">
       <thead><tr><th>Apodo</th><th>Proveedor</th><th>Periodicidad</th><th>Día</th><th>Tipo</th><th class="num">Monto origen</th><th>Glosa</th><th>Último pago</th><th>Próximo pago</th><th>Última ODP</th><th>Estado</th><th></th></tr></thead>
-      <tbody id="tbody"><tr><td colspan="11" class="vacio">Cargando…</td></tr></tbody>
+      <tbody id="tbody"><tr><td colspan="12" class="vacio">Cargando…</td></tr></tbody>
     </table></div>
   </div>
 
@@ -187,7 +187,7 @@ function render(){
               ['Órdenes generadas', DATA.reduce((s,p)=>s+Number(p.generadas||0),0), 'historial total']];
   document.getElementById('kpis').innerHTML = kp.map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
   const tb = document.getElementById('tbody');
-  if (!DATA.length) { tb.innerHTML = '<tr><td colspan="11" class="vacio">No hay pagos inscritos. Usa "Inscribir pago".</td></tr>'; return; }
+  if (!DATA.length) { tb.innerHTML = '<tr><td colspan="12" class="vacio">No hay pagos inscritos. Usa "Inscribir pago".</td></tr>'; return; }
   tb.innerHTML = DATA.map(p => {
     const prox = String(p.fecha_proximo_pago||'').slice(0,10);
     const venc = p.activo && prox && prox <= hoy;
