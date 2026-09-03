@@ -80,6 +80,7 @@
     <div class="sec-title">DATOS DEL CLIENTE</div>
     <table class="data-tbl">
       <tr><td class="lbl" style="width:13%">NOMBRE</td><td class="val" style="width:37%">${esc(title(c.cliente || ''))}</td><td class="lbl" style="width:13%">RUT</td><td class="val">${rutF(c.rutCliente || '')}</td></tr>
+      ${c.compraPara ? `<tr><td class="lbl">COMPRA PARA</td><td class="val">${esc(title(c.compraPara))}</td><td class="lbl">RUT</td><td class="val">${rutF(c.compraParaRut || '')}</td></tr>` : ''}
     </table>
     <div class="sec-title">DATOS DEL VEHÍCULO</div>
     <table class="data-tbl" style="table-layout:fixed;width:100%">

@@ -334,7 +334,9 @@
       <div class="ff"><label>Teléfono ejecutivo</label><input id="cEjTel" readonly></div>
       <div class="ff"><label>Correo ejecutivo</label><input id="cEjMail" readonly></div>
 
-      <div class="sec-form">Datos del cliente</div>
+      <div class="sec-form" style="display:flex;align-items:center;justify-content:space-between">Datos del cliente
+        <button type="button" class="btn-mini bm-ver" style="text-transform:none;font-weight:600" onclick="abrirCompraPara()"><i class="bi bi-person-plus me-1"></i>Compra para</button>
+      </div>
       <div class="ff"><label>RUT cliente *</label>
         <div style="display:flex;gap:6px">
           <input id="cRut" placeholder="12.345.678-9" oninput="fmtRutInput(this)" style="flex:1">
@@ -346,6 +348,7 @@
       <div class="ff"><label>Apellido paterno *</label><input id="cApPat" placeholder="Apellido paterno"></div>
       <div class="ff"><label>Apellido materno</label><input id="cApMat" placeholder="Apellido materno"></div>
       <div class="ff fg-4"><div id="clienteInfo" style="font-size:.76rem;color:#16a34a"></div></div>
+      <div class="ff fg-4"><div id="compraParaInfo" style="font-size:.76rem;color:#16a34a;display:none"></div></div>
 
       <div class="sec-form">Datos del vehículo</div>
       <div class="ff"><label>Tipo vehículo</label>
@@ -774,6 +777,7 @@ const CARTA_CONSID_DEFAULT = [
 let CARTA_INTRO = CARTA_INTRO_DEFAULT;
 let CARTA_CONSID = CARTA_CONSID_DEFAULT;
 let editandoId = null;
+let COMPRA_PARA = null;   // { nombre, rut } — compra para un tercero distinto del cliente; null = sin tercero
 let UF_HOY = null, TASAS = null, PARAMS_CRED = null, montoCredManual = false;
 let OPS_UAC = 0, MES_UAC = '';   // ops UAC del mes → tier vigente (rentabilidad de la Unidad)
 let VIGENCIA_DIAS = 5;   // días corridos de vigencia de la carta (parametros_credito.vigencia_carta_dias)
@@ -1430,6 +1434,67 @@ function rutValido(){
   return l.length >= 7 && calcularDV(l.slice(0,-1)) === l.slice(-1);
 }
 
+/* ── Compra para (tercero distinto del cliente que solicita el crédito) ──
+   Popup con su propio RUT (validado) + Nombres/Ap.Paterno/Ap.Materno. Reusa
+   el modal genérico (#modalCarta). Reabrir el botón permite modificar los
+   datos guardados antes de grabar la carta — o borrarlos para quitar el tercero. */
+function fmtRutCP(input){
+  const limpio = input.value.replace(/[^0-9kK]/g,'').toUpperCase().slice(0,9);
+  const msg = document.getElementById('cpRutMsg');
+  if (limpio.length < 2) { input.value = limpio; if(msg){msg.textContent='';} input.style.borderColor=''; return; }
+  const num = limpio.slice(0,-1), dv = limpio.slice(-1);
+  let f = ''; for (let i = 0; i < num.length; i++) { if (i > 0 && (num.length - i) % 3 === 0) f += '.'; f += num[i]; }
+  input.value = f + '-' + dv;
+  if (num.length >= 6) {
+    const ok = calcularDV(num) === dv;
+    input.style.borderColor = ok ? '#16a34a' : '#dc2626';
+    if (msg) msg.innerHTML = ok ? '<span style="color:#16a34a"><i class="bi bi-check-circle"></i> RUT válido</span>'
+                                 : '<span style="color:#dc2626"><i class="bi bi-x-circle"></i> Dígito verificador incorrecto</span>';
+  } else if (msg) { msg.textContent=''; input.style.borderColor=''; }
+}
+function renderCompraParaInfo(){
+  const el = document.getElementById('compraParaInfo');
+  if (!el) return;
+  if (COMPRA_PARA && COMPRA_PARA.nombre) {
+    el.style.display = '';
+    el.innerHTML = '<i class="bi bi-person-check me-1"></i>Compra para: <b>' + escH(COMPRA_PARA.nombre) + '</b> · RUT ' + escH(COMPRA_PARA.rut || '—');
+  } else { el.style.display = 'none'; el.innerHTML = ''; }
+}
+function abrirCompraPara(){
+  const cp = COMPRA_PARA || {};
+  document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-person-plus me-2"></i>Compra para';
+  document.getElementById('modalBody').innerHTML = `
+    <p style="font-size:.83rem;color:#475569;margin-bottom:14px">Para los casos en que se autorice comprar a nombre de una persona natural o jurídica distinta del cliente que solicita el crédito.</p>
+    <div class="ff"><label>RUT *</label>
+      <input id="cpRut" placeholder="12.345.678-9" value="${escH(cp.rut||'')}" oninput="fmtRutCP(this)" style="width:100%;margin-bottom:3px">
+      <div id="cpRutMsg" style="font-size:.72rem"></div>
+    </div>
+    <div class="ff" style="margin-top:10px"><label>Nombres / Razón social *</label><input id="cpNombres" placeholder="Nombres o razón social" value="${escH(cp.nombresRaw||'')}" style="width:100%"></div>
+    <div class="ff" style="margin-top:10px"><label>Apellido paterno</label><input id="cpApPat" placeholder="Apellido paterno" value="${escH(cp.apPat||'')}" style="width:100%"></div>
+    <div class="ff" style="margin-top:10px"><label>Apellido materno</label><input id="cpApMat" placeholder="Apellido materno" value="${escH(cp.apMat||'')}" style="width:100%"></div>
+    <p style="font-size:.72rem;color:#94a3b8;margin-top:10px">Deja los campos vacíos y graba para quitar el "compra para" de la carta.</p>`;
+  document.getElementById('modalFoot').innerHTML = `
+    <button class="btn-sec" onclick="cerrarModal()">Cancelar</button>
+    <button class="btn-af" onclick="guardarCompraPara()"><i class="bi bi-check-lg me-1"></i>Grabar</button>`;
+  if (cp.rut) setTimeout(()=>fmtRutCP(document.getElementById('cpRut')), 0);
+  document.getElementById('modalCarta').classList.add('show');
+}
+function guardarCompraPara(){
+  const rutIn = document.getElementById('cpRut').value.trim();
+  const nombresRaw = document.getElementById('cpNombres').value.trim();
+  const apPat = document.getElementById('cpApPat').value.trim();
+  const apMat = document.getElementById('cpApMat').value.trim();
+  // Todo vacío → quita el "compra para" (no hace falta un botón aparte)
+  if (!rutIn && !nombresRaw && !apPat && !apMat) { COMPRA_PARA = null; renderCompraParaInfo(); cerrarModal(); return; }
+  const limpio = rutIn.replace(/[^0-9kK]/g,'').toUpperCase();
+  if (limpio.length < 7 || calcularDV(limpio.slice(0,-1)) !== limpio.slice(-1)) { alert('El RUT del "compra para" no es válido (dígito verificador incorrecto).'); return; }
+  if (!nombresRaw) { alert('Falta el nombre (o razón social) del "compra para".'); return; }
+  const nombre = [nombresRaw, apPat, apMat].filter(Boolean).join(' ').toUpperCase();
+  COMPRA_PARA = { rut: document.getElementById('cpRut').value.trim(), nombre, nombresRaw, apPat, apMat };
+  renderCompraParaInfo();
+  cerrarModal();
+}
+
 async function buscarCliente(){
   const info = document.getElementById('clienteInfo');
   info.style.color = '#16a34a'; info.textContent = '';
@@ -1957,6 +2022,7 @@ function limpiarForm(){
   renderFinancierasSelect();
   document.getElementById('clienteInfo').textContent = '';
   document.getElementById('rutMsg').textContent = '';
+  COMPRA_PARA = null; renderCompraParaInfo();
   ['piePct','ufBadge','tasaMsg','comisionPizarra'].forEach(id=>document.getElementById(id).innerHTML='');
   document.getElementById('chkCambioPart').checked = false;
   toggleCambioPart();
@@ -2070,6 +2136,8 @@ async function guardarCarta(){
     cliente: [document.getElementById('cNombres').value, document.getElementById('cApPat').value, document.getElementById('cApMat').value]
       .map(s=>s.trim()).filter(Boolean).join(' ').toUpperCase(),
     rutCliente: document.getElementById('cRut').value.trim(),
+    compraPara: COMPRA_PARA?.nombre || null,
+    compraParaRut: COMPRA_PARA?.rut || null,
     tipoVehiculo: document.getElementById('cTipoVeh').value,
     marca: document.getElementById('cMarca').value, modelo: document.getElementById('cModelo').value,
     anio: document.getElementById('cAnio').value, patente: document.getElementById('cPatente').value.trim().toUpperCase(),
@@ -2480,6 +2548,8 @@ function editarCarta(id){
   document.getElementById('cNombres').value = c.cliente||'';
   document.getElementById('cApPat').value = '';
   document.getElementById('cApMat').value = '';
+  COMPRA_PARA = c.compraPara ? { rut: c.compraParaRut||'', nombre: c.compraPara, nombresRaw: c.compraPara, apPat:'', apMat:'' } : null;
+  renderCompraParaInfo();
   document.getElementById('cTipoVeh').value = c.tipoVehiculo||'AUTOMOVIL';
   document.getElementById('cMarca').value = c.marca||'';
   cargarModelos();
@@ -2793,7 +2863,8 @@ function fichaHTML(d){
       r('N° Operación', T(d.numeroCreditoCreado), true))}
 
     ${blq('Cliente','bi-person',
-      r('Nombre', T(d.cliente)) + r('RUT', T(d.rutCliente)))}
+      r('Nombre', T(d.cliente)) + r('RUT', T(d.rutCliente)) +
+      (d.compraPara ? r('Compra para', T(d.compraPara)+' · RUT '+T(d.compraParaRut)) : ''))}
 
     ${blq('Ejecutivo comercial','bi-person-badge',
       r('Nombre', T(d.ejecutivo)) + r('Correo', T(d.ejecutivoMail)) + r('Teléfono', T(d.ejecutivoTel)))}

@@ -462,6 +462,10 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS motivo_correccion VARCHAR(400) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS corregida_por_nombre VARCHAR(200) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS fecha_correccion_carta DATETIME DEFAULT NULL`);
+    // Compra para un tercero (persona natural o jurídica distinta del cliente que
+    // solicita el crédito) — cláusula 13 de la carta antigua. Opcional: NULL = sin tercero.
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS compra_para VARCHAR(200) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS compra_para_rut VARCHAR(20) DEFAULT NULL`);
     // Dónde vive el PDF adjunto (shared/almacen-docs.js): 161 documentos = 10,5 MB.
     for (const ddl of almacen.sqlColumnas('cartas_documentos')) {
       try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[cartas docs almacen]', e.message); }
@@ -609,6 +613,8 @@ function mapRow(r) {
     ejecutivoTel:             r.ejecutivo_tel,
     cliente:                  r.cliente,
     rutCliente:               r.rut_cliente,
+    compraPara:               r.compra_para,
+    compraParaRut:            r.compra_para_rut,
     tipoVehiculo:             cv(r.tipo_vehiculo, r.cred_tipo_vehiculo),
     marca:                    cv(r.marca, r.cred_marca),
     modelo:                   cv(r.modelo, r.cred_modelo),
@@ -848,6 +854,7 @@ const fichaCompleta = async (req, res) => {
       ejecutivo: r.ejecutivo, ejecutivoMail: r.ejecutivo_mail, ejecutivoTel: r.ejecutivo_tel,
       // Cliente
       cliente: r.cliente, rutCliente: r.rut_cliente,
+      compraPara: r.compra_para, compraParaRut: r.compra_para_rut,
       // Vehículo
       tipoVehiculo: r.tipo_vehiculo, marca: r.marca, modelo: r.modelo, anio: r.anio,
       patente: r.patente, prenda: r.prenda,
@@ -1259,6 +1266,7 @@ const upsert = async (req, res) => {
       c.opCarta, c.opOrigen, c.tipo,
       c.ejecutivoIdx || null, c.ejecutivoNombre, c.ejecutivoMail, c.ejecutivoTel,
       c.cliente, c.rutCliente,
+      c.compraPara || null, c.compraParaRut || null,
       c.tipoVehiculo, c.marca, c.modelo, c.anio, c.patente, c.prenda,
       c.precioVenta || null, c.pie || null, c.saldo || null,
       c.plazo || null, c.acreedor, c.parque,
@@ -1295,6 +1303,7 @@ const upsert = async (req, res) => {
           op_carta=?, id_financiera=?, tipo=?,
           ejecutivo_idx=?, ejecutivo=?, ejecutivo_mail=?, ejecutivo_tel=?,
           cliente=?, rut_cliente=?,
+          compra_para=?, compra_para_rut=?,
           tipo_vehiculo=?, marca=?, modelo=?, anio=?, patente=?, prenda=?,
           precio_venta=?, pie=?, saldo=?,
           plazo=?, acreedor=?, parque=?,
@@ -1385,6 +1394,7 @@ const upsert = async (req, res) => {
           op_carta, id_financiera, tipo,
           ejecutivo_idx, ejecutivo, ejecutivo_mail, ejecutivo_tel,
           cliente, rut_cliente,
+          compra_para, compra_para_rut,
           tipo_vehiculo, marca, modelo, anio, patente, prenda,
           precio_venta, pie, saldo,
           plazo, acreedor, parque,
