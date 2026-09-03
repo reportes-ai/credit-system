@@ -403,6 +403,10 @@ const listarOrdenes = async (req, res) => {
     const args = [];
     const origen = norm(req.query.origen).toUpperCase();
     if (['SALDO', 'COMISION', 'GENERAL', 'PARQUE'].includes(origen)) { where.push('oc.origen = ?'); args.push(origen); }
+    // Categoría: solo existe en las órdenes GENERALES (emisión manual). Botones
+    // "Administrativos"/"Arriendos" del historial filtran por acá, dentro de Otros.
+    const categoria = norm(req.query.categoria);
+    if (categoria) { where.push(`(oc.origen='GENERAL' AND op.categoria = ?)`); args.push(categoria); }
     const desde = fdate(req.query.desde), hasta = fdate(req.query.hasta);
     if (desde) { where.push('DATE(oc.created_at) >= ?'); args.push(desde); }
     if (hasta) { where.push('DATE(oc.created_at) <= ?'); args.push(hasta); }
@@ -415,7 +419,7 @@ const listarOrdenes = async (req, res) => {
       SELECT oc.id, oc.numero, oc.origen, oc.origen_id, oc.concepto, oc.monto, oc.created_at AS fecha_emision,
              oc.usuario_nombre, oc.id_usuario, oc.anulada, oc.anulada_nombre, oc.fecha_anulada, oc.pagada, oc.fecha_pagada,
              op.proveedor_nombre AS g_prov, op.tipo_documento AS g_tipodoc, op.numero_documento AS g_numdoc,
-             op.estado AS g_estado, op.fecha_pago AS g_fechapago,
+             op.estado AS g_estado, op.fecha_pago AS g_fechapago, op.categoria AS g_categoria,
              pfc.numero_factura AS c_factura,
              spv.nombre_dealer AS s_dealer, cpv.nombre_dealer AS c_dealer,
              (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=spo.id_seguimiento AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS saldo_pagado,
@@ -451,6 +455,7 @@ const listarOrdenes = async (req, res) => {
         (r.id_usuario == null && nombreYo && String(r.usuario_nombre || '').trim().toLowerCase() === nombreYo));
       return {
         id: r.id, op_id: r.origen_id, origen: r.origen, origen_label: ORIGEN_LBL[r.origen] || r.origen,
+        categoria: esGen ? (r.g_categoria || '') : '',
         emitida_por_mi: !!emitidaPorMi,
         numero: r.numero, concepto: r.concepto || '—', monto: r.monto, fecha_emision: r.fecha_emision,
         usuario_nombre: r.usuario_nombre, proveedor_nombre: proveedor || '—', documento: documento || '—',

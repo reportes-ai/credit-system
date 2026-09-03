@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.30 — boton Excel: descarga los casos filtrados con montos con formato y nombre de archivo segun filtros. v1.29 — selector "Cuenta de cargo" al registrar el pago (mantenedor Cuentas Bancarias): queda en la orden y el asiento acredita ese banco real; el detalle muestra "desde <cuenta>". v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.31 — filtro TIPO: botones Administrativos/Arriendos (categoria dentro de Otros/GENERAL) · v1.30 — boton Excel: descarga los casos filtrados con montos con formato y nombre de archivo segun filtros. v1.29 — selector "Cuenta de cargo" al registrar el pago (mantenedor Cuentas Bancarias): queda en la orden y el asiento acredita ese banco real; el detalle muestra "desde <cuenta>". v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -98,6 +98,9 @@
       <button class="ofilt" data-o="SALDO" onclick="setOrigen(this)">Saldos Precio</button>
       <button class="ofilt" data-o="PARQUE" onclick="setOrigen(this)">Parques</button>
       <button class="ofilt" data-o="GENERAL" onclick="setOrigen(this)">Otros</button>
+      <span style="width:1px;height:18px;background:#e2e8f0;margin:0 2px"></span>
+      <button class="ofilt" data-cat="Administrativos" onclick="setCategoria(this)">Administrativos</button>
+      <button class="ofilt" data-cat="Arriendos" onclick="setCategoria(this)">Arriendos</button>
     </div>
   </div>
 
@@ -158,7 +161,7 @@ function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.
 function chk401(r){ if(r && r.status===401){ sessionStorage.clear(); location.href='/login.html'; return true; } return false; }
 const fdate = d => d? String(d).slice(0,10).split('-').reverse().join('/') : '—';
 const fdatetime = d => { if(!d) return '—'; const s=String(d); const f=fdate(s); const hm=(s.slice(11,16)||''); return hm? f+' '+hm : f; };
-let DATA = [], PUEDE = (yo.perfil==='Administrador'), ORIGEN='', MICAJA=null, PAGO_ID=null;
+let DATA = [], PUEDE = (yo.perfil==='Administrador'), ORIGEN='', CATEGORIA='', MICAJA=null, PAGO_ID=null;
 /* ?origen=SALDO|COMISION|GENERAL — para que quien llegue desde otro módulo
    (ej. el aviso de Seguimiento que manda a anular una orden) caiga ya filtrado
    y no tenga que buscar su orden entre todas. */
@@ -205,7 +208,9 @@ function renderCajaStatus(){
 
 let tmr=null; function debounced(){ clearTimeout(tmr); tmr=setTimeout(cargar, 280); }
 function limpiar(){ document.getElementById('q').value=''; document.getElementById('fEstado').value=''; document.getElementById('fDesde').value=''; document.getElementById('fHasta').value=''; cargar(); }
-function setOrigen(btn){ ORIGEN = btn.dataset.o||''; document.querySelectorAll('.ofilt').forEach(b=>b.classList.toggle('on', b===btn)); cargar(); }
+function setOrigen(btn){ ORIGEN = btn.dataset.o||''; CATEGORIA=''; document.querySelectorAll('.ofilt').forEach(b=>b.classList.toggle('on', b===btn)); cargar(); }
+// Administrativos/Arriendos son categorías DENTRO de Otros (origen GENERAL) — al elegir una se fuerza ese origen.
+function setCategoria(btn){ CATEGORIA = btn.dataset.cat; ORIGEN = 'GENERAL'; document.querySelectorAll('.ofilt').forEach(b=>b.classList.toggle('on', b===btn)); cargar(); }
 
 async function permisos(){
   if (yo.perfil==='Administrador') { PUEDE=true; isAdmin=true; return; }
@@ -222,6 +227,7 @@ async function cargar(){
   const q = document.getElementById('q').value.trim(); if (q) p.set('q', q);
   const est = document.getElementById('fEstado').value; if (est) p.set('estado', est);
   if (ORIGEN) p.set('origen', ORIGEN);
+  if (CATEGORIA) p.set('categoria', CATEGORIA);
   const d = document.getElementById('fDesde').value; if (d) p.set('desde', d);
   const h = document.getElementById('fHasta').value; if (h) p.set('hasta', h);
   const tb = document.getElementById('tbody');
@@ -294,7 +300,7 @@ async function exportarExcel(){
   XLSX.utils.book_append_sheet(wb, ws, 'Ordenes de Pago');
   // Nombre del archivo según los filtros activos
   const est = document.getElementById('fEstado').value;
-  const tipo = { COMISION:'Comisiones', SALDO:'SaldosPrecio', PARQUE:'Parques', GENERAL:'Otros' }[ORIGEN] || 'Todas';
+  const tipo = CATEGORIA || ({ COMISION:'Comisiones', SALDO:'SaldosPrecio', PARQUE:'Parques', GENERAL:'Otros' }[ORIGEN] || 'Todas');
   const d = document.getElementById('fDesde').value, h = document.getElementById('fHasta').value;
   const q = document.getElementById('q').value.trim();
   const partes = ['ODP', tipo, est ? est.toLowerCase() : 'todas'];

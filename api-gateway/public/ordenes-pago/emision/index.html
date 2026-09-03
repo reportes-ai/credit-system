@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v2.3 — "Se paga a: banco · tipo · cuenta" visible bajo el proveedor al elegirlo · v2.2 — banco/cuenta del proveedor solo criticos con pago por Transferencia (cheque/efectivo/tarjeta no los exigen) · v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
+  <!-- v2.4 — Categoría con lista fija (Administrativos/Arriendos/Otros/Comisión Dealer/Comisión Parque/Saldo Precio), reemplaza el texto libre · v2.3 — "Se paga a: banco · tipo · cuenta" visible bajo el proveedor al elegirlo · v2.2 — banco/cuenta del proveedor solo criticos con pago por Transferencia (cheque/efectivo/tarjeta no los exigen) · v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -73,8 +73,15 @@
       <div class="fld full"><label>Concepto *</label><input id="fConcepto" maxlength="300" placeholder="Ej: Arriendo oficina junio 2026"></div>
 
       <div class="fld"><label>Categoría</label>
-        <input id="fCategoria" list="catList" maxlength="80" placeholder="Ej: Arriendo, Servicios, Insumos…">
-        <datalist id="catList"><option>Arriendo</option><option>Servicios Básicos</option><option>Honorarios</option><option>Insumos</option><option>Marketing</option><option>Tecnología</option><option>Mantención</option><option>Otros</option></datalist>
+        <select id="fCategoria">
+          <option value="">— Sin categoría —</option>
+          <option>Administrativos</option>
+          <option>Arriendos</option>
+          <option>Otros</option>
+          <option>Comisión Dealer</option>
+          <option>Comisión Parque</option>
+          <option>Saldo Precio</option>
+        </select>
       </div>
       <div class="fld"><label>Centro de Costo</label>
         <select id="fCentroCosto"><option value="">— Sin asignar —</option></select>
