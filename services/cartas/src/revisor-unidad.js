@@ -87,8 +87,13 @@ async function params() {
   return p;
 }
 
-/* Tasa pizarra UNIDAD a la fecha de la carta, por tramo mayor/menor 200 UF. */
-async function tasaPizarra(fecha, saldo, p) {
+/* Tasa pizarra UNIDAD a la fecha de la carta, por tramo mayor/menor 200 UF.
+   El tramo se decide con el MONTO DEL CRÉDITO (monto financiado), igual que el
+   generador de cartas, el cotizador y el dashboard — no con el saldo precio.
+   Caso 26664152KF (03-09-2026): saldo 171 UF pero crédito 221 UF; con el saldo
+   caía al tramo menor (2,875%) y la tasa 2,56% aparecía como rebaja sin código. */
+async function tasaPizarra(fecha, montoFinanciado, p) {
+  const saldo = montoFinanciado;
   const [[t]] = await pool.query(
     `SELECT tasa_mensual_menor, tasa_mensual_mayor FROM tasas
       WHERE fecha_desde <= COALESCE(?, CURDATE()) ORDER BY fecha_desde DESC LIMIT 1`, [fecha || null]);
@@ -235,7 +240,7 @@ async function revisar(carta, p) {
   const tasaCarta = carta.tasa_credito != null ? parseFloat(carta.tasa_credito) : null;
   if (tasaDoc != null && tasaCarta != null)
     add('Tasa cursada (doc vs sistema)', tasaDoc + '%', tasaCarta + '%', Math.abs(tasaDoc - tasaCarta) <= 0.005);
-  const piz = await tasaPizarra(carta.fecha, parseFloat(carta.saldo) || 0, p);
+  const piz = await tasaPizarra(carta.fecha, parseFloat(carta.monto_credito_clp) || parseFloat(carta.saldo) || 0, p);
   if (piz == null) return { checks, ok: false, motivo: 'Sin tasa pizarra vigente para la fecha de la carta: requiere ojo humano' };
   let tasaRebajada = false;
   if (piz != null && tasaCarta != null) {
