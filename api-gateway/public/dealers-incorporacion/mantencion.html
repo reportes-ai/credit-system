@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.26 — al CERRAR una ficha con deposito a tercero, quien cierra valida los poderes adjuntos (confirmacion + candado server-side docs_validados) · v1.25 — boton Portal (demo) en Editar Dealer: abre el portal real en modo demostracion; bloqueado si el dealer ya se registro · v1.24 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js). v1.23 — multi-local: locales con tabla POR local en el modal Editar Dealer (solo lectura) y en la vista de ficha (LOCALES ADICIONALES) · v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
+  <!-- v1.27 — Aprobaciones Históricas: encabezados ordenables (Tipo/Concesionario/RUT/Ejecutivo/Comisión/Resultado/Fecha) · v1.26 — al CERRAR una ficha con deposito a tercero, quien cierra valida los poderes adjuntos (confirmacion + candado server-side docs_validados) · v1.25 — boton Portal (demo) en Editar Dealer: abre el portal real en modo demostracion; bloqueado si el dealer ya se registro · v1.24 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js). v1.23 — multi-local: locales con tabla POR local en el modal Editar Dealer (solo lectura) y en la vista de ficha (LOCALES ADICIONALES) · v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -207,6 +207,9 @@ function render(){
 
 let histFiltro = 'todos';
 function setHistFiltro(v){ histFiltro = v; renderHistoricas(); }
+let histSort = 'fecha', histDir = -1;   // orden por defecto: más reciente primero
+function setHistSort(campo){ if(histSort===campo) histDir=-histDir; else { histSort=campo; histDir=1; } renderHistoricas(); }
+function histIconoOrden(campo){ return histSort!==campo ? '' : ` <i class="bi bi-caret-${histDir>0?'up':'down'}-fill"></i>`; }
 // Borrar un registro histórico (solo Administrador). NO elimina el dealer creado.
 async function borrarHistorico(id){
   if(!ESADMIN){ toast('Solo el Administrador puede borrar históricos.', true); return; }
@@ -239,14 +242,26 @@ function renderHistoricas(){
   if (histFiltro==='aprobados')  rows = rows.filter(f=>f.estado==='APROBADA');
   if (histFiltro==='rechazados') rows = rows.filter(f=>f.estado==='RECHAZADA');
   rows = filtroQ(rows, ['rut','nombre_razon','nombre_fantasia','ejecutivo_nombre']);
+  const CAMPO = {
+    tipo:       f => f.entidad==='PARQUE' ? 'PARQUE' : (f.tipo||''),
+    nombre:     f => (f.nombre_razon||f.nombre_fantasia||'').toUpperCase(),
+    rut:        f => f.rut||'',
+    ejecutivo:  f => (f.ejecutivo_nombre||'').toUpperCase(),
+    comision:   f => Number(f.com_6_12||0)+Number(f.com_13_24||0)+Number(f.com_25_36||0)+Number(f.com_37||0),
+    resultado:  f => f.estado||'',
+    fecha:      f => new Date(f.estado==='APROBADA'?f.updated_at:(f.fecha_revision||f.updated_at)).getTime()||0,
+  };
+  const get = CAMPO[histSort]||CAMPO.fecha;
+  rows = rows.slice().sort((a,b)=>{ const va=get(a), vb=get(b); return (va<vb?-1:va>vb?1:0)*histDir; });
   const sel = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
     <span style="font-size:.82rem;color:#475569">Mostrar:</span>
     ${['todos','Todos','aprobados','Aprobados','rechazados','Rechazados'].reduce((acc,_,i,a)=>{ if(i%2) return acc; const v=a[i],l=a[i+1];
       return acc+`<button class="btn btn-sm ${histFiltro===v?'btn-navy':'btn-light'}" onclick="setHistFiltro('${v}')">${l}</button>`; },'')}
     <span style="margin-left:auto;font-size:.8rem;color:#94a3b8">${rows.length} ficha(s)</span></div>`;
   if (!rows.length){ $('contenido').innerHTML = sel+'<div class="vacio"><i class="bi bi-archive" style="font-size:1.6rem"></i><br>Sin aprobaciones históricas con ese criterio.</div>'; return; }
+  const th = (campo,label) => `<th style="cursor:pointer;user-select:none" onclick="setHistSort('${campo}')" title="Ordenar por ${label}">${label}${histIconoOrden(campo)}</th>`;
   $('contenido').innerHTML = sel + `<table class="tb"><thead><tr>
-    <th>Tipo</th><th>Concesionario</th><th>RUT</th><th>Ejecutivo</th><th>Comisión</th><th>Resultado</th><th>Fecha</th><th></th></tr></thead><tbody>${
+    ${th('tipo','Tipo')}${th('nombre','Concesionario')}${th('rut','RUT')}${th('ejecutivo','Ejecutivo')}${th('comision','Comisión')}${th('resultado','Resultado')}${th('fecha','Fecha')}<th></th></tr></thead><tbody>${
     rows.map(f=>{
       const aprob = f.estado==='APROBADA';
       const chip = aprob
