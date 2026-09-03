@@ -1034,8 +1034,16 @@ const auditoria = async (req, res) => {
     // SOLO llamadas reales a DealerNet (gastan saldo): se cuenta sobre dealernet_consultas,
     // NO sobre dealernet_informes (que es el repositorio). La reutilización del repositorio
     // nunca inserta en dealernet_consultas, por lo que no infla la auditoría.
-    const [prods] = await pool.query('SELECT codigo, nombre FROM dealernet_productos');
+    // Costo por informe = precio UF del tramo del plan contratado (mantenedor DealerNet → Costos),
+    // valorizado a la UF de hoy. Mismo criterio que la facturación mensual (calcularConsumoMes).
+    const [[cfgPlan]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='plan_uf'");
+    const plan_uf = Number(cfgPlan?.valor) || 40;
+    const colPrecio = COLS_UF[plan_uf] || 'precio_uf_40';
+    const [prods] = await pool.query(`SELECT codigo, nombre, ${colPrecio} AS precio_uf FROM dealernet_productos`);
     const nombreProd = c => (prods.find(p => String(p.codigo) === String(c)) || {}).nombre || c;
+    const precioProd = c => Number((prods.find(p => String(p.codigo) === String(c)) || {}).precio_uf || 0);
+    const { getUF } = require('../../../../shared/uf');
+    const ufHoy = (await getUF(new Date())) || 0;
     const [cons] = await pool.query(
       `SELECT c.id_usuario, c.productos, c.rut, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) usuario_nombre
        FROM dealernet_consultas c LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
@@ -1053,9 +1061,13 @@ const auditoria = async (req, res) => {
       }
     }
     const porUsuario = Object.values(usuarios)
-      .map(u => ({ id_usuario: u.id_usuario, usuario: u.usuario, total: u.total, ruts_unicos: u._ruts.size,
-        promedio_dia: +(u.total / dias).toFixed(2),
-        porTipo: Object.entries(u._porTipo).map(([codigo, n]) => ({ codigo, nombre: nombreProd(codigo), n })) }))
+      .map(u => {
+        const costo_uf = Object.entries(u._porTipo).reduce((s, [codigo, n]) => s + n * precioProd(codigo), 0);
+        return { id_usuario: u.id_usuario, usuario: u.usuario, total: u.total, ruts_unicos: u._ruts.size,
+          promedio_dia: +(u.total / dias).toFixed(2),
+          costo_uf: +costo_uf.toFixed(4), costo_clp: Math.round(costo_uf * ufHoy),
+          porTipo: Object.entries(u._porTipo).map(([codigo, n]) => ({ codigo, nombre: nombreProd(codigo), n })) };
+      })
       .sort((a, b) => b.total - a.total);
 
     // Auto-consultas (RUT propio) y consultas a otros usuarios de la empresa — últimos 90 días.
@@ -1076,7 +1088,7 @@ const auditoria = async (req, res) => {
       }
     }
     res.json({ success: true, data: {
-      dias, porUsuario,
+      dias, porUsuario, plan_uf, uf_hoy: ufHoy,
       autoConsulta: Object.values(propio).sort((a, b) => b.n - a.n),
       consultaEmpresa: Object.values(empresa).sort((a, b) => b.n - a.n),
     }, error: null });
