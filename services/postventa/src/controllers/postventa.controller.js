@@ -2376,14 +2376,20 @@ const getOrdenPagoComision = async (req, res) => {
                 existan (medido 25-08-2026). Formatear a texto antes de mezclar. */
              COALESCE(DATE_FORMAT(fc.fecha_factura,'%Y-%m-%d'), DATE_FORMAT(efa.fecha,'%Y-%m-%d')) AS fecha_factura,
              COALESCE(fc.created_at, efa.fecha) AS fac_recepcion,
-             fc.numero_factura AS numero_factura, fc.monto_bruto AS monto_factura,
-             fc.es_terceros AS es_terceros, fc.es_boleta AS es_boleta,
-             fc.impuesto_pct AS impuesto_pct, fc.impuesto_monto AS impuesto_monto, fc.monto_liquido AS monto_liquido,
+             fc.numero_factura AS numero_factura,
+             /* Los MONTOS de la factura viven SOLO en la titular (una factura por cartola);
+                la réplica los lee de ahí. Sin esto, si la primera op cargada era una réplica
+                la orden caía a su comisión y acusaba descuadre (Omar Vasconcello, 04-09-2026). */
+             ft.monto_bruto AS monto_factura,
+             fc.es_terceros AS es_terceros, fc.es_boleta AS es_boleta, COALESCE(fc.es_replica,0) AS es_replica,
+             ft.impuesto_pct AS impuesto_pct, ft.impuesto_monto AS impuesto_monto, ft.monto_liquido AS monto_liquido,
              DATEDIFF(CURDATE(), efa.fecha) AS dias
       FROM postventa_seguimiento s
       JOIN postventa_etapas efa
         ON efa.id_seguimiento = s.id AND efa.track='COMISION' AND efa.etapa='FACTURA RECIBIDA'
       LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
+      LEFT JOIN postventa_facturas_comision ft
+        ON ft.id_seguimiento = COALESCE(CASE WHEN fc.es_replica=1 THEN fc.id_titular END, fc.id_seguimiento)
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
       -- Fallback: créditos sin id_dealer → dealer por razón social del seguimiento
