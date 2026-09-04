@@ -5866,11 +5866,28 @@ async function buildVRentEj(soloRender){
         {label:'Rentabilidad perdida',data:serie('lucro'),borderColor:C.red,borderDash:[5,4],tension:.3,pointRadius:3}]},
       options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+_reCLP(c.raw)}}},
         scales:{y:{ticks:{callback:v=>_reM(v),color:'#888',font:{size:9}}},x:{ticks:{color:'#888',font:{size:9}}}}})}),
+    // La misma curva en %: cada mes, realizada y perdida sobre el POTENCIAL (realizada + perdida),
+    // igual que el cuadro "Realizado vs potencial" pero mes a mes. Las dos suman 100.
+    evolpct:()=>{
+      const sr=serie('rent'), sl=serie('lucro');
+      const pr=sr.map((r,i)=>{const p=r+sl[i];return p?Math.round(r/p*1000)/10:0;});
+      const pl=sl.map((l,i)=>{const p=sr[i]+l;return p?Math.round(l/p*1000)/10:0;});
+      const _lblPct={id:'repctl',afterDatasetsDraw(ch){const ctx=ch.ctx;ctx.save();ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+        ch.data.datasets.forEach((ds,di)=>{const meta=ch.getDatasetMeta(di);ctx.fillStyle=ds.borderColor;
+          meta.data.forEach((pt,i)=>{const v=ds.data[i];if(v>0)ctx.fillText(String(v).replace('.',',')+'%',pt.x,di===0?pt.y-7:pt.y+13);});});ctx.restore();}};
+      return {type:'line',plugins:[_lblPct],
+        data:{labels:m12,datasets:[
+          {label:'% realizado',data:pr,borderColor:C.green,backgroundColor:'rgba(67,160,71,.12)',fill:true,tension:.3,pointRadius:3},
+          {label:'% perdido',data:pl,borderColor:C.red,borderDash:[5,4],tension:.3,pointRadius:3}]},
+        options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+String(c.raw).replace('.',',')+'%'}}},
+          scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%',color:'#888',font:{size:9}}},x:{ticks:{color:'#888',font:{size:9}}}}})};
+    },
   };
-  window._RE_TITULOS={bar:'Rentabilidad realizada por ejecutivo · '+fil.lbl,evol:'Evolución mensual — realizada vs Rentabilidad perdida'};
+  window._RE_TITULOS={bar:'Rentabilidad realizada por ejecutivo · '+fil.lbl,evol:'Evolución mensual — realizada vs Rentabilidad perdida',evolpct:'Evolución mensual — % realizado vs % perdido del potencial'};
   _RE_CH.bar  =new Chart(document.getElementById('ch-re-bar'),  window._RE_CFG.bar());
   _RE_CH.evol =new Chart(document.getElementById('ch-re-evol'), window._RE_CFG.evol());
-  for(const k of ['bar','evol']){const cv=document.getElementById('ch-re-'+k);cv.style.cursor='zoom-in';cv.onclick=()=>_reAbrirPopup(k);}
+  _RE_CH.evolpct=new Chart(document.getElementById('ch-re-evolpct'), window._RE_CFG.evolpct());
+  for(const k of ['bar','evol','evolpct']){const cv=document.getElementById('ch-re-'+k);cv.style.cursor='zoom-in';cv.onclick=()=>_reAbrirPopup(k);}
 
   // ── Cuadro Realizado vs Potencial: cuánto se ganó, cuánto se dejó de ganar
   //    y cuánto habría sido el ingreso cursando todo por el lado más rentable.
