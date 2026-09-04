@@ -21,6 +21,13 @@ const { NOMBRE: ENTORNO } = require('./entorno');
 const { enFila } = require('./migrate');
 
 const HOST_ID = `${os.hostname()}-${crypto.randomBytes(4).toString('hex')}`;
+/* Servicio al que pertenece el proceso (Render: RENDER_SERVICE_ID; si no, el hostname).
+   Un deploy de Render levanta la instancia nueva y mantiene la vieja unos segundos
+   hasta que la nueva responde: dos latidos del MISMO servicio en ese cruce son un
+   relevo, no un doble host (falso positivo del 04-09-2026 al desplegar v222.28). */
+const SERVICIO = process.env.RENDER_SERVICE_ID || process.env.K_SERVICE || os.hostname();
+const RELEVO_MS = 10 * 60 * 1000;
+const ARRANQUE = Date.now();
 const CADA_MS = 60 * 1000;
 const VENTANA_VIVO_MIN = 3;
 const AVISO_CADA_MS = 6 * 60 * 60 * 1000;
@@ -41,22 +48,26 @@ enFila('host_latidos', async () => {
     ultimo_latido DATETIME     NOT NULL,
     KEY ix_latido (ultimo_latido)
   )`);
+  await pool.query('ALTER TABLE host_latidos ADD COLUMN IF NOT EXISTS servicio VARCHAR(120) NULL');
 });
 
 async function latir() {
   const motores = motoresActivos() ? 1 : 0;
   await pool.query(
-    `INSERT INTO host_latidos (host_id, hostname, entorno, motores, version, arrancado_at, ultimo_latido)
-     VALUES (?, ?, ?, ?, ?, NOW(), NOW())
-     ON DUPLICATE KEY UPDATE motores=VALUES(motores), version=VALUES(version), ultimo_latido=NOW()`,
-    [HOST_ID, os.hostname(), ENTORNO, motores, VERSION]);
+    `INSERT INTO host_latidos (host_id, hostname, entorno, motores, version, servicio, arrancado_at, ultimo_latido)
+     VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+     ON DUPLICATE KEY UPDATE motores=VALUES(motores), version=VALUES(version), servicio=VALUES(servicio), ultimo_latido=NOW()`,
+    [HOST_ID, os.hostname(), ENTORNO, motores, VERSION, SERVICIO]);
   await pool.query('DELETE FROM host_latidos WHERE ultimo_latido < NOW() - INTERVAL 1 DAY').catch(() => {});
 
-  const [otros] = await pool.query(
-    `SELECT host_id, hostname, entorno, version, arrancado_at, ultimo_latido
+  const [vivos] = await pool.query(
+    `SELECT host_id, hostname, entorno, version, servicio, arrancado_at, ultimo_latido
        FROM host_latidos
       WHERE motores = 1 AND ultimo_latido >= NOW() - INTERVAL ? MINUTE
       ORDER BY arrancado_at`, [VENTANA_VIVO_MIN]);
+  // Relevo de deploy: instancia vieja del MISMO servicio, dentro de los primeros minutos de este proceso
+  const enRelevo = Date.now() - ARRANQUE < RELEVO_MS;
+  const otros = vivos.filter(h => h.host_id === HOST_ID || !(enRelevo && h.servicio && h.servicio === SERVICIO));
   const doble = motores === 1 && otros.length > 1;
   estadoActual = { doble_host: doble, hosts_con_motores: otros.map(h => ({ ...h, yo: h.host_id === HOST_ID })) };
   if (!doble) return;
