@@ -67,7 +67,9 @@ async function latir() {
       ORDER BY arrancado_at`, [VENTANA_VIVO_MIN]);
   // Relevo de deploy: instancia vieja del MISMO servicio, dentro de los primeros minutos de este proceso
   const enRelevo = Date.now() - ARRANQUE < RELEVO_MS;
-  const otros = vivos.filter(h => h.host_id === HOST_ID || !(enRelevo && h.servicio && h.servicio === SERVICIO));
+  // Respaldo: filas sin `servicio` (procesos anteriores a la columna) → se deduce del hostname de Render (srv-<id>-<pod>)
+  const servicioDe = h => h.servicio || (String(h.hostname || '').match(/^(srv-[a-z0-9]+)/) || [])[1] || null;
+  const otros = vivos.filter(h => h.host_id === HOST_ID || !(enRelevo && servicioDe(h) && servicioDe(h) === SERVICIO));
   const doble = motores === 1 && otros.length > 1;
   estadoActual = { doble_host: doble, hosts_con_motores: otros.map(h => ({ ...h, yo: h.host_id === HOST_ID })) };
   if (!doble) return;
