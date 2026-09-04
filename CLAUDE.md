@@ -208,6 +208,10 @@ correos programados y cobranza.
 - `opts.arranqueFn` existe porque varias tareas hacen algo distinto al arrancar que en cada
   vuelta (`indicadores-sync` se pone al día con `force`). Migrar una sin eso le cambia la
   conducta en silencio.
+- **Alerta de doble host** (`shared/latido-host.js`, 04-09-2026): cada proceso late por minuto en
+  `host_latidos`; si OTRO host con motores encendidos late contra la misma base, correo a
+  `ALERTA_ERRORES_MAIL` y `/api/health → doble_host: true`. Nació porque el servicio viejo de
+  Render revivió el 12-08 con motores activos y nadie lo notó en 23 días.
 
 ## Regla de Breadcrumbs (NO negociable — auditado 2026-07-29)
 1. **Toda página visible tiene miga completa**: `Inicio › [Sección] › Título`, con links

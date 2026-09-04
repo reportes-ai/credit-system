@@ -39,6 +39,7 @@ app.use(express.json({
 }));
 app.use(require('../../shared/presencia').middleware); // telemetría "conectados" (Cuadro de Mando)
 require('../../shared/uptime');                         // monitor de uptime por servicio (cada 5 min → uptime_checks)
+require('../../shared/latido-host');                    // alerta si DOS procesos con motores laten contra la misma base (host_latidos)
 require('../../shared/vigia-relojes');                  // chequeo diario 08:00: relojes coherentes, sin marcas del futuro
 
 // ── Sanitizar errores 500: el detalle técnico va al log, nunca al cliente ──
@@ -129,6 +130,10 @@ app.get('/api/health', async (req, res) => {
     // salen los que contactan clientes. El nombre dice "apagados" porque leer
     // `motores: [...]` invitaba a entenderlo justo al revés.
     motores_apagados: require('../../shared/scheduler').listar().filter(m => !m.activo).map(m => m.nombre),
+    /* ¿Hay OTRO proceso con motores encendidos contra esta misma base? (latido cada
+       minuto en `host_latidos`). true = cada reloj dispara dos veces: revisar Render. */
+    doble_host: require('../../shared/latido-host').estado().doble_host,
+    hosts_con_motores: require('../../shared/latido-host').estado().hosts_con_motores.map(h => `${h.hostname}${h.yo ? ' (este)' : ''} ${h.version || ''}`.trim()),
     /* ¿Este host alcanza el bucket de documentos? Importa sobre todo en
        contingencia: si `activo` es false, los documentos que ya se movieron al
        bucket no se pueden abrir desde acá (los que siguen en la base, sí). */
