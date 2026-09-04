@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — Pagos Recurrentes: inscripción de pagos periódicos (arriendos, servicios) con proveedor de la base, moneda de origen (CLP/UF/UTM/USD), glosa con {MES} variable; el motor genera la ODP el día del vencimiento al tipo de cambio del día, avisa a Tesorería y al proveedor al pagarse -->
+<!-- v1.1 — Pagos Recurrentes (v1.1: "Quién retiene" en boletas de honorarios + A pagar en la vista previa): inscripción de pagos periódicos (arriendos, servicios) con proveedor de la base, moneda de origen (CLP/UF/UTM/USD), glosa con {MES} variable; el motor genera la ODP el día del vencimiento al tipo de cambio del día, avisa a Tesorería y al proveedor al pagarse -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -107,7 +107,8 @@
       <li><b>Moneda y monto</b> → la conversión usa la UF del motor único y la UTM / dólar del <a href="/mantenedores/uf/">mantenedor de indicadores</a> del día de emisión. Sin cotización cargada, la orden NO se emite y se reintenta al día siguiente.</li>
       <li><b>Proveedor</b> → RUT, banco y cuenta se leen en vivo de <a href="/ordenes-pago/proveedores/">Proveedores</a> (una sola fuente); el correo del proveedor es el que recibe el aviso de pago (plantilla <code>pago_recurrente_pagado</code>).</li>
       <li><b>Cuenta de cargo</b> → sale del mantenedor <a href="/mantenedores/cuentas-bancarias/">Cuentas Bancarias</a> filtrado por la moneda del pago (USD → cuentas en dólares; pesos, UF y UTM → cuentas en pesos). Queda declarada en la ODP y el asiento del pago acredita ese banco; el cajero puede cambiarla al pagar. Vacía = la elige el cajero.</li>
-      <li><b>Tipo de documento</b> → define IVA / retención con el mismo motor de la emisión manual de ODP; el monto inscrito es lo que se paga (bruto).</li>
+      <li><b>Tipo de documento</b> → define IVA / retención con el mismo motor de la emisión manual de ODP; el monto inscrito es el bruto.</li>
+      <li><b>Quién retiene</b> (solo Boleta de Honorarios) → <i>AutoFácil retiene</i>: la ODP sale por el líquido (bruto − retención según el <a href="/mantenedores/impuestos/">mantenedor de Impuestos</a>) y la retención queda para el F29; <i>el emisor retiene</i>: la ODP sale por el total de la boleta, sin descuento. La vista previa muestra el A pagar antes de grabar.</li>
       <li><b>El pago</b> se registra desde la <a href="/ordenes-pago/historial/">Caja</a> como cualquier ODP (segregación de funciones incluida) y es ese flujo el que contabiliza el egreso.</li>
       <li><b>Arriendos de parques</b> → los arriendos fijos del mantenedor <a href="/mantenedores/parques/">Arriendos y Comisiones Parque y Calle</a> se pagan por acá el día 6 de cada mes; con eso la cartola y la ODP de <a href="/postventa/comisiones-parques/">Comisiones Parques</a> salen SOLO con las comisiones (interruptor <code>parques_arriendo_recurrente</code> en la configuración de Post Venta; los meses ya congelados no cambian).</li>
       <li><b>Respaldos que llegan después</b> → la factura o cuenta se adjunta a la ODP desde el Historial con "Adjuntar respaldo", en cualquier estado, incluso pagada.</li>
@@ -139,10 +140,15 @@
 
       <div class="g4"><label>Glosa del pago * <span style="text-transform:none;font-weight:600;color:#94a3b8">variables: {MES} {MES_ANTERIOR} {AÑO} {MES_NUM}</span></label>
         <input id="fGlosa" maxlength="300" placeholder="Ej: Arriendo oficina {MES} {AÑO}" oninput="previa()"></div>
-      <div><label>Tipo de documento</label><select id="fDoc"></select></div>
+      <div><label>Tipo de documento</label><select id="fDoc" onchange="toggleRet();previa()"></select></div>
       <div><label>Moneda *</label><select id="fMon" onchange="filtrarCtas();previa()"></select></div>
-      <div><label>Monto en moneda de origen *</label><input id="fMonto" inputmode="decimal" placeholder="0,00" oninput="previa()"></div>
+      <div><label>Monto en moneda de origen * <span id="montoHint" style="text-transform:none;font-weight:600;color:#94a3b8"></span></label><input id="fMonto" inputmode="decimal" placeholder="0,00" oninput="previa()"></div>
       <div><label>Próximo pago *</label><input type="date" id="fProx" onchange="ajustarProx()"></div>
+      <div id="retWrap" class="g2" style="display:none"><label>Quién retiene (boleta de honorarios) *</label>
+        <select id="fRet" onchange="previa()">
+          <option value="0">AutoFácil retiene — se paga el líquido (bruto − retención)</option>
+          <option value="1">El emisor retiene — se paga el total de la boleta</option>
+        </select></div>
       <div><label>Último pago</label><input type="date" id="fUlt"></div>
       <div class="g2"><label>Cuenta de cargo (se debita de) <span style="text-transform:none;font-weight:600;color:#94a3b8" id="ctaHint"></span></label><select id="fCta"><option value="">— la elige el cajero al pagar —</option></select></div>
       <div class="g4"><div class="previa" id="previa">Vista previa: completa moneda, monto y glosa.</div></div>
@@ -257,13 +263,25 @@ function previa(){
   prevTimer = setTimeout(async () => {
     const mon = document.getElementById('fMon').value, monto = Number(String(document.getElementById('fMonto').value).replace(',','.'))||0;
     const glosa = document.getElementById('fGlosa').value, fecha = document.getElementById('fProx').value || hoyISO();
+    const doc = document.getElementById('fDoc').value, ret = document.getElementById('fRet').value;
     const el = document.getElementById('previa');
-    const j = await api('GET', `/api/pagos-recurrentes/previa?moneda=${mon}&glosa=${encodeURIComponent(glosa)}&fecha=${fecha}`);
+    const j = await api('GET', `/api/pagos-recurrentes/previa?moneda=${mon}&glosa=${encodeURIComponent(glosa)}&fecha=${fecha}&monto=${monto}&tipo_documento=${encodeURIComponent(doc)}&emisor_retiene=${ret}`);
     if (!j || !j.success) { el.textContent = 'Vista previa: ' + (j && j.error || 'sin datos'); el.style.color='#b91c1c'; return; }
     el.style.color = '#166534';
-    const tc = Number(j.data.tipo_cambio);
-    el.innerHTML = `<b>Glosa que saldrá en la ODP:</b> ${escH(j.data.glosa)||'—'}<br><b>Al tipo de cambio de hoy:</b> ${mon==='CLP' ? fmtCLP(monto) : `${fmtOrigen(monto,mon)} × $${tc.toLocaleString('es-CL',{maximumFractionDigits:2})} = <b>${fmtCLP(monto*tc)}</b>`} <span style="color:#64748b">(el día del vencimiento se recalcula con la cotización de ese día)</span>`;
+    const tc = Number(j.data.tipo_cambio), m = j.data.montos;
+    // Boleta: el motor dice cuánto se paga según quién retiene (mismo cálculo que la ODP)
+    const pagar = m && m.clase==='RET'
+      ? `<br><b>A pagar:</b> ${m.emisor_retiene ? `<b>${fmtCLP(m.aPagar)}</b> — total de la boleta, la retención la declara el emisor`
+                                                : `bruto ${fmtCLP(m.bruto)} − retención ${m.pct}% ${fmtCLP(m.imp)} = <b>${fmtCLP(m.aPagar)}</b> líquido (la retención va al F29)`}`
+      : '';
+    el.innerHTML = `<b>Glosa que saldrá en la ODP:</b> ${escH(j.data.glosa)||'—'}<br><b>Al tipo de cambio de hoy:</b> ${mon==='CLP' ? fmtCLP(monto) : `${fmtOrigen(monto,mon)} × $${tc.toLocaleString('es-CL',{maximumFractionDigits:2})} = <b>${fmtCLP(monto*tc)}</b>`} <span style="color:#64748b">(el día del vencimiento se recalcula con la cotización de ese día)</span>${pagar}`;
   }, 300);
+}
+/* "Quién retiene" solo tiene sentido en Boleta de Honorarios. */
+function toggleRet(){
+  const esBol = document.getElementById('fDoc').value === 'Boleta de Honorarios';
+  document.getElementById('retWrap').style.display = esBol ? '' : 'none';
+  document.getElementById('montoHint').textContent = esBol ? '(bruto de la boleta)' : '';
 }
 
 /* Cuenta de cargo: del mantenedor Cuentas Bancarias, filtrada por la moneda del pago
@@ -293,6 +311,7 @@ function limpiar(){
   setProv(null); document.getElementById('provList').style.display='none';
   document.getElementById('fProx').value = hoyISO();
   document.getElementById('fDoc').value = 'Factura'; document.getElementById('fMon').value = 'CLP';
+  document.getElementById('fRet').value = '0'; toggleRet();
   filtrarCtas('');
   document.getElementById('previa').textContent = 'Vista previa: completa moneda, monto y glosa.';
 }
@@ -304,6 +323,7 @@ function abrirEditar(id){
   document.getElementById('fApodo').value = p.apodo; document.getElementById('fDesc').value = p.descripcion||'';
   document.getElementById('fPer').value = p.periodicidad; document.getElementById('fTipo').value = p.tipo_pago;
   document.getElementById('fDoc').value = p.tipo_documento||'Factura'; document.getElementById('fGlosa').value = p.glosa;
+  document.getElementById('fRet').value = Number(p.emisor_retiene) ? '1' : '0'; toggleRet();
   document.getElementById('fMon').value = p.moneda;
   // Decimales a la chilena (coma): 84,99 — el servidor y la vista previa aceptan coma o punto
   document.getElementById('fMonto').value = Number(p.monto_origen).toLocaleString('es-CL', { maximumFractionDigits: 4, useGrouping: false });
@@ -320,6 +340,7 @@ async function guardar(){
     apodo: document.getElementById('fApodo').value.trim(), descripcion: document.getElementById('fDesc').value.trim(),
     periodicidad: document.getElementById('fPer').value, tipo_pago: document.getElementById('fTipo').value,
     tipo_documento: document.getElementById('fDoc').value, id_proveedor: document.getElementById('fProvId').value,
+    emisor_retiene: document.getElementById('fRet').value,
     glosa: document.getElementById('fGlosa').value.trim(), moneda: document.getElementById('fMon').value,
     monto_origen: document.getElementById('fMonto').value, fecha_proximo_pago: document.getElementById('fProx').value,
     dia_pago: document.getElementById('fDia').value,

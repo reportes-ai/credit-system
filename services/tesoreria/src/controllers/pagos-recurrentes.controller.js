@@ -87,6 +87,9 @@ require('../../../../shared/migrate').enFila('pagos-recurrentes', async () => {
     // Cuenta corriente de cargo (mantenedor Cuentas Bancarias, filtrada por moneda CLP/USD): la ODP
     // nace con ella declarada y el asiento del pago acredita ese banco real.
     await pool.query('ALTER TABLE tesoreria_pagos_recurrentes ADD COLUMN IF NOT EXISTS id_cuenta_bancaria INT NULL');
+    // Boleta de Honorarios: quién retiene. 0 = AutoFácil retiene (se paga el líquido, la
+    // retención va al F29); 1 = el emisor retiene (se paga el total de la boleta).
+    await pool.query('ALTER TABLE tesoreria_pagos_recurrentes ADD COLUMN IF NOT EXISTS emisor_retiene TINYINT(1) NOT NULL DEFAULT 0');
 
     // Card en Tesorería + permisos (anti-hardcode: módulos y cards salen de la BD)
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Tesorería' OR ruta LIKE '/tesoreria%' LIMIT 1");
@@ -149,6 +152,16 @@ function conDia(iso, dia) {
   return `${y}-${String(m).padStart(2, '0')}-${String(Math.min(d, ultimo)).padStart(2, '0')}`;
 }
 
+// Montos de la ODP: mismo motor calcularDoc() de Órdenes de Pago (Máxima 1). El monto
+// inscrito es el BRUTO. Boleta con retención del emisor: no se descuenta nada y se paga
+// el total de la boleta (igual que en las comisiones de dealer con boleta).
+async function montosDoc(tipoDoc, montoCLP, emisorRetiene) {
+  const { calcularDoc } = require('../../../ordenes-pago/src/controllers/ordenes-pago.controller');
+  const m = await calcularDoc(tipoDoc || 'Factura', 'BRUTO', montoCLP);
+  if (m.clase === 'RET' && Number(emisorRetiene)) return { ...m, neto: m.bruto, imp: 0, aPagar: m.bruto, emisor_retiene: 1 };
+  return { ...m, emisor_retiene: 0 };
+}
+
 const fmtCLP = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
 const fmtOrigen = (n, mon) => mon === 'CLP' ? fmtCLP(n) : `${Number(n).toLocaleString('es-CL', { maximumFractionDigits: 4 })} ${mon}`;
 
@@ -164,12 +177,12 @@ async function generarUno(p, hoyISO, req) {
 
   const tc = await tipoCambio(p.moneda, hoyISO);
   const montoCLP = Math.round(Number(p.monto_origen) * tc);
-  const { calcularDoc, } = require('../../../ordenes-pago/src/controllers/ordenes-pago.controller');
-  const m = await calcularDoc(p.tipo_documento || 'Factura', 'BRUTO', montoCLP);   // el monto inscrito es lo que se paga
+  const m = await montosDoc(p.tipo_documento, montoCLP, p.emisor_retiene);   // el monto inscrito es el bruto
   const concepto = renderGlosa(p.glosa, venc);
   const destino = norm([prov.tipo_cuenta || (prov.numero_cuenta ? 'Cuenta Corriente' : null), prov.numero_cuenta].filter(Boolean).join(' ') + (prov.banco ? ' · ' + prov.banco : '')) || null;
   const detalleTC = p.moneda === 'CLP' ? '' : ` ${fmtOrigen(p.monto_origen, p.moneda)} × ${p.moneda === 'UF' || p.moneda === 'UTM' ? '$' + Number(tc).toLocaleString('es-CL', { maximumFractionDigits: 2 }) : '$' + Number(tc).toLocaleString('es-CL', { maximumFractionDigits: 2 })} (${p.moneda} del ${hoyISO.split('-').reverse().join('-')}) = ${fmtCLP(montoCLP)}.`;
   const obs = `Generada automáticamente por PAGOS RECURRENTES — «${p.apodo}» (${p.periodicidad.toLowerCase()}), vencimiento ${venc.split('-').reverse().join('-')}.${detalleTC}` +
+    (m.clase === 'RET' ? (m.emisor_retiene ? ' Boleta con retención del EMISOR: se paga el total de la boleta.' : ` Boleta con retención de AutoFácil (${m.pct}%): se paga el líquido.`) : '') +
     (p.descripcion ? `\n${p.descripcion}` : '');
 
   const [r] = await pool.query(
@@ -295,7 +308,8 @@ function validar(b) {
 // El próximo pago se acomoda al día de pago elegido (el mes lo pone la fecha, el día lo pone dia_pago).
 const campos = b => [norm(b.apodo), norm(b.descripcion) || null, String(b.periodicidad).toUpperCase(), parseInt(b.id_proveedor),
   b.tipo_pago, b.tipo_documento || 'Factura', norm(b.glosa), b.moneda, Number(String(b.monto_origen).replace(',', '.')),
-  b.fecha_ultimo_pago || null, conDia(b.fecha_proximo_pago, b.dia_pago), parseInt(b.dia_pago), parseInt(b.id_cuenta_bancaria) || null];
+  b.fecha_ultimo_pago || null, conDia(b.fecha_proximo_pago, b.dia_pago), parseInt(b.dia_pago), parseInt(b.id_cuenta_bancaria) || null,
+  (b.tipo_documento === 'Boleta de Honorarios' && Number(b.emisor_retiene)) ? 1 : 0];
 
 exports.crear = async (req, res) => {
   try {
@@ -305,7 +319,7 @@ exports.crear = async (req, res) => {
     const u = req.usuario || {};
     const [r] = await pool.query(
       `INSERT INTO tesoreria_pagos_recurrentes (apodo, descripcion, periodicidad, id_proveedor, tipo_pago, tipo_documento, glosa, moneda, monto_origen,
-         fecha_ultimo_pago, fecha_proximo_pago, dia_pago, id_cuenta_bancaria, creado_por, creado_nombre) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         fecha_ultimo_pago, fecha_proximo_pago, dia_pago, id_cuenta_bancaria, emisor_retiene, creado_por, creado_nombre) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [...campos(b), u.id_usuario || null, [u.nombre, u.apellido].filter(Boolean).join(' ')]);
     auditar({ req, accion: 'CREAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(r.insertId),
       detalle: `Inscribió pago recurrente «${norm(b.apodo)}» (${String(b.periodicidad).toUpperCase()}, ${b.monto_origen} ${b.moneda}, próximo ${b.fecha_proximo_pago})` });
@@ -319,7 +333,7 @@ exports.editar = async (req, res) => {
     // Editar un propuesto también lo confirma (alguien lo revisó).
     const [r] = await pool.query(
       `UPDATE tesoreria_pagos_recurrentes SET apodo=?, descripcion=?, periodicidad=?, id_proveedor=?, tipo_pago=?, tipo_documento=?, glosa=?, moneda=?, monto_origen=?,
-         fecha_ultimo_pago=?, fecha_proximo_pago=?, dia_pago=?, id_cuenta_bancaria=?, propuesto=0 WHERE id=?`, [...campos(b), id]);
+         fecha_ultimo_pago=?, fecha_proximo_pago=?, dia_pago=?, id_cuenta_bancaria=?, emisor_retiene=?, propuesto=0 WHERE id=?`, [...campos(b), id]);
     if (!r.affectedRows) return fail(res, 'Pago recurrente no encontrado', 404);
     auditar({ req, accion: 'EDITAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(id), detalle: `Editó «${norm(b.apodo)}»` });
     ok(res, { id });
@@ -363,7 +377,10 @@ exports.previa = async (req, res) => {
     const moneda = String(req.query.moneda || 'CLP').toUpperCase();
     const hoy = fc.hoyISO();
     const tc = await tipoCambio(moneda, hoy);
-    ok(res, { moneda, fecha: hoy, tipo_cambio: tc, glosa: renderGlosa(req.query.glosa || '', req.query.fecha || hoy) });
+    // Montos como saldrían hoy (mismo motor que la generación): bruto, impuesto/retención y A pagar.
+    const monto = Number(String(req.query.monto || '').replace(',', '.')) || 0;
+    const montos = monto > 0 ? await montosDoc(req.query.tipo_documento, Math.round(monto * tc), req.query.emisor_retiene) : null;
+    ok(res, { moneda, fecha: hoy, tipo_cambio: tc, glosa: renderGlosa(req.query.glosa || '', req.query.fecha || hoy), montos });
   } catch (e) { fail(res, e.message, 400); }
 };
 
