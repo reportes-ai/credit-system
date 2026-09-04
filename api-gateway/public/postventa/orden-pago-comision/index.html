@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.18 — la vista previa ya NO reserva el N° de ODP (POR ASIGNAR hasta emitir; el correo sale con el real) · v2.17 — resumen narrado desde el neto (+IVA / −retención / emisor retiene) con referencia bruta · v2.16 — cuadratura de boleta repone el IVA (bruto boleta = neto factura) antes de comparar contra las comisiones brutas · v2.15 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
+  <!-- v2.19 — los montos de la factura se toman de la op que TRAE el desglose (titular), sin depender del orden de carga · v2.18 — la vista previa ya NO reserva el N° de ODP (POR ASIGNAR hasta emitir; el correo sale con el real) · v2.17 — resumen narrado desde el neto (+IVA / −retención / emisor retiene) con referencia bruta · v2.16 — cuadratura de boleta repone el IVA (bruto boleta = neto factura) antes de comparar contra las comisiones brutas · v2.15 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -219,7 +219,12 @@ async function subirFacturaDoc(idSeg){
 // El total se reparte entre las comisiones de las operaciones cargadas (deben cuadrar).
 function docHTML(ops){
   if (!Array.isArray(ops)) ops = [ops];
-  const f0 = ops[0];
+  /* Los montos de la factura viven en la TITULAR del grupo (una factura por cartola).
+     El servidor ya se los copia a las réplicas, pero acá se elige además la op que
+     TRAE el desglose, sin depender del orden de carga: con la primera op cargada
+     siendo una réplica sin montos, la orden caía a su comisión y acusaba un
+     descuadre fantasma (Omar Vasconcello, 3 ops, 04-09-2026). */
+  const f0 = ops.find(o => o.monto_liquido != null) || ops.find(o => !Number(o.es_replica)) || ops[0];
   const iva = Number(IMPUESTOS.IVA)||19, ret = Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25;
   const esBoleta = !!f0.es_boleta;
   const pct0 = (f0.impuesto_pct != null) ? Number(f0.impuesto_pct) : (esBoleta ? ret : iva);
