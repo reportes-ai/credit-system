@@ -150,7 +150,14 @@ async function obtener({ ruta, blob }) {
   if (blob) return Buffer.isBuffer(blob) ? blob : Buffer.from(blob);
   if (ruta) {
     const b = bucket();
-    if (!b) throw new Error(`El documento vive en el bucket "${BUCKET || '(sin definir)'}" y este servidor no tiene acceso (${_motivo}).`);
+    if (!b) {
+      /* Marcado para que los controladores respondan 503 con la causa y no un 500
+         genérico: la alerta por correo debe decir "este host no tiene bucket"
+         (pasó con el host secundario de Render sin GCS_BUCKET, 04-09-2026). */
+      const e = new Error(`El documento vive en el bucket "${BUCKET || '(sin definir)'}" y este servidor no tiene acceso (${_motivo}).`);
+      e.code = 'SIN_ALMACEN'; e.status = 503;
+      throw e;
+    }
     const [buf] = await b.file(ruta).download();
     return buf;
   }
@@ -162,7 +169,12 @@ async function obtener({ ruta, blob }) {
  * archivo se sanea para la cabecera (comillas y no-ASCII rompen Content-Disposition).
  */
 async function servir(res, { ruta, blob, nombre, mime, adjunto = false }) {
-  const buf = await obtener({ ruta, blob });
+  let buf;
+  try { buf = await obtener({ ruta, blob }); }
+  catch (e) {
+    if (e.code === 'SIN_ALMACEN') { console.error('[almacen]', e.message); return res.status(503).json({ success: false, data: null, error: 'Este servidor no tiene acceso al almacén de documentos (sin GCS_BUCKET). Entra por el host oficial.' }); }
+    throw e;
+  }
   if (!buf) return res.status(404).json({ success: false, data: null, error: 'Archivo no encontrado' });
   const seguro = String(nombre || 'documento').replace(/"/g, '').replace(/[^\x20-\x7E]/g, '_');
   res.set('Content-Type', mime || 'application/octet-stream');

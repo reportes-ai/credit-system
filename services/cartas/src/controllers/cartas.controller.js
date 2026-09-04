@@ -2106,7 +2106,11 @@ const verDocumento = async (req, res) => {
     res.setHeader('Content-Type', d.mime || 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(fname)}`);
     res.send(contenido);
-  } catch (e) { console.error('[verDocumento]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+  } catch (e) {
+    console.error('[verDocumento]', e.message);
+    if (e.code === 'SIN_ALMACEN') return res.status(503).json({ success: false, data: null, error: 'Este servidor no tiene acceso al almacén de documentos (sin GCS_BUCKET). Entra por el host oficial.' });
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
 };
 
 
