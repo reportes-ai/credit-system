@@ -391,6 +391,12 @@ TiDB. Irrelevante para un respaldo que despierta de vez en cuando.
       esto**, así que el acceso de Pato es parte de la contingencia, no un trámite aparte.
 - [ ] **Ensayar la promoción completa una vez al año**, idealmente contra la base de staging
       para no duplicar motores. El ensayo del 04-08-2026 se hizo así y funcionó.
+- [x] ✅ **Alerta de doble host** (04-09-2026, `shared/latido-host.js`). Cada proceso late por
+      minuto en `host_latidos`; si otro host con motores encendidos late contra la misma base,
+      correo a `ALERTA_ERRORES_MAIL` y `/api/health → doble_host: true`. Nació porque el servicio
+      viejo de Render revivió el 12-08 con motores activos y corrió 23 días en paralelo sin que
+      nadie lo viera. **Al promover el standby, esta alerta debe sonar si Render sigue vivo** —
+      es la confirmación de que el orden "primero apagar, después levantar" se respetó.
 
 ---
 
