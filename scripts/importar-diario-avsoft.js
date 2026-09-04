@@ -99,6 +99,15 @@ function parseCSV(ruta) {
     return ++sig[k];
   }
 
+  /* ESTADO: el balance, el mayor y el cierre de mes solo suman 'CONTABILIZADO'.
+     La historia anterior a la APERTURA 2025 (T-1 ene-2025 ya trae esos saldos
+     acumulados) se guarda como 'VIGENTE': consultable en el diario, fuera de los
+     saldos — si entrara, cada saldo 2020-2024 contaría dos veces. Desde 2025 todo
+     va CONTABILIZADO. Lección del 04-09-2026: jul/ago-2026 se importaron VIGENTE
+     y el balance al 31-07 salió sin 256 comprobantes de julio. */
+  const APERTURA = '2025-01-01';
+  const estadoDe = fecha => fecha < APERTURA ? 'VIGENTE' : 'CONTABILIZADO';
+
   let insertados = 0, lineasIns = 0, saltadosCerrado = 0;
   // Orden cronológico para que el correlativo respete las fechas
   nuevos.sort((a, b) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0);
@@ -108,8 +117,8 @@ function parseCSV(ruta) {
     const numero = await siguienteNumero(c.tipo, c.anio);
     const [r] = await pool.query(
       `INSERT INTO ctb_comprobantes (tipo, anio, numero, fecha, glosa, estado, origen, origen_ref, total, creado_por)
-       VALUES (?,?,?,?,?, 'VIGENTE', 'AVSOFT', ?, ?, 'importar-diario-avsoft')`,
-      [c.tipo, c.anio, numero, c.fecha, c.glosa, c.ref, total]);
+       VALUES (?,?,?,?,?, ?, 'AVSOFT', ?, ?, 'importar-diario-avsoft')`,
+      [c.tipo, c.anio, numero, c.fecha, c.glosa, estadoDe(c.fecha), c.ref, total]);
     for (const l of c.lineas) {
       await pool.query(
         'INSERT INTO ctb_movimientos (id_comprobante, cuenta, glosa, debe, haber, rut) VALUES (?,?,?,?,?,?)',
