@@ -5887,6 +5887,27 @@ async function buildVRentEj(soloRender){
   _RE_CH.bar  =new Chart(document.getElementById('ch-re-bar'),  window._RE_CFG.bar());
   _RE_CH.evol =new Chart(document.getElementById('ch-re-evol'), window._RE_CFG.evol());
   _RE_CH.evolpct=new Chart(document.getElementById('ch-re-evolpct'), window._RE_CFG.evolpct());
+  // Lectura en palabras de la curva de %: tendencia (primer vs segundo semestre de la ventana),
+  // mejor y peor mes, y cómo viene el último mes contra el promedio. Sin IA: aritmética simple.
+  (function(){
+    const el=document.getElementById('re-lectura'); if(!el) return;
+    const sr=serie('rent'), sl=serie('lucro');
+    const pts=m12.map((m,i)=>{const p=sr[i]+sl[i];return {m, pct:p?sr[i]/p*100:null, ops:_RE.ops.filter(o=>o.mes===m).length};}).filter(x=>x.pct!=null);
+    if(pts.length<3){ el.textContent='Aún no hay meses suficientes para leer una tendencia.'; return; }
+    const f1=v=>v.toFixed(1).replace('.',',')+'%';
+    const mesLbl=m=>{const [y,mm]=m.split('-');return ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][Number(mm)-1]+'-'+y.slice(2);};
+    const prom=a=>a.reduce((s,x)=>s+x.pct,0)/a.length;
+    const mitad=Math.floor(pts.length/2), pA=prom(pts.slice(0,mitad)), pB=prom(pts.slice(mitad)), d=pB-pA;
+    const tend = Math.abs(d)<1 ? 'se mantiene <b>estable</b>' : (d>0 ? (d>=5?'muestra una <b>clara mejora</b>':'muestra una <b>leve mejora</b>') : (d<=-5?'muestra un <b>claro deterioro</b>':'muestra un <b>leve deterioro</b>'));
+    const mejor=pts.reduce((a,b)=>b.pct>a.pct?b:a), peor=pts.reduce((a,b)=>b.pct<a.pct?b:a);
+    const ult=pts[pts.length-1], promTot=prom(pts), du=ult.pct-promTot;
+    const ultTxt = Math.abs(du)<1 ? 'en línea con el promedio' : (du>0?'<b>por sobre</b> el promedio':'<b>por debajo</b> del promedio');
+    const enCurso = ult.ops<5 ? ' (mes en curso, pocas operaciones: la cifra todavía se mueve)' : '';
+    el.innerHTML='<b>Lectura:</b> el % realizado del potencial '+tend+' — promedio de '+f1(pA)+' en la primera mitad de la ventana a '+f1(pB)+' en la segunda. '
+      +'Mejor mes <b>'+mesLbl(mejor.m)+'</b> ('+f1(mejor.pct)+'), peor <b>'+mesLbl(peor.m)+'</b> ('+f1(peor.pct)+'). '
+      +'El último mes, '+mesLbl(ult.m)+', va en '+f1(ult.pct)+', '+ultTxt+' de '+f1(promTot)+enCurso+'. '
+      +'Cada punto de % perdido es rentabilidad que dejó la otra financiera y no se tomó.';
+  })();
   for(const k of ['bar','evol','evolpct']){const cv=document.getElementById('ch-re-'+k);cv.style.cursor='zoom-in';cv.onclick=()=>_reAbrirPopup(k);}
 
   // ── Cuadro Realizado vs Potencial: cuánto se ganó, cuánto se dejó de ganar
