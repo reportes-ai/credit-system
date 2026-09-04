@@ -1334,6 +1334,30 @@ function buildV1b() {
     <tbody>${ejRows2}</tbody>
     <tfoot><tr><td>Total</td><td>${totEJ2.ops}</td><td>${fM(totEJ2.fin)}</td><td>${fM(totEJ2.ops?totEJ2.fin/totEJ2.ops:0)}</td><td>${fM(totEJ2.saldo)}</td><td>${fM(totEJ2.cd)}</td><td>${fM(totEJ2.afa)}</td></tr></tfoot>`;
 
+  // Jefes Comerciales — Otorgados: la misma tabla de arriba agrupada por el jefe
+  // de cada ejecutivo (supervisor de la ficha de Usuarios). Los externos Autofin
+  // y quien no tiene jefe asignado van en "Sin jefe / Externos". Misma forma
+  // Nombre | Q | Monto Fin. para que la camarita de WhatsApp la capture igual.
+  const jcOt = {};
+  topEj.forEach(([nombre, v]) => {
+    const jefe = v.externo ? 'Sin jefe / Externos' : ((window.EJ_JEFE || {})[String(nombre).trim().toUpperCase()] || 'Sin jefe / Externos');
+    if (!jcOt[jefe]) jcOt[jefe] = {ops:0, fin:0, saldo:0, cd:0, afa:0, ej:0, ejConOps:0};
+    jcOt[jefe].ops += v.ops; jcOt[jefe].fin += v.fin; jcOt[jefe].saldo += v.saldo; jcOt[jefe].cd += v.cd; jcOt[jefe].afa += v.afa;
+    if (!v.externo) { jcOt[jefe].ej++; if (v.ops) jcOt[jefe].ejConOps++; }
+  });
+  const topJc = Object.entries(jcOt).sort((a,b)=>b[1].ops-a[1].ops||b[1].fin-a[1].fin);
+  const jcRows = topJc.map(([nombre,v],i)=>`<tr${v.ops?'':' style="color:#94a3b8"'}>
+    <td><span class="rank">${i+1}.</span>${nombre}</td>
+    <td>${v.ops}</td><td>${fM(v.fin)}</td><td>${fM(v.ops?v.fin/v.ops:0)}</td>
+    <td>${v.ejConOps}/${v.ej}</td><td>${fM(v.saldo)}</td><td>${fM(v.cd)}</td><td>${fM(v.afa)}</td>
+  </tr>`).join('');
+  const totJc = topJc.reduce((a,[,v])=>({ops:a.ops+v.ops,fin:a.fin+v.fin,saldo:a.saldo+v.saldo,cd:a.cd+v.cd,afa:a.afa+v.afa,ej:a.ej+v.ej,ejConOps:a.ejConOps+v.ejConOps}),{ops:0,fin:0,saldo:0,cd:0,afa:0,ej:0,ejConOps:0});
+  const tJc = document.getElementById('t-jc1b');
+  if (tJc) tJc.innerHTML = `
+    <thead><tr><th>Jefe Comercial</th><th>Q Otorgados</th><th>Monto Fin.</th><th>Prom. Fin.</th><th title="Ejecutivos con otorgados / ejecutivos del equipo">Ejec. c/op</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead>
+    <tbody>${jcRows}</tbody>
+    <tfoot><tr><td>Total</td><td>${totJc.ops}</td><td>${fM(totJc.fin)}</td><td>${fM(totJc.ops?totJc.fin/totJc.ops:0)}</td><td>${totJc.ejConOps}/${totJc.ej}</td><td>${fM(totJc.saldo)}</td><td>${fM(totJc.cd)}</td><td>${fM(totJc.afa)}</td></tr></tfoot>`;
+
   // Estado comercial (solo otorgados y relacionados)
   // Estado Otorgados — misma lógica: INGRESADAS=todos, APROBADAS=aprobado+otorgado
   const grpEst1b = {INGRESADAS:0,APROBADAS:0,OTORGADAS:0,PENDIENTE:0,RECHAZADAS:0,ANULADAS:0};
@@ -1465,6 +1489,9 @@ async function cargarEjecutivosActivos() {
     if (rc && rc.success && Array.isArray(rc.data)) {
       window.EJ_ACTIVOS = rc.data.filter(e => e.estado === 'activo').map(e => e.nombre).filter(Boolean);
       window.EJ_NUESTROS = new Set(rc.data.map(e => String(e.nombre).trim().toUpperCase()));
+      // ejecutivo → Jefe Comercial (supervisor de la ficha de Usuarios), para el ranking por jefe
+      window.EJ_JEFE = {};
+      rc.data.forEach(e => { if (e.nombre && e.jefe) window.EJ_JEFE[String(e.nombre).trim().toUpperCase()] = e.jefe; });
     }
     if (ru && ru.success && Array.isArray(ru.data))
       ru.data.forEach(e => { if (e.nombre) window.EJ_NUESTROS.add(String(e.nombre).trim().toUpperCase()); });

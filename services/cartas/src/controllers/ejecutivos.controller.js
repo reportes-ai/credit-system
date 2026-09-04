@@ -32,7 +32,10 @@ const getAll = async (req, res) => {
       `SELECT u.id_usuario AS id,
               -- Convención: PRIMER nombre + apellido PATERNO (nombre completo solo en documentos formales)
               TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1), ' ', SUBSTRING_INDEX(TRIM(COALESCE(u.apellido,'')),' ',1))) AS nombre,
-              u.email AS mail, u.telefono AS tel, u.estado
+              u.email AS mail, u.telefono AS tel, u.estado,
+              -- Jefe Comercial (supervisor de la ficha): el dashboard agrupa el ranking de otorgados por jefe
+              (SELECT TRIM(CONCAT(SUBSTRING_INDEX(TRIM(s.nombre),' ',1), ' ', SUBSTRING_INDEX(TRIM(COALESCE(s.apellido,'')),' ',1)))
+                 FROM usuarios s WHERE s.id_usuario = u.id_supervisor) AS jefe
          FROM usuarios u
          JOIN perfiles p ON p.id_perfil = u.id_perfil
         WHERE (u.estado = 'activo' OR ?)
