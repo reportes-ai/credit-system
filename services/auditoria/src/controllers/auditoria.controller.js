@@ -201,10 +201,16 @@ const getBitacoraDealers = async (req, res) => {
     try {
       const c = cond('l.created_at');
       const [rows] = await pool.query(
-        `SELECT l.created_at AS fecha, l.accion, l.detalle, l.ip, cu.nombre AS dealer
-         FROM portal_dealer_log l LEFT JOIN ar_dealer_cuentas cu ON cu.id = l.id_cuenta
+        /* Sin id_cuenta = token "Ver como dealer" / demo emitido desde adentro (atención
+           remota): el dealer sale de la ficha y se marca como vista interna. Antes mostraba
+           "—" y no se sabía de qué dealer eran las acciones (02-09-2026). */
+        `SELECT l.created_at AS fecha, l.accion, l.detalle, l.ip, l.id_cuenta,
+                COALESCE(cu.nombre, d.nombre_razon, d.nombre_indexa) AS dealer
+         FROM portal_dealer_log l
+         LEFT JOIN ar_dealer_cuentas cu ON cu.id = l.id_cuenta
+         LEFT JOIN dealers d ON d.id_dealer = l.id_dealer
          ${c.w} ORDER BY l.id DESC LIMIT 2000`, c.v);
-      rows.forEach(r => eventos.push({ categoria: 'Acción', fecha: r.fecha, dealer: r.dealer || '—', accion: accionLabel(r.accion), detalle: r.detalle || '', resultado: 'OK', ip: r.ip || '' }));
+      rows.forEach(r => eventos.push({ categoria: 'Acción', fecha: r.fecha, dealer: (r.dealer || '—') + (r.id_cuenta ? '' : ' · vista interna (Ver como)'), accion: accionLabel(r.accion), detalle: r.detalle || '', resultado: 'OK', ip: r.ip || '' }));
     } catch (_) {}
     try {
       const c = cond('u.ts');
