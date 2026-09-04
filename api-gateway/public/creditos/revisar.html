@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v3.1 — boton "Ver Carta de Aprobación" junto a Editar Crédito: abre la carta que creó la operación con sus documentos adjuntos (/aprobaciones/?carta=ID) · v3.0 — boton Rechazar (con motivo obligatorio) en toda operacion propia en curso, junto al boton de la etapa · v2.9 — rotulos: Etapa del Crédito (antes "Estado") · v2.8 — navbar migrada al componente topnav (avatar, campanita y Salir) · v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
+<!-- v3.2 — barra de acciones en UNA sola línea (sin wrap, botones más compactos, "Ver Carta") · v3.1 — boton "Ver Carta de Aprobación" junto a Editar Crédito: abre la carta que creó la operación con sus documentos adjuntos (/aprobaciones/?carta=ID) · v3.0 — boton Rechazar (con motivo obligatorio) en toda operacion propia en curso, junto al boton de la etapa · v2.9 — rotulos: Etapa del Crédito (antes "Estado") · v2.8 — navbar migrada al componente topnav (avatar, campanita y Salir) · v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -128,10 +128,10 @@
   .det-total { display:flex; justify-content:space-between; align-items:center; padding:6px 0 0; margin-top:4px; border-top:2px solid #bfdbfe; font-size:.88rem; font-weight:800; color:var(--navy); }
 
   /* ── Action footer ── */
-  .action-bar { position:sticky; bottom:0; background:#fff; border-top:1.5px solid var(--border); padding:14px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; box-shadow:0 -4px 16px rgba(0,0,0,.07); }
-  .action-bar-left  { display:flex; gap:10px; align-items:center; }
-  .action-bar-right { display:flex; gap:10px; align-items:center; }
-  .btn-accion { border:none; border-radius:9px; padding:10px 20px; font-size:.88rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:opacity .15s; }
+  .action-bar { position:sticky; bottom:0; background:#fff; border-top:1.5px solid var(--border); padding:14px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:nowrap; gap:8px; box-shadow:0 -4px 16px rgba(0,0,0,.07); }
+  .action-bar-left  { display:flex; gap:8px; align-items:center; }
+  .action-bar-right { display:flex; gap:8px; align-items:center; }
+  .btn-accion { border:none; border-radius:9px; padding:9px 14px; font-size:.84rem; white-space:nowrap; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:opacity .15s; }
   .btn-accion:hover { opacity:.88; }
   .btn-mini-ok, .btn-mini-no { border:none; border-radius:6px; padding:2px 9px; font-size:.72rem; font-weight:700; cursor:pointer; margin-left:2px; }
   .btn-mini-ok { background:#dcfce7; color:#15803d; }
@@ -838,7 +838,7 @@ function renderPagina(c, ant, com) {
       <button class="btn-accion" style="background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff"
         title="Ver la carta de aprobación ${c.op_carta ? 'N° '+c.op_carta : ''} y sus documentos adjuntos"
         onclick="window.open('/aprobaciones/?carta=${c.id_carta}','_blank')">
-        <i class="bi bi-file-earmark-text"></i>Ver Carta de Aprobación
+        <i class="bi bi-file-earmark-text"></i>Ver Carta
       </button>` : ''}
     </div>
     <div class="action-bar-right">
