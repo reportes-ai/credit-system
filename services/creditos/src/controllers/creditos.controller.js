@@ -594,7 +594,13 @@ const getById = async (req, res) => {
                   ELSE NULL
                 END)                                               AS estado_cartera_disp,
               COALESCE(cl.rut,             '') AS rut_cliente,
-              COALESCE(cl.nombre_completo, '') AS nombre_cliente
+              COALESCE(cl.nombre_completo, '') AS nombre_cliente,
+              -- Carta de aprobación VIGENTE que creó esta operación (una corrección
+              -- deja la anterior REEMPLAZADA; se prefiere la que no fue reemplazada).
+              (SELECT ca.id FROM cartas_aprobacion ca WHERE ca.id_credito_creado = ob.id
+                 ORDER BY (ca.reemplazada_por_id IS NULL) DESC, ca.id DESC LIMIT 1) AS id_carta,
+              (SELECT ca.op_carta FROM cartas_aprobacion ca WHERE ca.id_credito_creado = ob.id
+                 ORDER BY (ca.reemplazada_por_id IS NULL) DESC, ca.id DESC LIMIT 1) AS op_carta
        FROM creditos ob
        LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
        WHERE ob.id = ?`,

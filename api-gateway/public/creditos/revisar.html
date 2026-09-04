@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v3.0 — boton Rechazar (con motivo obligatorio) en toda operacion propia en curso, junto al boton de la etapa · v2.9 — rotulos: Etapa del Crédito (antes "Estado") · v2.8 — navbar migrada al componente topnav (avatar, campanita y Salir) · v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
+<!-- v3.1 — boton "Ver Carta de Aprobación" junto a Editar Crédito: abre la carta que creó la operación con sus documentos adjuntos (/aprobaciones/?carta=ID) · v3.0 — boton Rechazar (con motivo obligatorio) en toda operacion propia en curso, junto al boton de la etapa · v2.9 — rotulos: Etapa del Crédito (antes "Estado") · v2.8 — navbar migrada al componente topnav (avatar, campanita y Salir) · v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -833,6 +833,12 @@ function renderPagina(c, ant, com) {
       <button class="btn-accion" style="background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff"
         onclick="abrirEditBroker()">
         <i class="bi bi-pencil-square"></i>Editar Crédito
+      </button>` : ''}
+      ${c.id_carta ? `
+      <button class="btn-accion" style="background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff"
+        title="Ver la carta de aprobación ${c.op_carta ? 'N° '+c.op_carta : ''} y sus documentos adjuntos"
+        onclick="window.open('/aprobaciones/?carta=${c.id_carta}','_blank')">
+        <i class="bi bi-file-earmark-text"></i>Ver Carta de Aprobación
       </button>` : ''}
     </div>
     <div class="action-bar-right">
