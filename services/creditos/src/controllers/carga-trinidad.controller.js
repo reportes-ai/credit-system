@@ -296,11 +296,15 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
       const fechaCurse   = normDate(get('Fecha Curse'));
       const fechaIngreso = normDate(get('Fecha Ingreso'));
       const fechaBase    = fechaCurse || fechaIngreso;
-      // Período REAL desde la columna MES (INDEXA estampa Fecha Curse = 01/06).
-      // Si viene MES, manda MES y la fecha de otorgamiento = último día de ese mes.
+      /* FECHA CURSE MANDA (regla de negocio desde ago-26, shared/mes-atribucion.js).
+         La columna MES es solo respaldo cuando no hay Fecha Curse: la regla antigua
+         (MES manda, fecha = fin de mes) venía de INDEXA, que estampaba Fecha Curse
+         falsa. Con Trinidad la Fecha Curse es real, y MES trae el mes de INGRESO:
+         las 59 ops nuevas del 01-09-2026 quedaron con 31-08 sin haber cursado. */
       const mesTxt       = parseMesTxt(get('MES'));
-      const mes          = mesTxt || (fechaBase ? fechaBase.slice(0, 7) + '-01' : null);
-      const fechaOtorgado = mesTxt ? finDeMes(mesTxt) : fechaCurse;
+      const mes          = fechaCurse ? fechaCurse.slice(0, 7) + '-01'
+                         : (mesTxt || (fechaBase ? fechaBase.slice(0, 7) + '-01' : null));
+      const fechaOtorgado = fechaCurse || (mesTxt ? finDeMes(mesTxt) : null);
 
       const estadoCredito = mapEstado(estadoTri, mapaEstados);
       // Derivar estado_eval (usado por el dashboard) desde estado_credito
@@ -718,12 +722,18 @@ exports.importar = async (req, res) => {
             `UPDATE creditos SET estado_autofin = ?, ejecutivo_tri = ?,
                ${retrocedeEq ? '' : `estado_credito = ?, estado_eval = ?, ${SET_ESTADO_SQL},`}
                id_cliente = COALESCE(id_cliente, ?),
-               fecha_otorgado = COALESCE(fecha_otorgado, ?),
-               mes            = COALESCE(mes, ?), updated_at = NOW()
+               /* La Fecha Curse del archivo manda si acá no hay fecha o la que hay es
+                  ANTERIOR a la creación (prellenada con fin de mes por la regla MES
+                  antigua: las ops del 01-09-2026 quedaron con 31-08). mes va ANTES
+                  porque MySQL evalúa el SET de izquierda a derecha. */
+               mes            = CASE WHEN ? IS NOT NULL AND (fecha_otorgado IS NULL OR fecha_otorgado < DATE(created_at)) THEN ? ELSE COALESCE(mes, ?) END,
+               fecha_otorgado = CASE WHEN ? IS NOT NULL AND (fecha_otorgado IS NULL OR fecha_otorgado < DATE(created_at)) THEN ? ELSE fecha_otorgado END,
+               updated_at = NOW()
              WHERE id_financiera = ? AND financiera != 'NO APLICA'`,
             [f.estado_autofin, f.ejecutivo_tri,
              ...(retrocedeEq ? [] : [f.estado_credito, f.estado_eval, f.estado_credito || null]), idCliente,
-             fechaEq, fechaEq ? fechaEq.slice(0, 7) + '-01' : null, String(f.num_op)]
+             fechaEq, fechaEq ? fechaEq.slice(0, 7) + '-01' : null, fechaEq ? fechaEq.slice(0, 7) + '-01' : null,
+             fechaEq, fechaEq, String(f.num_op)]
           );
           actualizados++;
           // Diferencias de montos contra el archivo → cola para resolver a mano
@@ -803,7 +813,10 @@ exports.importar = async (req, res) => {
               f.estado_autofin, f.estado_credito, f.estado_eval,
               f.producto, f.ejecutivo, f.ejecutivo_tri, f.automotora,
               f.valor_vehiculo, f.pie, f.saldo_precio,
-              f.monto_financiado, f.fecha_otorgado, f.mes,
+              // Fecha de otorgamiento SOLO si la fila viene cursada: una op ingresada
+              // sin cursar no tiene fecha de curse todavía (la pone el export siguiente
+              // o el otorgar de la carta). `mes` sí se conserva: ubica la op en el período.
+              f.monto_financiado, (f.estado_credito || '').toLowerCase() === 'otorgado' ? f.fecha_otorgado : null, f.mes,
               f.marca, f.modelo, f.vendedor, idCliente,
             ]
           );

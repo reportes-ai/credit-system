@@ -915,7 +915,16 @@ const otorgar = async (req, res) => {
       if (cond.length) {
         await pool.query(
           `UPDATE creditos SET ${SET_ETAPA_SQL},
-                  fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()),
+                  /* Fecha de curse = HOY si no hay fecha o si la que hay es ANTERIOR a la
+                     creación del crédito: la carga Trinidad prellenaba fin de mes (MES del
+                     export) en ops aún no cursadas y la op quedaba atribuida al mes anterior
+                     (26090047, 05-09-2026: cursó en septiembre y caía en agosto). */
+                  /* mes va ANTES: MySQL evalúa el SET de izquierda a derecha y el segundo
+                     CASE vería la fecha_otorgado ya reemplazada. */
+                  mes=CASE WHEN fecha_otorgado IS NULL OR fecha_otorgado < DATE(created_at)
+                           THEN DATE_FORMAT(CURDATE(),'%Y-%m-01') ELSE mes END,
+                  fecha_otorgado=CASE WHEN fecha_otorgado IS NULL OR fecha_otorgado < DATE(created_at)
+                                      THEN CURDATE() ELSE fecha_otorgado END,
                   comdea_real = CASE WHEN ? > 0 THEN ? ELSE comdea_real END, updated_at=NOW()
             WHERE (${cond.join(' OR ')})
               /* UPPER en las dos ramas: estas columnas tienen collation BINARIA
