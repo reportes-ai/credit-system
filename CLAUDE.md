@@ -208,6 +208,12 @@ correos programados y cobranza.
 - `opts.arranqueFn` existe porque varias tareas hacen algo distinto al arrancar que en cada
   vuelta (`indicadores-sync` se pone al día con `force`). Migrar una sin eso le cambia la
   conducta en silencio.
+- **Cambio de hora en Chile = reinicio** (`shared/config/database.js` → `vigia-cambio-hora`, 06-09-2026):
+  el offset de mysql2 se fija al crear el pool y no se cambia en caliente. Cuando Chile cambia de hora
+  (1er domingo de septiembre y de abril) el proceso sale con código 0 y el host lo levanta con el offset
+  nuevo. Sin esto el pool quedaba MEZCLADO (conexiones viejas -04:00, nuevas -03:00) y toda fecha leída
+  corría una hora: el vigía de relojes mandó 15 correos el 06-09-2026. Las conexiones SIEMPRE hacen
+  `SET time_zone` con el mismo offset con que mysql2 interpreta, nunca con el "vivo".
 - **Alerta de doble host** (`shared/latido-host.js`, 04-09-2026): cada proceso late por minuto en
   `host_latidos`; si OTRO host con motores encendidos late contra la misma base, correo a
   `ALERTA_ERRORES_MAIL` y `/api/health → doble_host: true`. Nació porque el servicio viejo de

@@ -61,7 +61,12 @@ async function loadTZOverride() {
 
 // Forzar timezone en cada conexión nueva
 pool.on('connection', conn => {
-  let tz = _tzOverride || getChileAutoOffset();
+  /* SIEMPRE el mismo offset con el que mysql2 interpreta (MYSQL2_TZ, fijado al arrancar),
+     no el offset "vivo": el 06-09-2026 Chile pasó a UTC-3 a medianoche, el proceso venía
+     de la víspera con MYSQL2_TZ=-04:00 y las conexiones nuevas se abrían con -03:00 →
+     pool mezclado, cada DATETIME leído corría 1 h y el vigía alertó 15 veces. El cambio
+     de hora se resuelve reiniciando el proceso (ver vigilarCambioHora). */
+  let tz = _tzOverride || MYSQL2_TZ;
   // Validar formato: debe ser '+HH:MM', '-HH:MM' o nombre de zona ('Region/City')
   const validOffset = /^[+-]\d{2}:\d{2}$/.test(tz);
   const validNamed  = /^[A-Za-z_]+\/[A-Za-z_]+/.test(tz);
@@ -84,5 +89,20 @@ pool.loadTZOverride    = loadTZOverride;
 
 // Cargar override al arrancar (2s para que la BD esté lista)
 setTimeout(loadTZOverride, 2000);
+
+/* ── Cambio de hora en Chile → reinicio limpio ──────────────────────────────
+   El offset de mysql2 (`timezone`) se fija al crear el pool y no se puede cambiar en
+   caliente. Cuando el offset real de Chile deja de coincidir (primer domingo de
+   septiembre y de abril), el proceso sale con código 0 y Render/Cloud Run lo levantan
+   de nuevo con el offset correcto. Pasa dos veces al año, a medianoche, y tarda lo que
+   un deploy. Sin override manual (ahí el Admin decide). */
+function vigilarCambioHora() {
+  if (_tzOverride) return;
+  const actual = getChileAutoOffset();
+  if (actual === MYSQL2_TZ) return;
+  console.error(`[DB] Chile cambió de hora (${MYSQL2_TZ} → ${actual}): reiniciando el proceso para que el pool tome el offset nuevo.`);
+  setTimeout(() => process.exit(0), 1500);
+}
+require('../scheduler').programar('vigia-cambio-hora', vigilarCambioHora, 60 * 1000, { infra: true, enStaging: true, arranqueMs: 60 * 1000 });
 
 module.exports = pool;
