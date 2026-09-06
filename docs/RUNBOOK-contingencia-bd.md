@@ -558,6 +558,48 @@ temporalmente manual y sigue operando. No es una emergencia de contingencia.
 
 ---
 
+## 17-bis. Cambio de hora en Chile (primer domingo de abril y de septiembre)
+
+**No es una emergencia, pero conviene saber qué va a pasar** a las 00:00 de ese domingo,
+porque se parece a una caída y porque el 06-09-2026 nos costó un día de fechas corridas.
+
+**Qué pasa solo** (`shared/config/database.js`, motor infra `vigia-cambio-hora`):
+1. El offset con que el pool interpreta las fechas se fija al arrancar el proceso y no se
+   puede cambiar en caliente.
+2. Cada minuto el vigía compara el offset real de Chile con el del pool. En el primer
+   chequeo después de medianoche los ve distintos, lo deja en el log y **el proceso sale
+   con código 0**.
+3. **Render lo levanta solo en segundos** con el offset nuevo; todas las conexiones nacen
+   iguales. Unos 5-10 s sin servicio, un domingo a medianoche.
+4. La instancia que muere y la que nace son del mismo servicio: la **alerta de doble host no
+   suena**. El vigía de relojes de las 08:00 encuentra la base cuadrada y **no manda correo**.
+
+**Por host:**
+
+| Host | Qué hace |
+|---|---|
+| **Producción (Render)** | Sale y Render lo relanza. Nadie tiene que hacer nada. |
+| **Staging (Render)** | Idéntico. |
+| **Standby (Cloud Run `afbs2`)** | Si está despierto, sale y Cloud Run levanta uno nuevo con la primera petición (5 s). Si está dormido no hay proceso: el próximo ya nace bien. Además se reconstruye cada día a las 05:00. Promovido, opera igual que Render. |
+| **Laptop de desarrollo** | Si `node` estaba corriendo a esa hora, termina y **lo levantas tú**. Es el único lugar manual. |
+| **Cloud SQL de contingencia** | Es MySQL: el `SET time_zone` por conexión funciona igual que en TiDB. Nada que hacer. |
+| **Bucket de documentos (GCS)** | No lo toca: guarda solo los bytes. Las fechas de cada documento viven en su fila de TiDB, con las mismas reglas que todo lo demás. |
+
+**Cuándo NO actúa**: si en el mantenedor hay override manual de zona horaria
+(`db_tz_override`). Ahí el Admin manda y tiene que cambiarlo a mano.
+
+**Qué revisar el lunes** (1 minuto): `/api/health` responde y `uptime` es de pocas horas
+(arrancó a medianoche); no llegó ningún correo "Vigía de relojes" a las 08:00. Si llegó,
+reiniciar el servicio a mano en Render (Manual Deploy → Deploy latest commit) y avisar.
+
+**Lo que pasó el 06-09-2026** (por qué existe esto): el proceso venía de la víspera con
+-04:00, las conexiones nuevas se abrían con -03:00 y el pool quedó mezclado: unas escribían
+NOW() una hora atrás y otras leían una hora adelante. El vigía acusó 15 veces. Se arregló con
+el deploy de v222.34, que fue el reinicio que faltaba. Las marcas de tiempo de ese día entre
+las 00:00 y las 17:30 pueden estar una hora atrás (solo auditoría y logs, no fechas de negocio).
+
+---
+
 ## 18. Qué hacer SIEMPRE, sea cual sea la emergencia
 
 1. **Avisa al equipo primero** — qué no funciona, qué sí, y qué no deben hacer mientras tanto.

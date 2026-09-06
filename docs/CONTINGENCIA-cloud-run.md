@@ -397,6 +397,13 @@ TiDB. Irrelevante para un respaldo que despierta de vez en cuando.
       viejo de Render revivió el 12-08 con motores activos y corrió 23 días en paralelo sin que
       nadie lo viera. **Al promover el standby, esta alerta debe sonar si Render sigue vivo** —
       es la confirmación de que el orden "primero apagar, después levantar" se respetó.
+- [x] ✅ **Cambio de hora en Chile** (06-09-2026, `shared/config/database.js` → motor infra
+      `vigia-cambio-hora`). El offset del pool se fija al arrancar; cuando Chile cambia de hora
+      el proceso sale con código 0 y el host lo relanza con el offset nuevo. **En Cloud Run**:
+      si el contenedor está despierto sale y la primera petición levanta otro (5 s); si está
+      dormido no hay proceso y el próximo nace bien; la reconstrucción diaria de las 05:00 lo
+      cubre igual. Promovido se comporta como Render. Ver `docs/RUNBOOK-contingencia-bd.md`
+      §17-bis.
 
 ---
 
