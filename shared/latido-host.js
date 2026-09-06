@@ -69,7 +69,12 @@ async function latir() {
   const enRelevo = Date.now() - ARRANQUE < RELEVO_MS;
   // Respaldo: filas sin `servicio` (procesos anteriores a la columna) → se deduce del hostname de Render (srv-<id>-<pod>)
   const servicioDe = h => h.servicio || (String(h.hostname || '').match(/^(srv-[a-z0-9]+)/) || [])[1] || null;
-  const otros = vivos.filter(h => h.host_id === HOST_ID || !(enRelevo && servicioDe(h) && servicioDe(h) === SERVICIO));
+  /* Simétrico: la instancia VIEJA también ve aparecer a su reemplazo (arrancado hace
+     segundos) y alertaba antes de morir (falso positivo al desplegar v222.34). Un host
+     del mismo servicio con menos de RELEVO_MS de vida es un relevo, mire quien mire. */
+  const esJoven = h => Date.now() - new Date(h.arrancado_at).getTime() < RELEVO_MS;
+  const otros = vivos.filter(h => h.host_id === HOST_ID
+    || !(servicioDe(h) && servicioDe(h) === SERVICIO && (enRelevo || esJoven(h))));
   const doble = motores === 1 && otros.length > 1;
   estadoActual = { doble_host: doble, hosts_con_motores: otros.map(h => ({ ...h, yo: h.host_id === HOST_ID })) };
   if (!doble) return;
