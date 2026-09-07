@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.32 — boton Adjuntar respaldo en el detalle de CUALQUIER orden, incluso pagada (facturas que llegan despues del pago) · v1.31 — filtro TIPO: botones Administrativos/Arriendos (categoria dentro de Otros/GENERAL) · v1.30 — boton Excel: descarga los casos filtrados con montos con formato y nombre de archivo segun filtros. v1.29 — selector "Cuenta de cargo" al registrar el pago (mantenedor Cuentas Bancarias): queda en la orden y el asiento acredita ese banco real; el detalle muestra "desde <cuenta>". v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.33 — boton "PDF comprobantes": un solo PDF con la Solicitud de Pago de cada orden del filtro (una por pagina, timbre PAGADO, snapshot congelado), tope 80 · v1.32 — boton Adjuntar respaldo en el detalle de CUALQUIER orden, incluso pagada (facturas que llegan despues del pago) · v1.31 — filtro TIPO: botones Administrativos/Arriendos (categoria dentro de Otros/GENERAL) · v1.30 — boton Excel: descarga los casos filtrados con montos con formato y nombre de archivo segun filtros. v1.29 — selector "Cuenta de cargo" al registrar el pago (mantenedor Cuentas Bancarias): queda en la orden y el asiento acredita ese banco real; el detalle muestra "desde <cuenta>". v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -88,6 +88,7 @@
       <label style="font-size:.8rem;color:#475569">Hasta <input type="date" id="fHasta" onchange="cargar()"></label>
       <button class="btn-ghost" onclick="limpiar()"><i class="bi bi-x-circle me-1"></i>Limpiar</button>
       <button class="btn-ghost" style="color:#15803d;border-color:#bbf7d0" onclick="exportarExcel()" title="Descarga las órdenes del filtro actual"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button>
+      <button class="btn-ghost" id="btnPdf" style="color:#b91c1c;border-color:#fecaca" onclick="exportarPDF()" title="Un solo PDF con el comprobante (Solicitud de Pago) de cada orden del filtro actual, una por página"><i class="bi bi-file-earmark-pdf me-1"></i>PDF comprobantes</button>
       <div style="flex:1"></div>
       <a class="btn-af" href="/ordenes-pago/emision/" style="text-decoration:none"><i class="bi bi-plus-lg me-1"></i>Nueva orden</a>
     </div>
@@ -308,6 +309,66 @@ async function exportarExcel(){
   if (d || h) partes.push((d||'inicio')+'_a_'+(h||'hoy'));
   if (q) partes.push(q.replace(/[^\wáéíóúñÁÉÍÓÚÑ-]+/g,'_').slice(0,30));
   XLSX.writeFile(wb, partes.join('_') + '.xlsx');
+}
+
+/* PDF con los COMPROBANTES de las órdenes filtradas (v1.33): el mismo documento
+   Solicitud de Pago que abre "Detalle" (motor único /js/odp-documento.js, con el
+   timbre PAGADO si corresponde), una orden por página, en un solo archivo. Pide
+   cada documento al endpoint /documento (respeta el snapshot congelado de las
+   pagadas). Tope de 80 órdenes por archivo: html2pdf rasteriza en el navegador. */
+function nombreArchivoFiltro(pref){
+  const est = document.getElementById('fEstado').value;
+  const tipo = CATEGORIA || ({ COMISION:'Comisiones', SALDO:'SaldosPrecio', PARQUE:'Parques', GENERAL:'Otros' }[ORIGEN] || 'Todas');
+  const d = document.getElementById('fDesde').value, h = document.getElementById('fHasta').value;
+  const q = document.getElementById('q').value.trim();
+  const partes = [pref, tipo, est ? est.toLowerCase() : 'todas'];
+  if (d || h) partes.push((d||'inicio')+'_a_'+(h||'hoy'));
+  if (q) partes.push(q.replace(/[^\wáéíóúñÁÉÍÓÚÑ-]+/g,'_').slice(0,30));
+  return partes.join('_');
+}
+async function exportarPDF(){
+  if (!DATA.length) return toast('No hay órdenes para exportar');
+  const MAX = 80;
+  const lista = DATA.slice(0, MAX);
+  if (DATA.length > MAX && !confirm(`El filtro tiene ${DATA.length} órdenes. El PDF incluirá las primeras ${MAX} (acota el filtro por fecha o tipo para el resto). ¿Continuar?`)) return;
+  const btn = document.getElementById('btnPdf'); const orig = btn.innerHTML; btn.disabled = true;
+  try {
+    if (!window.html2pdf) await new Promise((ok,bad)=>{ const s=document.createElement('script'); s.src='/js/html2pdf.bundle.min.js'; s.onload=ok; s.onerror=bad; document.head.appendChild(s); });
+    const docs = [];
+    for (let i = 0; i < lista.length; i++) {
+      btn.innerHTML = `<i class="bi bi-hourglass-split me-1"></i>Cargando ${i+1}/${lista.length}…`;
+      const o = lista[i];
+      try {
+        const r = await fetch('/api/ordenes-pago/ordenes/'+o.id+'/documento', { headers:H }); if (chk401(r)) return;
+        const j = await r.json(); if (!j.success || !j.data) throw 0;
+        const full = j.data; full.origen = full.origen || o.origen; full.numero = full.numero || o.numero;
+        docs.push(full);
+      } catch(e) { docs.push({ numero: o.numero, _error: true }); }
+    }
+    const cont = document.createElement('div');
+    cont.style.cssText = 'position:fixed;left:-10000px;top:0;width:760px;background:#fff';
+    cont.innerHTML = docs.map((o, i) => {
+      const cab = o._error
+        ? `<p style="color:#b91c1c;font-size:12px">No se pudo cargar la orden ${escH(o.numero||'')}.</p>`
+        : (o.estado==='PAGADA' ? `<p style="color:#15803d;font-size:11px;margin:0 0 8px">Pagada el ${fdate(o.fecha_pago)}${o.metodo_pago?' · '+escH(o.metodo_pago):''}${o.cuenta_pago?' · desde '+escH(o.cuenta_pago):''}</p>`
+          : o.estado==='ANULADA' ? `<p style="color:#b91c1c;font-size:11px;margin:0 0 8px">Anulada${o.anulada_nombre?' por '+escH(o.anulada_nombre):''}</p>` : '');
+      return `<div style="padding:10px 8px;${i < docs.length-1 ? 'page-break-after:always;' : ''}">${cab}${o._error ? '' : docHTML(o)}</div>`;
+    }).join('');
+    document.body.appendChild(cont);
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Generando PDF…';
+    try {
+      await html2pdf().set({
+        filename: nombreArchivoFiltro('ODP_comprobantes') + '.pdf',
+        margin: 8, image: { type:'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit:'mm', format:'letter', orientation:'portrait' },
+        pagebreak: { mode: ['css'] },
+      }).from(cont).save();
+    } finally { cont.remove(); }
+    btn.innerHTML = `<i class="bi bi-check-lg me-1"></i>${docs.length} comprobante${docs.length===1?'':'s'}`;
+    setTimeout(()=>{ btn.innerHTML = orig; }, 3000);
+  } catch(e) { toast('No se pudo generar el PDF'); btn.innerHTML = orig; }
+  finally { btn.disabled = false; }
 }
 
 function pintaChips(rs, total){
