@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v2.9 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
+  <!-- v3.0 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -529,14 +529,14 @@ async function exportarAuditoria(){
   const d = _audData; if (!d || !d.porUsuario.length) { alert('No hay datos para exportar.'); return; }
   if (!window.XLSX) await new Promise((ok,bad)=>{ const s=document.createElement('script'); s.src='/js/xlsx.full.min.js'; s.onload=ok; s.onerror=bad; document.head.appendChild(s); });
   const tipos = [...new Set(d.porUsuario.flatMap(u=>u.porTipo.map(t=>t.nombre)))];
-  const head = ['Usuario','RUTs únicos','Créditos ingresados','Conversión','Informes ('+d.dias+'d)','Prom./día', ...tipos, 'Costo UF','Costo CLP'];
+  const head = ['Usuario','RUTs únicos','Créditos ingresados','Conversión','Otorgados','Otorgamiento','Informes ('+d.dias+'d)','Prom./día', ...tipos, 'Costo UF','Costo CLP'];
   const filas = d.porUsuario.map(u=>{ const byName={}; u.porTipo.forEach(t=>byName[t.nombre]=t.n);
-    return [u.usuario, u.ruts_unicos||0, u.creditos||0, (u.ruts_unicos? (u.creditos||0)/u.ruts_unicos : 0), u.total, u.promedio_dia, ...tipos.map(t=>byName[t]||0), u.costo_uf||0, u.costo_clp||0]; });
+    return [u.usuario, u.ruts_unicos||0, u.creditos||0, (u.ruts_unicos? (u.creditos||0)/u.ruts_unicos : 0), u.otorgados||0, (u.ruts_unicos? (u.otorgados||0)/u.ruts_unicos : 0), u.total, u.promedio_dia, ...tipos.map(t=>byName[t]||0), u.costo_uf||0, u.costo_clp||0]; });
   const tot = ['TOTAL']; for (let c=1;c<head.length;c++) tot.push(filas.reduce((s,f)=>s+Number(f[c]||0),0));
-  tot[3] = tot[1] ? tot[2]/tot[1] : 0; tot[5] = tot[4]/d.dias;
+  tot[3] = tot[1] ? tot[2]/tot[1] : 0; tot[5] = tot[1] ? tot[4]/tot[1] : 0; tot[7] = tot[6]/d.dias;
   const aoa = [head, ...filas, tot];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const fmt = { 3:'0.0%', 5:'0.00', [head.length-2]:'0.0000', [head.length-1]:'$#,##0' };
+  const fmt = { 3:'0.0%', 5:'0.0%', 7:'0.00', [head.length-2]:'0.0000', [head.length-1]:'$#,##0' };
   for (let r=1;r<aoa.length;r++) for (const [c,z] of Object.entries(fmt)) { const cell = ws[XLSX.utils.encode_cell({r, c:+c})]; if (cell) cell.z = z; }
   ws['!cols'] = head.map((h,i)=>({ wch: Math.min(34, Math.max(h.length, ...aoa.map(f=>String(f[i]??'').length))+2) }));
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Auditoría '+d.dias+'d');
@@ -550,21 +550,31 @@ function renderAuditoria(d){
   const tipos = [...new Set(d.porUsuario.flatMap(u=>u.porTipo.map(t=>t.nombre)))];
   const clp = n => '$'+Math.round(Number(n)||0).toLocaleString('es-CL');
   const tCosto = 'Precio UF del tramo del plan contratado ('+(d.plan_uf||'')+' UF, mantenedor DealerNet → Costos) × informes, a la UF de hoy ($'+Math.round(d.uf_hoy||0).toLocaleString('es-CL')+')';
-  let h = '<div style="overflow:auto"><table class="tb aud"><thead><tr><th>Usuario</th><th title="Personas distintas consultadas en el período (varios informes de un mismo RUT cuentan una vez)">RUTs únicos</th><th title="Créditos ingresados en el período ÷ RUTs únicos consultados: de cada 100 personas evaluadas, cuántas terminaron en crédito">Conversión</th><th>Informes ('+d.dias+'d)</th><th>Prom./día</th>'+
+  let h = '<div style="overflow:auto"><table class="tb aud"><thead><tr><th>Usuario</th><th title="Personas distintas consultadas en el período (varios informes de un mismo RUT cuentan una vez)">RUTs únicos</th><th title="Créditos ingresados en el período ÷ RUTs únicos consultados: de cada 100 personas evaluadas, cuántas terminaron en crédito (cualquier estado)">Conversión</th><th title="RUTs consultados con crédito OTORGADO en el período ÷ RUTs únicos consultados">Otorgamiento</th><th>Informes ('+d.dias+'d)</th><th>Prom./día</th>'+
     tipos.map(t=>'<th>'+esc(t)+'</th>').join('')+'<th title="'+esc(tCosto)+'">Costo total</th></tr></thead><tbody>';
-  if(!d.porUsuario.length) h += '<tr><td colspan="'+(6+tipos.length)+'" class="muted">Sin actividad en el período.</td></tr>';
-  const tot = { ruts:0, creditos:0, total:0, costo_uf:0, costo_clp:0, tipos:{} };
+  if(!d.porUsuario.length) h += '<tr><td colspan="'+(7+tipos.length)+'" class="muted">Sin actividad en el período.</td></tr>';
+  const tot = { ruts:0, creditos:0, otorgados:0, total:0, costo_uf:0, costo_clp:0, tipos:{} };
   const conv = (c, r) => r ? '<b>'+(c/r*100).toFixed(1).replace('.',',')+'%</b><div class="muted" style="font-size:.7rem">'+c+' / '+r+'</div>' : '—';
   h += d.porUsuario.map(u=>{
     const byName={}; u.porTipo.forEach(t=>{ byName[t.nombre]=t.n; tot.tipos[t.nombre]=(tot.tipos[t.nombre]||0)+t.n; });
-    tot.ruts += (u.ruts_unicos||0); tot.creditos += (u.creditos||0); tot.total += u.total; tot.costo_uf += (u.costo_uf||0); tot.costo_clp += (u.costo_clp||0);
-    return '<tr><td>'+esc(u.usuario)+'</td><td><b>'+(u.ruts_unicos??0)+'</b></td><td>'+conv(u.creditos||0, u.ruts_unicos||0)+'</td><td><b>'+u.total+'</b></td><td>'+u.promedio_dia+'</td>'+
+    tot.ruts += (u.ruts_unicos||0); tot.creditos += (u.creditos||0); tot.otorgados += (u.otorgados||0); tot.total += u.total; tot.costo_uf += (u.costo_uf||0); tot.costo_clp += (u.costo_clp||0);
+    return '<tr><td>'+esc(u.usuario)+'</td><td><b>'+(u.ruts_unicos??0)+'</b></td><td>'+conv(u.creditos||0, u.ruts_unicos||0)+'</td><td>'+conv(u.otorgados||0, u.ruts_unicos||0)+'</td><td><b>'+u.total+'</b></td><td>'+u.promedio_dia+'</td>'+
       tipos.map(t=>'<td>'+(byName[t]||0)+'</td>').join('')+
       '<td style="white-space:nowrap"><b>'+clp(u.costo_clp)+'</b><div class="muted" style="font-size:.7rem">'+Number(u.costo_uf||0).toFixed(2).replace('.',',')+' UF</div></td></tr>';
   }).join('');
-  if (d.porUsuario.length) h += '<tr style="background:#f8fafc;font-weight:800;border-top:2px solid #e2e8f0"><td>TOTAL</td><td>'+tot.ruts+'</td><td>'+conv(tot.creditos, tot.ruts)+'</td><td>'+tot.total+'</td><td>'+(tot.total/d.dias).toFixed(2)+'</td>'+
+  if (d.porUsuario.length) h += '<tr style="background:#f8fafc;font-weight:800;border-top:2px solid #e2e8f0"><td>TOTAL</td><td>'+tot.ruts+'</td><td>'+conv(tot.creditos, tot.ruts)+'</td><td>'+conv(tot.otorgados, tot.ruts)+'</td><td>'+tot.total+'</td><td>'+(tot.total/d.dias).toFixed(2)+'</td>'+
     tipos.map(t=>'<td>'+(tot.tipos[t]||0)+'</td>').join('')+'<td style="white-space:nowrap">'+clp(tot.costo_clp)+'<div class="muted" style="font-size:.7rem;font-weight:400">'+tot.costo_uf.toFixed(2).replace('.',',')+' UF</div></td></tr>';
   h += '</tbody></table></div>';
+  h += '<div style="margin-top:12px;padding:10px 14px;background:#f8fafc;border-left:4px solid #2563eb;border-radius:6px;font-size:.8rem;color:#475569">'+
+    '<b style="color:#1e293b"><i class="bi bi-book"></i> Glosario</b><ul style="margin:6px 0 0 18px;padding:0;line-height:1.6">'+
+    '<li><b>RUTs únicos</b>: personas distintas consultadas en el período. Varios informes del mismo RUT cuentan una vez.</li>'+
+    '<li><b>Conversión</b>: RUTs consultados que tienen un crédito <u>ingresado</u> en el período (digitado, en análisis, aprobado, rechazado u otorgado, por cualquier ejecutivo o canal) ÷ RUTs únicos. Mide cuántas personas evaluadas llegaron a operación en el sistema, no cuántas se cursaron.</li>'+
+    '<li><b>Otorgamiento</b>: RUTs consultados con un crédito <u>OTORGADO</u> en el período ÷ RUTs únicos. Es la conversión real a venta. Un RUT con varios créditos cuenta una vez.</li>'+
+    '<li><b>Informes</b>: llamadas reales a DealerNet que gastaron saldo (una consulta con 4 productos = 4 informes). Reusar el repositorio no cuenta.</li>'+
+    '<li><b>Prom./día</b>: informes ÷ días del período.</li>'+
+    '<li><b>Costo total</b>: informes × precio UF del tramo del plan contratado, a la UF de hoy. Mismo criterio que Facturación.</li>'+
+    '<li>Ventana: consultas y créditos se miran en los mismos últimos '+d.dias+' días. Un RUT consultado hoy cuyo crédito se ingresa después del corte no cuenta hasta que entre en la ventana.</li>'+
+    '</ul></div>';
   h += '<div class="grid" style="margin-top:14px">';
   h += '<div><div class="rep-h" style="background:#b91c1c">Consultas a su propio RUT (90 días)</div>'+
     (d.autoConsulta.length ? '<table class="tb"><tbody>'+d.autoConsulta.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td style="text-align:right"><b>'+x.n+'</b></td></tr>').join('')+'</tbody></table>' : '<div class="muted">Ninguna.</div>')+'</div>';

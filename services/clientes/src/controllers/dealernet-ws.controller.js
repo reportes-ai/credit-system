@@ -1063,17 +1063,24 @@ const auditoria = async (req, res) => {
     }
     // Conversión: de los RUTs consultados en el período, cuántos terminaron con un crédito
     // ingresado en el mismo período (cualquier estado). Se compara por cuerpo del RUT.
+    // Otorgamiento: de esos mismos RUTs, cuántos tienen un crédito OTORGADO (etapa por el motor único).
+    const { ES_ETAPA } = require('../../../../shared/etapa-credito');
     const [creds] = await pool.query(
-      `SELECT DISTINCT REPLACE(SUBSTRING_INDEX(cl.rut,'-',1),'.','') body
+      `SELECT REPLACE(SUBSTRING_INDEX(cl.rut,'-',1),'.','') body, MAX(${ES_ETAPA('OTORGADO', 'cr')}) otorgado
          FROM creditos cr JOIN clientes cl ON cl.id_cliente = cr.id_cliente
-        WHERE cr.created_at >= NOW() - INTERVAL ? DAY AND cl.rut IS NOT NULL`, [dias]);
+        WHERE cr.created_at >= NOW() - INTERVAL ? DAY AND cl.rut IS NOT NULL
+        GROUP BY body`, [dias]);
     const conCredito = new Set(creds.map(r => String(r.body)));
+    const conOtorgado = new Set(creds.filter(r => Number(r.otorgado) === 1).map(r => String(r.body)));
     const porUsuario = Object.values(usuarios)
       .map(u => {
         const costo_uf = Object.entries(u._porTipo).reduce((s, [codigo, n]) => s + n * precioProd(codigo), 0);
-        const creditos = [...u._ruts].filter(b => conCredito.has(b.replace(/[^0-9]/g, ''))).length;
+        const cuerpos = [...u._ruts].map(b => b.replace(/[^0-9]/g, ''));
+        const creditos = cuerpos.filter(b => conCredito.has(b)).length;
+        const otorgados = cuerpos.filter(b => conOtorgado.has(b)).length;
         return { id_usuario: u.id_usuario, usuario: u.usuario, total: u.total, ruts_unicos: u._ruts.size,
           creditos, conversion: u._ruts.size ? +(creditos / u._ruts.size * 100).toFixed(1) : 0,
+          otorgados, otorgamiento: u._ruts.size ? +(otorgados / u._ruts.size * 100).toFixed(1) : 0,
           promedio_dia: +(u.total / dias).toFixed(2),
           costo_uf: +costo_uf.toFixed(4), costo_clp: Math.round(costo_uf * ufHoy),
           porTipo: Object.entries(u._porTipo).map(([codigo, n]) => ({ codigo, nombre: nombreProd(codigo), n })) };
