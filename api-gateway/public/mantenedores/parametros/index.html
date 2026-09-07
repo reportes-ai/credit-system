@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parámetros de Crédito — AutoFácil</title>
-  <!-- v1.3 navbar migrada al componente topnav -->
+  <!-- v1.4 cap_dias_gracia en el footer · v1.3 navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -138,6 +138,7 @@
       <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
       <ul style="margin:8px 0 0;padding-left:18px">
         <li><b>Gastos operacionales</b> → se capitalizan en el monto financiado y entran al costo de cada operación en <a href="/dashboard/">Dashboard → Rentabilidades</a> y en las <a href="/cotizaciones/">Cotizaciones</a>.</li>
+        <li><b>Días de gracia del capitalizado</b> (<code>cap_dias_gracia</code>) → los días entre el curse y la primera cuota que superan este valor capitalizan interés a la tasa cliente; ese <b>monto capitalizado</b> es la base de la comisión que paga AutoFin (Ing. x Colocaciones) en <a href="/dashboard/">Dashboard</a>, <a href="/post-venta/facturacion-af/">Facturación AutoFácil</a> y el recálculo mensual. Si la op ya trae capitalizado (Excel INDEXA o digitado) ese manda.</li>
         <li><b>Prima de seguro mínima válida</b> → qué créditos entran a la cola de <a href="/carga-masiva/digitacion/">Digitación de Datos Faltantes</a> y al cuadro de otorgados incompletos (mismo motor para los dos).</li>
       </ul>
     </div>

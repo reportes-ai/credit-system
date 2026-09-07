@@ -93,6 +93,30 @@
     return Math.round(pv - mc);
   }
 
+  // MONTO CAPITALIZADO (07-09-2026): AutoFin calcula su comisión sobre el monto
+  // financiado MÁS los intereses de los días que van más allá del mes de gracia hasta
+  // la primera cuota (capitalización compuesta a la tasa cliente, base 30 días).
+  // Venía listo en el Excel de INDEXA; con Trinidad/cartas nadie lo calculaba y el
+  // motor caía al monto financiado: agosto 2026 quedó 1,2% bajo lo que pagó AutoFin.
+  // Ajustado contra 223 ops históricas: capitalizado = mf × (1+t)^((días − 30)/30).
+  // tasaCli en FRACCIÓN mensual; dias = días entre el curse y la primera cuota.
+  function montoCapitalizado(o) {
+    const mf = +o.montoFin || 0, t = +o.tasaCli || 0, d = parseInt(o.dias);
+    const gracia = o.gracia != null && isFinite(+o.gracia) ? +o.gracia : 30;
+    if (!(mf > 0)) return 0;
+    if (!(t > 0) || !isFinite(d)) return Math.round(mf);
+    const extra = Math.max(0, d - gracia);
+    return Math.round(mf * Math.pow(1 + t, extra / 30));
+  }
+
+  // Días entre dos fechas (YYYY-MM-DD o Date); null si falta alguna. Para el capitalizado.
+  function diasEntreFechas(desde, hasta) {
+    const f = x => x instanceof Date ? x : (x ? new Date(String(x).slice(0, 10) + 'T12:00:00') : null);
+    const a = f(desde), b = f(hasta);
+    if (!a || !b || isNaN(a) || isNaN(b)) return null;
+    return Math.round((b - a) / 86400000);
+  }
+
   // Ingreso por colocación UAC = % del saldo precio (tier del mes, en fracción).
   function ingresoColocacionUAC(o) {
     const s = +o.saldo || 0, p = +o.pctUAC || 0;
@@ -127,6 +151,8 @@
     valorPresenteAnualidad,
     tablaDesarrollo,
     ingresoColocacionAutoFin,
+    montoCapitalizado,
+    diasEntreFechas,
     ingresoColocacionUAC,
     comisionEjecutivo,
     esMayor200,

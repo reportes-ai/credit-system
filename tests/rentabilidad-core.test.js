@@ -74,3 +74,19 @@ test('tramo UF: el umbral es parametrizable (mantenedor), no fijo en 200', () =>
   assert.equal(R.esMayor200({ montoCap: 4000000, uf, umbralUf: 100 }), true);   // 100 UF = 3,9M
   assert.equal(R.esMayor200({ montoCap: 4000000, uf, umbralUf: 200 }), false);
 });
+
+/* Monto capitalizado (07-09-2026): mf + intereses de los días a la 1ª cuota que
+   exceden la gracia (30). 52 días a 2,875% → 22/30 de mes → ×1,0210. */
+test('monto capitalizado: 30 días o menos no capitaliza; 52 días capitaliza 22/30 de mes', () => {
+  const C = require('../api-gateway/public/js/rentabilidad-core');
+  assert.strictEqual(C.montoCapitalizado({ montoFin: 4806130, tasaCli: 0.02875, dias: 30 }), 4806130);
+  assert.strictEqual(C.montoCapitalizado({ montoFin: 4806130, tasaCli: 0.02875, dias: 31 }), Math.round(4806130 * Math.pow(1.02875, 1 / 30)));
+  const cap52 = C.montoCapitalizado({ montoFin: 4806130, tasaCli: 0.02875, dias: 52 });
+  assert.ok(Math.abs(cap52 / 4806130 - Math.pow(1.02875, 22 / 30)) < 0.0001, 'ratio ' + (cap52 / 4806130));
+  // gracia paramétrica y datos incompletos → nunca NaN
+  assert.strictEqual(C.montoCapitalizado({ montoFin: 1000000, tasaCli: 0.03, dias: 40, gracia: 40 }), 1000000);
+  assert.strictEqual(C.montoCapitalizado({ montoFin: 1000000, tasaCli: 0.03, dias: null }), 1000000);
+  assert.strictEqual(C.montoCapitalizado({ montoFin: 0, tasaCli: 0.03, dias: 60 }), 0);
+  assert.strictEqual(C.diasEntreFechas('2026-08-01', '2026-09-05'), 35);
+  assert.strictEqual(C.diasEntreFechas(null, '2026-09-05'), null);
+});

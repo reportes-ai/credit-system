@@ -86,7 +86,7 @@ async function calcularOperacion(op) {
 
   const saldo_precio  = parseFloat(op.saldo_precio)    || 0;
   const monto_fin     = parseFloat(op.monto_financiado)   || 0;
-  const monto_cap     = parseFloat(op.monto_capitalizado) || monto_fin; // AutoFin usa capitalizado
+  let   monto_cap     = parseFloat(op.monto_capitalizado) || 0;        // AutoFin usa capitalizado; si no viene, se calcula abajo
   const plazo         = parseInt(op.plazo)              || 0;
   const financiera    = (op.financiera || '').toUpperCase();
   const parqueVal     = (op.parque || '').toUpperCase().trim();
@@ -114,13 +114,16 @@ async function calcularOperacion(op) {
       // cuota, con default al mantenedor. Mismo criterio que el recálculo mensual.
       const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
       if (tasa) {
-        const mayor      = core.esMayor200({ montoCap: monto_cap, uf, umbralUf: p.umbral_uf_tramo });
+        const mayor      = core.esMayor200({ montoCap: monto_cap || monto_fin, uf, umbralUf: p.umbral_uf_tramo });
         const mantTasa   = mayor ? parseFloat(tasa.tasa_mensual_mayor) : parseFloat(tasa.tasa_mensual_menor);
         const mantSpread = mayor ? parseFloat(tasa.spread_mayor)       : parseFloat(tasa.spread_menor);
         const costoFondo = (mantTasa - mantSpread) / 100;
         // Regla de negocio: tasa cliente JAMÁS bajo el costo de fondo (dato inválido
         // → cae al mantenedor). Incluye normalización fracción→% (motor único).
         const tasaCli = core.tasaClienteValida(op.tascli_real, mantTasa, costoFondo) / 100;
+        // Capitalizado = mf + intereses de los días a la 1ª cuota que exceden la gracia (motor único)
+        if (!(monto_cap > 0)) monto_cap = core.montoCapitalizado({ montoFin: monto_fin, tasaCli,
+          dias: core.diasEntreFechas(op.fecha_otorgado, op.fecha_primera_cuota), gracia: p.cap_dias_gracia });
         monto_comision_fin = core.ingresoColocacionAutoFin({ montoCap: monto_cap, plazo, tasaCli, costoFondo });
       }
     } else if (financiera.includes('UNIDAD') || financiera.includes('UAC')) {

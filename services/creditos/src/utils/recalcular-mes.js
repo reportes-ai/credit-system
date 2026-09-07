@@ -33,6 +33,12 @@ function forzadosSet(raw) {
 }
 
 /* ── Parámetros configurables ───────────────────────────────────────── */
+// Días de gracia del capitalizado (07-09-2026): los días a la primera cuota que superan
+// este valor capitalizan interés a la tasa cliente. Ajustado contra INDEXA/AutoFin = 30.
+require('../../../../shared/migrate').enFila('cap-dias-gracia', async () => {
+  await pool.query(`INSERT IGNORE INTO parametros_credito (clave, valor, descripcion) VALUES
+    ('cap_dias_gracia', 30, 'Monto capitalizado AutoFin: días a la primera cuota que NO capitalizan interés (los que exceden se capitalizan a la tasa cliente, base 30)')`);
+});
 async function cargarParams() {
   const [rows] = await pool.query('SELECT clave, valor FROM parametros_credito');
   const p = {};
@@ -139,7 +145,9 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
   const esUAC    = fin.includes('UNIDAD') || fin.includes('UAC');
   const saldo    = parseFloat(op.saldo_precio)       || 0;
   const montoFin = parseFloat(op.monto_financiado)   || 0;
-  const montoCap = parseFloat(op.monto_capitalizado) || montoFin;
+  // Capitalizado: el guardado (Excel INDEXA / digitado) manda; si no hay, se calcula con
+  // los días a la primera cuota (motor único rentabilidad-core.montoCapitalizado).
+  let montoCap   = parseFloat(op.monto_capitalizado) || 0;
   const plazo    = parseInt(op.plazo)                || 0;
 
   let monto_comision_fin = 0;
@@ -148,11 +156,11 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
     // Modelo 2: la op con plazo >= corte no recibe el tier alto (tope uac2_pct_largo).
     // El snapshot de la decisión se congela aparte en la carta (cartas_aprobacion.tier_uac_*).
     monto_comision_fin = core.ingresoColocacionUAC({ saldo, pctUAC: aplicarCortePlazoUAC(pctUAC, plazo, p, op.mes || op.fecha_otorgado) });
-  } else if (plazo > 0 && montoCap > 0) {
+  } else if (plazo > 0 && montoFin > 0) {
     const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
     if (tasa) {
       const uf    = await getUF(op.fecha_otorgado);
-      const mayor = core.esMayor200({ montoCap, uf, umbralUf: p.umbral_uf_tramo });
+      const mayor = core.esMayor200({ montoCap: montoCap || montoFin, uf, umbralUf: p.umbral_uf_tramo });
       const mantTasa   = mayor ? parseFloat(tasa.tasa_mensual_mayor) : parseFloat(tasa.tasa_mensual_menor); // %
       const mantSpread = mayor ? parseFloat(tasa.spread_mayor)       : parseFloat(tasa.spread_menor);        // %
       const costoFondo = (mantTasa - mantSpread) / 100;        // costo de fondo del mantenedor a la fecha
@@ -161,9 +169,12 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
       // Regla de negocio: tasa cliente JAMÁS bajo el costo de fondo (dato inválido
       // → cae al mantenedor). Incluye normalización fracción→% (motor único).
       const tasaCli = core.tasaClienteValida(op.tascli_real, mantTasa, costoFondo) / 100;
+      if (!(montoCap > 0)) montoCap = core.montoCapitalizado({ montoFin, tasaCli,
+        dias: core.diasEntreFechas(op.fecha_otorgado, op.fecha_primera_cuota), gracia: p.cap_dias_gracia });
       monto_comision_fin = core.ingresoColocacionAutoFin({ montoCap, plazo, tasaCli, costoFondo });
     }
   }
+  if (!(montoCap > 0)) montoCap = montoFin;
 
   // Comisión dealer y parque — motor único comision-dealer.js (tabla del dealer manda;
   // con dealer_comisiones, la fila del LOCAL de la op manda sobre la tabla legacy).
@@ -172,7 +183,7 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
     { saldo, plazo, esParque, ubicacion: parqKey },
     { dealerTabla: dTab, dealerUbicaciones: dTab && dTab._ubics, parqData: parqMap[parqKey], pizarra: p }
   );
-  return { monto_comision_fin, comdea_real, com_parque, arriendo };
+  return { monto_capitalizado: montoCap, monto_comision_fin, comdea_real, com_parque, arriendo };
 }
 
 /* ── Detectar y marcar campos forzados ──────────────────────────────────────
@@ -189,7 +200,7 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
   const tol = opts.tol != null ? opts.tol : 1; // $ de tolerancia por redondeo
   const [p, parqMap, todasTasas, dealerMap] = await Promise.all([cargarParams(), cargarParques(), cargarTasas(), cargarDealers()]);
   const [ops] = await pool.query(
-    `SELECT id, id_financiera, financiera, parque, rut_dealer, saldo_precio, monto_financiado, monto_capitalizado, plazo, fecha_otorgado, tascli_real,
+    `SELECT id, id_financiera, financiera, parque, rut_dealer, saldo_precio, monto_financiado, monto_capitalizado, plazo, fecha_otorgado, fecha_primera_cuota, tascli_real,
             monto_comision_fin, comdea_real, com_parque, campos_forzados
      FROM creditos WHERE id IN (?)`, [ids]);
   // La carta manda: el valor esperado de comdea_real es el part_bruto de la carta
@@ -259,7 +270,7 @@ async function recalcularMeses(meses, opciones = {}) {
     const [ops] = await pool.query(`
       SELECT id, num_op, id_financiera, financiera, parque, rut_dealer, estado, estado_credito,
              saldo_precio, monto_financiado, monto_capitalizado,
-             plazo, fecha_otorgado, mes,
+             plazo, fecha_otorgado, fecha_primera_cuota, mes,
              seguro_rdh, seguro_cesantia, seguro_rep_menor,
              com_rdh, com_cesantia, com_reparaciones,
              pen_rdh, pen_cesantia, pen_reparaciones,
@@ -368,6 +379,7 @@ async function recalcularMeses(meses, opciones = {}) {
       // 6. UPDATE (los forzados se reescriben con su propio valor guardado) ──
       await pool.query(`
         UPDATE creditos SET
+          monto_capitalizado  = CASE WHEN COALESCE(monto_capitalizado,0) > 0 THEN monto_capitalizado ELSE ? END,
           monto_comision_fin  = ?,
           comdea_real         = ?,
           com_parque          = ?,
@@ -382,6 +394,7 @@ async function recalcularMeses(meses, opciones = {}) {
           updated_at          = NOW()
         WHERE id = ?
       `, [
+        calc.monto_capitalizado || 0,
         eff_mcf,
         eff_cdr,
         eff_cpq,
