@@ -178,18 +178,38 @@ programar('rrhh-devengo-vacaciones', generarDevengos, 24 * 60 * 60 * 1000);
 exports.generarDevengos = generarDevengos;
 
 /* ── MOTOR ÚNICO de saldo: movimientos + proporcional del período en curso ──── */
+/* Saldo A UNA FECHA (07-09-2026): antes sumaba TODOS los movimientos sin mirar su fecha
+   y solo el proporcional respetaba `aFecha`. Un período abonado DESPUÉS de la fecha
+   consultada se contaba igual, y encima se sumaba el proporcional de ese mismo período:
+   al 31-07-2026 Ponce, Saavedra y Soto salían con 13,8 días de más (su período 2 se
+   abonó en agosto). Afecta al finiquito (feriado proporcional a la fecha de término)
+   y a cualquier cuadratura histórica. Ahora:
+     · DEVENGO/PROGRESIVO cuentan si su aniversario (periodo_hasta + 1) es ≤ fecha;
+       si a esa fecha hay períodos cumplidos que aún no están depositados (fecha
+       futura, o motor que no alcanzó a correr) se suman virtualmente;
+     · TOMADO cuenta por la fecha de inicio de la solicitud (o su created_at);
+     · AJUSTE y el resto por created_at.
+   Sin `aFecha` (= hoy) el resultado es el mismo de siempre. */
 async function saldoCuenta(idUsuario, aFecha) {
   const fecha = aFecha || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
   const [[m]] = await pool.query(
-    `SELECT COALESCE(SUM(dias),0) s,
-            COALESCE(SUM(CASE WHEN dias>0 THEN dias END),0) abonos,
-            COALESCE(SUM(CASE WHEN dias<0 THEN -dias END),0) cargos
-       FROM rh_vac_movimientos WHERE id_usuario=?`, [idUsuario]);
+    `SELECT COALESCE(SUM(m.dias),0) s,
+            COALESCE(SUM(CASE WHEN m.dias>0 THEN m.dias END),0) abonos,
+            COALESCE(SUM(CASE WHEN m.dias<0 THEN -m.dias END),0) cargos,
+            COALESCE(SUM(m.tipo='DEVENGO'),0) n_devengos
+       FROM rh_vac_movimientos m
+       LEFT JOIN rh_vacaciones v ON v.id = m.id_ref AND m.tipo='TOMADO'
+      WHERE m.id_usuario=?
+        AND CASE
+              WHEN m.tipo IN ('DEVENGO','PROGRESIVO') AND m.periodo_hasta IS NOT NULL THEN DATE_ADD(m.periodo_hasta, INTERVAL 1 DAY) <= ?
+              WHEN m.tipo='TOMADO' THEN COALESCE(v.fecha_desde, DATE(m.created_at)) <= ?
+              ELSE DATE(m.created_at) <= ?
+            END`, [idUsuario, fecha, fecha, fecha]);
   // proporcional del período en curso (desde el último aniversario, 30avos → anuales/12 por mes completo)
   const [[u]] = await pool.query(
     `SELECT DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fi, COALESCE(f.anos_trabajados_previos,0) previos
        FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE u.id_usuario=?`, [idUsuario]);
-  let proporcional = 0;
+  let proporcional = 0, virtuales = 0;
   if (u?.fi) {
     const [[cfgV]] = await pool.query("SELECT valor FROM rh_config WHERE clave='vac_dias_anuales'");
     const anuales = parseFloat(cfgV?.valor) || 15;
@@ -198,13 +218,17 @@ async function saldoCuenta(idUsuario, aFecha) {
     if (h.getDate() < fi.getDate()) mesesTot--;
     mesesTot = Math.max(0, mesesTot);
     const mesesEnCurso = mesesTot % 12;
-    const n = Math.floor(mesesTot / 12) + 1;
+    const cumplidos = Math.floor(mesesTot / 12);
+    const n = cumplidos + 1;
     const progAnual = progresivoDelPeriodo(u.previos, n);
     proporcional = Math.round(mesesEnCurso * ((anuales + progAnual) / 12) * 10) / 10;
+    // períodos cumplidos a la fecha que todavía no están depositados en la cuenta
+    for (let k = Number(m.n_devengos) + 1; k <= cumplidos; k++) virtuales += anuales + progresivoDelPeriodo(u.previos, k);
   }
+  const saldoPer = Number(m.s) + virtuales;
   return {
-    saldo_periodos: Number(m.s), abonos: Number(m.abonos), cargos: Number(m.cargos),
-    proporcional, disponibles: Math.round((Number(m.s) + proporcional) * 10) / 10,
+    saldo_periodos: saldoPer, abonos: Number(m.abonos) + virtuales, cargos: Number(m.cargos),
+    proporcional, disponibles: Math.round((saldoPer + proporcional) * 10) / 10,
   };
 }
 exports.saldoCuenta = saldoCuenta;
