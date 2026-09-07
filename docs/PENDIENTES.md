@@ -54,7 +54,7 @@
 | 3.3 | **Historial de mora INDEXA para el Score de Mora** | El módulo está construido pero le falta el histórico para calibrar por segmento. |
 | 3.4 | **Ops a nombre de un ejecutivo suspendido** | Se siguen digitando operaciones con el nombre de Carlo Moreno (usuario 120005, inactivo desde ~mayo), en variantes "CARLOS MORENO" y "CARLO ANDRÉS". Revisar con Operaciones a quién corresponden de verdad — afecta atribución y comisión. |
 | 3.5 | **Actividades económicas del SII** | 674 códigos cargados; falta cablearlos a los giros de clientes y proveedores. |
-| 3.6 | **`cartas_aprobacion.id_credito_creado` huérfano en 382 de 600 cartas** (07-09-2026) | Apuntan a ids de `creditos` anteriores a la re-migración de la tabla. El envío de cartola ya no confía en ese id (v222.44, cae a ID Financiera), pero los JOIN de Post Venta por `id_credito_creado` siguen expuestos. Falta un barrido que re-apunte cada carta al crédito actual por ID Financiera / num_op. Quedaron 4 ops con cartola enviada en agosto sin el check CARTOLA ENVIADA: 5523893, 5629705, 5901108, 5960661 (marcar cuando corresponda). |
+| 3.6 | **`cartas_aprobacion.id_credito_creado` huérfano en 382 de 600 cartas** (07-09-2026) | Apuntan a ids de `creditos` anteriores a la re-migración de la tabla. El envío de cartola ya no confía en ese id (v222.44, cae a ID Financiera), pero los JOIN de Post Venta por `id_credito_creado` siguen expuestos. Falta un barrido que re-apunte cada carta al crédito actual por ID Financiera / num_op. Las 7 ops afectadas de agosto (5381115, 5714593, 5738833, 5523893, 5629705, 5901108, 5960661) se marcaron a mano el 07-09-2026. |
 
 ## 4. Módulos con fase pendiente
 
