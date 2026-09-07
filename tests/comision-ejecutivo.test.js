@@ -198,3 +198,32 @@ test('un mes sin operaciones no revienta: no cumple el mínimo y no hay comisió
   assert.strictEqual(r.total_creditos, 0);
   assert.strictEqual(r.total_financiado, 0);
 });
+
+/* ── Reglas de ESTRUCTURA paramétricas (07-09-2026): un modelo = variables + switches ──
+   Con los tres switches en 0 el motor es el anexo 08-2026 (todo lo de arriba). Con 1
+   vuelve el modelo anterior, mes a mes según la vigencia de las variables. */
+test('tramo_24_tasa_menor=1: 24 cuotas exactas pagan la tasa MENOR (modelo anterior)', () => {
+  const r = calcularComision([op({ monto_financiado: 40000000, plazo: 24 })], vars({ tramo_24_tasa_menor: 1 }), '2026-08');
+  assert.strictEqual(r.n_24, 1);
+  assert.strictEqual(r.incentivo_base, 40000000 * 0.0075);
+  const r0 = calcularComision([op({ monto_financiado: 40000000, plazo: 24 })], VARS, '2026-08');
+  assert.strictEqual(r0.incentivo_base, 40000000 * 0.0100);
+});
+
+test('calidad_proporcional=1: una de tres ops UNIDAD ya paga un tercio del indicador', () => {
+  const ops = [op({ monto_financiado: 40000000 }), op({ financiera: 'UNIDAD DE CREDITO', producto: 'UNIDAD' })];
+  const r = calcularComision(ops, vars({ calidad_proporcional: 1, peso_calidad: 0.2, meta_unidad: 3 }), '2026-08');
+  assert.ok(Math.abs(r.calidad - 1 / 3) < 1e-9);
+  const r0 = calcularComision(ops, vars({ peso_calidad: 0.2, meta_unidad: 3 }), '2026-08');
+  assert.strictEqual(r0.calidad, 0);
+});
+
+test('bono_sobre_base_total=1: el bono aplica sobre toda la base, no solo sobre las ops con el seguro', () => {
+  const ops = [op({ monto_financiado: 30000000, seguro_rdh: 1 }), op({ monto_financiado: 30000000, seguro_rdh: 1 }), op({ monto_financiado: 30000000 })];
+  const v = vars({ peso_rdh: 1, peso_cesantia: 0, peso_rep: 0, umbral_rdh: 0.5 });
+  const nuevo = calcularComision(ops, v, '2026-08');
+  const viejo = calcularComision(ops, { ...v, bono_sobre_base_total: 1 }, '2026-08');
+  assert.strictEqual(nuevo.base_rdh, 60000000 * 0.01);
+  assert.strictEqual(viejo.base_rdh, viejo.incentivo_base);
+  assert.ok(viejo.bono_rdh > nuevo.bono_rdh);
+});

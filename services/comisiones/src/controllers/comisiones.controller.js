@@ -42,6 +42,11 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
       ['dcto_meses_t2',  6,     'Prepago — meses tramo 2',         'Prepagos hasta este mes descuentan el % del tramo 2. Después de este mes no hay descuento', 'factor'],
       ['dcto_pct_t2',    0.50,  'Prepago — % descuento tramo 2',   'Porcentaje de la comisión pagada que se descuenta en el tramo 2 (0,50 = 50%)', 'porcentaje'],
       ['dcto_pct_anul',  1.00,  'Anulación — % descuento',         'Porcentaje que se descuenta cuando la operación se anula, sin importar cuándo (1,00 = 100%)', 'porcentaje'],
+      // Reglas de ESTRUCTURA del modelo (07-09-2026): permiten aplicar el modelo anterior o el
+      // anexo 08-2026 según el mes. Default 0 = anexo vigente. Ver shared/comision-ejecutivo.js.
+      ['tramo_24_tasa_menor',   0, '24 cuotas exactas pagan la tasa MENOR (1=sí, 0=no)', 'Con 1 el plazo de 24 meses cae en "% base < 24" (modelo anterior, "≤ 24"). Con 0 paga la tasa mayor (anexo 08-2026)', 'factor'],
+      ['calidad_proporcional',  0, 'Calidad proporcional a la meta (1=sí, 0=todo o nada)', 'Con 1 el indicador de calidad = ops UNIDAD ÷ meta, topado en 100% (modelo anterior). Con 0 es todo o nada (anexo 08-2026)', 'factor'],
+      ['bono_sobre_base_total', 0, 'Bonos sobre el incentivo base TOTAL (1=sí, 0=solo ops con el seguro)', 'Con 1 cada bono de seguro aplica sobre toda la base del mes (modelo anterior). Con 0 solo sobre la base de las operaciones que llevan ese seguro (desde 19-08-2026)', 'factor'],
     ];
     for (const [clave, valor, etiqueta, descripcion, tipo] of defaults) {
       await pool.query(
@@ -68,6 +73,38 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
         created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_cvv_vig (vigente_desde, vigente_hasta)
       )`);
+    /* MODELOS de incentivo (07-09-2026): un juego completo de variables con nombre, para
+       aplicarlo a un rango de meses sin digitar valor por valor. Aplicar un modelo pasa por
+       el mismo camino que "Guardar cambios" (versión con vigencia + bitácora inmutable).
+       Los de sistema se siembran una vez y no se borran; el usuario puede crear los suyos. */
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS comisiones_modelos (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        nombre      VARCHAR(120) NOT NULL,
+        descripcion VARCHAR(400) NULL,
+        valores     JSON NOT NULL,
+        es_sistema  TINYINT(1) NOT NULL DEFAULT 0,
+        creado_por  VARCHAR(160) NULL,
+        created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_modelo_nombre (nombre)
+      )`);
+    const [[hayModelos]] = await pool.query('SELECT COUNT(*) n FROM comisiones_modelos');
+    if (!hayModelos.n) {
+      const [vivas] = await pool.query('SELECT clave, valor FROM comisiones_variables');
+      const actual = {}; vivas.forEach(r => { actual[r.clave] = parseFloat(r.valor); });
+      const anexo = { ...actual, tramo_24_tasa_menor: 0, calidad_proporcional: 0, bono_sobre_base_total: 0 };
+      const anterior = { ...actual,
+        pct_24: 0.0075, pct_mas24: 0.01, minimo_monto: 30000000, factor_max: 0.66,
+        peso_rdh: 0, peso_cesantia: 0.5, peso_rep: 0.3, peso_calidad: 0.2, meta_unidad: 3,
+        umbral_rdh: 0.99, umbral_cesantia: 0.65, umbral_rep: 0.5,
+        semana_corrida_calc: 0, semana_corrida: 1.1667, dctos_activo: 0,
+        tramo_24_tasa_menor: 1, calidad_proporcional: 1, bono_sobre_base_total: 1 };
+      await pool.query('INSERT IGNORE INTO comisiones_modelos (nombre, descripcion, valores, es_sistema, creado_por) VALUES (?,?,?,1,?)',
+        ['Anexo 08-2026 (3 seguros)', 'Anexo de Remuneración Variable: piso $35M, 24 cuotas pagan 1%, RDH 34% / cesantía 33% / reparaciones 33% con umbrales 99/65/55, calidad fuera (peso 0), bonos solo sobre las ops con el seguro, semana corrida art. 45 CT, descuentos por prepago y anulación.', JSON.stringify(anexo), 'Sistema']);
+      await pool.query('INSERT IGNORE INTO comisiones_modelos (nombre, descripcion, valores, es_sistema, creado_por) VALUES (?,?,?,1,?)',
+        ['Modelo anterior (hasta jul-2026)', 'Piso $30M, 24 cuotas pagan 0,75% (≤ 24), cesantía 50% / reparaciones 30% / calidad 20% (UNIDAD ÷ meta 3, proporcional) con umbrales 65/50, sin RDH, bonos sobre el incentivo base total, semana corrida fija 1,1667, sin descuentos por prepago.', JSON.stringify(anterior), 'Sistema']);
+    }
+
     // Permiso propio para ver la bitácora (se designa desde la matriz de Perfiles)
     const [[modC]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/comisiones/' LIMIT 1");
     if (modC) await pool.query(`INSERT INTO funcionalidades (id_modulo, codigo, nombre, href, icono)
@@ -177,7 +214,7 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
 const { sumarDiasHabiles } = require('../../../../shared/feriados');
 /* Comisión del ejecutivo: motor único en shared/comision-ejecutivo.js. Vivía acá;
    se movió para poder probarlo sin levantar la BD (auditoría 03-08-2026, B-3). */
-const { calcularComision, factorSemanaCorrida } = require('../../../../shared/comision-ejecutivo');
+const { calcularComision, factorSemanaCorrida, esPlazoMenor } = require('../../../../shared/comision-ejecutivo');
 const SC = require('../../../../shared/semana-corrida');  // días hábiles = sin fines de semana ni feriados chilenos
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const mesNombre     = ym => { const [y,m]=String(ym).split('-'); return `${MESES_ES[parseInt(m)-1]} de ${y}`; };
@@ -411,7 +448,7 @@ async function descuentosDelMes(mes, vars) {
 
     const { factor_ajuste, factor_sc } = await factorOrigen(mesOrigen, o.ejecutivo);
     const monto = parseFloat(o.monto_financiado) || 0;
-    const base  = monto * (parseInt(o.plazo) < 24 ? vars.pct_24 : vars.pct_mas24);
+    const base  = monto * (esPlazoMenor(o.plazo, vars) ? vars.pct_24 : vars.pct_mas24);
     // Lo efectivamente pagado por esa operación: base + su ajuste, con la semana
     // corrida del mes de origen (así se devuelve lo mismo que se pagó, no menos).
     const comision_original = base * (1 + factor_ajuste) * factor_sc;
@@ -440,58 +477,146 @@ const getVariables = async (_req, res) => {
   }
 };
 
+/* ── Aplicar un juego de variables con vigencia (motor único del guardado) ──────
+   Lo usan "Guardar cambios" y "Aplicar modelo": valida la vigencia, rechaza meses
+   cerrados, escribe las variables vivas, crea la versión (bitácora inmutable) con la
+   simulación del efecto y audita. Devuelve { n_cambios, vigente_desde, vigente_hasta }
+   o lanza un Error con .status. */
+async function aplicarVariables({ updates, desdeRaw, hastaRaw, req, origen }) {
+  const desde = String(desdeRaw || '').trim();
+  const hasta = String(hastaRaw || '').trim();
+  const falla = (msg, status = 400) => { const e = new Error(msg); e.status = status; return e; };
+  if (!/^\d{4}-\d{2}$/.test(desde)) throw falla('Indica el mes DESDE cuándo rige este cambio');
+  if (hasta && !/^\d{4}-\d{2}$/.test(hasta)) throw falla('Mes HASTA inválido');
+  if (hasta && hasta < desde) throw falla('El mes HASTA no puede ser anterior al DESDE');
+  // Un mes cerrado ya está liquidado y pagado: sus variables no se tocan.
+  const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
+  if (await isMesCerrado(desde)) throw falla(`El mes ${desde} está CERRADO: no se permiten cambios de variables sobre meses cerrados`);
+  for (const [clave, valor] of Object.entries(updates || {}))
+    if (!Number.isFinite(parseFloat(valor))) throw falla(`Valor inválido para ${clave}`);
+
+  /* Las variables VIVAS (comisiones_variables) son las que rigen los meses sin versión
+     que los cubra; por eso solo se pisan cuando la vigencia es abierta o alcanza el mes
+     en curso. Aplicar un modelo a un mes ya pasado (ej. agosto) NO debe cambiar lo que
+     se paga hoy: para ese mes manda la versión, que se resuelve al leer (varsVersion). */
+  const mesHoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7);
+  const tocaVivas = !hasta || hasta >= mesHoy;
+  const antes = await getVars();
+  const antesMes = (await getVars(desde)) || antes;
+  const despues = { ...antes };
+  for (const [clave, valor] of Object.entries(updates || {})) {
+    if (!(clave in antes)) continue;
+    despues[clave] = parseFloat(valor);
+    if (tocaVivas) await pool.query('UPDATE comisiones_variables SET valor = ? WHERE clave = ?', [parseFloat(valor), clave]);
+  }
+  const difs = Object.keys(despues).filter(k => Number(antesMes[k]) !== Number(despues[k]));
+
+  // Efecto: total de comisiones del equipo en el mes de inicio de vigencia,
+  // con las variables que regían ese mes y con las nuevas (mismas operaciones).
+  let totAntes = null, totDespues = null;
+  try {
+    const suma = filas => Math.round(filas.reduce((s, f) => s + (Number(f.con_semana_corrida) || Number(f.incentivo_final) || 0), 0));
+    totAntes = suma(await calcularMes(desde, antesMes));
+    totDespues = suma(await calcularMes(desde, despues));
+  } catch (e) { console.error('[comisiones simulación]', e.message); }
+
+  const nom = [req.usuario?.nombre, req.usuario?.apellido].filter(Boolean).join(' ') || req.usuario?.email || 'Sistema';
+  await pool.query(
+    `INSERT INTO comisiones_variables_versiones (vigente_desde, vigente_hasta, valores, anterior, n_cambios,
+       total_antes, total_despues, mes_simulado, id_usuario, usuario_nombre)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [desde, hasta || null, JSON.stringify(despues), JSON.stringify(antesMes), difs.length,
+     totAntes, totDespues, desde, req.usuario?.id_usuario || null, nom]);
+
+  auditar({ req, accion: 'EDITAR', modulo: 'comisiones', entidad: 'comision_variable', entidad_id: 'variables',
+    detalle: `${origen || 'Actualizó variables de comisiones'} (${difs.length} variable/s, vigencia ${desde} → ${hasta || 'indefinido'}${tocaVivas ? '' : '; solo la versión, las vivas no cambian'})`, meta: updates });
+  return { n_cambios: difs.length, vigente_desde: desde, vigente_hasta: hasta || null, vivas_actualizadas: tocaVivas };
+}
+
 /* ── PUT /api/comisiones/variables ───────────────────────────────────────── */
 const putVariables = async (req, res) => {
   try {
-    const { vigente_desde: desdeRaw, vigente_hasta: hastaRaw, variables, ...resto } = req.body || {};
+    const { vigente_desde, vigente_hasta, variables, ...resto } = req.body || {};
     const updates = (variables && typeof variables === 'object') ? variables : resto;   // { clave: valor, ... }
-
-    // ── Vigencia del cambio (obligatoria "desde"; "hasta" vacío = indefinido) ──
-    const desde = String(desdeRaw || '').trim();
-    const hasta = String(hastaRaw || '').trim();
-    if (!/^\d{4}-\d{2}$/.test(desde))
-      return res.status(400).json({ success: false, data: null, error: 'Indica el mes DESDE cuándo rige este cambio' });
-    if (hasta && !/^\d{4}-\d{2}$/.test(hasta))
-      return res.status(400).json({ success: false, data: null, error: 'Mes HASTA inválido' });
-    if (hasta && hasta < desde)
-      return res.status(400).json({ success: false, data: null, error: 'El mes HASTA no puede ser anterior al DESDE' });
-    // Un mes cerrado ya está liquidado y pagado: sus variables no se tocan.
-    const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
-    if (await isMesCerrado(desde))
-      return res.status(400).json({ success: false, data: null, error: `El mes ${desde} está CERRADO: no se permiten cambios de variables sobre meses cerrados` });
-
-    const antes = await getVars();
-    for (const [clave, valor] of Object.entries(updates)) {
-      const num = parseFloat(valor);
-      if (!Number.isFinite(num)) return res.status(400).json({ success: false, data: null, error: `Valor inválido para ${clave}` });
-      await pool.query('UPDATE comisiones_variables SET valor = ? WHERE clave = ?', [num, clave]);
-    }
-    const despues = await getVars();
-    const difs = Object.keys(despues).filter(k => Number(antes[k]) !== Number(despues[k]));
-
-    // Efecto: total de comisiones del equipo en el mes de inicio de vigencia,
-    // con las variables antiguas y con las nuevas (mismas operaciones).
-    let totAntes = null, totDespues = null;
-    try {
-      const suma = filas => Math.round(filas.reduce((s, f) => s + (Number(f.con_semana_corrida) || Number(f.incentivo_final) || 0), 0));
-      totAntes = suma(await calcularMes(desde, antes));
-      totDespues = suma(await calcularMes(desde, despues));
-    } catch (e) { console.error('[comisiones simulación]', e.message); }
-
-    const nom = [req.usuario?.nombre, req.usuario?.apellido].filter(Boolean).join(' ') || req.usuario?.email || 'Sistema';
-    await pool.query(
-      `INSERT INTO comisiones_variables_versiones (vigente_desde, vigente_hasta, valores, anterior, n_cambios,
-         total_antes, total_despues, mes_simulado, id_usuario, usuario_nombre)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      [desde, hasta || null, JSON.stringify(despues), JSON.stringify(antes), difs.length,
-       totAntes, totDespues, desde, req.usuario?.id_usuario || null, nom]);
-
-    auditar({ req, accion: 'EDITAR', modulo: 'comisiones', entidad: 'comision_variable', entidad_id: 'variables',
-      detalle: `Actualizó variables de comisiones (${difs.length} variable/s, vigencia ${desde} → ${hasta || 'indefinido'})`, meta: updates });
-    res.json({ success: true, data: { n_cambios: difs.length, vigente_desde: desde, vigente_hasta: hasta || null }, error: null });
+    const data = await aplicarVariables({ updates, desdeRaw: vigente_desde, hastaRaw: vigente_hasta, req });
+    res.json({ success: true, data, error: null });
   } catch (e) {
-    res.status(500).json({ success: false, data: null, error: e.message });
+    res.status(e.status || 500).json({ success: false, data: null, error: e.message });
   }
+};
+
+/* ── MODELOS de incentivo: juegos completos de variables con nombre ─────────── */
+const getModelos = async (_req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, nombre, descripcion, valores, es_sistema, creado_por, created_at FROM comisiones_modelos ORDER BY es_sistema DESC, id');
+    const par = x => { try { return typeof x === 'string' ? JSON.parse(x) : (x || {}); } catch { return {}; } };
+    res.json({ success: true, data: rows.map(r => ({ ...r, valores: par(r.valores) })), error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+const postModelo = async (req, res) => {
+  try {
+    const nombre = String(req.body?.nombre || '').trim().slice(0, 120);
+    if (!nombre) return res.status(400).json({ success: false, data: null, error: 'El modelo necesita un nombre' });
+    // Sin valores explícitos se guardan las variables VIVAS (lo que hoy está en pantalla)
+    const base = (req.body?.valores && typeof req.body.valores === 'object') ? req.body.valores : await getVars();
+    const vivas = await getVars();
+    const valores = {};
+    for (const k of Object.keys(vivas)) { const n = parseFloat(base[k]); valores[k] = Number.isFinite(n) ? n : vivas[k]; }
+    const nom = [req.usuario?.nombre, req.usuario?.apellido].filter(Boolean).join(' ') || req.usuario?.email || 'Sistema';
+    const [r] = await pool.query('INSERT INTO comisiones_modelos (nombre, descripcion, valores, es_sistema, creado_por) VALUES (?,?,?,0,?)',
+      [nombre, String(req.body?.descripcion || '').slice(0, 400) || null, JSON.stringify(valores), nom]);
+    auditar({ req, accion: 'CREAR', modulo: 'comisiones', entidad: 'comision_modelo', entidad_id: r.insertId, detalle: `Creó el modelo de incentivo "${nombre}"` });
+    res.json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) {
+    res.status(e.code === 'ER_DUP_ENTRY' ? 400 : 500).json({ success: false, data: null, error: e.code === 'ER_DUP_ENTRY' ? 'Ya existe un modelo con ese nombre' : e.message });
+  }
+};
+const deleteModelo = async (req, res) => {
+  try {
+    const [[m]] = await pool.query('SELECT id, nombre, es_sistema FROM comisiones_modelos WHERE id=?', [req.params.id]);
+    if (!m) return res.status(404).json({ success: false, data: null, error: 'Modelo no encontrado' });
+    if (m.es_sistema) return res.status(400).json({ success: false, data: null, error: 'Los modelos de sistema no se borran' });
+    await pool.query('DELETE FROM comisiones_modelos WHERE id=?', [m.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'comisiones', entidad: 'comision_modelo', entidad_id: m.id, detalle: `Eliminó el modelo de incentivo "${m.nombre}"` });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+const aplicarModelo = async (req, res) => {
+  try {
+    const [[m]] = await pool.query('SELECT id, nombre, valores FROM comisiones_modelos WHERE id=?', [req.params.id]);
+    if (!m) return res.status(404).json({ success: false, data: null, error: 'Modelo no encontrado' });
+    const valores = typeof m.valores === 'string' ? JSON.parse(m.valores) : m.valores;
+    const data = await aplicarVariables({ updates: valores, desdeRaw: req.body?.vigente_desde, hastaRaw: req.body?.vigente_hasta, req,
+      origen: `Aplicó el modelo de incentivo "${m.nombre}"` });
+    res.json({ success: true, data: { ...data, modelo: m.nombre }, error: null });
+  } catch (e) { res.status(e.status || 500).json({ success: false, data: null, error: e.message }); }
+};
+/* Qué juego de variables rige cada mes (últimos N): la versión que lo cubre y, si sus
+   valores calzan con un modelo guardado, el nombre del modelo. */
+const getVigenciaMeses = async (req, res) => {
+  try {
+    const n = Math.min(24, Math.max(3, parseInt(req.query.meses) || 12));
+    const [modelos] = await pool.query('SELECT id, nombre, valores FROM comisiones_modelos');
+    const par = x => { try { return typeof x === 'string' ? JSON.parse(x) : (x || {}); } catch { return {}; } };
+    const mods = modelos.map(m => ({ id: m.id, nombre: m.nombre, valores: par(m.valores) }));
+    const calza = vals => mods.find(m => Object.keys(m.valores).every(k => Number(m.valores[k]) === Number(vals[k] ?? m.valores[k])));
+    const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
+    const hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+    const out = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+      const mes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const [[v]] = await pool.query(
+        `SELECT id, vigente_desde, vigente_hasta, usuario_nombre, created_at FROM comisiones_variables_versiones
+          WHERE vigente_desde <= ? AND (vigente_hasta IS NULL OR vigente_hasta >= ?) ORDER BY vigente_desde DESC, id DESC LIMIT 1`, [mes, mes]);
+      const vals = (await getVars(mes)) || {};
+      const m = calza(vals);
+      out.push({ mes, cerrado: await isMesCerrado(mes), version_id: v ? v.id : null, vigente_desde: v?.vigente_desde || null, vigente_hasta: v?.vigente_hasta || null,
+        modelo: m ? m.nombre : (v ? 'Variables propias (versión ' + v.id + ')' : 'Variables vivas'), reglas: {
+          tramo_24_tasa_menor: Number(vals.tramo_24_tasa_menor) > 0, calidad_proporcional: Number(vals.calidad_proporcional) > 0, bono_sobre_base_total: Number(vals.bono_sobre_base_total) > 0 } });
+    }
+    res.json({ success: true, data: out, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
 
 /* ── BITÁCORA DE CAMBIOS de variables (solo lectura; sin endpoints de edición) ── */
@@ -597,7 +722,7 @@ async function calcularMes(mes, varsOverride) {
       if (calc.cumple_minimo) {
         creds.forEach(c => {
           if ((c.estado_credito || '').toUpperCase() !== 'OTORGADO') return;
-          const pct    = parseInt(c.plazo) < 24 ? vars.pct_24 : vars.pct_mas24;
+          const pct    = esPlazoMenor(c.plazo, vars) ? vars.pct_24 : vars.pct_mas24;
           const monto  = parseFloat(c.monto_financiado) || 0;
           const base   = monto * pct;
           const isNcnu = (c.financiera || '').toUpperCase() === 'AUTOFIN' &&
@@ -910,5 +1035,5 @@ const marcarIndependiente = async (req, res) => {
   } catch (e) { console.error('[comisiones independiente]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getVariables, putVariables, getVariablesBitacora, getVariablesBitacoraDetalle, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos, getResumenConfig, enviarResumen, marcarIndependiente,
+module.exports = { getVariables, putVariables, getVariablesBitacora, getVariablesBitacoraDetalle, getModelos, postModelo, deleteModelo, aplicarModelo, getVigenciaMeses, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos, getResumenConfig, enviarResumen, marcarIndependiente,
   calcularMes };  // motor único: lo reusa Remuneraciones (RRHH) para las comisiones imponibles

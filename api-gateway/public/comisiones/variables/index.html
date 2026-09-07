@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Variables Comisiones — AutoFácil</title><!-- v6.2 -->
+  <title>Variables Comisiones — AutoFácil</title><!-- v7.0 modelos de incentivo + reglas de estructura por vigencia -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -71,7 +71,26 @@
     <div class="formula-step"><div class="formula-num">3</div><div class="formula-text"><strong>Factor ajuste</strong> = (Cruce RDH × <code>Peso RDH</code> + Cruce cesantía × <code>Peso ces.</code> + Cruce rep. × <code>Peso rep.</code> + Calidad × <code>Peso calidad</code>) × <code>Factor máx.</code> — <em>Calidad es <b>todo o nada</b>: 100% si alcanza la <code>Meta créditos UNIDAD</code>, 0% si queda bajo ella.</em></div></div>
     <div class="formula-step"><div class="formula-num">4</div><div class="formula-text"><strong>Incentivo Final</strong> = Base + Bono RDH + Bono Cesantía + Bono Reparaciones + Bono Calidad — cada bono aplica su ajuste <b>solo sobre la base de las operaciones que llevan ese seguro</b> (las mismas con que se midió el cumplimiento), no sobre el incentivo base total</div></div>
     <div class="formula-step"><div class="formula-num">5</div><div class="formula-text"><strong>Con Semana Corrida</strong> = Incentivo Final × factor del mes. Con <code>Semana corrida calculada</code> = 1 se aplica el art. 45 del Código del Trabajo: <code>1 + (domingos+festivos) ÷ días lunes a sábado hábiles</code>, que cambia cada mes (ej. feb-26 1,1667 · may-26 1,2917). Con 0 se usa el multiplicador fijo.</div></div>
+    <div class="formula-step"><div class="formula-num">★</div><div class="formula-text"><strong>Reglas de estructura</strong> (grupo al final): con <code>24 cuotas → tasa menor</code> = 1 el plazo 24 paga la tasa menor; con <code>Calidad proporcional</code> = 1 vuelve a ser ops ÷ meta; con <code>Bonos sobre base total</code> = 1 cada bono aplica sobre toda la base. Los tres en 1 = <b>modelo anterior</b>; los tres en 0 = <b>anexo 08-2026</b>. Se guardan con vigencia como cualquier variable, y los <b>Modelos</b> de arriba los fijan de una vez.</div></div>
     <div class="formula-step"><div class="formula-num">6</div><div class="formula-text"><strong>− Descuentos por prepago y anulación</strong> (cláusula novena): si una operación ya comisionada se <b>prepaga</b> dentro de los <code>meses tramo 1</code> contados desde el <b>vencimiento de su primera cuota</b> se devuelve el <code>% tramo 1</code> de lo pagado por ella; hasta los <code>meses tramo 2</code>, el <code>% tramo 2</code>; después, nada. Las <b>anuladas</b> devuelven el <code>% anulación</code> siempre. La reversa se imputa al <b>mes siguiente</b> al del hecho y baja la comisión del mes. A Remuneraciones llega solo el neto a pagar; el detalle de las reversas queda en Revisión de Comisiones (<i>Reversa comisión pagada OP12345 Prepago/Anulación</i>). Ningún mes pagado se reabre y la comisión nunca queda en negativo.</div></div>
+  </div>
+
+  <!-- Modelos de incentivo: juegos completos de variables con nombre -->
+  <div class="section-card" id="cardModelos">
+    <h6><i class="bi bi-collection"></i>Modelos de incentivo</h6>
+    <p style="font-size:.83rem;color:#64748b;margin:0 0 10px">Un <b>modelo</b> es el juego completo de variables, pesos y reglas con un nombre. Se aplica a un rango de meses
+      con la vigencia de abajo: así puede regir el modelo anterior en un mes y el anexo en el siguiente, sin digitar valor por valor.
+      El cálculo de cada mes usa el modelo que regía ese mes.</p>
+    <div id="modelosLista" class="text-secondary" style="font-size:.85rem">Cargando…</div>
+    <div id="modelosNuevo" style="display:none;margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input class="var-input" id="modNombre" placeholder="Nombre del modelo nuevo" style="width:260px">
+      <input class="var-input" id="modDesc" placeholder="Descripción (opcional)" style="flex:1;min-width:220px">
+      <button class="btn-guardar" onclick="guardarModelo()" style="background:#fff;color:#0f172a;border:1.5px solid #cbd5e1"><i class="bi bi-bookmark-plus"></i>Guardar valores actuales como modelo</button>
+    </div>
+    <div style="margin-top:14px">
+      <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;font-weight:700;margin-bottom:6px">Qué modelo rige cada mes</div>
+      <div id="vigenciaMeses" style="display:flex;gap:6px;flex-wrap:wrap;font-size:.78rem">Cargando…</div>
+    </div>
   </div>
 
   <div id="formContainer"><div class="text-center p-4 text-secondary"><i class="bi bi-hourglass-split me-2"></i>Cargando variables...</div></div>
@@ -150,7 +169,13 @@
           <a href="/rrhh/remuneraciones/">Remuneraciones</a>. El tramo se cuenta desde el
           <b>vencimiento de la primera cuota</b>, no desde el curse. Con el switch en 0 no se descuenta nada.</li>
       <li><b>Vigencia desde / hasta</b> → en qué meses rige este juego de variables. Los meses anteriores conservan
-          las que tenían (no se recalculan) y un <b>mes cerrado no se puede tocar</b>.</li>
+          las que tenían (no se recalculan) y un <b>mes cerrado no se puede tocar</b>. Si la vigencia termina antes del mes en curso,
+          solo cambia ese período: las variables vivas (las que rigen hoy) no se tocan.</li>
+      <li><b>Modelos de incentivo</b> → aplicar uno escribe el juego completo de variables con la vigencia elegida y queda en la
+          Bitácora igual que un guardado a mano. La franja "Qué modelo rige cada mes" muestra con qué modelo se calcula
+          <a href="/comisiones/revision/">Revisión de Comisiones</a> en cada mes. Los modelos de sistema (Anexo 08-2026 y Modelo anterior) no se borran.</li>
+      <li><b>Reglas de estructura</b> (24 cuotas → tasa menor · calidad proporcional · bonos sobre base total) → cambian la
+          <i>forma</i> del cálculo, no solo los valores: son lo que distingue el modelo anterior del anexo. Con los tres en 0 rige el anexo.</li>
       <li><b>Cada guardado</b> → queda en la <b>Bitácora de cambios</b> (botón arriba): autor, fecha y hora,
           antes/después de cada variable y el efecto en la comisión del equipo. Es inmutable y su acceso se designa
           por perfil (permiso <code>comisiones_variables_bitacora</code> en <a href="/usuarios/perfiles.html">Perfiles</a>).</li>
@@ -212,6 +237,11 @@ const GRUPOS = [
     icon: 'bi-dash-circle',
     claves: ['dctos_activo','dcto_meses_t1','dcto_pct_t1','dcto_meses_t2','dcto_pct_t2','dcto_pct_anul'],
   },
+  {
+    titulo: 'Reglas de estructura del modelo (0 = anexo 08-2026 · 1 = modelo anterior)',
+    icon: 'bi-toggles',
+    claves: ['tramo_24_tasa_menor','calidad_proporcional','bono_sobre_base_total'],
+  },
 ];
 
 const UNIDADES = {
@@ -219,11 +249,12 @@ const UNIDADES = {
   peso_cesantia:'%', peso_rep:'%', peso_calidad:'%',
   umbral_rdh:'%', umbral_cesantia:'%', umbral_rep:'%', semana_corrida:'×', meta_unidad:'ops', peso_rdh:'%', semana_corrida_calc:'0/1',
   dctos_activo:'0/1', dcto_meses_t1:'meses', dcto_pct_t1:'%', dcto_meses_t2:'meses', dcto_pct_t2:'%', dcto_pct_anul:'%',
+  tramo_24_tasa_menor:'0/1', calidad_proporcional:'0/1', bono_sobre_base_total:'0/1',
 };
 const PORCENTAJES = ['pct_24','pct_mas24','factor_max','peso_rdh','peso_cesantia','peso_rep','peso_calidad','umbral_rdh','umbral_cesantia','umbral_rep',
   'dcto_pct_t1','dcto_pct_t2','dcto_pct_anul'];
 const PASO = { minimo_monto:'100000', semana_corrida:'0.01', meta_unidad:'1', semana_corrida_calc:'1',
-  dctos_activo:'1', dcto_meses_t1:'1', dcto_meses_t2:'1' };
+  dctos_activo:'1', dcto_meses_t1:'1', dcto_meses_t2:'1', tramo_24_tasa_menor:'1', calidad_proporcional:'1', bono_sobre_base_total:'1' };
 
 let vars = {};
 
@@ -274,6 +305,73 @@ async function cargar() {
     if (esAdmin || codes.has('comisiones_variables_bitacora'))
       document.getElementById('btnBitacora').style.display = 'flex';
   } catch(_){}
+  cargarModelos(); cargarVigenciaMeses();
+}
+
+/* ── Modelos de incentivo y vigencia por mes ── */
+const REGLA_TXT = { tramo_24_tasa_menor:'24 cuotas → tasa menor', calidad_proporcional:'calidad proporcional', bono_sobre_base_total:'bonos sobre base total' };
+async function cargarModelos(){
+  const cont = document.getElementById('modelosLista');
+  const j = await (await fetch('/api/comisiones/variables/modelos',{headers:H})).json().catch(()=>({}));
+  if (!j.success){ cont.textContent = j.error || 'Sin acceso'; return; }
+  const pct = v => (Number(v)*100).toFixed(2).replace('.',',')+'%';
+  cont.innerHTML = j.data.map(m => {
+    const v = m.valores || {};
+    const reglas = Object.keys(REGLA_TXT).filter(k => Number(v[k])>0).map(k => REGLA_TXT[k]);
+    const resumen = `Piso ${clpF(v.minimo_monto)} · ${pct(v.pct_24)} / ${pct(v.pct_mas24)} · pesos RDH ${pct(v.peso_rdh)} · ces. ${pct(v.peso_cesantia)} · rep. ${pct(v.peso_rep)} · calidad ${pct(v.peso_calidad)}${reglas.length ? ' · ' + reglas.join(', ') : ''}`;
+    return `<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #f1f5f9">
+      <div style="flex:1"><b>${escH(m.nombre)}</b>${m.es_sistema ? ' <span style="font-size:.68rem;background:#eff6ff;color:#0141A2;border-radius:10px;padding:1px 8px">sistema</span>' : ''}
+        <div style="color:#64748b;font-size:.78rem">${escH(m.descripcion||'')}</div>
+        <div style="color:#334155;font-size:.76rem;margin-top:2px">${resumen}</div></div>
+      ${esAdmin ? `<button class="btn-guardar" style="padding:6px 12px;font-size:.8rem" onclick="aplicarModelo(${m.id}, '${escH(m.nombre).replace(/'/g,'&#39;')}')"><i class="bi bi-check2-circle"></i>Aplicar con la vigencia de abajo</button>
+      ${m.es_sistema ? '' : `<button class="btn-guardar" style="padding:6px 10px;font-size:.8rem;background:#fff;color:#b91c1c;border:1.5px solid #fecaca" onclick="borrarModelo(${m.id}, '${escH(m.nombre).replace(/'/g,'&#39;')}')"><i class="bi bi-trash"></i></button>`}` : ''}
+    </div>`;
+  }).join('') || '<div class="text-secondary">No hay modelos guardados.</div>';
+  if (esAdmin) document.getElementById('modelosNuevo').style.display = 'flex';
+}
+async function cargarVigenciaMeses(){
+  const cont = document.getElementById('vigenciaMeses');
+  const j = await (await fetch('/api/comisiones/variables/vigencia-meses?meses=12',{headers:H})).json().catch(()=>({}));
+  if (!j.success){ cont.textContent = j.error || '—'; return; }
+  const color = s => { let h=0; for (const c of s) h=(h*31+c.charCodeAt(0))>>>0; return ['#dbeafe','#dcfce7','#fef3c7','#fce7f3','#e0e7ff','#ffedd5'][h%6]; };
+  cont.innerHTML = j.data.map(x => `<div title="${escH(x.modelo)}${x.vigente_desde ? ' · versión '+x.version_id+' ('+x.vigente_desde+' → '+(x.vigente_hasta||'indefinido')+')' : ''}"
+      style="background:${color(x.modelo)};border-radius:8px;padding:6px 9px;min-width:92px;${x.cerrado?'opacity:.75;':''}">
+      <div style="font-weight:800;color:#0f172a">${x.mes}${x.cerrado?' <i class="bi bi-lock-fill" style="font-size:.7rem"></i>':''}</div>
+      <div style="color:#334155;font-size:.72rem;line-height:1.2">${escH(x.modelo)}</div></div>`).join('');
+}
+function vigenciaElegida(){
+  const vigente_desde = document.getElementById('vigDesde').value;
+  const vigente_hasta = document.getElementById('vigHasta').value;
+  if (!vigente_desde) { mostrarToast('Indica en "Vigencia" desde qué mes rige', false); return null; }
+  if (vigente_hasta && vigente_hasta < vigente_desde) { mostrarToast('El mes HASTA no puede ser anterior al DESDE', false); return null; }
+  return { vigente_desde, vigente_hasta };
+}
+async function aplicarModelo(id, nombre){
+  const vig = vigenciaElegida(); if (!vig) return;
+  if (!confirm(`Aplicar el modelo "${nombre}" desde ${vig.vigente_desde} ${vig.vigente_hasta ? 'hasta '+vig.vigente_hasta : 'en adelante (indefinido)'}.
+
+Las comisiones de esos meses se calcularán con ese modelo. Queda en la Bitácora. ¿Continuar?`)) return;
+  const j = await (await fetch('/api/comisiones/variables/modelos/'+id+'/aplicar',{ method:'POST', headers:H, body:JSON.stringify(vig) })).json().catch(()=>({}));
+  if (!j.success) return mostrarToast('Error: '+(j.error||'no se pudo aplicar'), false);
+  mostrarToast(`Modelo "${nombre}" aplicado — ${j.data.n_cambios} variable(s), ${j.data.vigente_desde} → ${j.data.vigente_hasta||'indefinido'}${j.data.vivas_actualizadas ? '' : ' (solo ese período; el mes actual no cambia)'}`, true);
+  vars = {}; cargar();
+}
+async function guardarModelo(){
+  const nombre = document.getElementById('modNombre').value.trim();
+  if (!nombre) return mostrarToast('Ponle nombre al modelo', false);
+  const valores = {};
+  document.querySelectorAll('.var-input[data-clave]').forEach(inp => { valores[inp.dataset.clave] = inp.dataset.pct==='true' ? parseFloat(inp.value)/100 : parseFloat(inp.value); });
+  const j = await (await fetch('/api/comisiones/variables/modelos',{ method:'POST', headers:H, body:JSON.stringify({ nombre, descripcion: document.getElementById('modDesc').value, valores }) })).json().catch(()=>({}));
+  if (!j.success) return mostrarToast('Error: '+(j.error||'no se pudo guardar'), false);
+  document.getElementById('modNombre').value = ''; document.getElementById('modDesc').value = '';
+  mostrarToast(`Modelo "${nombre}" guardado (con los valores que están en pantalla)`, true);
+  cargarModelos();
+}
+async function borrarModelo(id, nombre){
+  if (!confirm(`¿Eliminar el modelo "${nombre}"? No afecta los meses donde ya se aplicó (la versión queda en la bitácora).`)) return;
+  const j = await (await fetch('/api/comisiones/variables/modelos/'+id,{ method:'DELETE', headers:H })).json().catch(()=>({}));
+  if (!j.success) return mostrarToast('Error: '+(j.error||'no se pudo eliminar'), false);
+  mostrarToast('Modelo eliminado', true); cargarModelos();
 }
 
 /* ── Bitácora de cambios (solo lectura) ── */

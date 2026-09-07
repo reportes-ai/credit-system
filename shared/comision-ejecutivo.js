@@ -30,6 +30,25 @@ function factorSemanaCorrida(mes, vars) {
   return SC.factorMes(mes, 6, vars.semana_corrida || 1);
 }
 
+/* ── Reglas de ESTRUCTURA del modelo (paramétricas desde el 07-09-2026) ──────────
+   Además de tasas, pesos y umbrales, entre el modelo anterior y el anexo 08-2026
+   cambiaron tres REGLAS. Para poder aplicar un modelo u otro según el mes (las
+   variables tienen vigencia por mes), cada regla es un switch en comisiones_variables:
+     tramo_24_tasa_menor   1 = plazo 24 exacto paga la tasa MENOR (modelo anterior: "≤ 24")
+                           0 = 24 paga la tasa MAYOR (anexo 08-2026: "< 24 / ≥ 24")
+     calidad_proporcional  1 = calidad = min(ops UNIDAD ÷ meta, 1) (modelo anterior)
+                           0 = todo o nada: 100% si alcanza la meta, 0% si no (anexo)
+     bono_sobre_base_total 1 = cada bono aplica sobre el incentivo base TOTAL (anterior)
+                           0 = solo sobre la base de las ops que llevan ese seguro (19-08-2026)
+   Default 0 (anexo vigente). Un modelo = un juego de variables + estos switches. */
+const on = v => Number(v) > 0;
+/** ¿El plazo cae en el tramo de la tasa menor (pct_24)? Motor único: lo usan el cálculo
+ *  agregado, el reparto por crédito y los descuentos por prepago. */
+function esPlazoMenor(plazo, vars) {
+  const p = parseInt(plazo);
+  return on(vars && vars.tramo_24_tasa_menor) ? p <= 24 : p < 24;
+}
+
 function calcularComision(creditos, vars, mes) {
   const {
     pct_24, pct_mas24, minimo_monto, factor_max,
@@ -37,6 +56,8 @@ function calcularComision(creditos, vars, mes) {
     umbral_rdh, umbral_cesantia, umbral_rep, semana_corrida,
     meta_unidad,
   } = vars;
+  const calidadProporcional = on(vars.calidad_proporcional);
+  const bonoSobreBaseTotal  = on(vars.bono_sobre_base_total);
 
   const otorgados = creditos.filter(c => (c.estado_credito || '').toUpperCase() === 'OTORGADO');
 
@@ -47,10 +68,10 @@ function calcularComision(creditos, vars, mes) {
     return { cumple_minimo: false, total_creditos: otorgados.length, total_financiado, minimo_monto };
   }
 
-  // Split por plazo — regla del anexo de contrato: MENOR a 24 = pct_24; IGUAL O MAYOR a 24 = pct_mas24.
-  // (el plazo de 24 exactos paga la tasa mayor; antes caía en la menor)
-  const ot24    = otorgados.filter(c => parseInt(c.plazo) <  24);
-  const otMas24 = otorgados.filter(c => parseInt(c.plazo) >= 24);
+  // Split por plazo — anexo 08-2026: MENOR a 24 = pct_24; IGUAL O MAYOR a 24 = pct_mas24.
+  // Con tramo_24_tasa_menor = 1 (modelo anterior) el 24 exacto cae en la tasa menor.
+  const ot24    = otorgados.filter(c =>  esPlazoMenor(c.plazo, vars));
+  const otMas24 = otorgados.filter(c => !esPlazoMenor(c.plazo, vars));
   const monto24    = ot24.reduce((s, c) => s + (parseFloat(c.monto_financiado) || 0), 0);
   const montoMas24 = otMas24.reduce((s, c) => s + (parseFloat(c.monto_financiado) || 0), 0);
 
@@ -92,7 +113,9 @@ function calcularComision(creditos, vars, mes) {
   // TODO O NADA (anexo de contrato 08-2026): la meta es una EXIGENCIA, no un divisor.
   // Bajo la meta el indicador aporta 0; alcanzada o superada, aporta el 100%.
   // (antes era proporcional: 1 de 3 operaciones ya pagaba un tercio del indicador)
-  const calidad        = unidad_logrado >= META_UNIDAD ? 1 : 0;
+  // Con calidad_proporcional = 1 (modelo anterior) vuelve a ser ops ÷ meta, topado en 1.
+  const calidad        = calidadProporcional ? Math.min(unidad_logrado / META_UNIDAD, 1)
+                                             : (unidad_logrado >= META_UNIDAD ? 1 : 0);
 
   const cumple_rdh = cruce_rdh          > umbral_rdh;
   const cumple_ces = cruce_cesantia     > umbral_cesantia;
@@ -111,8 +134,9 @@ function calcularComision(creditos, vars, mes) {
   // ese seguro (las mismas con que se midió el cumplimiento), no sobre el
   // incentivo_base total (corrección 19-08-2026). La base de cada operación es
   // su monto financiado por la tasa de su tramo de plazo.
-  const baseDe = ops => ops.reduce((s, c) =>
-    s + (parseFloat(c.monto_financiado) || 0) * (parseInt(c.plazo) >= 24 ? pct_mas24 : pct_24), 0);
+  // Con bono_sobre_base_total = 1 (modelo anterior) cada bono aplica sobre el incentivo base total.
+  const baseDe = ops => bonoSobreBaseTotal ? incentivo_base : ops.reduce((s, c) =>
+    s + (parseFloat(c.monto_financiado) || 0) * (esPlazoMenor(c.plazo, vars) ? pct_24 : pct_mas24), 0);
   const base_rdh = baseDe(conRdh);
   const base_ces = baseDe(conCes);
   const base_rep = baseDe(conRep);
@@ -147,8 +171,9 @@ function calcularComision(creditos, vars, mes) {
     incentivo_final,
     factor_semana_corrida: factor_sc,
     con_semana_corrida: incentivo_final * factor_sc,
+    reglas: { tramo_24_tasa_menor: on(vars.tramo_24_tasa_menor), calidad_proporcional: calidadProporcional, bono_sobre_base_total: bonoSobreBaseTotal },
   };
 }
 
 
-module.exports = { calcularComision, factorSemanaCorrida };
+module.exports = { calcularComision, factorSemanaCorrida, esPlazoMenor };

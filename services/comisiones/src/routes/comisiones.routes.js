@@ -10,6 +10,13 @@ router.put('/variables',          verifyToken, requireFunc('comisiones_variables
 // edición ni de borrado — la bitácora es inmutable por diseño.
 router.get('/variables/bitacora',     verifyToken, requireFunc('comisiones_variables_bitacora'), ctrl.getVariablesBitacora);
 router.get('/variables/bitacora/:id', verifyToken, requireFunc('comisiones_variables_bitacora'), ctrl.getVariablesBitacoraDetalle);
+// Modelos de incentivo (juegos de variables con nombre) y qué modelo rige cada mes.
+// Aplicar un modelo = guardar variables con vigencia: mismo permiso que editar.
+router.get('/variables/modelos',              verifyToken,                                       ctrl.getModelos);
+router.get('/variables/vigencia-meses',       verifyToken,                                       ctrl.getVigenciaMeses);
+router.post('/variables/modelos',             verifyToken, requireFunc('comisiones_variables'), ctrl.postModelo);
+router.delete('/variables/modelos/:id',       verifyToken, requireFunc('comisiones_variables'), ctrl.deleteModelo);
+router.post('/variables/modelos/:id/aplicar', verifyToken, requireFunc('comisiones_variables'), ctrl.aplicarModelo);
 // Reportes propios del módulo: exigen Ver Comisión Ejecutivos (auditoría 2026-08-08).
 // ajustes-vigentes (más abajo) queda abierto: lo lee reportería de rentabilidad.
 router.get('/calculo',            verifyToken, requireFunc('comisión_ejecutivos_ver'), ctrl.getCalculo);
