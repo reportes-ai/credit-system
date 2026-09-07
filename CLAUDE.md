@@ -192,7 +192,7 @@ Reglas de diseño que se derivan de este principio:
 ## Motores automáticos: un solo interruptor (`shared/scheduler.js`)
 > **Toda tarea de fondo se registra con `programar()`, nunca con un `setInterval` suelto.**
 
-Hay **28 motores** que actúan sin que nadie los llame: aprueban comisiones, desisten aprobados
+Hay **29 motores** que actúan sin que nadie los llame: aprueban comisiones, desisten aprobados
 vencidos, cierran castigos, generan devengos de vacaciones, escalan tickets y workflows, mandan
 correos programados y cobranza.
 
@@ -214,6 +214,12 @@ correos programados y cobranza.
   nuevo. Sin esto el pool quedaba MEZCLADO (conexiones viejas -04:00, nuevas -03:00) y toda fecha leída
   corría una hora: el vigía de relojes mandó 15 correos el 06-09-2026. Las conexiones SIEMPRE hacen
   `SET time_zone` con el mismo offset con que mysql2 interpreta, nunca con el "vivo".
+- **Mes contable sigue a la fecha de curse** (`shared/mes-atribucion-core.js` → `SET_MES_SQL`, 07-09-2026):
+  dashboard, cartolas y ranking cuentan por `creditos.mes`; comisiones por `fecha_otorgado`. Desde el corte
+  (ago-26) TODO UPDATE que escriba `fecha_otorgado` lleva `SET_MES_SQL(corte)` DESPUÉS de esa columna.
+  Sin eso, 7 ops cursadas en septiembre quedaron en agosto y el mes cerrado pasó de 104 a 111. Red de
+  seguridad: `shared/vigia-mes-atribucion.js` (horario: corrige en mes abierto, solo avisa en cerrado) y el
+  chequeo `MES_ATRIBUCION` del Cierre de Mes.
 - **Alerta de doble host** (`shared/latido-host.js`, 04-09-2026): cada proceso late por minuto en
   `host_latidos`; si OTRO host con motores encendidos late contra la misma base, correo a
   `ALERTA_ERRORES_MAIL` y `/api/health → doble_host: true`. Nació porque el servicio viejo de

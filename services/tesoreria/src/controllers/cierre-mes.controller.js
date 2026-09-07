@@ -93,6 +93,17 @@ require('../../../../shared/migrate').enFila('cierre-mes', async () => {
            VALUES (?,?,?,?,1,?,'PERFIL',?,?)`, [nombre, desc, href, orden, dh, perfil, auto]);
     }
 
+    // Ítem agregado el 07-09-2026 (después del seed inicial): mes contable = fecha de curse
+    const [[hayMA]] = await pool.query("SELECT COUNT(*) n FROM cierre_checklist_items WHERE check_auto='MES_ATRIBUCION'");
+    if (!hayMA.n) {
+      const [[pOp]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Gerente de Operaciones y Crédito' LIMIT 1");
+      await pool.query(
+        `INSERT INTO cierre_checklist_items (nombre, descripcion, href, orden, obligatorio, dia_habil, resp_tipo, id_perfil, check_auto)
+         VALUES (?,?,?,?,1,?,'PERFIL',?,?)`,
+        ['Otorgadas con mes contable = fecha de curse', 'Ninguna otorgada del mes con el mes contable distinto al mes de su fecha de curse (es lo que cuentan dashboard y cartolas).',
+         '/dashboard/', 0, 2, pOp ? pOp.id_perfil : null, 'MES_ATRIBUCION']);
+    }
+
     // Funcionalidades: página (todos los que operan cierre) + acción de cerrar + mantenedor
     const [[modT]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Tesorería' OR ruta LIKE '/tesoreria%' LIMIT 1");
     if (modT) {
@@ -161,6 +172,23 @@ const CHECKS_AUTO = {
       "SELECT COUNT(*) n FROM ordenes_pago WHERE estado='EMITIDA' AND DATE_FORMAT(fecha_emision,'%Y-%m') <= ?", [mes]);
     return r.n === 0 ? { ok: true, detalle: 'Sin órdenes de pago pendientes' }
                      : { ok: false, detalle: `${r.n} orden(es) de pago emitida(s) sin pagar` };
+  },
+  /* Otorgadas del mes cuyo mes contable no coincide con su fecha de curse (07-09-2026:
+     agosto pasó de 104 a 111 después del cierre por 7 ops cursadas en septiembre con
+     mes agosto). Cuenta en ambas direcciones: mes = M con curse fuera de M, y curse en M
+     con mes distinto. Aplica desde el corte del mes de atribución. */
+  async MES_ATRIBUCION(mes) {
+    const { mesCorte } = require('../../../../shared/mes-atribucion');
+    const { ETAPA_SQL } = require('../../../../shared/etapa-credito');
+    if (mes < await mesCorte()) return { ok: true, detalle: 'Mes anterior al corte: manda el mes contable ajustado' };
+    const [[r]] = await pool.query(
+      `SELECT COUNT(*) n, GROUP_CONCAT(c.num_op ORDER BY c.num_op SEPARATOR ', ') ops
+         FROM creditos c
+        WHERE ${ETAPA_SQL('c')} = 'OTORGADO' AND c.fecha_otorgado IS NOT NULL
+          AND (DATE_FORMAT(c.mes,'%Y-%m') = ? OR DATE_FORMAT(c.fecha_otorgado,'%Y-%m') = ?)
+          AND DATE_FORMAT(COALESCE(c.mes,''),'%Y-%m') <> DATE_FORMAT(c.fecha_otorgado,'%Y-%m')`, [mes, mes]);
+    return r.n === 0 ? { ok: true, detalle: 'Todas las otorgadas tienen mes contable = mes de curse' }
+                     : { ok: false, detalle: `${r.n} otorgada(s) con mes contable distinto a la fecha de curse: ${String(r.ops || '').slice(0, 300)}` };
   },
 };
 

@@ -6,6 +6,8 @@ const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 // Motor único de etapa: escribir la etapa toca SIEMPRE las tres columnas.
 const { SET_ETAPA_SQL, SET_ESTADO_SQL, valoresEtapa } = require('../../../../shared/etapa-credito');
+// Motor único de mes de atribución: `mes` sigue a la fecha de curse desde el corte.
+const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
 // Motor único de numeración (num_op y numero_credito).
 const { numeroCreditoCarta } = require('../../../../shared/num-op');
 
@@ -364,7 +366,10 @@ const update = async (req, res) => {
       // La etapa también en `estado`, para que las tres columnas no se partan
       // (motor único: shared/etapa-credito.js).
       SET_ESTADO_SQL,
-      'fecha_otorgado=?','producto=?',
+      'fecha_otorgado=?',
+      // Después de fecha_otorgado: desde el corte, `mes` = mes de la fecha de curse (07-09-2026)
+      SET_MES_SQL(await mesCorte()),
+      'producto=?',
       'marca=?','modelo=?','anio=?','tasacion=?','permiso_circulacion=?',
       'valor_vehiculo=?','pie=?',
       'saldo_precio=?','pct_financiado=?','impuesto=?','estado_impuesto=?',
