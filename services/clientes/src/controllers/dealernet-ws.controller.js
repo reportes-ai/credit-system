@@ -1030,7 +1030,21 @@ const updateConfigEndpoint = async (req, res) => {
 /* ── Auditoría de uso (promedios por día por tipo + auto/empresa) ──────────── */
 const auditoria = async (req, res) => {
   try {
-    const dias = Math.min(365, Math.max(1, parseInt(req.query.dias) || 30));
+    // Ventana: ?dias=N (últimos N días) o ?mes=YYYY-MM (mes calendario; el en curso hasta hoy).
+    // `dias` queda como días efectivos de la ventana para el promedio diario.
+    let dias, ini, fin, mesFiltro = null;
+    if (/^\d{4}-\d{2}$/.test(req.query.mes || '')) {
+      mesFiltro = req.query.mes;
+      const [y, m] = mesFiltro.split('-').map(Number);
+      ini = `${mesFiltro}-01`;
+      fin = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-01`;
+      const hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+      const enCurso = hoy.getFullYear() === y && hoy.getMonth() + 1 === m;
+      dias = enCurso ? hoy.getDate() : new Date(y, m, 0).getDate();
+    } else {
+      dias = Math.min(365, Math.max(1, parseInt(req.query.dias) || 30));
+      ini = new Date(Date.now() - dias * 86400000); fin = new Date(Date.now() + 60000);
+    }
     // SOLO llamadas reales a DealerNet (gastan saldo): se cuenta sobre dealernet_consultas,
     // NO sobre dealernet_informes (que es el repositorio). La reutilización del repositorio
     // nunca inserta en dealernet_consultas, por lo que no infla la auditoría.
@@ -1047,7 +1061,7 @@ const auditoria = async (req, res) => {
     const [cons] = await pool.query(
       `SELECT c.id_usuario, c.productos, c.rut, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) usuario_nombre
        FROM dealernet_consultas c LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
-       WHERE c.retcode='0' AND c.created_at >= NOW() - INTERVAL ? DAY`, [dias]);
+       WHERE c.retcode='0' AND c.created_at >= ? AND c.created_at < ?`, [ini, fin]);
     const usuarios = {};
     for (const r of cons) {
       const k = r.id_usuario != null ? 'u' + r.id_usuario : 'n' + (r.usuario_nombre || '');
@@ -1068,8 +1082,8 @@ const auditoria = async (req, res) => {
     const [creds] = await pool.query(
       `SELECT REPLACE(SUBSTRING_INDEX(cl.rut,'-',1),'.','') body, MAX(${ES_ETAPA('OTORGADO', 'cr')}) otorgado
          FROM creditos cr JOIN clientes cl ON cl.id_cliente = cr.id_cliente
-        WHERE cr.created_at >= NOW() - INTERVAL ? DAY AND cl.rut IS NOT NULL
-        GROUP BY body`, [dias]);
+        WHERE cr.created_at >= ? AND cr.created_at < ? AND cl.rut IS NOT NULL
+        GROUP BY body`, [ini, fin]);
     const conCredito = new Set(creds.map(r => String(r.body)));
     const conOtorgado = new Set(creds.filter(r => Number(r.otorgado) === 1).map(r => String(r.body)));
     const porUsuario = Object.values(usuarios)
@@ -1105,7 +1119,7 @@ const auditoria = async (req, res) => {
       }
     }
     res.json({ success: true, data: {
-      dias, porUsuario, plan_uf, uf_hoy: ufHoy,
+      dias, mes: mesFiltro, porUsuario, plan_uf, uf_hoy: ufHoy,
       autoConsulta: Object.values(propio).sort((a, b) => b.n - a.n),
       consultaEmpresa: Object.values(empresa).sort((a, b) => b.n - a.n),
     }, error: null });
