@@ -2616,5 +2616,37 @@
   "viejo": 1710001,
   "nuevo": 2280023,
   "num_op": 89056
+ },
+ {
+  "carta": 240002,
+  "op_carta": "266002380AS",
+  "viejo": 750064,
+  "nuevo": 1157693,
+  "num_op": 88411,
+  "nota": "par anulada+aprobada, mismo crédito"
+ },
+ {
+  "carta": 270001,
+  "op_carta": "266002380BP",
+  "viejo": 750064,
+  "nuevo": 1157693,
+  "num_op": 88411,
+  "nota": "par anulada+aprobada, mismo crédito"
+ },
+ {
+  "carta": 390002,
+  "op_carta": "266060979B",
+  "viejo": 990002,
+  "nuevo": 1157988,
+  "num_op": 88712,
+  "nota": "par anulada+aprobada, mismo crédito"
+ },
+ {
+  "carta": 420001,
+  "op_carta": "266060979AS",
+  "viejo": 1020001,
+  "nuevo": 1157988,
+  "num_op": 88712,
+  "nota": "par anulada+aprobada, mismo crédito"
  }
 ]
