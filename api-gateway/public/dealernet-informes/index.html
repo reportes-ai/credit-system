@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v3.2 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
+  <!-- v3.3 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -86,6 +86,7 @@
   <div class="tabs">
     <button class="tabbtn active" data-t="consultar" onclick="tab('consultar')"><i class="bi bi-search me-1"></i>Consultar</button>
     <button class="tabbtn" id="tabAudBtn" data-t="auditoria" onclick="tab('auditoria')" style="display:none"><i class="bi bi-graph-up me-1"></i>Auditoría de uso</button>
+    <button class="tabbtn" id="tabAlBtn" data-t="alertas" onclick="tab('alertas')" style="display:none"><i class="bi bi-exclamation-triangle me-1"></i>Alertas</button>
     <button class="tabbtn" id="tabFacBtn" data-t="facturacion" onclick="tab('facturacion')" style="display:none"><i class="bi bi-receipt me-1"></i>Facturación</button>
     <button class="tabbtn" id="tabRepoBtn" data-t="repositorio" onclick="tab('repositorio')" style="display:none"><i class="bi bi-archive me-1"></i>Repositorio</button>
   </div>
@@ -140,6 +141,22 @@
     <div id="audBody"><div class="muted">Cargando…</div></div>
   </div>
   </div><!-- /tab-auditoria -->
+
+  <!-- Alertas de uso (mismo permiso que la auditoría) -->
+  <div id="tab-alertas" style="display:none">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <h3 style="margin:0"><i class="bi bi-exclamation-triangle"></i> Alertas de uso</h3>
+      <div>
+        <button class="btn-ghost al-d" data-d="30" onclick="cargarAlertas(30)">30 días</button>
+        <button class="btn-ghost al-d" data-d="90" onclick="cargarAlertas(90)">90 días</button>
+        <a class="btn-ghost" href="/mantenedores/dealernet-productos/" style="margin-left:8px;text-decoration:none" title="Los umbrales se cambian en el mantenedor"><i class="bi bi-sliders"></i> Umbrales</a>
+      </div>
+    </div>
+    <div class="muted" style="margin:-4px 0 10px">Patrones que pueden indicar venta de informes o trabajo para la competencia. Son <b>señales</b>, no pruebas: cada una tiene explicaciones legítimas y la revisa una persona.</div>
+    <div id="alBody"><div class="muted">Cargando…</div></div>
+  </div>
+  </div><!-- /tab-alertas -->
 
   <!-- Repositorio completo (solo Administrador) -->
   <div id="tab-repositorio" style="display:none">
@@ -588,15 +605,66 @@ function renderAuditoria(d){
   document.getElementById('audBody').innerHTML = h;
 }
 
+/* ── Alertas de uso ─────────────────────────────────────────────────────── */
+async function cargarAlertas(dias=90){
+  const body = document.getElementById('alBody');
+  try {
+    const r = await fetch('/api/dealernet/informes/alertas?dias='+dias, { headers:H });
+    const j = await r.json();
+    if (!j.success){ body.innerHTML = '<div class="muted">'+esc(j.error||'Sin acceso')+'</div>'; return; }
+    document.querySelectorAll('.al-d').forEach(b=>b.style.background = (+b.dataset.d===dias)?'#dbe6f3':'');
+    renderAlertas(j.data);
+  } catch(_){ body.innerHTML = '<div class="muted">Error al cargar.</div>'; }
+}
+function renderAlertas(d){
+  const c = d.cfg;
+  const fh = s => s ? new Date(s).toLocaleString('es-CL',{ timeZone:'America/Santiago', day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+  const fd = s => s ? String(s).slice(0,10).split('-').reverse().join('-') : '';
+  const sec = (color, titulo, desc, n, inner) =>
+    '<div class="card" style="margin-bottom:14px;border-left:4px solid '+color+'"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'+
+    '<h3 style="margin:0;font-size:.95rem">'+titulo+' <span style="background:'+(n?color:'#94a3b8')+';color:#fff;border-radius:12px;padding:1px 9px;font-size:.75rem;margin-left:6px">'+n+'</span></h3></div>'+
+    '<div class="muted" style="margin:4px 0 8px">'+desc+'</div>'+(n ? inner : '<div class="muted">Sin casos.</div>')+'</div>';
+  const tabla = (cab, filas) => '<div style="overflow:auto"><table class="tb"><thead><tr>'+cab.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+filas.join('')+'</tbody></table></div>';
+  const total = d.rafagas.length + d.fueraHorario.length + d.sinDestino.length + d.repetidos.length + d.volumen.length + d.autoConsulta.length + d.consultaEmpresa.length;
+  let h = '<div style="font-size:.85rem;margin-bottom:12px">Ventana: últimos <b>'+d.dias+'</b> días · <b>'+total+'</b> señal(es).</div>';
+
+  h += sec('#b91c1c', 'Ráfaga de RUTs', 'Más de <b>'+c.al_ruts_hora+'</b> RUTs distintos consultados por la misma persona en <b>60 minutos</b>. Puede ser una jornada intensa en el parque, o alguien pasando una lista.', d.rafagas.length,
+    tabla(['Usuario','Desde','Hasta','RUTs en 1 h','RUTs'], d.rafagas.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td>'+fh(x.desde)+'</td><td>'+fh(x.hasta)+'</td><td><b>'+x.n+'</b></td><td class="muted" style="font-size:.75rem">'+esc(x.ruts)+'</td></tr>')));
+
+  h += sec('#92400e', 'Fuera de horario', 'Consultas antes de las <b>'+String(c.al_hora_ini).padStart(2,'0')+':00</b>, desde las <b>'+String(c.al_hora_fin).padStart(2,'0')+':00</b> o en <b>domingo</b>. El sábado se vende; el domingo de noche, no tanto.', d.fueraHorario.length,
+    tabla(['Usuario','Consultas','Domingos','Última','Ejemplos'], d.fueraHorario.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td><b>'+x.n+'</b></td><td>'+x.domingos+'</td><td>'+fh(x.ultima)+'</td><td class="muted" style="font-size:.75rem">'+esc(String(x.ejemplos||'').split(', ').slice(0,6).join(', '))+'</td></tr>')));
+
+  h += sec('#7c2d12', 'Consultas sin destino', 'RUTs consultados hace <b>'+c.al_sin_destino_dias+'</b> días o más que <b>nunca</b> aparecen en un crédito, una cotización ni una carta. Se lista a quien supera el <b>'+c.al_sin_destino_pct+'%</b> (mínimo 5 RUTs). Es la señal más directa: se gastó saldo en personas que no entraron al negocio.', d.sinDestino.length,
+    tabla(['Usuario','RUTs evaluados','Sin destino','%','Ejemplos'], d.sinDestino.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td>'+x.ruts+'</td><td><b>'+x.sin_destino+'</b></td><td><b>'+String(x.pct).replace('.',',')+'%</b></td><td class="muted" style="font-size:.75rem">'+esc(x.ejemplos.join(', '))+'</td></tr>')));
+
+  h += sec('#1d4ed8', 'RUT repetido', 'La misma persona pide informes del mismo RUT <b>'+c.al_rut_repetido+'</b> veces o más en 30 días. El repositorio ya los tiene: repetirlos gasta saldo y sugiere seguimiento a alguien que no es cliente.', d.repetidos.length,
+    tabla(['Usuario','RUT','Veces','Primera','Última'], d.repetidos.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td>'+esc(x.rut)+'</td><td><b>'+x.n+'</b></td><td>'+fh(x.primera)+'</td><td>'+fh(x.ultima)+'</td></tr>')));
+
+  h += sec('#0f766e', 'Volumen anómalo', 'Un día con <b>'+c.al_volumen_factor+'×</b> o más el promedio diario de esa persona (sobre sus días con actividad, mínimo 5 consultas). Un salto así sin una feria o un evento detrás merece una pregunta.', d.volumen.length,
+    tabla(['Usuario','Día','Consultas','Su promedio'], d.volumen.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td>'+fd(x.dia)+'</td><td><b>'+x.n+'</b></td><td>'+String(x.promedio).replace('.',',')+'</td></tr>')));
+
+  h += sec('#b91c1c', 'Consultas a su propio RUT (90 días)', 'Uso personal del saldo de la empresa. Ya avisa a supervisor y RRHH al momento.', d.autoConsulta.length,
+    tabla(['Usuario','Veces'], d.autoConsulta.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td><b>'+x.n+'</b></td></tr>')));
+  h += sec('#92400e', 'Consultas a RUT de colegas (90 días)', 'Informes sobre otros usuarios de la empresa.', d.consultaEmpresa.length,
+    tabla(['Usuario','Veces','A quién'], d.consultaEmpresa.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td><b>'+x.n+'</b></td><td class="muted">'+esc((x.a||[]).join(', '))+'</td></tr>')));
+
+  h += '<div style="margin-top:6px;padding:10px 14px;background:#f8fafc;border-left:4px solid #2563eb;border-radius:6px;font-size:.8rem;color:#475569"><b style="color:#1e293b"><i class="bi bi-book"></i> Cómo leerlo</b>'+
+    '<ul style="margin:6px 0 0 18px;padding:0;line-height:1.6"><li>Una señal sola rara vez dice algo. <b>Dos o más señales sobre la misma persona</b> (ráfaga + sin destino, fuera de horario + RUT repetido) son el patrón a revisar.</li>'+
+    '<li>Los umbrales se ajustan en <a href="/mantenedores/dealernet-productos/">Productos DealerNet → Alertas de uso</a>. Si una sección lista a todo el equipo, el umbral está bajo.</li>'+
+    '<li>Para ver qué consultó exactamente una persona, usa la pestaña Repositorio (buscar por RUT) o la <a href="/auditoria/">Auditoría</a> del sistema.</li></ul></div>';
+  document.getElementById('alBody').innerHTML = h;
+}
+
 /* ── Pestañas ────────────────────────────────────────────────────────────── */
-let _audCargada = false, _facCargada = false, _repoCargado = false;
+let _audCargada = false, _facCargada = false, _repoCargado = false, _alCargada = false;
 function tab(t){
-  ['consultar','auditoria','facturacion','repositorio'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.style.display = x===t ? '' : 'none'; });
+  ['consultar','auditoria','alertas','facturacion','repositorio'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.style.display = x===t ? '' : 'none'; });
   document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
   // Miga sigue a la pestaña (regla SPA): Consultar = home interno
-  const HOJAS = { auditoria:'Auditoría de uso', facturacion:'Facturación', repositorio:'Repositorio' };
+  const HOJAS = { auditoria:'Auditoría de uso', alertas:'Alertas', facturacion:'Facturación', repositorio:'Repositorio' };
   if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(HOJAS[t] || null, () => tab('consultar'));
   if(t==='auditoria' && !_audCargada){ _audCargada = true; cargarAuditoria(30); }
+  if(t==='alertas' && !_alCargada){ _alCargada = true; cargarAlertas(90); }
   if(t==='facturacion' && !_facCargada){ _facCargada = true; cargarFacturacion(); }
   if(t==='repositorio' && !_repoCargado){ _repoCargado = true; cargarRepositorio(); }
 }
@@ -613,6 +681,7 @@ function tab(t){
     if (f.includes('dealernet_facturacion') || g) pFac = true;
   } catch(_){}
   document.getElementById('tabAudBtn').style.display = pAud ? '' : 'none';
+  document.getElementById('tabAlBtn').style.display = pAud ? '' : 'none';
   document.getElementById('tabFacBtn').style.display = pFac ? '' : 'none';
   document.getElementById('tabRepoBtn').style.display = esAdmin ? '' : 'none';
 })();

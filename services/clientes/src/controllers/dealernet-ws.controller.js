@@ -998,6 +998,7 @@ const getConfigEndpoint = async (req, res) => {
     res.json({ success: true, data: {
       ...(await getConfig()), rrhh_email: await leerRRHHEmail(),
       timeout_seg: parseInt(t && t.valor) || 90,
+      alertas: await leerAlertasCfg(),
       salud: { total: s.total || 0, ok: s.ok || 0, fallidos: s.fallidos || 0,
                ms_prom: s.ms_prom || null, ms_max: s.ms_max || null },
     }, error: null });
@@ -1022,9 +1023,143 @@ const updateConfigEndpoint = async (req, res) => {
       await pool.query("INSERT INTO dealernet_config (clave, valor) VALUES ('rrhh_email', ?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)",
         [String(req.body.rrhh_email || '').trim()]);
     }
+    if (req.body?.alertas && typeof req.body.alertas === 'object') {
+      for (const k of Object.keys(ALERTAS_DEF)) {
+        if (req.body.alertas[k] === undefined) continue;
+        const n = Number(req.body.alertas[k]);
+        if (!Number.isFinite(n) || n < 0 || (k === 'al_hora_ini' && n > 23) || (k === 'al_hora_fin' && n > 24) || (k === 'al_sin_destino_pct' && n > 100))
+          return res.status(400).json({ success: false, data: null, error: `Umbral inválido: ${k}` });
+        await pool.query('INSERT INTO dealernet_config (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(n)]);
+      }
+    }
     auditar({ req, accion: 'EDITAR', modulo: 'dealernet', entidad: 'config', detalle: 'Actualizó configuración DealerNet (umbrales / RRHH)' });
     res.json({ success: true, data: { ...(await getConfig()), rrhh_email: await leerRRHHEmail() }, error: null });
   } catch (e) { errSrv(res, e, 'updateConfigEndpoint'); }
+};
+
+/* ── Alertas de uso: patrones que sugieren venta de informes o trabajo para la
+   competencia. Umbrales paramétricos en dealernet_config (mantenedor Productos
+   DealerNet → Alertas de uso). Solo señales: quien decide es una persona. ──── */
+const ALERTAS_DEF = { al_ruts_hora: 3, al_hora_ini: 8, al_hora_fin: 21, al_sin_destino_dias: 30, al_sin_destino_pct: 50, al_rut_repetido: 3, al_volumen_factor: 3 };
+async function leerAlertasCfg() {
+  const [rows] = await pool.query(`SELECT clave, valor FROM dealernet_config WHERE clave IN (${Object.keys(ALERTAS_DEF).map(() => '?').join(',')})`, Object.keys(ALERTAS_DEF));
+  const cfg = { ...ALERTAS_DEF };
+  rows.forEach(r => { const n = Number(r.valor); if (Number.isFinite(n)) cfg[r.clave] = n; });
+  return cfg;
+}
+const rutCuerpo = r => String(r || '').replace(/[^0-9]/g, '');
+/* Auto-consultas (RUT propio) y consultas a otros usuarios de la empresa — últimos 90 días. */
+async function autoConsultas90() {
+  const [users] = await pool.query("SELECT id_usuario, nombre, apellido, rut FROM usuarios WHERE rut IS NOT NULL AND rut<>''");
+  const rutToUser = {}, myRut = {};
+  users.forEach(u => { const n = rutNum(u.rut); if (n) { rutToUser[n] = `${u.nombre} ${u.apellido || ''}`.trim(); myRut[u.id_usuario] = n; } });
+  const [inf90] = await pool.query(
+    `SELECT c.id_usuario, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) usuario_nombre, c.rut
+     FROM dealernet_consultas c LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
+     WHERE c.retcode='0' AND c.created_at >= NOW() - INTERVAL 90 DAY AND c.id_usuario IS NOT NULL`);
+  const propio = {}, empresa = {};
+  for (const r of inf90) {
+    const n = String(r.rut), nombre = r.usuario_nombre || '—';
+    if (myRut[r.id_usuario] && myRut[r.id_usuario] === n) {
+      (propio[r.id_usuario] ||= { id_usuario: r.id_usuario, usuario: nombre, n: 0 }).n++;
+    } else if (rutToUser[n]) {
+      (empresa[r.id_usuario] ||= { id_usuario: r.id_usuario, usuario: nombre, n: 0, a: new Set() }).n++;
+      empresa[r.id_usuario].a.add(rutToUser[n]);
+    }
+  }
+  return {
+    autoConsulta: Object.values(propio).sort((a, b) => b.n - a.n),
+    consultaEmpresa: Object.values(empresa).map(x => ({ ...x, a: [...x.a] })).sort((a, b) => b.n - a.n),
+  };
+}
+const alertas = async (req, res) => {
+  try {
+    const dias = Math.min(365, Math.max(7, parseInt(req.query.dias) || 90));
+    const cfg = await leerAlertasCfg();
+    const NOMBRE = 'TRIM(CONCAT(u.nombre," ",COALESCE(u.apellido,"")))';
+
+    // 1. Ráfaga: más de N RUTs distintos en 60 minutos (ventana deslizante por consulta)
+    const [raf] = await pool.query(
+      `SELECT a.id_usuario, ${NOMBRE} usuario, a.created_at, COUNT(DISTINCT b.rut) n,
+              GROUP_CONCAT(DISTINCT b.rut ORDER BY b.created_at SEPARATOR ',') ruts
+         FROM dealernet_consultas a
+         JOIN dealernet_consultas b ON b.id_usuario = a.id_usuario AND b.retcode='0'
+              AND b.created_at > a.created_at - INTERVAL 60 MINUTE AND b.created_at <= a.created_at
+         LEFT JOIN usuarios u ON u.id_usuario = a.id_usuario
+        WHERE a.retcode='0' AND a.id_usuario IS NOT NULL AND a.created_at >= NOW() - INTERVAL ? DAY
+        GROUP BY a.id, a.id_usuario, usuario, a.created_at
+       HAVING n > ?
+        ORDER BY a.created_at`, [dias, cfg.al_ruts_hora]);
+    // Colapsa ventanas que se pisan: una alerta por usuario cada 60 min (la de mayor n)
+    const rafagas = [];
+    for (const r of raf) {
+      const ult = rafagas[rafagas.length - 1];
+      if (ult && ult.id_usuario === r.id_usuario && new Date(r.created_at) - new Date(ult.hasta) < 3600000) {
+        ult.hasta = r.created_at; if (r.n > ult.n) { ult.n = r.n; ult.ruts = r.ruts; }
+      } else rafagas.push({ id_usuario: r.id_usuario, usuario: r.usuario, desde: r.created_at, hasta: r.created_at, n: r.n, ruts: r.ruts });
+    }
+
+    // 2. Fuera de horario: antes de hora_ini, desde hora_fin, o domingo
+    const [fuera] = await pool.query(
+      `SELECT c.id_usuario, ${NOMBRE} usuario, COUNT(*) n, MAX(c.created_at) ultima,
+              SUM(DAYOFWEEK(c.created_at)=1) domingos,
+              GROUP_CONCAT(DISTINCT DATE_FORMAT(c.created_at,'%d-%m %H:%i') ORDER BY c.created_at DESC SEPARATOR ', ') ejemplos
+         FROM dealernet_consultas c LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
+        WHERE c.retcode='0' AND c.id_usuario IS NOT NULL AND c.created_at >= NOW() - INTERVAL ? DAY
+          AND (HOUR(c.created_at) < ? OR HOUR(c.created_at) >= ? OR DAYOFWEEK(c.created_at) = 1)
+        GROUP BY c.id_usuario, usuario ORDER BY n DESC`, [dias, cfg.al_hora_ini, cfg.al_hora_fin]);
+
+    // 3. Sin destino: RUT consultado hace ≥N días que no aparece en créditos, cotizaciones ni cartas
+    const [cons] = await pool.query(
+      `SELECT c.id_usuario, ${NOMBRE} usuario, c.rut, MIN(c.created_at) primera
+         FROM dealernet_consultas c LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
+        WHERE c.retcode='0' AND c.id_usuario IS NOT NULL
+          AND c.created_at >= NOW() - INTERVAL ? DAY AND c.created_at <= NOW() - INTERVAL ? DAY
+        GROUP BY c.id_usuario, usuario, c.rut`, [dias, cfg.al_sin_destino_dias]);
+    const [[cr], [co], [ca]] = await Promise.all([
+      pool.query(`SELECT DISTINCT REPLACE(SUBSTRING_INDEX(cl.rut,'-',1),'.','') b FROM clientes cl JOIN creditos c ON c.id_cliente = cl.id_cliente WHERE cl.rut IS NOT NULL`),
+      pool.query('SELECT DISTINCT rut_cliente_cuerpo b FROM cotizaciones WHERE rut_cliente_cuerpo IS NOT NULL'),
+      pool.query('SELECT DISTINCT rut_cliente_cuerpo b FROM cartas_aprobacion WHERE rut_cliente_cuerpo IS NOT NULL'),
+    ]);
+    const destino = new Set([...cr, ...co, ...ca].map(r => rutCuerpo(r.b)));
+    const sd = {};
+    for (const r of cons) {
+      const u = (sd[r.id_usuario] ||= { id_usuario: r.id_usuario, usuario: r.usuario, ruts: 0, sin_destino: 0, ejemplos: [] });
+      u.ruts++;
+      if (!destino.has(rutCuerpo(r.rut))) { u.sin_destino++; if (u.ejemplos.length < 8) u.ejemplos.push(r.rut); }
+    }
+    const sinDestino = Object.values(sd).map(u => ({ ...u, pct: u.ruts ? +(u.sin_destino / u.ruts * 100).toFixed(1) : 0 }))
+      .filter(u => u.ruts >= 5 && u.pct >= cfg.al_sin_destino_pct).sort((a, b) => b.pct - a.pct);
+
+    // 4. RUT repetido: mismo usuario consulta el mismo RUT N o más veces en 30 días
+    const [rep] = await pool.query(
+      `SELECT c.id_usuario, ${NOMBRE} usuario, c.rut, COUNT(*) n, MIN(c.created_at) primera, MAX(c.created_at) ultima
+         FROM dealernet_consultas c LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
+        WHERE c.retcode='0' AND c.id_usuario IS NOT NULL AND c.created_at >= NOW() - INTERVAL 30 DAY
+        GROUP BY c.id_usuario, usuario, c.rut HAVING n >= ? ORDER BY n DESC LIMIT 100`, [cfg.al_rut_repetido]);
+
+    // 5. Volumen anómalo: un día con N× el promedio diario del usuario (sobre sus días activos), mínimo 5
+    const [dd] = await pool.query(
+      `SELECT c.id_usuario, ${NOMBRE} usuario, DATE(c.created_at) dia, COUNT(*) n
+         FROM dealernet_consultas c LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
+        WHERE c.retcode='0' AND c.id_usuario IS NOT NULL AND c.created_at >= NOW() - INTERVAL ? DAY
+        GROUP BY c.id_usuario, usuario, dia`, [dias]);
+    const porU = {};
+    dd.forEach(r => (porU[r.id_usuario] ||= { usuario: r.usuario, dias: [] }).dias.push(r));
+    const volumen = [];
+    for (const [id, u] of Object.entries(porU)) {
+      if (u.dias.length < 5) continue;
+      const prom = u.dias.reduce((s, d) => s + Number(d.n), 0) / u.dias.length;
+      u.dias.filter(d => d.n >= 5 && d.n >= cfg.al_volumen_factor * prom)
+        .forEach(d => volumen.push({ id_usuario: +id, usuario: u.usuario, dia: d.dia, n: Number(d.n), promedio: +prom.toFixed(1) }));
+    }
+    volumen.sort((a, b) => b.n / b.promedio - a.n / a.promedio);
+
+    // 6. Propio RUT / colegas (90 días)
+    const auto = await autoConsultas90();
+
+    res.json({ success: true, data: { dias, cfg, rafagas, fueraHorario: fuera, sinDestino, repetidos: rep, volumen, ...auto }, error: null });
+  } catch (e) { errSrv(res, e, 'alertas'); }
 };
 
 /* ── Auditoría de uso (promedios por día por tipo + auto/empresa) ──────────── */
@@ -1101,28 +1236,9 @@ const auditoria = async (req, res) => {
       })
       .sort((a, b) => b.total - a.total);
 
-    // Auto-consultas (RUT propio) y consultas a otros usuarios de la empresa — últimos 90 días.
-    const [users] = await pool.query("SELECT id_usuario, nombre, apellido, rut FROM usuarios WHERE rut IS NOT NULL AND rut<>''");
-    const rutToUser = {}, myRut = {};
-    users.forEach(u => { const n = rutNum(u.rut); if (n) { rutToUser[n] = `${u.nombre} ${u.apellido || ''}`.trim(); myRut[u.id_usuario] = n; } });
-    const [inf90] = await pool.query(
-      `SELECT c.id_usuario, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) usuario_nombre, c.rut
-       FROM dealernet_consultas c LEFT JOIN usuarios u ON u.id_usuario = c.id_usuario
-       WHERE c.retcode='0' AND c.created_at >= NOW() - INTERVAL 90 DAY AND c.id_usuario IS NOT NULL`);
-    const propio = {}, empresa = {};
-    for (const r of inf90) {
-      const n = String(r.rut), nombre = r.usuario_nombre || '—';
-      if (myRut[r.id_usuario] && myRut[r.id_usuario] === n) {
-        (propio[r.id_usuario] ||= { id_usuario: r.id_usuario, usuario: nombre, n: 0 }).n++;
-      } else if (rutToUser[n]) {
-        (empresa[r.id_usuario] ||= { id_usuario: r.id_usuario, usuario: nombre, n: 0 }).n++;
-      }
-    }
-    res.json({ success: true, data: {
-      dias, mes: mesFiltro, porUsuario, plan_uf, uf_hoy: ufHoy,
-      autoConsulta: Object.values(propio).sort((a, b) => b.n - a.n),
-      consultaEmpresa: Object.values(empresa).sort((a, b) => b.n - a.n),
-    }, error: null });
+    // Auto-consultas y consultas a colegas (90 días): mismo motor que la pestaña Alertas
+    const auto = await autoConsultas90();
+    res.json({ success: true, data: { dias, mes: mesFiltro, porUsuario, plan_uf, uf_hoy: ufHoy, ...auto }, error: null });
   } catch (e) { errSrv(res, e, 'auditoria'); }
 };
 
@@ -1323,4 +1439,4 @@ const renderFallback = async (req, res) => {
 
 module.exports = { getProductos, fichaInformes, asegurarInformes, analizarInforme, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
   verificarRepositorio, solicitarInformes, productosActivos, historicos, verInforme, descargarPdf, getConfigEndpoint, updateConfigEndpoint,
-  clasificarRut, auditoria, getCostos, updateCostos, facturacion, guardarFacturacion, historialFacturacion, repositorio, renderFallback };
+  clasificarRut, auditoria, alertas, getCostos, updateCostos, facturacion, guardarFacturacion, historialFacturacion, repositorio, renderFallback };

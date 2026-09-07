@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Productos DealerNet — AutoFácil</title>
-  <!-- v1.9 — navbar migrada al componente topnav -->
+  <!-- v2.0 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -109,6 +109,22 @@
   </div>
 
   <div class="card">
+    <h3><i class="bi bi-exclamation-triangle me-1"></i>Alertas de uso</h3>
+    <p style="font-size:.83rem;color:#64748b;margin:0 0 12px">Umbrales de la pestaña <a href="/dealernet-informes/">Alertas</a> de Informes DealerNet: patrones que pueden indicar venta de informes o trabajo para la competencia. Son señales que revisa una persona; si una sección lista a todo el equipo, el umbral está bajo.</p>
+    <div class="addgrid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="fld"><label title="Más de N RUTs distintos en 60 minutos">Ráfaga: RUTs en 1 h (más de)</label><input type="number" id="alRutsHora" min="1" placeholder="3"></div>
+      <div class="fld"><label>Horario normal desde (hora)</label><input type="number" id="alHoraIni" min="0" max="23" placeholder="8"></div>
+      <div class="fld"><label>Horario normal hasta (hora)</label><input type="number" id="alHoraFin" min="1" max="24" placeholder="21"></div>
+      <div class="fld"><label title="RUT consultado hace N días o más sin crédito, cotización ni carta">Sin destino: días de espera</label><input type="number" id="alSdDias" min="1" placeholder="30"></div>
+      <div class="fld"><label>Sin destino: % para alertar</label><input type="number" id="alSdPct" min="0" max="100" placeholder="50"></div>
+      <div class="fld"><label>RUT repetido: veces en 30 días</label><input type="number" id="alRep" min="2" placeholder="3"></div>
+      <div class="fld"><label>Volumen anómalo: × su promedio</label><input type="number" id="alVol" min="1" step="0.5" placeholder="3"></div>
+      <div class="fld" style="align-self:end"><button class="btn-primary2" onclick="guardarAlertas()"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+    </div>
+    <p style="font-size:.78rem;color:#94a3b8;margin:8px 0 0">El domingo siempre cuenta como fuera de horario (el sábado no: se vende). Las consultas al propio RUT y a colegas no tienen umbral: se listan todas.</p>
+  </div>
+
+  <div class="card">
     <h3><i class="bi bi-search me-1"></i>Probar consulta</h3>
     <p style="font-size:.83rem;color:#64748b;margin:0 0 12px">Consulta los productos <b>activos</b> para un RUT. <b>Ojo:</b> con credenciales reales esto consume saldo.</p>
     <div class="test-grid">
@@ -126,6 +142,7 @@
       <li><b>Código / Nombre</b> → identifican cada producto del catálogo DealerNet (rango 3401–3450 y códigos propios como <code>16</code> Comportamiento Vigente o <code>2101</code> Boletín Deudores de Pensión). Agrega aquí los códigos nuevos que te confirme DealerNet.</li>
       <li><b>Vigencia de informes (bloqueo / vigencia)</b> → controlan la reutilización del repositorio en <a href="/dealernet-informes/">Informes DealerNet</a>: bajo el bloqueo no deja consultar (usa histórico), entre bloqueo y vigencia pregunta, sobre la vigencia consulta directo.</li>
       <li><b>Espera máx. a DealerNet (seg)</b> → cuánto aguantamos su respuesta antes de dar la consulta por fallida, en <a href="/dealernet-informes/">Informes DealerNet</a> y en la <a href="/dealers-incorporacion/nuevo.html">Ficha de Dealer</a>. DealerNet se demora más cuando está cargado o cuando se piden varios informes de una vez; si los usuarios ven timeouts, súbelo mirando la demora máxima real del recuadro de arriba. <b>No hay reintento automático a propósito:</b> si el corte fue nuestro pero DealerNet alcanzó a emitir el informe, reintentar solo lo cobraría dos veces.</li>
+      <li><b>Alertas de uso (ráfaga, horario, sin destino, RUT repetido, volumen)</b> → umbrales de la pestaña <a href="/dealernet-informes/">Alertas</a> de Informes DealerNet. No bloquean nada ni mandan correo: solo deciden qué casos se listan para revisión.</li>
       <li><b>Credenciales</b> → en variables de entorno de Render; afectan a toda consulta al Web Service.</li>
       <li>El módulo <a href="/dealernet-informes/">Informes DealerNet</a> (consulta en vivo + repositorio compartido) reemplaza la carga manual de PDF de <a href="/informes-dealernet/">Informes Comerciales Dealernet</a>.</li>
     </ul>
@@ -223,7 +240,15 @@ async function cargarConfig(){
     if(j.success){ document.getElementById('cfgBloqueo').value=j.data.dias_bloqueo; document.getElementById('cfgVigencia').value=j.data.dias_vigencia;
       const tt=document.getElementById('cfgTimeout'); if(tt) tt.value=j.data.timeout_seg||90;
       const rr=document.getElementById('cfgRRHH'); if(rr) rr.value=j.data.rrhh_email||'';
+      const a=j.data.alertas||{}; const M={alRutsHora:'al_ruts_hora',alHoraIni:'al_hora_ini',alHoraFin:'al_hora_fin',alSdDias:'al_sin_destino_dias',alSdPct:'al_sin_destino_pct',alRep:'al_rut_repetido',alVol:'al_volumen_factor'};
+      for(const [id,k] of Object.entries(M)){ const el=document.getElementById(id); if(el && a[k]!==undefined) el.value=a[k]; }
       pintarSalud(j.data.salud); } } catch(_){}
+}
+async function guardarAlertas(){
+  const M={alRutsHora:'al_ruts_hora',alHoraIni:'al_hora_ini',alHoraFin:'al_hora_fin',alSdDias:'al_sin_destino_dias',alSdPct:'al_sin_destino_pct',alRep:'al_rut_repetido',alVol:'al_volumen_factor'};
+  const alertas={}; for(const [id,k] of Object.entries(M)){ const v=document.getElementById(id).value; if(v!=='') alertas[k]=Number(v); }
+  try { const r=await fetch('/api/dealernet/config',{ method:'PUT', headers:H, body:JSON.stringify({ alertas }) });
+    const j=await r.json(); if(j.success) toast('Umbrales de alertas guardados'); else toast(j.error||'Error', true); } catch(_){ toast('Error', true); }
 }
 /* Salud del conector: cuántos intentos fallaron y cuánto se demora DealerNet
    de verdad. Sirve para decidir el tiempo de espera con datos, no a ojo. */
