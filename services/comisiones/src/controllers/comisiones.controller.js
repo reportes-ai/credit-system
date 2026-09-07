@@ -98,11 +98,11 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
         peso_rdh: 0, peso_cesantia: 0.5, peso_rep: 0.3, peso_calidad: 0.2, meta_unidad: 3,
         umbral_rdh: 0.99, umbral_cesantia: 0.65, umbral_rep: 0.5,
         semana_corrida_calc: 0, semana_corrida: 1.1667, dctos_activo: 0,
-        tramo_24_tasa_menor: 1, calidad_proporcional: 1, bono_sobre_base_total: 1 };
+        tramo_24_tasa_menor: 1, calidad_proporcional: 0, bono_sobre_base_total: 1 };   // calidad también era binaria (Pato, 07-09-2026)
       await pool.query('INSERT IGNORE INTO comisiones_modelos (nombre, descripcion, valores, es_sistema, creado_por) VALUES (?,?,?,1,?)',
         ['Anexo 08-2026 (3 seguros)', 'Anexo de Remuneración Variable: piso $35M, 24 cuotas pagan 1%, RDH 34% / cesantía 33% / reparaciones 33% con umbrales 99/65/55, calidad fuera (peso 0), bonos solo sobre las ops con el seguro, semana corrida art. 45 CT, descuentos por prepago y anulación.', JSON.stringify(anexo), 'Sistema']);
       await pool.query('INSERT IGNORE INTO comisiones_modelos (nombre, descripcion, valores, es_sistema, creado_por) VALUES (?,?,?,1,?)',
-        ['Modelo anterior (hasta jul-2026)', 'Piso $30M, 24 cuotas pagan 0,75% (≤ 24), cesantía 50% / reparaciones 30% / calidad 20% (UNIDAD ÷ meta 3, proporcional) con umbrales 65/50, sin RDH, bonos sobre el incentivo base total, semana corrida fija 1,1667, sin descuentos por prepago.', JSON.stringify(anterior), 'Sistema']);
+        ['Modelo anterior (hasta jul-2026)', 'Piso $30M, 24 cuotas pagan 0,75% (≤ 24), cesantía 50% / reparaciones 30% / calidad 20% (3 créditos UNIDAD, todo o nada) con umbrales 65/50, sin RDH, bonos sobre el incentivo base total, semana corrida fija 1,1667, sin descuentos por prepago.', JSON.stringify(anterior), 'Sistema']);
     }
 
     // Permiso propio para ver la bitácora (se designa desde la matriz de Perfiles)
