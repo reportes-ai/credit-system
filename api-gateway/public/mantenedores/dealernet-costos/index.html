@@ -130,9 +130,7 @@ async function guardar(){
 cargar();
 </script>
 <script>
-  window.AF_TOPNAV = {
-    self: { key:'dealernet-costos', title:'Costo DealerNet', icon:'bi-cash-coin', defaultSection:'mantenedores' }
-  };
+  window.AF_TOPNAV = { breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Mantenedor DealerNet',href:'/mantenedores/dealernet/'},{label:'Costo DealerNet',current:true}] };
 </script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
