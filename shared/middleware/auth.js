@@ -128,11 +128,14 @@ const verifyToken = async (req, res, next) => {
   /* PERFIL DE SOLO LECTURA (perfiles.solo_lectura=1, ej. "Demo" o Director): mismo
      candado que "Ver como" — datos reales a la vista, cero escrituras. Se hace valer
      acá en el middleware para que ninguna ruta dependa de acordarse.
-     Excepción: cambiar SU PROPIA contraseña — es seguridad de la cuenta, no un dato
-     de negocio (Diego, perfil Director, no podía cambiar la clave — 02-09-2026). */
+     Excepciones (no son datos de negocio): cambiar SU PROPIA contraseña (Diego, perfil
+     Director, no podía cambiar la clave — 02-09-2026) y el latido/cierre de sesión
+     (/api/desempeno/ping y /logout): son POST, el candado los bloqueaba y la Auditoría
+     mostraba a Diego con 4 sesiones de "0 minutos" aunque hubiera navegado (07-09-2026). */
+  const RUTAS_SL_LIBRES = ['/api/auth/cambiar-clave', '/api/desempeno/ping', '/api/desempeno/logout'];
   if (payload && payload.sl && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     const rutaSL = String(req.originalUrl || req.url || '').split('?')[0];
-    if (rutaSL !== '/api/auth/cambiar-clave' && !rutaSL.endsWith('/api/auth/cambiar-clave')) {
+    if (!RUTAS_SL_LIBRES.some(r => rutaSL === r || rutaSL.endsWith(r))) {
       return res.status(403).json({ success: false, data: null,
         error: 'Perfil de solo lectura: puedes navegar y ver, no operar.' });
     }
