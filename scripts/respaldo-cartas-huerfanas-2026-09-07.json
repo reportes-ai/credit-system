@@ -1,0 +1,2620 @@
+[
+ {
+  "carta": 180001,
+  "op_carta": "265313613TA",
+  "viejo": 9098,
+  "nuevo": 1154172,
+  "num_op": 84883
+ },
+ {
+  "carta": 180002,
+  "op_carta": "265311911KF",
+  "viejo": 9099,
+  "nuevo": 1154173,
+  "num_op": 84884
+ },
+ {
+  "carta": 180003,
+  "op_carta": "265315221AV",
+  "viejo": 9100,
+  "nuevo": 1154174,
+  "num_op": 84885
+ },
+ {
+  "carta": 180004,
+  "op_carta": "265316924AP",
+  "viejo": 9101,
+  "nuevo": 1154175,
+  "num_op": 84886
+ },
+ {
+  "carta": 180005,
+  "op_carta": "265314682TA",
+  "viejo": 9102,
+  "nuevo": 1154176,
+  "num_op": 84887
+ },
+ {
+  "carta": 180006,
+  "op_carta": "265318030CV",
+  "viejo": 9103,
+  "nuevo": 1154177,
+  "num_op": 84893
+ },
+ {
+  "carta": 180007,
+  "op_carta": "26478107LS",
+  "viejo": 9106,
+  "nuevo": 1154180,
+  "num_op": 84905
+ },
+ {
+  "carta": 180008,
+  "op_carta": "265317790AV",
+  "viejo": 9127,
+  "nuevo": 1154201,
+  "num_op": 84927
+ },
+ {
+  "carta": 180009,
+  "op_carta": "26479201KF",
+  "viejo": 9173,
+  "nuevo": 1154247,
+  "num_op": 84948
+ },
+ {
+  "carta": 180010,
+  "op_carta": "265327430AP",
+  "viejo": 9164,
+  "nuevo": 1154238,
+  "num_op": 84965
+ },
+ {
+  "carta": 180011,
+  "op_carta": "265324177AV",
+  "viejo": 9165,
+  "nuevo": 1154239,
+  "num_op": 84967
+ },
+ {
+  "carta": 180012,
+  "op_carta": "265317348TA",
+  "viejo": 9167,
+  "nuevo": 1154241,
+  "num_op": 84969
+ },
+ {
+  "carta": 180013,
+  "op_carta": "265327748CV",
+  "viejo": 9172,
+  "nuevo": 1154246,
+  "num_op": 84974
+ },
+ {
+  "carta": 180014,
+  "op_carta": "265329502TA",
+  "viejo": 9247,
+  "nuevo": 1154321,
+  "num_op": 84975
+ },
+ {
+  "carta": 180015,
+  "op_carta": "265264187KF",
+  "viejo": 9211,
+  "nuevo": 1154285,
+  "num_op": 85014
+ },
+ {
+  "carta": 180016,
+  "op_carta": "265333778AV",
+  "viejo": 9212,
+  "nuevo": 1154286,
+  "num_op": 85015
+ },
+ {
+  "carta": 180017,
+  "op_carta": "265327115LS",
+  "viejo": 9213,
+  "nuevo": 1154287,
+  "num_op": 85016
+ },
+ {
+  "carta": 180018,
+  "op_carta": "265329788LS",
+  "viejo": 9246,
+  "nuevo": 1154320,
+  "num_op": 85017
+ },
+ {
+  "carta": 180019,
+  "op_carta": "265322782JM",
+  "viejo": 9214,
+  "nuevo": 1154288,
+  "num_op": 85018
+ },
+ {
+  "carta": 180020,
+  "op_carta": "265333838KF",
+  "viejo": 9245,
+  "nuevo": 1154319,
+  "num_op": 85036
+ },
+ {
+  "carta": 180021,
+  "op_carta": "265335055KF",
+  "viejo": 9243,
+  "nuevo": 1154317,
+  "num_op": 85049
+ },
+ {
+  "carta": 180022,
+  "op_carta": "26480831KF",
+  "viejo": 9244,
+  "nuevo": 1154318,
+  "num_op": 85050
+ },
+ {
+  "carta": 180023,
+  "op_carta": "265327206KF",
+  "viejo": 9248,
+  "nuevo": 1154322,
+  "num_op": 85051
+ },
+ {
+  "carta": 180024,
+  "op_carta": "265347489CV",
+  "viejo": 9249,
+  "nuevo": 1154323,
+  "num_op": 85052
+ },
+ {
+  "carta": 180025,
+  "op_carta": "265348542LS",
+  "viejo": 9250,
+  "nuevo": 1154324,
+  "num_op": 85053
+ },
+ {
+  "carta": 180026,
+  "op_carta": "265340172JM",
+  "viejo": 9251,
+  "nuevo": 1154325,
+  "num_op": 85054
+ },
+ {
+  "carta": 180027,
+  "op_carta": "265350735TA",
+  "viejo": 9252,
+  "nuevo": 1154326,
+  "num_op": 85055
+ },
+ {
+  "carta": 180028,
+  "op_carta": "26481965TA",
+  "viejo": 9253,
+  "nuevo": 1154327,
+  "num_op": 85056
+ },
+ {
+  "carta": 180029,
+  "op_carta": "265343299AV",
+  "viejo": 9261,
+  "nuevo": 1154335,
+  "num_op": 85064
+ },
+ {
+  "carta": 180030,
+  "op_carta": "265345337AV",
+  "viejo": 9262,
+  "nuevo": 1154336,
+  "num_op": 85066
+ },
+ {
+  "carta": 180031,
+  "op_carta": "265354969TA",
+  "viejo": 9325,
+  "nuevo": 1154398,
+  "num_op": 85084
+ },
+ {
+  "carta": 180032,
+  "op_carta": "265348544TA",
+  "viejo": 9324,
+  "nuevo": 1154397,
+  "num_op": 85085
+ },
+ {
+  "carta": 180033,
+  "op_carta": "265354297KF",
+  "viejo": 9326,
+  "nuevo": 1154399,
+  "num_op": 85086
+ },
+ {
+  "carta": 180034,
+  "op_carta": "265354834AV",
+  "viejo": 9284,
+  "nuevo": 1154358,
+  "num_op": 85088
+ },
+ {
+  "carta": 180035,
+  "op_carta": "265359896KF",
+  "viejo": 9304,
+  "nuevo": 1154377,
+  "num_op": 85111
+ },
+ {
+  "carta": 180036,
+  "op_carta": "265353912CP",
+  "viejo": 9316,
+  "nuevo": 1154389,
+  "num_op": 85115
+ },
+ {
+  "carta": 180037,
+  "op_carta": "265351926CM",
+  "viejo": 9336,
+  "nuevo": 1154409,
+  "num_op": 85141
+ },
+ {
+  "carta": 180038,
+  "op_carta": "265350532AV",
+  "viejo": 9344,
+  "nuevo": 1154417,
+  "num_op": 85142
+ },
+ {
+  "carta": 180039,
+  "op_carta": "265362878TA",
+  "viejo": 9341,
+  "nuevo": 1154414,
+  "num_op": 85147
+ },
+ {
+  "carta": 180040,
+  "op_carta": "265352287SV",
+  "viejo": 9342,
+  "nuevo": 1154415,
+  "num_op": 85148
+ },
+ {
+  "carta": 180041,
+  "op_carta": "265365515AV",
+  "viejo": 9352,
+  "nuevo": 1154425,
+  "num_op": 85150
+ },
+ {
+  "carta": 180042,
+  "op_carta": "265366126CM",
+  "viejo": 9345,
+  "nuevo": 1154418,
+  "num_op": 85151
+ },
+ {
+  "carta": 180043,
+  "op_carta": "265365488JM",
+  "viejo": 9364,
+  "nuevo": 1154437,
+  "num_op": 85171
+ },
+ {
+  "carta": 180044,
+  "op_carta": "265372489SV",
+  "viejo": 9373,
+  "nuevo": 1154446,
+  "num_op": 85172
+ },
+ {
+  "carta": 180045,
+  "op_carta": "265348703AV",
+  "viejo": 9365,
+  "nuevo": 1154438,
+  "num_op": 85173
+ },
+ {
+  "carta": 180046,
+  "op_carta": "265363008AV",
+  "viejo": 9372,
+  "nuevo": 1154445,
+  "num_op": 85181
+ },
+ {
+  "carta": 180047,
+  "op_carta": "265369854JM",
+  "viejo": 9374,
+  "nuevo": 1154447,
+  "num_op": 85182
+ },
+ {
+  "carta": 180048,
+  "op_carta": "265380026TA",
+  "viejo": 9375,
+  "nuevo": 1154448,
+  "num_op": 85183
+ },
+ {
+  "carta": 180049,
+  "op_carta": "265377195AV",
+  "viejo": 9376,
+  "nuevo": 1154449,
+  "num_op": 85184
+ },
+ {
+  "carta": 180050,
+  "op_carta": "265379503TA",
+  "viejo": 9377,
+  "nuevo": 1154450,
+  "num_op": 85185
+ },
+ {
+  "carta": 180051,
+  "op_carta": "265378696CM",
+  "viejo": 9383,
+  "nuevo": 1154455,
+  "num_op": 85188
+ },
+ {
+  "carta": 180052,
+  "op_carta": "265383095CM",
+  "viejo": 9390,
+  "nuevo": 1154462,
+  "num_op": 85201
+ },
+ {
+  "carta": 180053,
+  "op_carta": "265381115AV",
+  "viejo": 9391,
+  "nuevo": 1154463,
+  "num_op": 85202
+ },
+ {
+  "carta": 180054,
+  "op_carta": "26485628JM",
+  "viejo": 9392,
+  "nuevo": 1154464,
+  "num_op": 85203
+ },
+ {
+  "carta": 180055,
+  "op_carta": "26487427KF",
+  "viejo": 9394,
+  "nuevo": 1154466,
+  "num_op": 85205
+ },
+ {
+  "carta": 180056,
+  "op_carta": "26486466KF",
+  "viejo": 9398,
+  "nuevo": 1154470,
+  "num_op": 85209
+ },
+ {
+  "carta": 180057,
+  "op_carta": "265380614LS",
+  "viejo": 9401,
+  "nuevo": 1154473,
+  "num_op": 85212
+ },
+ {
+  "carta": 180058,
+  "op_carta": "265380122JM",
+  "viejo": 9402,
+  "nuevo": 1154474,
+  "num_op": 85213
+ },
+ {
+  "carta": 180059,
+  "op_carta": "265375182JM",
+  "viejo": 9462,
+  "nuevo": 1154533,
+  "num_op": 85227
+ },
+ {
+  "carta": 180060,
+  "op_carta": "265389449KF",
+  "viejo": 9439,
+  "nuevo": 1154510,
+  "num_op": 85253
+ },
+ {
+  "carta": 180061,
+  "op_carta": "265370306JM",
+  "viejo": 9449,
+  "nuevo": 1154520,
+  "num_op": 85263
+ },
+ {
+  "carta": 180062,
+  "op_carta": "265396688TA",
+  "viejo": 9450,
+  "nuevo": 1154521,
+  "num_op": 85264
+ },
+ {
+  "carta": 180063,
+  "op_carta": "265386208TA",
+  "viejo": 9451,
+  "nuevo": 1154522,
+  "num_op": 85265
+ },
+ {
+  "carta": 180064,
+  "op_carta": "265398944KF",
+  "viejo": 9454,
+  "nuevo": 1154525,
+  "num_op": 85268
+ },
+ {
+  "carta": 180065,
+  "op_carta": "265382700JM",
+  "viejo": 9457,
+  "nuevo": 1154528,
+  "num_op": 85272
+ },
+ {
+  "carta": 180066,
+  "op_carta": "265407131SV",
+  "viejo": 9459,
+  "nuevo": 1154530,
+  "num_op": 85275
+ },
+ {
+  "carta": 180067,
+  "op_carta": "265405799TA",
+  "viejo": 9460,
+  "nuevo": 1154531,
+  "num_op": 85276
+ },
+ {
+  "carta": 180068,
+  "op_carta": "265411541AV",
+  "viejo": 9461,
+  "nuevo": 1154532,
+  "num_op": 85277
+ },
+ {
+  "carta": 180069,
+  "op_carta": "265411367CV",
+  "viejo": 9482,
+  "nuevo": 1154552,
+  "num_op": 85287
+ },
+ {
+  "carta": 180070,
+  "op_carta": "265412877JM",
+  "viejo": 9480,
+  "nuevo": 1154550,
+  "num_op": 85297
+ },
+ {
+  "carta": 180071,
+  "op_carta": "265411606KF",
+  "viejo": 9481,
+  "nuevo": 1154551,
+  "num_op": 85298
+ },
+ {
+  "carta": 180072,
+  "op_carta": "26490595JM",
+  "viejo": 9483,
+  "nuevo": 1154553,
+  "num_op": 85299
+ },
+ {
+  "carta": 180073,
+  "op_carta": "265419613TA",
+  "viejo": 9489,
+  "nuevo": 1154559,
+  "num_op": 85306
+ },
+ {
+  "carta": 180074,
+  "op_carta": "26487997JM",
+  "viejo": 9490,
+  "nuevo": 1154560,
+  "num_op": 85307
+ },
+ {
+  "carta": 180075,
+  "op_carta": "265417337AP",
+  "viejo": 9491,
+  "nuevo": 1154561,
+  "num_op": 85308
+ },
+ {
+  "carta": 180076,
+  "op_carta": "26491796KF",
+  "viejo": 9503,
+  "nuevo": 1154573,
+  "num_op": 85311
+ },
+ {
+  "carta": 180077,
+  "op_carta": "265419231TA",
+  "viejo": 9502,
+  "nuevo": 1154572,
+  "num_op": 85320
+ },
+ {
+  "carta": 180078,
+  "op_carta": "26485871JM",
+  "viejo": 9504,
+  "nuevo": 1154574,
+  "num_op": 85321
+ },
+ {
+  "carta": 180079,
+  "op_carta": "265413277AV",
+  "viejo": 9509,
+  "nuevo": 1154579,
+  "num_op": 85322
+ },
+ {
+  "carta": 180080,
+  "op_carta": "265413862CM",
+  "viejo": 9508,
+  "nuevo": 1154578,
+  "num_op": 85326
+ },
+ {
+  "carta": 180081,
+  "op_carta": "265427413JM",
+  "viejo": 9535,
+  "nuevo": 1154605,
+  "num_op": 85355
+ },
+ {
+  "carta": 180082,
+  "op_carta": "265422943JM",
+  "viejo": 9547,
+  "nuevo": 1154616,
+  "num_op": 85367
+ },
+ {
+  "carta": 180083,
+  "op_carta": "265428354LS",
+  "viejo": 9562,
+  "nuevo": 1154631,
+  "num_op": 85382
+ },
+ {
+  "carta": 180084,
+  "op_carta": "265433913CV",
+  "viejo": 9578,
+  "nuevo": 1154645,
+  "num_op": 85399
+ },
+ {
+  "carta": 180085,
+  "op_carta": "265419163AP",
+  "viejo": 9579,
+  "nuevo": 1154646,
+  "num_op": 85400
+ },
+ {
+  "carta": 180086,
+  "op_carta": "265438661AV",
+  "viejo": 9580,
+  "nuevo": 1154647,
+  "num_op": 85401
+ },
+ {
+  "carta": 180087,
+  "op_carta": "265417871AV",
+  "viejo": 9581,
+  "nuevo": 1154648,
+  "num_op": 85402
+ },
+ {
+  "carta": 180088,
+  "op_carta": "265435327JM",
+  "viejo": 9582,
+  "nuevo": 1154649,
+  "num_op": 85403
+ },
+ {
+  "carta": 180089,
+  "op_carta": "265431581CM",
+  "viejo": 9583,
+  "nuevo": 1154650,
+  "num_op": 85404
+ },
+ {
+  "carta": 180090,
+  "op_carta": "26491581JM",
+  "viejo": 9584,
+  "nuevo": 1154651,
+  "num_op": 85405
+ },
+ {
+  "carta": 180091,
+  "op_carta": "26493474JM",
+  "viejo": 9585,
+  "nuevo": 1154652,
+  "num_op": 85406
+ },
+ {
+  "carta": 180092,
+  "op_carta": "26495831AV",
+  "viejo": 9723,
+  "nuevo": 1154785,
+  "num_op": 85449
+ },
+ {
+  "carta": 180093,
+  "op_carta": "265446213SV",
+  "viejo": 9701,
+  "nuevo": 1154763,
+  "num_op": 85426
+ },
+ {
+  "carta": 180094,
+  "op_carta": "265451867KF",
+  "viejo": 9722,
+  "nuevo": 1154784,
+  "num_op": 85448
+ },
+ {
+  "carta": 180095,
+  "op_carta": "265450896LS",
+  "viejo": 9713,
+  "nuevo": 1154775,
+  "num_op": 85439
+ },
+ {
+  "carta": 180096,
+  "op_carta": "265450126SV",
+  "viejo": 9721,
+  "nuevo": 1154783,
+  "num_op": 85447
+ },
+ {
+  "carta": 180097,
+  "op_carta": "265447317KF",
+  "viejo": 9714,
+  "nuevo": 1154776,
+  "num_op": 85440
+ },
+ {
+  "carta": 180098,
+  "op_carta": "265455120AV",
+  "viejo": 9814,
+  "nuevo": 1154873,
+  "num_op": 85540
+ },
+ {
+  "carta": 180099,
+  "op_carta": "265454765JM",
+  "viejo": 9773,
+  "nuevo": 1154834,
+  "num_op": 85499
+ },
+ {
+  "carta": 180100,
+  "op_carta": "265453276AV",
+  "viejo": 9772,
+  "nuevo": 1154833,
+  "num_op": 85498
+ },
+ {
+  "carta": 180101,
+  "op_carta": "265435691LS",
+  "viejo": 9800,
+  "nuevo": 1154859,
+  "num_op": 85528
+ },
+ {
+  "carta": 180102,
+  "op_carta": "265449104CV",
+  "viejo": 9821,
+  "nuevo": 1154880,
+  "num_op": 85517
+ },
+ {
+  "carta": 180103,
+  "op_carta": "265462423AV",
+  "viejo": 9824,
+  "nuevo": 1154883,
+  "num_op": 85551
+ },
+ {
+  "carta": 180104,
+  "op_carta": "265462135CV",
+  "viejo": 9837,
+  "nuevo": 1154896,
+  "num_op": 85565
+ },
+ {
+  "carta": 180105,
+  "op_carta": "265461607CV",
+  "viejo": 9857,
+  "nuevo": 1154916,
+  "num_op": 85577
+ },
+ {
+  "carta": 180106,
+  "op_carta": "265467086LS",
+  "viejo": 9847,
+  "nuevo": 1154906,
+  "num_op": 85575
+ },
+ {
+  "carta": 180107,
+  "op_carta": "265468823SV",
+  "viejo": 9848,
+  "nuevo": 1154907,
+  "num_op": 85576
+ },
+ {
+  "carta": 180108,
+  "op_carta": "265469454AV",
+  "viejo": 9864,
+  "nuevo": 1154923,
+  "num_op": 85592
+ },
+ {
+  "carta": 180109,
+  "op_carta": "265470808SV",
+  "viejo": 9861,
+  "nuevo": 1154920,
+  "num_op": 85588
+ },
+ {
+  "carta": 180110,
+  "op_carta": "26497242JM",
+  "viejo": 9862,
+  "nuevo": 1154921,
+  "num_op": 85590
+ },
+ {
+  "carta": 180111,
+  "op_carta": "265464253AV",
+  "viejo": 9891,
+  "nuevo": 1154945,
+  "num_op": 85620
+ },
+ {
+  "carta": 180112,
+  "op_carta": "265465154LS",
+  "viejo": 9894,
+  "nuevo": 1154948,
+  "num_op": 85623
+ },
+ {
+  "carta": 180113,
+  "op_carta": "265468509CM",
+  "viejo": 9890,
+  "nuevo": 1154944,
+  "num_op": 85619
+ },
+ {
+  "carta": 180114,
+  "op_carta": "265475862LS",
+  "viejo": 9893,
+  "nuevo": 1154947,
+  "num_op": 85622
+ },
+ {
+  "carta": 180115,
+  "op_carta": "265432052LS",
+  "viejo": 9908,
+  "nuevo": 1154961,
+  "num_op": 85637
+ },
+ {
+  "carta": 180116,
+  "op_carta": "265473062AP",
+  "viejo": 9945,
+  "nuevo": 1154996,
+  "num_op": 85678
+ },
+ {
+  "carta": 180117,
+  "op_carta": "265481790LS",
+  "viejo": 9944,
+  "nuevo": 1154995,
+  "num_op": 85677
+ },
+ {
+  "carta": 180118,
+  "op_carta": "265484329AV",
+  "viejo": 9976,
+  "nuevo": 1155025,
+  "num_op": 85709
+ },
+ {
+  "carta": 180119,
+  "op_carta": "265488939AV",
+  "viejo": 9985,
+  "nuevo": 1155034,
+  "num_op": 85717
+ },
+ {
+  "carta": 180120,
+  "op_carta": "265488384CM",
+  "viejo": 9978,
+  "nuevo": 1155027,
+  "num_op": 85711
+ },
+ {
+  "carta": 180121,
+  "op_carta": "265484524CM",
+  "viejo": 9979,
+  "nuevo": 1155028,
+  "num_op": 85712
+ },
+ {
+  "carta": 180122,
+  "op_carta": "265465476CV",
+  "viejo": 9994,
+  "nuevo": 1155042,
+  "num_op": 85727
+ },
+ {
+  "carta": 180123,
+  "op_carta": "265496971CV",
+  "viejo": 9995,
+  "nuevo": 1155043,
+  "num_op": 85728
+ },
+ {
+  "carta": 180124,
+  "op_carta": "265503704TA",
+  "viejo": 10025,
+  "nuevo": 1155070,
+  "num_op": 85759
+ },
+ {
+  "carta": 180125,
+  "op_carta": "265500812TA",
+  "viejo": 10023,
+  "nuevo": 1155068,
+  "num_op": 85757
+ },
+ {
+  "carta": 180126,
+  "op_carta": "265498516SV",
+  "viejo": 10001,
+  "nuevo": 1155049,
+  "num_op": 85735
+ },
+ {
+  "carta": 180127,
+  "op_carta": "26502164LS",
+  "viejo": 10027,
+  "nuevo": 1155072,
+  "num_op": 85729
+ },
+ {
+  "carta": 180128,
+  "op_carta": "265501395AV",
+  "viejo": 10069,
+  "nuevo": 1155113,
+  "num_op": 85802
+ },
+ {
+  "carta": 180129,
+  "op_carta": "265510172TA",
+  "viejo": 10080,
+  "nuevo": 1155123,
+  "num_op": 85813
+ },
+ {
+  "carta": 180130,
+  "op_carta": "265516782CV",
+  "viejo": 10108,
+  "nuevo": 1155151,
+  "num_op": 85843
+ },
+ {
+  "carta": 180131,
+  "op_carta": "265500674SM",
+  "viejo": 10121,
+  "nuevo": 1155164,
+  "num_op": 85842
+ },
+ {
+  "carta": 180132,
+  "op_carta": "265472813AP",
+  "viejo": 10120,
+  "nuevo": 1155163,
+  "num_op": 85855
+ },
+ {
+  "carta": 180133,
+  "op_carta": "265521074SM",
+  "viejo": 10125,
+  "nuevo": 1155168,
+  "num_op": 85859
+ },
+ {
+  "carta": 180134,
+  "op_carta": "26504849SV",
+  "viejo": 10109,
+  "nuevo": 1155152,
+  "num_op": 85844
+ },
+ {
+  "carta": 180135,
+  "op_carta": "265521833AP",
+  "viejo": 10129,
+  "nuevo": 1155172,
+  "num_op": 85863
+ },
+ {
+  "carta": 180136,
+  "op_carta": "265527199AP",
+  "viejo": 10132,
+  "nuevo": 1155175,
+  "num_op": 85866
+ },
+ {
+  "carta": 180137,
+  "op_carta": "265525899TA",
+  "viejo": 10127,
+  "nuevo": 1155170,
+  "num_op": 85861
+ },
+ {
+  "carta": 180138,
+  "op_carta": "265524552CV",
+  "viejo": 10130,
+  "nuevo": 1155173,
+  "num_op": 85864
+ },
+ {
+  "carta": 180139,
+  "op_carta": "265524436SM",
+  "viejo": 10128,
+  "nuevo": 1155171,
+  "num_op": 85862
+ },
+ {
+  "carta": 180140,
+  "op_carta": "265523893TA",
+  "viejo": 10131,
+  "nuevo": 1155174,
+  "num_op": 85865
+ },
+ {
+  "carta": 180141,
+  "op_carta": "26504902TA",
+  "viejo": 10133,
+  "nuevo": 1155176,
+  "num_op": 85867
+ },
+ {
+  "carta": 180142,
+  "op_carta": "265525801KF",
+  "viejo": 10134,
+  "nuevo": 1155177,
+  "num_op": 85868
+ },
+ {
+  "carta": 180143,
+  "op_carta": "265531151CV",
+  "viejo": 10136,
+  "nuevo": 1155179,
+  "num_op": 85870
+ },
+ {
+  "carta": 180144,
+  "op_carta": "265527346AV",
+  "viejo": 10137,
+  "nuevo": 1155180,
+  "num_op": 85871
+ },
+ {
+  "carta": 180145,
+  "op_carta": "26505484SM",
+  "viejo": 10135,
+  "nuevo": 1155178,
+  "num_op": 85869
+ },
+ {
+  "carta": 180146,
+  "op_carta": "265527799KF",
+  "viejo": 10157,
+  "nuevo": 1155200,
+  "num_op": 85911
+ },
+ {
+  "carta": 180147,
+  "op_carta": "265541117CV",
+  "viejo": 10153,
+  "nuevo": 1155196,
+  "num_op": 85906
+ },
+ {
+  "carta": 180148,
+  "op_carta": "265541974TA",
+  "viejo": 10156,
+  "nuevo": 1155199,
+  "num_op": 85910
+ },
+ {
+  "carta": 180149,
+  "op_carta": "265547077SV",
+  "viejo": 10158,
+  "nuevo": 1155201,
+  "num_op": 85912
+ },
+ {
+  "carta": 180150,
+  "op_carta": "26508254JM",
+  "viejo": 10154,
+  "nuevo": 1155197,
+  "num_op": 85908
+ },
+ {
+  "carta": 180151,
+  "op_carta": "26506547SM",
+  "viejo": 10155,
+  "nuevo": 1155198,
+  "num_op": 85909
+ },
+ {
+  "carta": 180152,
+  "op_carta": "26503137AP",
+  "viejo": 10159,
+  "nuevo": 1155202,
+  "num_op": 85913
+ },
+ {
+  "carta": 180153,
+  "op_carta": "26506335CV",
+  "viejo": 10160,
+  "nuevo": 1155203,
+  "num_op": 85914
+ },
+ {
+  "carta": 180154,
+  "op_carta": "265508637AP",
+  "viejo": 10165,
+  "nuevo": 1155208,
+  "num_op": 85920
+ },
+ {
+  "carta": 180155,
+  "op_carta": "265554359TA",
+  "viejo": 10163,
+  "nuevo": 1155206,
+  "num_op": 85917
+ },
+ {
+  "carta": 180156,
+  "op_carta": "265552358KF",
+  "viejo": 10164,
+  "nuevo": 1155207,
+  "num_op": 85918
+ },
+ {
+  "carta": 180157,
+  "op_carta": "265550878SV",
+  "viejo": 10162,
+  "nuevo": 1155205,
+  "num_op": 85916
+ },
+ {
+  "carta": 180158,
+  "op_carta": "265548978TA",
+  "viejo": 10161,
+  "nuevo": 1155204,
+  "num_op": 85915
+ },
+ {
+  "carta": 180159,
+  "op_carta": "265547347JM",
+  "viejo": 10166,
+  "nuevo": 1155209,
+  "num_op": 85921
+ },
+ {
+  "carta": 180160,
+  "op_carta": "265526952VD",
+  "viejo": 10143,
+  "nuevo": 1155186,
+  "num_op": 85894
+ },
+ {
+  "carta": 180161,
+  "op_carta": "265544029JM",
+  "viejo": 10227,
+  "nuevo": 1155270,
+  "num_op": 85938
+ },
+ {
+  "carta": 180162,
+  "op_carta": "265554646CV",
+  "viejo": 10226,
+  "nuevo": 1155269,
+  "num_op": 85937
+ },
+ {
+  "carta": 180163,
+  "op_carta": "265558222JM",
+  "viejo": 10228,
+  "nuevo": 1155271,
+  "num_op": 85939
+ },
+ {
+  "carta": 180164,
+  "op_carta": "265563686TA",
+  "viejo": 10263,
+  "nuevo": 1155306,
+  "num_op": 85977
+ },
+ {
+  "carta": 180165,
+  "op_carta": "265551456AP",
+  "viejo": 10289,
+  "nuevo": 1155332,
+  "num_op": 85950
+ },
+ {
+  "carta": 180166,
+  "op_carta": "265562223CP",
+  "viejo": 10290,
+  "nuevo": 1155333,
+  "num_op": 86006
+ },
+ {
+  "carta": 180167,
+  "op_carta": "265567405JM",
+  "viejo": 10334,
+  "nuevo": 1155377,
+  "num_op": 86053
+ },
+ {
+  "carta": 180168,
+  "op_carta": "265560686FB",
+  "viejo": 10317,
+  "nuevo": 1155360,
+  "num_op": 86028
+ },
+ {
+  "carta": 180169,
+  "op_carta": "265564724JM",
+  "viejo": 10338,
+  "nuevo": 1155381,
+  "num_op": 86056
+ },
+ {
+  "carta": 180170,
+  "op_carta": "26511997JM",
+  "viejo": 10335,
+  "nuevo": 1155378,
+  "num_op": 86049
+ },
+ {
+  "carta": 180171,
+  "op_carta": "265583880TA",
+  "viejo": 10341,
+  "nuevo": 1155384,
+  "num_op": 86065
+ },
+ {
+  "carta": 180172,
+  "op_carta": "265583088TA",
+  "viejo": 10340,
+  "nuevo": 1155383,
+  "num_op": 86066
+ },
+ {
+  "carta": 180173,
+  "op_carta": "265578755KF",
+  "viejo": 10342,
+  "nuevo": 1155385,
+  "num_op": 86063
+ },
+ {
+  "carta": 180174,
+  "op_carta": "265583871CM",
+  "viejo": 10372,
+  "nuevo": 1155415,
+  "num_op": 86097
+ },
+ {
+  "carta": 180175,
+  "op_carta": "265584566TA",
+  "viejo": 10394,
+  "nuevo": 1155437,
+  "num_op": 86114
+ },
+ {
+  "carta": 180176,
+  "op_carta": "26515053SV",
+  "viejo": 10403,
+  "nuevo": 1155446,
+  "num_op": 86123
+ },
+ {
+  "carta": 180177,
+  "op_carta": "265588442AP",
+  "viejo": 10434,
+  "nuevo": 1155477,
+  "num_op": 86154
+ },
+ {
+  "carta": 180178,
+  "op_carta": "265580872TA",
+  "viejo": 10462,
+  "nuevo": 1155505,
+  "num_op": 86183
+ },
+ {
+  "carta": 180179,
+  "op_carta": "265580228JM",
+  "viejo": 10447,
+  "nuevo": 1155490,
+  "num_op": 86167
+ },
+ {
+  "carta": 180180,
+  "op_carta": "265602502TA",
+  "viejo": 10461,
+  "nuevo": 1155504,
+  "num_op": 86182
+ },
+ {
+  "carta": 180181,
+  "op_carta": "265606343LS",
+  "viejo": 10498,
+  "nuevo": 1155541,
+  "num_op": 86220
+ },
+ {
+  "carta": 180182,
+  "op_carta": "265613750JM",
+  "viejo": 10533,
+  "nuevo": 1155576,
+  "num_op": 86256
+ },
+ {
+  "carta": 180183,
+  "op_carta": "265589161LS",
+  "viejo": 10534,
+  "nuevo": 1155577,
+  "num_op": 86257
+ },
+ {
+  "carta": 180184,
+  "op_carta": "265602790CM",
+  "viejo": 10535,
+  "nuevo": 1155578,
+  "num_op": 86258
+ },
+ {
+  "carta": 180185,
+  "op_carta": "265609543AP",
+  "viejo": 10537,
+  "nuevo": 1155580,
+  "num_op": 86260
+ },
+ {
+  "carta": 180186,
+  "op_carta": "265620588AP",
+  "viejo": 10540,
+  "nuevo": 1155583,
+  "num_op": 86263
+ },
+ {
+  "carta": 180187,
+  "op_carta": "265621871AV",
+  "viejo": 10543,
+  "nuevo": 1155586,
+  "num_op": 86266
+ },
+ {
+  "carta": 180188,
+  "op_carta": "265621036TA",
+  "viejo": 10541,
+  "nuevo": 1155584,
+  "num_op": 86264
+ },
+ {
+  "carta": 180189,
+  "op_carta": "265620772KF",
+  "viejo": 10538,
+  "nuevo": 1155581,
+  "num_op": 86261
+ },
+ {
+  "carta": 180190,
+  "op_carta": "26519279KF",
+  "viejo": 10539,
+  "nuevo": 1155582,
+  "num_op": 86262
+ },
+ {
+  "carta": 180191,
+  "op_carta": "265626653LS",
+  "viejo": 10542,
+  "nuevo": 1155585,
+  "num_op": 86265
+ },
+ {
+  "carta": 180192,
+  "op_carta": "265609993CM",
+  "viejo": 10556,
+  "nuevo": 1155599,
+  "num_op": 86281
+ },
+ {
+  "carta": 180194,
+  "op_carta": "26520740KF",
+  "viejo": 10581,
+  "nuevo": 1155624,
+  "num_op": 86305
+ },
+ {
+  "carta": 180195,
+  "op_carta": "265631348LS",
+  "viejo": 10597,
+  "nuevo": 1155640,
+  "num_op": 86322
+ },
+ {
+  "carta": 180196,
+  "op_carta": "265632045KF",
+  "viejo": 10616,
+  "nuevo": 1155659,
+  "num_op": 86342
+ },
+ {
+  "carta": 180197,
+  "op_carta": "265634564JM",
+  "viejo": 10629,
+  "nuevo": 1155672,
+  "num_op": 86355
+ },
+ {
+  "carta": 180198,
+  "op_carta": "265618356JM",
+  "viejo": 10630,
+  "nuevo": 1155673,
+  "num_op": 86280
+ },
+ {
+  "carta": 180199,
+  "op_carta": "265643718AP",
+  "viejo": 10631,
+  "nuevo": 1155674,
+  "num_op": 86356
+ },
+ {
+  "carta": 180200,
+  "op_carta": "265653029CM",
+  "viejo": 10634,
+  "nuevo": 1155677,
+  "num_op": 86360
+ },
+ {
+  "carta": 180201,
+  "op_carta": "265630264AV",
+  "viejo": 10633,
+  "nuevo": 1155676,
+  "num_op": 86358
+ },
+ {
+  "carta": 180202,
+  "op_carta": "265653688KF",
+  "viejo": 10640,
+  "nuevo": 1155683,
+  "num_op": 86365
+ },
+ {
+  "carta": 180203,
+  "op_carta": "265653577AP",
+  "viejo": 10641,
+  "nuevo": 1155684,
+  "num_op": 86367
+ },
+ {
+  "carta": 180204,
+  "op_carta": "265653193KF",
+  "viejo": 10647,
+  "nuevo": 1155690,
+  "num_op": 86373
+ },
+ {
+  "carta": 180205,
+  "op_carta": "26523176CM",
+  "viejo": 10645,
+  "nuevo": 1155688,
+  "num_op": 86370
+ },
+ {
+  "carta": 180206,
+  "op_carta": "26521151AV",
+  "viejo": 10646,
+  "nuevo": 1155689,
+  "num_op": 86372
+ },
+ {
+  "carta": 180207,
+  "op_carta": "265652652LS",
+  "viejo": 10657,
+  "nuevo": 1155700,
+  "num_op": 86383
+ },
+ {
+  "carta": 180208,
+  "op_carta": "265644502LS",
+  "viejo": 10661,
+  "nuevo": 1155704,
+  "num_op": 86387
+ },
+ {
+  "carta": 180209,
+  "op_carta": "265659146KF",
+  "viejo": 10719,
+  "nuevo": 1155762,
+  "num_op": 86446
+ },
+ {
+  "carta": 180210,
+  "op_carta": "26525143KF",
+  "viejo": 10727,
+  "nuevo": 1155770,
+  "num_op": 86454
+ },
+ {
+  "carta": 180211,
+  "op_carta": "26525171SV",
+  "viejo": 10733,
+  "nuevo": 1155776,
+  "num_op": 86460
+ },
+ {
+  "carta": 180212,
+  "op_carta": "265626290FB",
+  "viejo": 10740,
+  "nuevo": 1155783,
+  "num_op": 86467
+ },
+ {
+  "carta": 180213,
+  "op_carta": "265638363FB",
+  "viejo": 10741,
+  "nuevo": 1155784,
+  "num_op": 86468
+ },
+ {
+  "carta": 180214,
+  "op_carta": "265652934SV",
+  "viejo": 10744,
+  "nuevo": 1155787,
+  "num_op": 86359
+ },
+ {
+  "carta": 180215,
+  "op_carta": "265664359CP",
+  "viejo": 10747,
+  "nuevo": 1155790,
+  "num_op": 86473
+ },
+ {
+  "carta": 180216,
+  "op_carta": "265669016KF",
+  "viejo": 10765,
+  "nuevo": 1155808,
+  "num_op": 86491
+ },
+ {
+  "carta": 180217,
+  "op_carta": "265544886TA",
+  "viejo": 10782,
+  "nuevo": 1155825,
+  "num_op": 86509
+ },
+ {
+  "carta": 180218,
+  "op_carta": "265659863TA",
+  "viejo": 10805,
+  "nuevo": 1155848,
+  "num_op": 86532
+ },
+ {
+  "carta": 180219,
+  "op_carta": "265678156CV",
+  "viejo": 10806,
+  "nuevo": 1155849,
+  "num_op": 86533
+ },
+ {
+  "carta": 180220,
+  "op_carta": "26525917JM",
+  "viejo": 10807,
+  "nuevo": 1155850,
+  "num_op": 86534
+ },
+ {
+  "carta": 180221,
+  "op_carta": "265646868AV",
+  "viejo": 10811,
+  "nuevo": 1155854,
+  "num_op": 86540
+ },
+ {
+  "carta": 180222,
+  "op_carta": "265656315TA",
+  "viejo": 10812,
+  "nuevo": 1155855,
+  "num_op": 86541
+ },
+ {
+  "carta": 180223,
+  "op_carta": "265664010KF",
+  "viejo": 10809,
+  "nuevo": 1155852,
+  "num_op": 86537
+ },
+ {
+  "carta": 180224,
+  "op_carta": "265681015AV",
+  "viejo": 10810,
+  "nuevo": 1155853,
+  "num_op": 86539
+ },
+ {
+  "carta": 180225,
+  "op_carta": "265682837SV",
+  "viejo": 10814,
+  "nuevo": 1155857,
+  "num_op": 86542
+ },
+ {
+  "carta": 180226,
+  "op_carta": "26528092KF",
+  "viejo": 10813,
+  "nuevo": 1155856,
+  "num_op": 86536
+ },
+ {
+  "carta": 180227,
+  "op_carta": "265684477AV",
+  "viejo": 10816,
+  "nuevo": 1155859,
+  "num_op": 86544
+ },
+ {
+  "carta": 180228,
+  "op_carta": "26525760KF",
+  "viejo": 10815,
+  "nuevo": 1155858,
+  "num_op": 86543
+ },
+ {
+  "carta": 180229,
+  "op_carta": "265685014AV",
+  "viejo": 10820,
+  "nuevo": 1155862,
+  "num_op": 86547
+ },
+ {
+  "carta": 180230,
+  "op_carta": "26528111CV",
+  "viejo": 10819,
+  "nuevo": 1155861,
+  "num_op": 86546
+ },
+ {
+  "carta": 180231,
+  "op_carta": "265683775CM",
+  "viejo": 10849,
+  "nuevo": 1155891,
+  "num_op": 86575
+ },
+ {
+  "carta": 180232,
+  "op_carta": "265684970AV",
+  "viejo": 10857,
+  "nuevo": 1155899,
+  "num_op": 86583
+ },
+ {
+  "carta": 180233,
+  "op_carta": "26528768CM",
+  "viejo": 10861,
+  "nuevo": 1155903,
+  "num_op": 86587
+ },
+ {
+  "carta": 180234,
+  "op_carta": "265690187KF",
+  "viejo": 10875,
+  "nuevo": 1155917,
+  "num_op": 86602
+ },
+ {
+  "carta": 180235,
+  "op_carta": "265693794TA",
+  "viejo": 10885,
+  "nuevo": 1155927,
+  "num_op": 86612
+ },
+ {
+  "carta": 180236,
+  "op_carta": "26527991CV",
+  "viejo": 10883,
+  "nuevo": 1155925,
+  "num_op": 86610
+ },
+ {
+  "carta": 180237,
+  "op_carta": "265683095JM",
+  "viejo": 10895,
+  "nuevo": 1155937,
+  "num_op": 86622
+ },
+ {
+  "carta": 180238,
+  "op_carta": "265587026CM",
+  "viejo": 10896,
+  "nuevo": 1155938,
+  "num_op": 86623
+ },
+ {
+  "carta": 180239,
+  "op_carta": "26528423CV",
+  "viejo": 10897,
+  "nuevo": 1155939,
+  "num_op": 86625
+ },
+ {
+  "carta": 180240,
+  "op_carta": "265697747KF",
+  "viejo": 10920,
+  "nuevo": 1155962,
+  "num_op": 86642
+ },
+ {
+  "carta": 180241,
+  "op_carta": "265629705JM",
+  "viejo": 10942,
+  "nuevo": 1155984,
+  "num_op": 86671
+ },
+ {
+  "carta": 180242,
+  "op_carta": "265698024TA",
+  "viejo": 10916,
+  "nuevo": 1155958,
+  "num_op": 86646
+ },
+ {
+  "carta": 180243,
+  "op_carta": "265701971TA",
+  "viejo": 10955,
+  "nuevo": 1155997,
+  "num_op": 86684
+ },
+ {
+  "carta": 180244,
+  "op_carta": "265696412AV",
+  "viejo": 10967,
+  "nuevo": 1156009,
+  "num_op": 86696
+ },
+ {
+  "carta": 180245,
+  "op_carta": "265702784CP",
+  "viejo": 10990,
+  "nuevo": 1156032,
+  "num_op": 86721
+ },
+ {
+  "carta": 180246,
+  "op_carta": "265670898LS",
+  "viejo": 10992,
+  "nuevo": 1156034,
+  "num_op": 86723
+ },
+ {
+  "carta": 180247,
+  "op_carta": "26531570KF",
+  "viejo": 10994,
+  "nuevo": 1156036,
+  "num_op": 86725
+ },
+ {
+  "carta": 180248,
+  "op_carta": "26531466KF",
+  "viejo": 10997,
+  "nuevo": 1156039,
+  "num_op": 86728
+ },
+ {
+  "carta": 180249,
+  "op_carta": "26520619JM",
+  "viejo": 10999,
+  "nuevo": 1156041,
+  "num_op": 86730
+ },
+ {
+  "carta": 180250,
+  "op_carta": "26527299AV",
+  "viejo": 11005,
+  "nuevo": 1156047,
+  "num_op": 86738
+ },
+ {
+  "carta": 180251,
+  "op_carta": "265674348AV",
+  "viejo": 11012,
+  "nuevo": 1156054,
+  "num_op": 86746
+ },
+ {
+  "carta": 180252,
+  "op_carta": "265714593AV",
+  "viejo": 11031,
+  "nuevo": 1156073,
+  "num_op": 86765
+ },
+ {
+  "carta": 180253,
+  "op_carta": "26527631AV",
+  "viejo": 11014,
+  "nuevo": 1156056,
+  "num_op": 86748
+ },
+ {
+  "carta": 180254,
+  "op_carta": "26530683JM",
+  "viejo": 11035,
+  "nuevo": 1156077,
+  "num_op": 86769
+ },
+ {
+  "carta": 180255,
+  "op_carta": "265711365TA",
+  "viejo": 11095,
+  "nuevo": 1156137,
+  "num_op": 86832
+ },
+ {
+  "carta": 180256,
+  "op_carta": "26530938FB",
+  "viejo": 11096,
+  "nuevo": 1156138,
+  "num_op": 86833
+ },
+ {
+  "carta": 180257,
+  "op_carta": "265722476LS",
+  "viejo": 11286,
+  "nuevo": 1156326,
+  "num_op": 87027
+ },
+ {
+  "carta": 180258,
+  "op_carta": "265728198CM",
+  "viejo": 11284,
+  "nuevo": 1156324,
+  "num_op": 87024
+ },
+ {
+  "carta": 180259,
+  "op_carta": "265718467SV",
+  "viejo": 11278,
+  "nuevo": 1156318,
+  "num_op": 87014
+ },
+ {
+  "carta": 180260,
+  "op_carta": "265706952CV",
+  "viejo": 11298,
+  "nuevo": 1156338,
+  "num_op": 86890
+ },
+ {
+  "carta": 180261,
+  "op_carta": "265712990CV",
+  "viejo": 11294,
+  "nuevo": 1156334,
+  "num_op": 87036
+ },
+ {
+  "carta": 180262,
+  "op_carta": "265730295JM",
+  "viejo": 11303,
+  "nuevo": 1156343,
+  "num_op": 87045
+ },
+ {
+  "carta": 180263,
+  "op_carta": "265734707JM",
+  "viejo": 11296,
+  "nuevo": 1156336,
+  "num_op": 87039
+ },
+ {
+  "carta": 180264,
+  "op_carta": "265683516KF",
+  "viejo": 11312,
+  "nuevo": 1156352,
+  "num_op": 87054
+ },
+ {
+  "carta": 180265,
+  "op_carta": "265738833AV",
+  "viejo": 11328,
+  "nuevo": 1156368,
+  "num_op": 87070
+ },
+ {
+  "carta": 180266,
+  "op_carta": "26536613CM",
+  "viejo": 11377,
+  "nuevo": 1156417,
+  "num_op": 87119
+ },
+ {
+  "carta": 180267,
+  "op_carta": "265750020KF",
+  "viejo": 11422,
+  "nuevo": 1156461,
+  "num_op": 87163
+ },
+ {
+  "carta": 180268,
+  "op_carta": "265750843AV",
+  "viejo": 11423,
+  "nuevo": 1156462,
+  "num_op": 87164
+ },
+ {
+  "carta": 180269,
+  "op_carta": "265742681FB",
+  "viejo": 11444,
+  "nuevo": 1156483,
+  "num_op": 87185
+ },
+ {
+  "carta": 180270,
+  "op_carta": "265770645TA",
+  "viejo": 11452,
+  "nuevo": 1156491,
+  "num_op": 87194
+ },
+ {
+  "carta": 180271,
+  "op_carta": "265721413CP",
+  "viejo": 11454,
+  "nuevo": 1156493,
+  "num_op": 87186
+ },
+ {
+  "carta": 180272,
+  "op_carta": "265760345CM",
+  "viejo": 11451,
+  "nuevo": 1156490,
+  "num_op": 87193
+ },
+ {
+  "carta": 180273,
+  "op_carta": "265768829LS",
+  "viejo": 11453,
+  "nuevo": 1156492,
+  "num_op": 87195
+ },
+ {
+  "carta": 180274,
+  "op_carta": "265764151JM",
+  "viejo": 11482,
+  "nuevo": 1156521,
+  "num_op": 87224
+ },
+ {
+  "carta": 180275,
+  "op_carta": "265771193AV",
+  "viejo": 11484,
+  "nuevo": 1156523,
+  "num_op": 87226
+ },
+ {
+  "carta": 180276,
+  "op_carta": "26540761TA",
+  "viejo": 11467,
+  "nuevo": 1156506,
+  "num_op": 87208
+ },
+ {
+  "carta": 180277,
+  "op_carta": "26540581JM",
+  "viejo": 11531,
+  "nuevo": 1156570,
+  "num_op": 87273
+ },
+ {
+  "carta": 180278,
+  "op_carta": "265783013JM",
+  "viejo": 11606,
+  "nuevo": 1156645,
+  "num_op": 87309
+ },
+ {
+  "carta": 180279,
+  "op_carta": "265757003CM",
+  "viejo": 11658,
+  "nuevo": 1156697,
+  "num_op": 87403
+ },
+ {
+  "carta": 180280,
+  "op_carta": "26543171SV",
+  "viejo": 11666,
+  "nuevo": 1156705,
+  "num_op": 87410
+ },
+ {
+  "carta": 180281,
+  "op_carta": "26541352FB",
+  "viejo": 11683,
+  "nuevo": 1156722,
+  "num_op": 87429
+ },
+ {
+  "carta": 180282,
+  "op_carta": "265799439CV",
+  "viejo": 11680,
+  "nuevo": 1156719,
+  "num_op": 87425
+ },
+ {
+  "carta": 180283,
+  "op_carta": "265799473JM",
+  "viejo": 11682,
+  "nuevo": 1156721,
+  "num_op": 87428
+ },
+ {
+  "carta": 180284,
+  "op_carta": "265800819TA",
+  "viejo": 11681,
+  "nuevo": 1156720,
+  "num_op": 87426
+ },
+ {
+  "carta": 180285,
+  "op_carta": "265801341SV",
+  "viejo": 11688,
+  "nuevo": 1156727,
+  "num_op": 87427
+ },
+ {
+  "carta": 180286,
+  "op_carta": "265801779FB",
+  "viejo": 11715,
+  "nuevo": 1156754,
+  "num_op": 87461
+ },
+ {
+  "carta": 180287,
+  "op_carta": "265804895SV",
+  "viejo": 11716,
+  "nuevo": 1156755,
+  "num_op": 87463
+ },
+ {
+  "carta": 180288,
+  "op_carta": "26545384TA",
+  "viejo": 11725,
+  "nuevo": 1156763,
+  "num_op": 87471
+ },
+ {
+  "carta": 180289,
+  "op_carta": "265792087AV",
+  "viejo": 1,
+  "nuevo": 1156793,
+  "num_op": 87501
+ },
+ {
+  "carta": 180290,
+  "op_carta": "265805876CV",
+  "viejo": 2,
+  "nuevo": 1156813,
+  "num_op": 87521
+ },
+ {
+  "carta": 180291,
+  "op_carta": "265817973AV",
+  "viejo": 3,
+  "nuevo": 1156863,
+  "num_op": 87572
+ },
+ {
+  "carta": 180292,
+  "op_carta": "26549673KF",
+  "viejo": 8,
+  "nuevo": 1156891,
+  "num_op": 87598
+ },
+ {
+  "carta": 180293,
+  "op_carta": "265808920BF",
+  "viejo": 7,
+  "nuevo": 1156890,
+  "num_op": 87547
+ },
+ {
+  "carta": 180294,
+  "op_carta": "265819591MN",
+  "viejo": 4,
+  "nuevo": 1156883,
+  "num_op": 87592
+ },
+ {
+  "carta": 180295,
+  "op_carta": "265819157PC",
+  "viejo": 5,
+  "nuevo": 1156888,
+  "num_op": 87597
+ },
+ {
+  "carta": 180296,
+  "op_carta": "265811939MN",
+  "viejo": 6,
+  "nuevo": 1156889,
+  "num_op": 87601
+ },
+ {
+  "carta": 180297,
+  "op_carta": "265785281KF",
+  "viejo": 10,
+  "nuevo": 1156893,
+  "num_op": 87599
+ },
+ {
+  "carta": 180298,
+  "op_carta": "265801982SV",
+  "viejo": 9,
+  "nuevo": 1156892,
+  "num_op": 87432
+ },
+ {
+  "carta": 180299,
+  "op_carta": "265824934TA",
+  "viejo": 11,
+  "nuevo": 1156894,
+  "num_op": 87600
+ },
+ {
+  "carta": 180300,
+  "op_carta": "265824955TA",
+  "viejo": 13,
+  "nuevo": 1156896,
+  "num_op": 87603
+ },
+ {
+  "carta": 180301,
+  "op_carta": "265825451TA",
+  "viejo": 12,
+  "nuevo": 1156895,
+  "num_op": 87602
+ },
+ {
+  "carta": 180302,
+  "op_carta": "265825457TA",
+  "viejo": 614,
+  "nuevo": 1156906,
+  "num_op": 87613
+ },
+ {
+  "carta": 180303,
+  "op_carta": "265827349TA",
+  "viejo": 6016,
+  "nuevo": 1156931,
+  "num_op": 87639
+ },
+ {
+  "carta": 180304,
+  "op_carta": "265829877KF",
+  "viejo": 4815,
+  "nuevo": 1156926,
+  "num_op": 87634
+ },
+ {
+  "carta": 180305,
+  "op_carta": "265828904JM",
+  "viejo": 11119,
+  "nuevo": 1156955,
+  "num_op": 87663
+ },
+ {
+  "carta": 180306,
+  "op_carta": "265833483JM",
+  "viejo": 11420,
+  "nuevo": 1156956,
+  "num_op": 87664
+ },
+ {
+  "carta": 180307,
+  "op_carta": "265835733CV",
+  "viejo": 11118,
+  "nuevo": 1156954,
+  "num_op": 87662
+ },
+ {
+  "carta": 180308,
+  "op_carta": "26547626JM",
+  "viejo": 11924,
+  "nuevo": 1156962,
+  "num_op": 87669
+ },
+ {
+  "carta": 180309,
+  "op_carta": "265831633KF",
+  "viejo": 11721,
+  "nuevo": 1156957,
+  "num_op": 87672
+ },
+ {
+  "carta": 180310,
+  "op_carta": "265838364KF",
+  "viejo": 10817,
+  "nuevo": 1156953,
+  "num_op": 87661
+ },
+ {
+  "carta": 180311,
+  "op_carta": "26553232AV",
+  "viejo": 12000,
+  "nuevo": 1157038,
+  "num_op": 87746
+ },
+ {
+  "carta": 180312,
+  "op_carta": "265849396JM",
+  "viejo": 12006,
+  "nuevo": 1157044,
+  "num_op": 87752
+ },
+ {
+  "carta": 180313,
+  "op_carta": "265846335KF",
+  "viejo": 11999,
+  "nuevo": 1157037,
+  "num_op": 87745
+ },
+ {
+  "carta": 180314,
+  "op_carta": "265849332AV",
+  "viejo": 12007,
+  "nuevo": 1157045,
+  "num_op": 87753
+ },
+ {
+  "carta": 180315,
+  "op_carta": "265851197AV",
+  "viejo": 12004,
+  "nuevo": 1157042,
+  "num_op": 87750
+ },
+ {
+  "carta": 180316,
+  "op_carta": "265849015LS",
+  "viejo": 12001,
+  "nuevo": 1157039,
+  "num_op": 87747
+ },
+ {
+  "carta": 180317,
+  "op_carta": "265850963AV",
+  "viejo": 12005,
+  "nuevo": 1157043,
+  "num_op": 87751
+ },
+ {
+  "carta": 180318,
+  "op_carta": "265854378SV",
+  "viejo": 12011,
+  "nuevo": 1157049,
+  "num_op": 87756
+ },
+ {
+  "carta": 180319,
+  "op_carta": "265854817LS",
+  "viejo": 12048,
+  "nuevo": 1157086,
+  "num_op": 87762
+ },
+ {
+  "carta": 180320,
+  "op_carta": "26556434KF",
+  "viejo": 12049,
+  "nuevo": 1157087,
+  "num_op": 87795
+ },
+ {
+  "carta": 180321,
+  "op_carta": "265863618AV",
+  "viejo": 12091,
+  "nuevo": 1157129,
+  "num_op": 87837
+ },
+ {
+  "carta": 180322,
+  "op_carta": "265862636LS",
+  "viejo": 12090,
+  "nuevo": 1157128,
+  "num_op": 87836
+ },
+ {
+  "carta": 180323,
+  "op_carta": "265864475KF",
+  "viejo": 12106,
+  "nuevo": 1157144,
+  "num_op": 87852
+ },
+ {
+  "carta": 180324,
+  "op_carta": "26558565SV",
+  "viejo": 12147,
+  "nuevo": 1157185,
+  "num_op": 87897
+ },
+ {
+  "carta": 180325,
+  "op_carta": "26557835KF",
+  "viejo": 12158,
+  "nuevo": 1157196,
+  "num_op": 87907
+ },
+ {
+  "carta": 180326,
+  "op_carta": "265875973AV",
+  "viejo": 12157,
+  "nuevo": 1157195,
+  "num_op": 87906
+ },
+ {
+  "carta": 180327,
+  "op_carta": "265863960CV",
+  "viejo": 12175,
+  "nuevo": 1157213,
+  "num_op": 87920
+ },
+ {
+  "carta": 180329,
+  "op_carta": "265873681LS",
+  "viejo": 12171,
+  "nuevo": 1157209,
+  "num_op": 87916
+ },
+ {
+  "carta": 180330,
+  "op_carta": "265891313CV",
+  "viejo": 12222,
+  "nuevo": 1157260,
+  "num_op": 87970
+ },
+ {
+  "carta": 180331,
+  "op_carta": "265891179LS",
+  "viejo": 12223,
+  "nuevo": 1157261,
+  "num_op": 87971
+ },
+ {
+  "carta": 180332,
+  "op_carta": "265866224CV",
+  "viejo": 12259,
+  "nuevo": 1157297,
+  "num_op": 87880
+ },
+ {
+  "carta": 180333,
+  "op_carta": "265895952LS",
+  "viejo": 12260,
+  "nuevo": 1157298,
+  "num_op": 88007
+ },
+ {
+  "carta": 180334,
+  "op_carta": "26558591JM",
+  "viejo": 12280,
+  "nuevo": 1157318,
+  "num_op": 88028
+ },
+ {
+  "carta": 180335,
+  "op_carta": "265891094CV",
+  "viejo": 12288,
+  "nuevo": 1157326,
+  "num_op": 88036
+ },
+ {
+  "carta": 180336,
+  "op_carta": "265904291AV",
+  "viejo": 12290,
+  "nuevo": 1157328,
+  "num_op": 88037
+ },
+ {
+  "carta": 180337,
+  "op_carta": "265907618JM",
+  "viejo": 12292,
+  "nuevo": 1157330,
+  "num_op": 88039
+ },
+ {
+  "carta": 180338,
+  "op_carta": "265905468JM",
+  "viejo": 12293,
+  "nuevo": 1157331,
+  "num_op": 88040
+ },
+ {
+  "carta": 180339,
+  "op_carta": "265907999CV",
+  "viejo": 12294,
+  "nuevo": 1157332,
+  "num_op": 88041
+ },
+ {
+  "carta": 180340,
+  "op_carta": "265900664JM",
+  "viejo": 210012,
+  "nuevo": 1157346,
+  "num_op": 88055
+ },
+ {
+  "carta": 180341,
+  "op_carta": "265901108JM",
+  "viejo": 210028,
+  "nuevo": 1157362,
+  "num_op": 88071
+ },
+ {
+  "carta": 180342,
+  "op_carta": "265917641LS",
+  "viejo": 210016,
+  "nuevo": 1157350,
+  "num_op": 88059
+ },
+ {
+  "carta": 180343,
+  "op_carta": "265922067JM",
+  "viejo": 210053,
+  "nuevo": 1157387,
+  "num_op": 88097
+ },
+ {
+  "carta": 180344,
+  "op_carta": "265920094AV",
+  "viejo": 210051,
+  "nuevo": 1157385,
+  "num_op": 88095
+ },
+ {
+  "carta": 180345,
+  "op_carta": "265923028KF",
+  "viejo": 210048,
+  "nuevo": 1157382,
+  "num_op": 88092
+ },
+ {
+  "carta": 180346,
+  "op_carta": "26569697CV",
+  "viejo": 210087,
+  "nuevo": 1157421,
+  "num_op": 88134
+ },
+ {
+  "carta": 180347,
+  "op_carta": "26569844JM",
+  "viejo": 210091,
+  "nuevo": 1157425,
+  "num_op": 88138
+ },
+ {
+  "carta": 180348,
+  "op_carta": "26553293AV",
+  "viejo": 210054,
+  "nuevo": 1157388,
+  "num_op": 88099
+ },
+ {
+  "carta": 180349,
+  "op_carta": "265919423JM",
+  "viejo": 210076,
+  "nuevo": 1157410,
+  "num_op": 88123
+ },
+ {
+  "carta": 180350,
+  "op_carta": "265927319SV",
+  "viejo": 210068,
+  "nuevo": 1157402,
+  "num_op": 88114
+ },
+ {
+  "carta": 180351,
+  "op_carta": "26569445KF",
+  "viejo": 210090,
+  "nuevo": 1157424,
+  "num_op": 88137
+ },
+ {
+  "carta": 180352,
+  "op_carta": "265924045AV",
+  "viejo": 210118,
+  "nuevo": 1157452,
+  "num_op": 88167
+ },
+ {
+  "carta": 180353,
+  "op_carta": "265928813KF",
+  "viejo": 210100,
+  "nuevo": 1157434,
+  "num_op": 88148
+ },
+ {
+  "carta": 180354,
+  "op_carta": "265939080CV",
+  "viejo": 210099,
+  "nuevo": 1157433,
+  "num_op": 88146
+ },
+ {
+  "carta": 180356,
+  "op_carta": "26571357KM",
+  "viejo": 210101,
+  "nuevo": 1157435,
+  "num_op": 88149
+ },
+ {
+  "carta": 180357,
+  "op_carta": "265944123AV",
+  "viejo": 210119,
+  "nuevo": 1157453,
+  "num_op": 88168
+ },
+ {
+  "carta": 180358,
+  "op_carta": "265903176LS",
+  "viejo": 12286,
+  "nuevo": 1157324,
+  "num_op": 88034
+ },
+ {
+  "carta": 180359,
+  "op_carta": "265945562LS",
+  "viejo": 420006,
+  "nuevo": 1157459,
+  "num_op": 88173
+ },
+ {
+  "carta": 180360,
+  "op_carta": "265943307KF",
+  "viejo": 420077,
+  "nuevo": 1157529,
+  "num_op": 88246
+ },
+ {
+  "carta": 180361,
+  "op_carta": "265946960KF",
+  "viejo": 420080,
+  "nuevo": 1157532,
+  "num_op": 88249
+ },
+ {
+  "carta": 180362,
+  "op_carta": "265946974SV",
+  "viejo": 420001,
+  "nuevo": 1157454,
+  "num_op": 88169
+ },
+ {
+  "carta": 180363,
+  "op_carta": "265947881KF",
+  "viejo": 420081,
+  "nuevo": 1157533,
+  "num_op": 88250
+ },
+ {
+  "carta": 180364,
+  "op_carta": "265952640SV",
+  "viejo": 420039,
+  "nuevo": 1157492,
+  "num_op": 88207
+ },
+ {
+  "carta": 180365,
+  "op_carta": "265953570JM",
+  "viejo": 600144,
+  "nuevo": 1157595,
+  "num_op": 88234
+ },
+ {
+  "carta": 180366,
+  "op_carta": "265960661LS",
+  "viejo": 600116,
+  "nuevo": 1157669,
+  "num_op": 88286
+ },
+ {
+  "carta": 180367,
+  "op_carta": "265961713SV",
+  "viejo": 420078,
+  "nuevo": 1157530,
+  "num_op": 88247
+ },
+ {
+  "carta": 180368,
+  "op_carta": "265962498JM",
+  "viejo": 420086,
+  "nuevo": 1157538,
+  "num_op": 88255
+ },
+ {
+  "carta": 180369,
+  "op_carta": "265967983FC",
+  "viejo": 600143,
+  "nuevo": 1157594,
+  "num_op": 88313
+ },
+ {
+  "carta": 180370,
+  "op_carta": "265970476LS",
+  "viejo": 420082,
+  "nuevo": 1157534,
+  "num_op": 88251
+ },
+ {
+  "carta": 180371,
+  "op_carta": "265971272SV",
+  "viejo": 420083,
+  "nuevo": 1157535,
+  "num_op": 88252
+ },
+ {
+  "carta": 300001,
+  "op_carta": "26587586DI",
+  "viejo": 810001,
+  "nuevo": 1157776,
+  "num_op": 88496
+ },
+ {
+  "carta": 360001,
+  "op_carta": "266024855DI",
+  "viejo": 930267,
+  "nuevo": 1157989,
+  "num_op": 88556
+ },
+ {
+  "carta": 390001,
+  "op_carta": "266063886PE",
+  "viejo": 990001,
+  "nuevo": 1157991,
+  "num_op": 88714
+ },
+ {
+  "carta": 480001,
+  "op_carta": "266090409KT",
+  "viejo": 1290001,
+  "nuevo": 1350143,
+  "num_op": 6090409
+ },
+ {
+  "carta": 750001,
+  "op_carta": "26614841KT",
+  "viejo": 1680001,
+  "nuevo": 2280024,
+  "num_op": 89137
+ },
+ {
+  "carta": 780001,
+  "op_carta": "26612356DI",
+  "viejo": 1710001,
+  "nuevo": 2280023,
+  "num_op": 89056
+ }
+]
