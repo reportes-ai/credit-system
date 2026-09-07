@@ -1,6 +1,6 @@
 # Pendientes del Business Suite — vista consolidada
 
-> **Actualizado: 20-08-2026.** Este archivo es la **única lista completa** de lo que está
+> **Actualizado: 07-09-2026.** Este archivo es la **única lista completa** de lo que está
 > abierto. Antes vivía repartido: la sección "Pendientes de Madurez" de `CLAUDE.md`, los
 > backlogs de memoria, y lo que cada módulo dejó anotado por su cuenta. Ahora todo
 > converge acá, y las otras ubicaciones apuntan a este archivo.
@@ -119,6 +119,34 @@
 | 8.4 | **`saldo_insoluto` transporta el monto de prepago** | `calcularPrepago` (certificados.controller.js) devuelve `saldo_insoluto: total` = capital + mora + intereses + gastos + comisión de prepago; los certificados de deuda vigente devuelven capital puro bajo la misma clave. El placeholder `{saldo}` de las plantillas editables puede imprimir el prepago rotulado como saldo insoluto. Fix: clave propia (`monto_prepago`) manteniendo compatibilidad de plantillas. |
 | 8.5 | **Pestañas "Rentabilidades" con motores propios** | `creditos/app.js` (credCalcFull) y `cotizaciones/index.html` calculan inline, divergen entre sí y del motor AF_RENT: CORFO y bono como COSTO (en AF_RENT CORFO es INGRESO), com. ejecutivo sobre `saldoPrecio` en Cotizaciones vs `montoFin` en el resto, seguros con fórmula distinta. Máxima 1 (un solo motor): consolidar ambos en AF_RENT/CORE. |
 | 8.6 | **Menores** | (a) Filtro "Estado" de Reportería mezcla etapa y estado de cartera en un solo control. (b) Desplegable de `creditos/revisar.html` ofrece OTORGADO y CURSADO como dos etapas elegibles para el mismo hecho (ver cuántas ops tienen CURSADO antes de retirar la opción). (c) Alias `rentab_afa` en la API del dashboard = ingreso bruto por colocación, nombre engañoso para consumidores nuevos. (d) "Comisión Neta" significa neto de IVA (cartolas), efecto neto en rentabilidad (excepciones) y markup de seguro (factores-seguro) — cada uso está explicado en su contexto, pero son tres significados. |
+
+## 9. Brechas contra el RFP de software core (07-09-2026)
+
+> Origen: revisión punto a punto del "RFP Inicial - Software Crédito Automotriz Autofacil -
+> Portcoll" contra el sistema en producción (v222.43). Documento completo: `Cobertura RFP -
+> AutoFacil Business Suite.docx` en la carpeta del RFP (OneDrive). De 122 requisitos: 59 cubre,
+> 34 parcial, 29 no cubre. Acá van solo las brechas (parciales y no cubiertas), agrupadas por
+> módulo y **sin priorizar**: el RFP está escrito para una entidad supervisada por la CMF, así
+> que varias no aplican mientras AutoFácil no lo sea (marcadas *no aplica hoy*).
+
+| # | Brecha | Estado / detalle |
+|---|---|---|
+| 9.1 | **Originación — productos y solicitud** | (a) Solo crédito en cuotas: sin compra inteligente (cuota balón), leasing, líneas de crédito, flotillas ni subsidios de planta/distribuidor. (b) Sin constructor de formularios por tipo de solicitante/vehículo (los campos son paramétricos, el formulario no). (c) Borrador general de solicitud: hoy solo la preaprobación del dealer y la cola de Datos Faltantes guardan a medias. |
+| 9.2 | **Originación — fraude y cumplimiento** | (a) PEP: producto DealerNet 3450 en catálogo pero inactivo, sin tratamiento. (b) Sin listas negras internas ni cruce con listas de sancionados. (c) Sin verificación de encargo por robo del vehículo (solo texto en la política). (d) Ver 5.7 (duplicados al digitar). |
+| 9.3 | **Originación — documentos y firma** | (a) Contrato, pagaré, hoja resumen y mandatos se cargan y validan; no se generan desde plantilla con los datos del crédito. (b) Firma: FES propia con QR/SHA-256; sin Firma Electrónica Avanzada de proveedor (relacionado con 5.3 onboarding digital). |
+| 9.4 | **Dealer — integración y mensajería** | (a) API pública solo cotiza; no expone estados de solicitud para DMS del dealer. (b) Sin hilo de mensajes por solicitud dentro del Portal del Dealer (Atención Remota es un chat general). (c) Reportes de desempeño del dealer (aprobación, tiempos) no expuestos en su portal. |
+| 9.5 | **Servicing — modificaciones contractuales** | Sin reestructuración, refinanciamiento, cambio de fecha de pago, meses de gracia, novación ni cesión individual. Cada una necesita flujo de aprobación, anexo de contrato y recálculo de la tabla de desarrollo por el motor único. |
+| 9.6 | **Servicing — seguros y colateral** | (a) Sin registro de pólizas (compañía, vigencia, coberturas) ni alertas de vencimiento; sin integración con aseguradoras. (b) Prenda: existe el certificado de alzamiento, falta seguimiento del estado de inscripción. (c) Sin valor de mercado del vehículo ni LTV en el tiempo (tasadores). (d) Sin GPS del vehículo. |
+| 9.7 | **Servicing — pagos** | (a) Sin PAC/débito automático. (b) Sin pago en línea desde el Portal del Cliente (pasarela). (c) Sin estado de cuenta periódico enviado al cliente (solo certificado a demanda). (d) Cliente no puede solicitar modificaciones ni gestionar su prepago desde el portal. |
+| 9.8 | **Cobranza — canales y estrategia** | (a) Sin CTI ni marcación predictiva (solo discador manual de campañas). (b) Sin SMS. (c) Sin link de pago en correo/WhatsApp. (d) Promesas de pago sin alerta automática de incumplimiento. (e) Sin champion-challenger ni asignación de casos por reglas de segmento. (f) Guiones solo por campaña. (g) Escritorio unificado del gestor. |
+| 9.9 | **Cobranza — judicial y agencias externas** | Sin flujo prejudicial/judicial (demandas, embargos, dación en pago) ni traspaso y seguimiento de agencias o estudios de abogados. Ver también 5.1 (voz). |
+| 9.10 | **Activos reposeídos** | Módulo completo inexistente: registro del vehículo recuperado, custodia y costos, documentación, tasación, reparaciones, venta/remate y resultado neto contra la deuda castigada. Impacta LGD y contabilidad. |
+| 9.11 | **Contabilidad y riesgo normativo** (*no aplica hoy*) | (a) Provisiones PD×LGD×EAD con matrices CMF (hoy modelo propio por tramo). (b) Interés efectivo NIIF 9. (c) Archivos MSI de la CMF. (d) Multiempresa/multimoneda. (e) Recuperos de castigados sin cuenta de utilidad específica; gastos por cuenta de clientes sin cuenta por cobrar separada. |
+| 9.12 | **Riesgo — analítica** | Sin vintage/cosechas, stress testing ni concentración por segmento de riesgo o tipo de vehículo. Relacionado con 5.5 (predicción de mora) y Score de Mora sin historial INDEXA. |
+| 9.13 | **PLD/FT y datos personales** | (a) Sin KYC formal, monitoreo de transacciones ni ROS a la UAF (*no aplica hoy*). (b) Ley 19.628: sin flujo de derechos ARCOP ni registro de consentimientos. |
+| 9.14 | **Tesorería** | Flujo de caja proyectado (Plan Liquidez sin motor); reportes regulatorios SII más allá del F29 y el RCV. |
+| 9.15 | **Seguridad y acceso** | 2FA y SSO (Google Client ID sin cargar; ya estaba en CLAUDE.md como futuro). Pentest formal. |
+| 9.16 | **Plataforma** | Editor visual de reglas/flujos (low-code): todo es paramétrico pero se edita por mantenedor, no por diagrama. Pruebas de carga formales y SLA escrito. |
 
 ---
 
