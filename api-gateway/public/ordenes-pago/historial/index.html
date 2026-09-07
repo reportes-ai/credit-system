@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.34 — fix PDF comprobantes en blanco (contenedor dentro del viewport) · v1.33 — boton "PDF comprobantes": un solo PDF con la Solicitud de Pago de cada orden del filtro (una por pagina, timbre PAGADO, snapshot congelado), tope 80 · v1.32 — boton Adjuntar respaldo en el detalle de CUALQUIER orden, incluso pagada (facturas que llegan despues del pago) · v1.31 — filtro TIPO: botones Administrativos/Arriendos (categoria dentro de Otros/GENERAL) · v1.30 — boton Excel: descarga los casos filtrados con montos con formato y nombre de archivo segun filtros. v1.29 — selector "Cuenta de cargo" al registrar el pago (mantenedor Cuentas Bancarias): queda en la orden y el asiento acredita ese banco real; el detalle muestra "desde <cuenta>". v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.35 — fix real PDF en blanco: contenedor en flujo estatico (absolute tambien fallaba, probado), velo mientras genera · v1.34 — intento (contenedor dentro del viewport) · v1.33 — boton "PDF comprobantes": un solo PDF con la Solicitud de Pago de cada orden del filtro (una por pagina, timbre PAGADO, snapshot congelado), tope 80 · v1.32 — boton Adjuntar respaldo en el detalle de CUALQUIER orden, incluso pagada (facturas que llegan despues del pago) · v1.31 — filtro TIPO: botones Administrativos/Arriendos (categoria dentro de Otros/GENERAL) · v1.30 — boton Excel: descarga los casos filtrados con montos con formato y nombre de archivo segun filtros. v1.29 — selector "Cuenta de cargo" al registrar el pago (mantenedor Cuentas Bancarias): queda en la orden y el asiento acredita ese banco real; el detalle muestra "desde <cuenta>". v1.28 — filtro TIPO: boton Parques (origen PARQUE, con badge verde y deep-link ?origen=PARQUE). v1.27 — login conserva el destino (?next=). v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -346,9 +346,15 @@ async function exportarPDF(){
       } catch(e) { docs.push({ numero: o.numero, _error: true }); }
     }
     const cont = document.createElement('div');
-    // Dentro del viewport (detrás de todo): html2canvas no rasteriza lo que está fuera
-    // de pantalla — con left:-10000px el PDF salía en blanco (07-09-2026).
-    cont.style.cssText = 'position:absolute;left:0;top:0;width:760px;background:#fff;z-index:-1;pointer-events:none';
+    // EN FLUJO NORMAL, al final del body: probado el 07-09-2026 con el mismo motor —
+    // con position:absolute o left:-10000px html2canvas entrega UNA hoja en blanco
+    // (4 KB); en flujo estático salen todas las páginas. Un velo tapa la pantalla
+    // mientras se genera para que el usuario no vea el documento pegado abajo.
+    cont.style.cssText = 'width:760px;background:#fff;margin:0 auto';
+    const velo = document.createElement('div');
+    velo.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(6px);z-index:5000;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1rem';
+    velo.innerHTML = '<div style="background:#0141A2;padding:16px 26px;border-radius:12px"><i class="bi bi-hourglass-split me-2"></i>Generando PDF con ' + docs.length + ' comprobante' + (docs.length===1?'':'s') + '…</div>';
+    document.body.appendChild(velo);
     cont.innerHTML = docs.map((o, i) => {
       const cab = o._error
         ? `<p style="color:#b91c1c;font-size:12px">No se pudo cargar la orden ${escH(o.numero||'')}.</p>`
@@ -362,11 +368,11 @@ async function exportarPDF(){
       await html2pdf().set({
         filename: nombreArchivoFiltro('ODP_comprobantes') + '.pdf',
         margin: 8, image: { type:'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, windowWidth: 760 },
+        html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit:'mm', format:'letter', orientation:'portrait' },
         pagebreak: { mode: ['css', 'legacy'], after: '.html2pdf__page-break' },
       }).from(cont).save();
-    } finally { cont.remove(); }
+    } finally { cont.remove(); velo.remove(); }
     btn.innerHTML = `<i class="bi bi-check-lg me-1"></i>${docs.length} comprobante${docs.length===1?'':'s'}`;
     setTimeout(()=>{ btn.innerHTML = orig; }, 3000);
   } catch(e) { toast('No se pudo generar el PDF'); btn.innerHTML = orig; }
