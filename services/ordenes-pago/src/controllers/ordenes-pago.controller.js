@@ -747,7 +747,12 @@ async function construirTraza(oc) {
     // La orden de pago misma — el final de la cadena, en cualquier origen.
     push('Orden ' + (oc.numero || '') + ' emitida', oc.usuario_nombre, oc.created_at);
     if (oc.anulada)     push('Orden anulada', oc.anulada_nombre, oc.fecha_anulada, true);
-    else if (oc.pagada) push('Pagada', oc.pagada_nombre || null, oc.fecha_pagada);
+    /* El pago de una orden de Post Venta se registra por dos vías a la vez (etapa
+       COMISION PAGADA / SALDO PRECIO PAGADO en el seguimiento + correlativo pagado):
+       es UN hecho, no se muestra dos veces (Pato, 07-09-2026: "Pagada Cristina Peña"
+       aparecía repetida). Si la etapa ya está en la traza, la línea de la orden se omite. */
+    else if (oc.pagada && !pasos.some(p => /PAGAD[OA]$/i.test(String(p.label || '').trim())))
+      push('Pagada', oc.pagada_nombre || null, oc.fecha_pagada);
   } catch (e) { console.error('[ordenes-pago traza]', e.message); }
   /* Ordenado por FECHA, no por el orden en que se consultó: hay operaciones
      cursadas antes de que existiera su carta (incorporación de otorgadas sin
