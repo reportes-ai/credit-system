@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v3.1 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
+  <!-- v3.2 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -663,7 +663,10 @@ const fmtCLP = n => '$'+Math.round(Number(n||0)).toLocaleString('es-CL');
 const fmtUF  = n => Number(n||0).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:4})+' UF';
 function facCard(lbl,val){ return '<div style="background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:12px 14px"><div style="font-size:.72rem;color:#64748b;text-transform:uppercase">'+lbl+'</div><div style="font-weight:800;font-size:1rem;color:#012d70;margin-top:2px">'+val+'</div></div>'; }
 async function cargarFacturacion(){
-  const mes = document.getElementById('facMes').value;
+  const inp = document.getElementById('facMes');
+  // Por defecto el mes en curso (hora Chile); el usuario puede retroceder con el selector
+  if (!inp.value) inp.value = new Date().toLocaleDateString('en-CA', { timeZone:'America/Santiago' }).slice(0,7);
+  const mes = inp.value;
   const body = document.getElementById('facBody');
   body.innerHTML = '<div class="muted">Calculando…</div>';
   try {
