@@ -310,16 +310,22 @@ const getEnviadas = async (req, res) => {
    movimiento referencia el ID Financiera en num_op): vía creditos, primero por
    id_financiera y si no por num_op. Sin esta segunda rama las ops sin carta
    nunca recibían CARTOLA ENVIADA aunque la cartola se enviara (op 89013,
-   detectado 25-08-2026). filtroSql usa alias `m`. */
+   detectado 25-08-2026). CON carta pero id_credito_creado HUÉRFANO (382 de 600
+   cartas apuntan a ids de creditos anteriores a la re-migración de la tabla):
+   se confiaba en ese id y no se caía al respaldo, así que la op tampoco recibía
+   CARTOLA ENVIADA (ops 5381115/5714593/5738833, cartola 330003 del 18-08-2026,
+   detectado 07-09-2026). Ahora el id de la carta solo vale si existe en creditos.
+   filtroSql usa alias `m`. */
 async function segsDeMovs(filtroSql, vals) {
   const [movs] = await pool.query(
-    `SELECT m.id, m.num_op, ca.id_credito_creado
+    `SELECT m.id, m.num_op, ca.id_credito_creado, cc.id AS id_credito_ok
        FROM cartolas_movimientos m
        LEFT JOIN cartas_aprobacion ca ON ca.id = m.id_carta
+       LEFT JOIN creditos cc ON cc.id = ca.id_credito_creado
       WHERE ${filtroSql}`, vals);
   const credIds = new Set();
   for (const m of movs) {
-    if (m.id_credito_creado) { credIds.add(Number(m.id_credito_creado)); continue; }
+    if (m.id_credito_ok) { credIds.add(Number(m.id_credito_ok)); continue; }
     if (!m.num_op) continue;
     const [[cr]] = await pool.query(
       `SELECT id FROM creditos
