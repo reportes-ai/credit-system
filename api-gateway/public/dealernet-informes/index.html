@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v3.3 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
+  <!-- v3.4 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -142,7 +142,7 @@
   </div>
   </div><!-- /tab-auditoria -->
 
-  <!-- Alertas de uso (mismo permiso que la auditoría) -->
+  <!-- Alertas de uso (funcionalidad dealernet_alertas: hoy solo Administrador) -->
   <div id="tab-alertas" style="display:none">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
@@ -671,7 +671,7 @@ function tab(t){
 // Pestañas Auditoría/Facturación/Repositorio: solo con permiso (Admin siempre; Repositorio SOLO Admin).
 (async () => {
   const esAdmin = (yo?.perfil === 'Administrador');
-  let pAud = esAdmin, pFac = esAdmin;
+  let pAud = esAdmin, pFac = esAdmin, pAl = esAdmin;
   try {
     const r = await fetch('/api/auth/mis-permisos', { headers:H });
     const j = await r.json();
@@ -679,9 +679,10 @@ function tab(t){
     const g = f.includes('usuarios_gestionar');
     if (f.includes('dealernet_auditoria') || g) pAud = true;
     if (f.includes('dealernet_facturacion') || g) pFac = true;
+    if (f.includes('dealernet_alertas')) pAl = true;   // hoy solo Administrador; se abre desde Perfiles y Permisos
   } catch(_){}
   document.getElementById('tabAudBtn').style.display = pAud ? '' : 'none';
-  document.getElementById('tabAlBtn').style.display = pAud ? '' : 'none';
+  document.getElementById('tabAlBtn').style.display = pAl ? '' : 'none';
   document.getElementById('tabFacBtn').style.display = pFac ? '' : 'none';
   document.getElementById('tabRepoBtn').style.display = esAdmin ? '' : 'none';
 })();
