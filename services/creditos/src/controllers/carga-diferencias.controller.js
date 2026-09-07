@@ -13,6 +13,7 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
+const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
 
 /* Qué campos existen y cómo se llaman: catálogo ÚNICO en shared/campos-carga-dif.js,
    el mismo que usa la carga para detectarlas. Antes la lista estaba acá y también
@@ -116,7 +117,9 @@ exports.resolver = async (req, res) => {
       }
 
       if (eleccion !== 'SISTEMA') {
-        await pool.query(`UPDATE creditos SET ${dif.campo} = ?, updated_at = NOW() WHERE id = ?`, [valor, dif.id_credito]);
+        // Si cambia la fecha de curse, el mes contable la sigue (motor único; desde el corte)
+        const sigueMes = dif.campo === 'fecha_otorgado' ? `, ${SET_MES_SQL(await mesCorte())}` : '';
+        await pool.query(`UPDATE creditos SET ${dif.campo} = ?${sigueMes}, updated_at = NOW() WHERE id = ?`, [valor, dif.id_credito]);
         aplicados++;
         auditar({ req, accion: 'EDITAR', modulo: 'carga-masiva', entidad: 'credito', entidad_id: dif.id_credito,
           detalle: `Diferencia con la carga resuelta en OP ${cr.num_op}: ${ETIQUETAS[dif.campo]} ${dif.valor_sistema} → ${valor} (${eleccion === 'ARCHIVO' ? 'valor del archivo' : 'valor digitado'})` });

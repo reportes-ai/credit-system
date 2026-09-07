@@ -55,4 +55,18 @@ function MES_SQL(mesEvaluado, corte, alias = 'c') {
     : `DATE_FORMAT(${a}mes, '%Y-%m')`;
 }
 
-module.exports = { mesCorte, MES_SQL, DEFAULT_CORTE };
+/**
+ * Fragmento para un SET que ESCRIBE `mes` coherente con `fecha_otorgado`: desde el
+ * corte, el mes contable de una op cursada es el mes de su fecha de curse; antes del
+ * corte `mes` se respeta tal cual (ajustes históricos). Va DESPUÉS de `fecha_otorgado`
+ * en el SET: MySQL evalúa de izquierda a derecha y así ve la fecha ya definitiva.
+ * Nació el 07-09-2026: 7 ops cursadas el 03/04-09 quedaron con mes agosto (el dashboard
+ * y las cartolas cuentan por `mes`) y agosto pasó de 104 a 111 después del cierre.
+ * @param {string} corte 'YYYY-MM' (de mesCorte())
+ */
+function SET_MES_SQL(corte) {
+  return `mes = CASE WHEN fecha_otorgado IS NOT NULL AND fecha_otorgado >= '${corte}-01'
+                     THEN DATE_FORMAT(fecha_otorgado, '%Y-%m-01') ELSE mes END`;
+}
+
+module.exports = { mesCorte, MES_SQL, SET_MES_SQL, DEFAULT_CORTE };

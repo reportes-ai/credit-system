@@ -8,6 +8,8 @@ const { publicarAnuncio } = require('../../../../shared/anuncios');
 const { marcarForzadosCalculo, recalcularPorOps } = require('../../../creditos/src/utils/recalcular-mes');
 // Motor único de etapa: otorgar escribe las TRES columnas de una sola vez.
 const { SET_ETAPA_SQL, valoresEtapa } = require('../../../../shared/etapa-credito');
+// Motor único de mes de atribución: al otorgar, `mes` sigue a la fecha de curse (desde el corte).
+const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
 const pdf = require('pdf-parse');
 
 /* numero_credito (YYMM###) — motor único en shared/num-op.js. La versión
@@ -921,10 +923,12 @@ const otorgar = async (req, res) => {
                      (26090047, 05-09-2026: cursó en septiembre y caía en agosto). */
                   /* mes va ANTES: MySQL evalúa el SET de izquierda a derecha y el segundo
                      CASE vería la fecha_otorgado ya reemplazada. */
-                  mes=CASE WHEN fecha_otorgado IS NULL OR fecha_otorgado < DATE(created_at)
-                           THEN DATE_FORMAT(CURDATE(),'%Y-%m-01') ELSE mes END,
                   fecha_otorgado=CASE WHEN fecha_otorgado IS NULL OR fecha_otorgado < DATE(created_at)
                                       THEN CURDATE() ELSE fecha_otorgado END,
+                  /* mes DESPUÉS de fecha_otorgado: desde el corte, mes = mes de la fecha de
+                     curse definitiva (motor único shared/mes-atribucion). Con el CASE
+                     anterior una fecha prellenada válida dejaba el mes viejo (07-09-2026). */
+                  ${SET_MES_SQL(await mesCorte())},
                   comdea_real = CASE WHEN ? > 0 THEN ? ELSE comdea_real END, updated_at=NOW()
             WHERE (${cond.join(' OR ')})
               /* UPPER en las dos ramas: estas columnas tienen collation BINARIA

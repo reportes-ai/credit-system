@@ -8,6 +8,8 @@ const { isMesCerrado, getMesDeNumOp } = require('../../../../shared/utils/mes-ce
 const { esFechaFutura, hoyChile } = require('../../../../shared/utils/fecha-futura');
 // Motor único de etapa: al sincronizar desde Trinidad, `estado` acompaña a las otras dos.
 const { SET_ESTADO_SQL } = require('../../../../shared/etapa-credito');
+// Motor único de mes de atribución: `mes` sigue a la fecha de curse desde el corte (07-09-2026).
+const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
 
 /* ── Migraciones ────────────────────────────────────────────────── */
 require('../../../../shared/migrate').enFila('carga-trinidad', async () => {
@@ -427,6 +429,7 @@ function esArchivoCanal(buffer) {
    Solo RELLENA lo vacío (montos 0/NULL, strings NULL); nunca pisa datos
    existentes ni toca meses cerrados. Match por num_op o id_financiera. */
 async function aplicarCanal(mapaCanal, log) {
+  const corteMes = await mesCorte();
   const ids = Object.keys(mapaCanal).map(Number);
   const idsSet = new Set(ids);
   let complementados = 0, sinMatch = 0, omitidosCerrado = 0, erroresSQL = 0; let primerError = null;
@@ -490,6 +493,7 @@ async function aplicarCanal(mapaCanal, log) {
       if (!cerrado && esCursadoCanal && f.fecha_curse &&
           String(r.estado_credito || '').toUpperCase() === 'OTORGADO' && r.fo !== f.fecha_curse) {
         sets.push('fecha_otorgado = ?'); vals.push(f.fecha_curse);
+        sets.push(SET_MES_SQL(corteMes));   // el mes contable sigue a la fecha de curse (desde el corte)
       }
       if (cerrado && !sets.length) { omitidosCerrado++; continue; }
       if (!sets.length) continue;
@@ -583,6 +587,7 @@ exports.preview = async (req, res) => {
 /* ── POST /api/carga-trinidad/importar ─────────────────────────── */
 exports.importar = async (req, res) => {
   try {
+    const corteMes = await mesCorte();
     const { solicitudes, canal } = archivosDe(req);
     const nombreArchivo = [solicitudes?.originalname, canal?.originalname].filter(Boolean).join(' + ');
     if (!solicitudes && !canal) return res.json({ success: false, error: 'Archivo requerido' });
@@ -726,14 +731,14 @@ exports.importar = async (req, res) => {
                   ANTERIOR a la creación (prellenada con fin de mes por la regla MES
                   antigua: las ops del 01-09-2026 quedaron con 31-08). mes va ANTES
                   porque MySQL evalúa el SET de izquierda a derecha. */
-               mes            = CASE WHEN ? IS NOT NULL AND (fecha_otorgado IS NULL OR fecha_otorgado < DATE(created_at)) THEN ? ELSE COALESCE(mes, ?) END,
                fecha_otorgado = CASE WHEN ? IS NOT NULL AND (fecha_otorgado IS NULL OR fecha_otorgado < DATE(created_at)) THEN ? ELSE fecha_otorgado END,
+               mes            = COALESCE(mes, ?),
+               ${SET_MES_SQL(corteMes)},
                updated_at = NOW()
              WHERE id_financiera = ? AND financiera != 'NO APLICA'`,
             [f.estado_autofin, f.ejecutivo_tri,
              ...(retrocedeEq ? [] : [f.estado_credito, f.estado_eval, f.estado_credito || null]), idCliente,
-             fechaEq, fechaEq ? fechaEq.slice(0, 7) + '-01' : null, fechaEq ? fechaEq.slice(0, 7) + '-01' : null,
-             fechaEq, fechaEq, String(f.num_op)]
+             fechaEq, fechaEq, fechaEq ? fechaEq.slice(0, 7) + '-01' : null, String(f.num_op)]
           );
           actualizados++;
           // Diferencias de montos contra el archivo → cola para resolver a mano
@@ -773,6 +778,7 @@ exports.importar = async (req, res) => {
                id_cliente     = COALESCE(id_cliente, ?),
                fecha_otorgado = COALESCE(?, fecha_otorgado),
                mes            = COALESCE(?, mes),
+               ${SET_MES_SQL(corteMes)},
                marca    = COALESCE(?, marca), modelo   = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
