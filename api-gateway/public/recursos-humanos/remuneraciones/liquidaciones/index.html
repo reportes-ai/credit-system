@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
+  <!-- v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -74,7 +74,7 @@
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>Colaborador</th><th>Días</th><th>Sueldo Base</th><th>Comisiones</th><th>Otros Imp.</th><th>Gratif.</th><th>Imponible</th>
+          <th>Colaborador</th><th>Días</th><th>Sueldo Base</th><th id="thComis" title="Mes vencido: la liquidación paga las comisiones del mes anterior">Comisiones</th><th>Otros Imp.</th><th>Gratif.</th><th>Imponible</th>
           <th>No Impon.</th><th>AFP</th><th>Salud</th><th>AFC</th><th>Impuesto</th><th>Otros Dcto.</th><th>Líquido</th><th>Estado</th><th>Ver</th>
         </tr></thead>
         <tbody id="tb"><tr><td colspan="16" class="empty">Cargando…</td></tr></tbody>
@@ -130,6 +130,7 @@ async function cargar(){
   render();
 }
 function render(){
+  const thC = document.getElementById('thComis'); if (thC && DATA && DATA.comisiones_mes) thC.textContent = 'Comisiones ' + DATA.comisiones_mes;
   const rows = DATA.filas || [];
   if (!rows.length) { document.getElementById('tb').innerHTML = '<tr><td colspan="16" class="empty">No hay colaboradores con sueldo base en su ficha. Complétalos en <a href="/recursos-humanos/colaboradores/">Colaboradores</a>.</td></tr>'; return; }
   // Libro de SOLO LECTURA: todo viene de su fuente (ficha, licencias,
@@ -137,7 +138,7 @@ function render(){
   const aviso = document.getElementById('avisoComis');
   if (aviso) aviso.style.display = (DATA.comisiones_sin_aprobar||[]).length ? '' : 'none';
   if (aviso && (DATA.comisiones_sin_aprobar||[]).length)
-    aviso.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i><b>Comisiones sin aprobar</b> en <a href="/comisiones/revision/">Revisión de Comisiones</a> para: ${DATA.comisiones_sin_aprobar.map(esc).join(', ')} — el mes NO se podrá emitir hasta aprobarlas.`;
+    aviso.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i><b>Comisiones de ${esc(DATA.comisiones_mes||'')} sin aprobar</b> en <a href="/comisiones/revision/">Revisión de Comisiones</a> para: ${DATA.comisiones_sin_aprobar.map(esc).join(', ')} — el mes NO se podrá emitir hasta aprobarlas.`;
   document.getElementById('tb').innerHTML = rows.map((r,i)=>{
     return `<tr class="fila">
       <td style="font-weight:600">${esc(r.nombre)}<div style="font-size:.66rem;color:#94a3b8">${esc(r.cargo||'')}</div></td>
@@ -246,7 +247,7 @@ function pintarLiq(l, d){
         <table style="width:100%;border-collapse:collapse;font-size:.8rem;border-right:1px solid #e2e8f0">
           ${cab('HABERES')}
           ${fila('Sueldo base'+((d.dias??30)!==30?` (${d.dias}/30)`:''), d.sueldo_base)}
-          ${fila('Comisiones', d.comisiones)}
+          ${fila('Comisiones' + (d.comisiones_mes ? ' ' + d.comisiones_mes : ''), d.comisiones)}
           ${d.feriado_variable>0?fila(`Feriado renta variable art. 71 (${d.feriado_var_dias} día/s, prom. 3 meses)`, d.feriado_variable):''}
           ${fila('Otros imponibles', d.otros_imponibles)}
           ${fila('Gratificación legal (tope 4,75 IMM/12)', d.gratificacion)}

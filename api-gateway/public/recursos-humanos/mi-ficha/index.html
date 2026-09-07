@@ -315,7 +315,7 @@ async function verLiq(id){
     <span style="color:#64748b;font-size:12px">${esc(d.tipo_contrato||'')} · AFP ${esc(d.afp||'—')} · ${esc(d.salud||'—')}</span></p>
     <table style="width:100%;border-collapse:collapse">
       <tr><td colspan="2" style="background:#eff6ff;font-weight:800;font-size:11px;padding:5px 8px">HABERES</td></tr>
-      ${fila('Sueldo base',d.sueldo_base)}${fila('Comisiones',d.comisiones)}${fila('Otros imponibles',d.otros_imponibles)}${fila('Gratificación legal',d.gratificacion)}${fila('Colación',d.colacion)}${fila('Movilización',d.movilizacion)}${fila('Otros no imponibles',d.otros_no_imponibles)}
+      ${fila('Sueldo base',d.sueldo_base)}${fila('Comisiones'+(d.comisiones_mes?' '+d.comisiones_mes:''),d.comisiones)}${fila('Otros imponibles',d.otros_imponibles)}${fila('Gratificación legal',d.gratificacion)}${fila('Colación',d.colacion)}${fila('Movilización',d.movilizacion)}${fila('Otros no imponibles',d.otros_no_imponibles)}
       <tr><td style="font-weight:700;padding:3px 8px">Total haberes</td><td style="text-align:right;font-weight:700;padding:3px 8px">${co(d.total_haberes)}</td></tr>
       <tr><td colspan="2" style="background:#eff6ff;font-weight:800;font-size:11px;padding:5px 8px">DESCUENTOS</td></tr>
       ${fila('AFP '+(d.afp||''),d.desc_afp,1)}${fila('Salud',d.desc_salud,1)}${fila('Seguro cesantía AFC',d.desc_afc,1)}${fila('Impuesto único',d.impuesto,1)}${fila('Otros descuentos',d.otros_descuentos,1)}

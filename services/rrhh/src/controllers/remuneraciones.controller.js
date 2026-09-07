@@ -696,10 +696,14 @@ async function feriadoVariableDelMes(mes) {
 }
 
 /* ── Comisiones aprobadas: sin aprobación de Operaciones no se emite el mes ── */
+/* Las comisiones se pagan MES VENCIDO (definición de Pato, 07-09-2026, igual que AVSOFT
+   "COMISIONES MES ANTERIOR"): la liquidación de un mes lleva las comisiones del mes
+   anterior, que a esa altura ya están revisadas y aprobadas. */
+const mesAnteriorDe = (mes) => { let [y, m] = String(mes).split('-').map(Number); m--; if (m < 1) { m = 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; };
 async function comisionesSinAprobar(mes, comis) {
   const conComision = Object.entries(comis).filter(([, monto]) => monto > 0).map(([nom]) => nom);
   if (!conComision.length) return [];
-  const [aps] = await pool.query("SELECT ejecutivo FROM comisiones_aprobaciones WHERE mes=? AND estado='aprobado'", [mes]).catch(() => [[]]);
+  const [aps] = await pool.query("SELECT ejecutivo FROM comisiones_aprobaciones WHERE mes=? AND estado='aprobado'", [mesAnteriorDe(mes)]).catch(() => [[]]);
   const okSet = new Set(aps.map(a => String(a.ejecutivo).toUpperCase().trim()));
   return conComision.filter(n => !okSet.has(n));
 }
@@ -708,7 +712,7 @@ async function comisionesSinAprobar(mes, comis) {
 async function comisionesDelMes(mes) {
   try {
     const { calcularMes } = require('../../../comisiones/src/controllers/comisiones.controller');
-    const filas = await calcularMes(mes);
+    const filas = await calcularMes(mesAnteriorDe(mes));   // mes vencido
     const porNombre = {};
     // Comision NETA de reversas: la liquidacion muestra solo la comision a pagar.
     // El detalle de que operaciones se revirtieron vive en Revision de Comisiones,
@@ -763,11 +767,11 @@ const getMes = async (req, res) => {
       };
       return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo,
         licencia_dias: 30 - diasTrabajadosMes(mes, null, lics[e.id_usuario]),
-        estado: g ? 'BORRADOR' : 'SIN GUARDAR', id_liq: g?.id || null, ...calcLiquidacion(inp, ind) };
+        estado: g ? 'BORRADOR' : 'SIN GUARDAR', id_liq: g?.id || null, comisiones_mes: mesAnteriorDe(mes), ...calcLiquidacion(inp, ind) };
     });
     const emitidas = filas.filter(f => f.estado === 'EMITIDA').length;
     const sinAprobar = await comisionesSinAprobar(mes, comis);
-    ok(res, { mes, filas, comisiones_sin_aprobar: sinAprobar,
+    ok(res, { mes, filas, comisiones_sin_aprobar: sinAprobar, comisiones_mes: mesAnteriorDe(mes),
       indicadores: { uf: ind.uf, utm: ind.utm, imm: ind.rem_imm, tope_uf: ind.rem_tope_imponible_uf, salud_pct: ind.rem_salud_pct, afc_pct: ind.rem_afc_trabajador_pct, grat_tope_imm: ind.rem_grat_tope_imm, afps: ind.afps, tramos: ind.tramos },
       mes_emitido: emitidas > 0 && emitidas === filas.length });
   } catch (e) { console.error('[rrhh remuneraciones getMes]', e.message); fail(res, 'Error interno del servidor'); }
@@ -809,6 +813,7 @@ const guardar = async (req, res) => {
         otros_descuentos: descs[emp.id_usuario] || 0,
       };
       const calc = calcLiquidacion(inp, ind);
+      calc.comisiones_mes = mesAnteriorDe(mes);   // queda en el snapshot: la liquidación dice de qué mes son
       await pool.query(
         `INSERT INTO rh_liquidaciones (id_usuario, mes, nombre, rut, cargo, detalle, total_imponible, total_haberes, total_descuentos, liquido, estado)
          VALUES (?,?,?,?,?,?,?,?,?,?,'BORRADOR')
@@ -834,7 +839,7 @@ const emitir = async (req, res) => {
     // Gate: sin comisiones APROBADAS (Operaciones) no se emiten las liquidaciones
     const sinAprobar = await comisionesSinAprobar(mes, await comisionesDelMes(mes));
     if (sinAprobar.length)
-      return fail(res, `No se puede emitir: hay comisiones SIN APROBAR en Revisión de Comisiones para: ${sinAprobar.join(', ')}. Apruébalas primero en /comisiones/revision/.`, 409);
+      return fail(res, `No se puede emitir: hay comisiones de ${mesAnteriorDe(mes)} SIN APROBAR en Revisión de Comisiones para: ${sinAprobar.join(', ')}. Apruébalas primero en /comisiones/revision/.`, 409);
     const u = req.usuario || {};
     const [r] = await pool.query(
       "UPDATE rh_liquidaciones SET estado='EMITIDA', emitido_por=?, emitido_at=NOW() WHERE mes=? AND estado='BORRADOR'",
@@ -872,7 +877,7 @@ async function enviarLiquidacionesCorreo(mes) {
       <p>Hola ${String(l.nombre || '').split(' ')[0]}, tu liquidación de sueldo de <b>${mesPalabras(mes)}</b> fue emitida:</p>
       <table style="border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;width:100%;max-width:460px">
         <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">HABERES</td></tr>
-        ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila('Comisiones', d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación', d.colacion)}${fila('Movilización', d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
+        ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila('Comisiones' + (d.comisiones_mes ? ' ' + d.comisiones_mes : ''), d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación', d.colacion)}${fila('Movilización', d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
         <tr><td style="padding:3px 10px;font-weight:700">Total haberes</td><td style="padding:3px 10px;text-align:right;font-weight:700">${co(d.total_haberes)}</td></tr>
         <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">DESCUENTOS</td></tr>
         ${fila('AFP ' + (d.afp || ''), d.desc_afp, 1)}${fila('Salud 7%', d.desc_salud, 1)}${fila('Adicional Isapre', d.desc_salud_adicional, 1)}${fila('Seguro cesantía', d.desc_afc, 1)}${fila('Impuesto único', d.impuesto, 1)}${fila('Otros descuentos', d.otros_descuentos, 1)}
