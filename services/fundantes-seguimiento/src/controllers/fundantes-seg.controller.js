@@ -417,8 +417,15 @@ const eliminarDoc = async (req, res) => {
     const id = Number(req.params.id), codigo = String(req.params.codigo || '');
     if (!id || !codigo) return res.status(400).json({ success: false, data: null, error: 'id y codigo requeridos' });
     if (!(await puedeOperar(req, id))) return res.status(403).json({ success: false, data: null, error: 'Sin permiso sobre esta operación' });
-    const [[doc]] = await pool.query('SELECT doc_ruta FROM fundantes_seg_docs WHERE id_credito=? AND codigo=?', [id, codigo]);
+    // Solo mientras la op no esté enviada (PENDIENTE o RECHAZADA): lo enviado ya está en manos de Operaciones
+    const [[fs]] = await pool.query('SELECT estado FROM fundantes_seg WHERE id_credito=?', [id]);
+    const est = (fs && fs.estado) || 'PENDIENTE';
+    if (est === 'ENVIADO' || est === 'CERRADO') return res.status(409).json({ success: false, data: null, error: 'La operación ya fue enviada: no se puede eliminar el archivo' });
+    const [[doc]] = await pool.query('SELECT doc_ruta, archivo_nombre FROM fundantes_seg_docs WHERE id_credito=? AND codigo=?', [id, codigo]);
+    if (!doc) return res.status(404).json({ success: false, data: null, error: 'No hay archivo que eliminar' });
     await pool.query('DELETE FROM fundantes_seg_docs WHERE id_credito=? AND codigo=?', [id, codigo]);
+    await pool.query('INSERT INTO fundantes_bitacora (id_credito, comentario, autor, id_autor) VALUES (?,?,?,?)',
+      [id, `Eliminó el documento ${codigo}${doc.archivo_nombre ? ' ("' + doc.archivo_nombre + '")' : ''}`, nombreUsuario(req), req.usuario.id_usuario || null]).catch(() => {});
     /* La fila manda: borrada la fila el documento ya no existe para el sistema.
        El objeto se limpia después y sin bloquear —y el bucket tiene versionado,
        así que un borrado por error todavía se puede revertir. */

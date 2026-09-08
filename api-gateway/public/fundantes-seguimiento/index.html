@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Fundantes — AutoFácil</title>
-  <!-- v2.2 — fecha y hora del envio bajo la pill Enviado (columna ENVIO). v2.1 — texto del popup Sin Limitacion: casos excepcionales + prenda hasta la inscripcion. v2.0 — SIN LIMITACION: casillero en Sol. Limitacion (AUTOFIN) con popup de confirmacion; deja enviar sin ese documento y la ODP del saldo excluye el concepto -->
+  <!-- v2.3 — boton Eliminar en cada documento subido mientras la op este PENDIENTE o RECHAZADA (quitar una limitacion mal subida y marcar Sin limitacion). v2.2 — fecha y hora del envio bajo la pill Enviado (columna ENVIO). v2.1 — texto del popup Sin Limitacion: casos excepcionales + prenda hasta la inscripcion. v2.0 — SIN LIMITACION: casillero en Sol. Limitacion (AUTOFIN) con popup de confirmacion; deja enviar sin ese documento y la ODP del saldo excluye el concepto -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; --amber:#b45309; }
@@ -236,7 +236,11 @@ function celdaDoc(row, codigo){
         <input type="checkbox" onclick="this.checked=false;abrirSinLim(${row.id_credito})"> Sin limitación</label></td>`;
   }
   if (d.subido) {
-    const re = editable ? ` <button class="doc-re" title="Subir uno nuevo en su lugar" onclick="subir(${row.id_credito},'${codigo}')"><i class="bi bi-arrow-repeat"></i> Reemplazar</button>` : '';
+    // Mientras la op no esté enviada, el ejecutivo puede reemplazar o ELIMINAR el archivo
+    // (Pato 08-09-2026: una limitación subida "por si acaso" genera $6.000 en la ODP; al
+    // devolverla, el ejecutivo la quita y marca Sin limitación antes de reenviar).
+    const re = editable ? ` <button class="doc-re" title="Subir uno nuevo en su lugar" onclick="subir(${row.id_credito},'${codigo}')"><i class="bi bi-arrow-repeat"></i> Reemplazar</button>
+      <button class="doc-re" style="color:#b91c1c" title="Quitar este archivo${codigo==='SOL_LIMITACION'?' (si la operación va sin limitación, quítalo y marca Sin limitación)':''}" onclick="eliminarDoc(${row.id_credito},'${codigo}','${esc(d.archivo_nombre||'')}')"><i class="bi bi-trash"></i></button>` : '';
     return `<td><a class="doc-up" onclick="verDoc(${d.doc_id})"><i class="bi bi-check-circle-fill"></i> Subido</a>${re}</td>`;
   }
   if (editable) return `<td><button class="doc-subir ${d.obligatorio?'':'opc'}" onclick="subir(${row.id_credito},'${codigo}')">Subir${d.obligatorio?'':' (opc.)'}</button></td>`;
@@ -315,6 +319,16 @@ document.getElementById('fileInput').addEventListener('change', async function()
   } catch(e){ toast(e.message, false); }
 });
 const fileB64 = file => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
+async function eliminarDoc(idCredito, codigo, nombre){
+  const lim = codigo === 'SOL_LIMITACION';
+  const extra = lim ? '\n\nSi la operación va SIN limitación, después marca la casilla "Sin limitación" para que la Orden de Pago no incluya ese concepto.' : '';
+  if (!confirm(`¿Eliminar el archivo${nombre?' "'+nombre+'"':''} de esta operación?${extra}`)) return;
+  try {
+    const j = await (await API(`/api/fundantes-seguimiento/${idCredito}/doc/${encodeURIComponent(codigo)}`, { method:'DELETE' })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast('Archivo eliminado', true); cargar();
+  } catch(e){ toast(e.message, false); }
+}
 function verDoc(docId){ window.open(`/api/fundantes-seguimiento/doc/${docId}/download?token=${encodeURIComponent(token)}`, '_blank'); }
 
 /* ── SIN LIMITACIÓN (solo AUTOFIN) ── */
