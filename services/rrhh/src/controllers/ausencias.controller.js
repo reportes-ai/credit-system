@@ -166,6 +166,9 @@ const crear = async (req, res) => {
         } catch (e) { console.error('[licencia correo supervisor]', e.message); }
       }
       auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'licencia_medica', entidad_id: r.insertId, detalle: `Licencia de ${colab.nombre} ${fd}→${fh} (${dias}d hábiles), supervisor informado` });
+      // Back Up automático (08-09-2026): el suplente asume todas las funciones durante la licencia.
+      try { await require('../../../backups/src/controllers/backups.controller').programarPorAusencia({ id_usuario: colab.id_usuario, ref_id: r.insertId, desde: fd, hasta: fh, origen: 'LICENCIA' }); }
+      catch (e) { console.error('[licencia backup programado]', e.message); }
       // Espejo Workera: la licencia ingresada se informa al reloj control (no bloquea)
       require('../workera-espejo').espejar({ idUsuario: colab.id_usuario, tipo: 'LICENCIA MEDICA',
         desde: fd, hasta: fh, comentario: `Licencia médica ingresada por ${nombreDe(u)}`, tabla: 'rh_ausencias', id: r.insertId }).catch(() => {});

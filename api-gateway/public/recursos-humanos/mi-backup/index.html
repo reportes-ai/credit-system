@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Back Up — AutoFácil</title>
-  <!-- v1.0 — autoservicio del suplente: cada usuario define quién lo respalda; en vacaciones aprobadas el suplente asume todas las funciones automáticamente (activación y desactivación con correo) -->
+  <!-- v1.1 — también licencias médicas (motivo en la tabla) · v1.0 — autoservicio del suplente: cada usuario define quién lo respalda; en vacaciones aprobadas el suplente asume todas las funciones automáticamente (activación y desactivación con correo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -28,7 +28,7 @@
 <div id="af-topnav"></div>
 <script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Mi Back Up',current:true}]};</script>
 <div class="wrap">
-  <div class="banner"><i class="bi bi-people"></i><div><h2>Mi Back Up</h2><p>Quién te reemplaza cuando no estás. En tus vacaciones aprobadas, tu suplente asume todas tus funciones automáticamente.</p></div></div>
+  <div class="banner"><i class="bi bi-people"></i><div><h2>Mi Back Up</h2><p>Quién te reemplaza cuando no estás. En tus vacaciones aprobadas y en tus licencias médicas, tu suplente asume todas tus funciones automáticamente.</p></div></div>
 
   <div class="card">
     <h5><i class="bi bi-person-check me-1"></i>Mi suplente</h5>
@@ -42,8 +42,8 @@
   </div>
 
   <div class="card">
-    <h5><i class="bi bi-calendar-event me-1"></i>Back Up programado por vacaciones</h5>
-    <table><thead><tr><th>Desde</th><th>Hasta</th><th>Suplente</th><th>Estado</th></tr></thead><tbody id="tbProg"><tr><td colspan="4" style="color:#94a3b8">Cargando…</td></tr></tbody></table>
+    <h5><i class="bi bi-calendar-event me-1"></i>Back Up programado (vacaciones y licencias médicas)</h5>
+    <table><thead><tr><th>Motivo</th><th>Desde</th><th>Hasta</th><th>Suplente</th><th>Estado</th></tr></thead><tbody id="tbProg"><tr><td colspan="5" style="color:#94a3b8">Cargando…</td></tr></tbody></table>
   </div>
 
   <div class="card">
@@ -67,8 +67,8 @@ async function cargar(){
   document.getElementById('estadoActual').innerHTML = b && b.id_suplente
     ? `Suplente actual: <b>${esc(b.suplente_nombre)}</b>${(b.b_funciones||b.b_alertas||b.b_correos)?` · <span class="pill ACTIVO">ACTIVO AHORA</span> (${['b_funciones','b_alertas','b_correos'].filter(k=>b[k]).map(k=>({b_funciones:'funciones',b_alertas:'alertas',b_correos:'correos'})[k]).join(', ')})`:' · <span class="pill CERRADO">inactivo</span>'}`
     : '<span style="color:#b45309"><i class="bi bi-exclamation-triangle"></i> No tienes suplente definido: si te vas de vacaciones nadie asumirá tus funciones.</span>';
-  document.getElementById('tbProg').innerHTML = d.programados.length ? d.programados.map(p=>`<tr><td>${fd(p.desde)}</td><td>${fd(p.hasta)}</td><td>${esc(p.suplente_nombre||'—')}</td><td><span class="pill ${p.estado}">${p.estado.replace('_',' ')}</span></td></tr>`).join('')
-    : '<tr><td colspan="4" style="color:#94a3b8">Sin vacaciones aprobadas próximas.</td></tr>';
+  document.getElementById('tbProg').innerHTML = d.programados.length ? d.programados.map(p=>`<tr><td>${p.origen==='LICENCIA'?'Licencia médica':'Vacaciones'}</td><td>${fd(p.desde)}</td><td>${fd(p.hasta)}</td><td>${esc(p.suplente_nombre||'—')}</td><td><span class="pill ${p.estado}">${p.estado.replace('_',' ')}</span></td></tr>`).join('')
+    : '<tr><td colspan="5" style="color:#94a3b8">Sin vacaciones ni licencias próximas.</td></tr>';
   document.getElementById('respaldoDe').innerHTML = d.respaldo_de.length
     ? d.respaldo_de.map(r=>`<div style="padding:4px 0">${esc(r.titular)} ${(r.b_funciones||r.b_alertas||r.b_correos)?'<span class="pill ACTIVO">activo</span>':'<span class="pill CERRADO">inactivo</span>'}</div>`).join('')
     : 'Nadie te tiene como suplente.';

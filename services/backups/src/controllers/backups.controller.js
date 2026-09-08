@@ -173,26 +173,34 @@ async function aplicarBackup(idTit, { id_suplente, b_funciones, b_alertas, b_cor
 /* ── Programación por VACACIONES ───────────────────────────────────────────────
    programarPorVacaciones: al aprobar la solicitud. Sin suplente definido queda
    SIN_SUPLENTE (se avisa al titular para que lo defina en "Mi Back Up"). */
-async function programarPorVacaciones({ id_usuario, id_solicitud, desde, hasta }) {
+const ORIGEN_TXT = { VACACIONES: 'vacaciones', LICENCIA: 'licencia médica' };
+/* Genérico: VACACIONES (al aprobar la solicitud) y LICENCIA médica (al ingresarla RRHH,
+   08-09-2026). ref_id = id de rh_vacaciones / rh_ausencias. */
+async function programarPorAusencia({ id_usuario, ref_id, desde, hasta, origen = 'VACACIONES' }) {
   try {
     const [[b]] = await pool.query('SELECT id_suplente FROM usuario_backups WHERE id_titular=?', [id_usuario]);
     const idSup = b && b.id_suplente ? Number(b.id_suplente) : null;
     await pool.query(
       `INSERT INTO backup_programados (id_titular, id_suplente, desde, hasta, origen, ref_id, estado)
-       VALUES (?,?,?,?,'VACACIONES',?,?)
+       VALUES (?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE id_suplente=VALUES(id_suplente), desde=VALUES(desde), hasta=VALUES(hasta), estado=VALUES(estado)`,
-      [id_usuario, idSup, desde, hasta, id_solicitud, idSup ? 'PROGRAMADO' : 'SIN_SUPLENTE']);
+      [id_usuario, idSup, desde, hasta, origen, ref_id, idSup ? 'PROGRAMADO' : 'SIN_SUPLENTE']);
     if (!idSup) {
       try {
         const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
-        notificar([id_usuario], { tipo: 'RRHH', prioridad: 'alta', titulo: 'Define tu Back Up antes de tus vacaciones',
-          mensaje: `Tus vacaciones del ${desde} al ${hasta} fueron aprobadas pero no tienes suplente definido: nadie asumirá tus funciones. Defínelo en el menú de tu usuario → Mi Back Up.`, href: '/recursos-humanos/mi-backup/' });
+        const que = ORIGEN_TXT[origen] || String(origen).toLowerCase();
+        const dest = [id_usuario];
+        // Con licencia médica la persona no está: se avisa también a su supervisor.
+        if (origen === 'LICENCIA') { const [[su]] = await pool.query('SELECT id_supervisor FROM usuarios WHERE id_usuario=?', [id_usuario]); if (su && su.id_supervisor) dest.push(su.id_supervisor); }
+        notificar(dest, { tipo: 'RRHH', prioridad: 'alta', titulo: `Sin Back Up definido (${que})`,
+          mensaje: `${que === 'vacaciones' ? 'Vacaciones' : 'Licencia médica'} del ${desde} al ${hasta} sin suplente definido: nadie asumirá las funciones. Se define en el menú del usuario → Mi Back Up (o el Administrador en Mantenedores → Backups).`, href: '/recursos-humanos/mi-backup/' });
       } catch (_) {}
     }
-    // Ya empezaron (aprobación tardía) → activar de inmediato
+    // Ya empezó (aprobación/ingreso tardío) → activar de inmediato
     await procesarProgramados();
-  } catch (e) { console.error('[backups programarPorVacaciones]', e.message); }
+  } catch (e) { console.error('[backups programarPorAusencia]', e.message); }
 }
+const programarPorVacaciones = ({ id_usuario, id_solicitud, desde, hasta }) => programarPorAusencia({ id_usuario, ref_id: id_solicitud, desde, hasta, origen: 'VACACIONES' });
 
 /* Motor: activa lo que empieza hoy o ya empezó; cierra lo que terminó ayer. */
 async function procesarProgramados() {
@@ -209,8 +217,9 @@ async function procesarProgramados() {
     try {
       const [[prev]] = await pool.query('SELECT id_suplente, b_funciones, b_alertas, b_correos FROM usuario_backups WHERE id_titular=?', [bp.id_titular]);
       await pool.query("UPDATE backup_programados SET estado='ACTIVO', activado_at=NOW(), prev_json=? WHERE id=?", [JSON.stringify(prev || null), bp.id]);
-      await aplicarBackup(bp.id_titular, { id_suplente: bp.id_suplente, b_funciones: 1, b_alertas: 1, b_correos: 1 }, 'el Sistema (vacaciones aprobadas)',
-        { motivo: `vacaciones del ${fmtF(bp.desde)} al ${fmtF(bp.hasta)}` });
+      const que = ORIGEN_TXT[bp.origen] || String(bp.origen || '').toLowerCase();
+      await aplicarBackup(bp.id_titular, { id_suplente: bp.id_suplente, b_funciones: 1, b_alertas: 1, b_correos: 1 }, `el Sistema (${que})`,
+        { motivo: `${que} del ${fmtF(bp.desde)} al ${fmtF(bp.hasta)}` });
       console.log('[backups-vacaciones] activado', bp.id, 'titular', bp.id_titular, '→ suplente', bp.id_suplente);
     } catch (e) { console.error('[backups-vacaciones activar]', bp.id, e.message); }
   }
@@ -221,7 +230,8 @@ async function procesarProgramados() {
       let prev = null; try { prev = bp.prev_json ? JSON.parse(bp.prev_json) : null; } catch (_) {}
       const restaurar = prev && prev.id_suplente ? prev : { id_suplente: bp.id_suplente, b_funciones: 0, b_alertas: 0, b_correos: 0 };
       // Si ANTES ya estaba activo por otra razón, se respeta; si no, se apaga todo.
-      await aplicarBackup(bp.id_titular, restaurar, 'el Sistema (fin de vacaciones)', { motivo: `término de las vacaciones el ${fmtF(bp.hasta)}` });
+      const que = ORIGEN_TXT[bp.origen] || String(bp.origen || '').toLowerCase();
+      await aplicarBackup(bp.id_titular, restaurar, `el Sistema (fin de ${que})`, { motivo: `término de ${que === 'vacaciones' ? 'las vacaciones' : 'la ' + que} el ${fmtF(bp.hasta)}` });
       await pool.query("UPDATE backup_programados SET estado='CERRADO', cerrado_at=NOW() WHERE id=?", [bp.id]);
       console.log('[backups-vacaciones] cerrado', bp.id, 'titular', bp.id_titular);
     } catch (e) { console.error('[backups-vacaciones cerrar]', bp.id, e.message); }
@@ -321,4 +331,4 @@ const guardar = async (req, res) => {
   } catch (e) { console.error('[backups guardar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, guardar, mio, guardarMio, programarPorVacaciones, procesarProgramados, aplicarBackup };
+module.exports = { listar, guardar, mio, guardarMio, programarPorVacaciones, programarPorAusencia, procesarProgramados, aplicarBackup };
