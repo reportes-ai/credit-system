@@ -430,6 +430,14 @@ const resolverVacaciones = async (req, res) => {
     } catch (_) {}
     // Cuenta corriente: la aprobación descuenta los días hábiles del saldo
     if (estado === 'APROBADA') try { await require('./vac-cuenta.controller').registrarTomado(s); } catch (_) {}
+    // Back Up automático (08-09-2026): el suplente asume todas las funciones durante las vacaciones.
+    if (estado === 'APROBADA') {
+      try {
+        const isoF = d => (typeof d === 'string' ? d : new Date(d).toISOString()).slice(0, 10);
+        await require('../../../backups/src/controllers/backups.controller').programarPorVacaciones({
+          id_usuario: s.id_usuario, id_solicitud: s.id, desde: isoF(s.fecha_desde), hasta: isoF(s.fecha_hasta) });
+      } catch (e) { console.error('[vacaciones backup programado]', e.message); }
+    }
     // Cierre automático (08-09-2026): folio + comprobante PDF en la carpeta al aprobar.
     // RRHH queda INFORMADO (aviso de arriba), ya no tiene que recepcionar.
     if (estado === 'APROBADA') {

@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v222.77';
+const APP_VERSION = 'v222.78';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -565,6 +565,9 @@ document.addEventListener('DOMContentLoaded', () => {
       </button>
       <button class="af-menu-item" onclick="afOpenModal();document.getElementById('afUserMenu')?.remove()">
         <i class="bi bi-shield-lock"></i> Cambiar contraseña
+      </button>
+      <button class="af-menu-item" onclick="window.location.href='/recursos-humanos/mi-backup/';document.getElementById('afUserMenu')?.remove()">
+        <i class="bi bi-people"></i> Mi Back Up
       </button>
       ${yo?.perfil === 'Administrador' ? `
       <button class="af-menu-item" onclick="afToggleDebug();document.getElementById('afUserMenu')?.remove()">

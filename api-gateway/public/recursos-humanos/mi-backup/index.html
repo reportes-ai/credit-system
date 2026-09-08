@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Back Up — AutoFácil</title>
+  <!-- v1.0 — autoservicio del suplente: cada usuario define quién lo respalda; en vacaciones aprobadas el suplente asume todas las funciones automáticamente (activación y desactivación con correo) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body{background:#f0f4f8;font-family:'Segoe UI',system-ui,sans-serif;margin:0}
+    .wrap{max-width:900px;margin:0 auto;padding:24px 16px 60px}
+    .banner{background:linear-gradient(135deg,#012d70,#0255c5 60%,#009AFE);border-radius:16px;color:#fff;padding:22px 28px;margin-bottom:18px;display:flex;gap:18px;align-items:center}
+    .banner i{font-size:2.2rem;opacity:.85} .banner h2{margin:0;font-size:1.2rem;font-weight:700} .banner p{margin:0;opacity:.85;font-size:.84rem}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px;margin-bottom:16px}
+    .card h5{font-size:.95rem;font-weight:800;color:#012d70;margin:0 0 10px}
+    label{font-size:.74rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px}
+    select{border:1.5px solid #e2e8f0;border-radius:9px;padding:9px 12px;font-size:.9rem;width:100%;max-width:420px}
+    .btn-navy{background:#0141A2;color:#fff;border:none;border-radius:9px;padding:9px 18px;font-weight:700;cursor:pointer}
+    .pill{font-size:.7rem;font-weight:700;border-radius:10px;padding:2px 9px}
+    .PROGRAMADO{background:#dbeafe;color:#1d4ed8} .ACTIVO{background:#dcfce7;color:#15803d} .CERRADO{background:#f1f5f9;color:#64748b} .CANCELADO{background:#fee2e2;color:#b91c1c} .SIN_SUPLENTE{background:#fef3c7;color:#b45309}
+    table{width:100%;border-collapse:collapse;font-size:.84rem} th{font-size:.7rem;text-transform:uppercase;color:#64748b;text-align:left;padding:8px;border-bottom:1px solid #e2e8f0} td{padding:8px;border-bottom:1px solid #f1f5f9}
+    .nota{font-size:.8rem;color:#475569;background:#f8fafc;border-left:4px solid #0141A2;border-radius:8px;padding:10px 14px}
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Mi Back Up',current:true}]};</script>
+<div class="wrap">
+  <div class="banner"><i class="bi bi-people"></i><div><h2>Mi Back Up</h2><p>Quién te reemplaza cuando no estás. En tus vacaciones aprobadas, tu suplente asume todas tus funciones automáticamente.</p></div></div>
+
+  <div class="card">
+    <h5><i class="bi bi-person-check me-1"></i>Mi suplente</h5>
+    <label for="sel">Suplente</label>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px">
+      <select id="sel"><option value="">— sin suplente —</option></select>
+      <button class="btn-navy" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+    </div>
+    <div id="estadoActual" style="font-size:.82rem;color:#475569;margin-top:10px"></div>
+    <div class="nota" style="margin-top:12px"><i class="bi bi-info-circle me-1"></i>Cambiar el suplente no activa nada por sí solo. Se activa <b>automáticamente el primer día de tus vacaciones aprobadas</b> (funciones, alertas y correos) y se desactiva el día siguiente al último; tú y tu suplente reciben correo en ambos momentos. Fuera de vacaciones, la activación la hace el Administrador en Mantenedores → Backups.</div>
+  </div>
+
+  <div class="card">
+    <h5><i class="bi bi-calendar-event me-1"></i>Back Up programado por vacaciones</h5>
+    <table><thead><tr><th>Desde</th><th>Hasta</th><th>Suplente</th><th>Estado</th></tr></thead><tbody id="tbProg"><tr><td colspan="4" style="color:#94a3b8">Cargando…</td></tr></tbody></table>
+  </div>
+
+  <div class="card">
+    <h5><i class="bi bi-arrow-left-right me-1"></i>A quién respaldo yo</h5>
+    <div id="respaldoDe" style="font-size:.86rem;color:#334155">Cargando…</div>
+  </div>
+</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const fd = s => s ? String(s).slice(0,10).split('-').reverse().join('-') : '—';
+async function cargar(){
+  const j = await (await fetch('/api/backups/mio',{headers:H})).json();
+  if (!j.success) return alert(j.error);
+  const d = j.data, sel = document.getElementById('sel');
+  sel.innerHTML = '<option value="">— sin suplente —</option>' + d.usuarios.map(u=>`<option value="${u.id_usuario}">${esc(u.nombre)} · ${esc(u.perfil)}</option>`).join('');
+  sel.value = d.backup && d.backup.id_suplente ? String(d.backup.id_suplente) : '';
+  const b = d.backup;
+  document.getElementById('estadoActual').innerHTML = b && b.id_suplente
+    ? `Suplente actual: <b>${esc(b.suplente_nombre)}</b>${(b.b_funciones||b.b_alertas||b.b_correos)?` · <span class="pill ACTIVO">ACTIVO AHORA</span> (${['b_funciones','b_alertas','b_correos'].filter(k=>b[k]).map(k=>({b_funciones:'funciones',b_alertas:'alertas',b_correos:'correos'})[k]).join(', ')})`:' · <span class="pill CERRADO">inactivo</span>'}`
+    : '<span style="color:#b45309"><i class="bi bi-exclamation-triangle"></i> No tienes suplente definido: si te vas de vacaciones nadie asumirá tus funciones.</span>';
+  document.getElementById('tbProg').innerHTML = d.programados.length ? d.programados.map(p=>`<tr><td>${fd(p.desde)}</td><td>${fd(p.hasta)}</td><td>${esc(p.suplente_nombre||'—')}</td><td><span class="pill ${p.estado}">${p.estado.replace('_',' ')}</span></td></tr>`).join('')
+    : '<tr><td colspan="4" style="color:#94a3b8">Sin vacaciones aprobadas próximas.</td></tr>';
+  document.getElementById('respaldoDe').innerHTML = d.respaldo_de.length
+    ? d.respaldo_de.map(r=>`<div style="padding:4px 0">${esc(r.titular)} ${(r.b_funciones||r.b_alertas||r.b_correos)?'<span class="pill ACTIVO">activo</span>':'<span class="pill CERRADO">inactivo</span>'}</div>`).join('')
+    : 'Nadie te tiene como suplente.';
+}
+async function guardar(){
+  const j = await (await fetch('/api/backups/mio',{method:'PUT',headers:H,body:JSON.stringify({id_suplente:document.getElementById('sel').value||null})})).json();
+  if (!j.success) return alert(j.error);
+  alert('Suplente guardado'); cargar();
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vacaciones — RRHH</title>
-  <!-- v1.12 — RRHH: Reenviar correo del comprobante · v1.11 — Ver comprobante / Descargar / QR en cada solicitud aprobada y en el extracto; correo al beneficiario con copia a RRHH con el comprobante adjunto al aprobar · v1.10 — cuenta corriente como EXTRACTO cronológico con saldo acumulado (no por período, modelo AVSOFT) · v1.9 — RRHH ya no recepciona: el comprobante (folio + PDF) se emite solo al aprobar y RRHH queda informado; el badge cuenta solo pendientes · v1.8 — badge visible (fix display) con N pendientes, saldo del solicitante por fila, y RECEPCION RRHH: firma FES, comprobante PDF verificable archivado en la carpeta digital · v1.7 — cartola rediseñada + saldos por línea jerárquica + ajustes con firma -->
+  <!-- v1.13 — aviso del Back Up que asumirá las funciones al pedir vacaciones · v1.12 — RRHH: Reenviar correo del comprobante · v1.11 — Ver comprobante / Descargar / QR en cada solicitud aprobada y en el extracto; correo al beneficiario con copia a RRHH con el comprobante adjunto al aprobar · v1.10 — cuenta corriente como EXTRACTO cronológico con saldo acumulado (no por período, modelo AVSOFT) · v1.9 — RRHH ya no recepciona: el comprobante (folio + PDF) se emite solo al aprobar y RRHH queda informado; el badge cuenta solo pendientes · v1.8 — badge visible (fix display) con N pendientes, saldo del solicitante por fila, y RECEPCION RRHH: firma FES, comprobante PDF verificable archivado en la carpeta digital · v1.7 — cartola rediseñada + saldos por línea jerárquica + ajustes con firma -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx-style.min.js" defer></script>
   <style>
@@ -35,6 +35,7 @@
     <div class="grid2"><div class="fld"><label>Desde</label><input type="date" id="fD"></div><div class="fld"><label>Hasta</label><input type="date" id="fH"></div></div>
     <div class="fld"><label>Comentario (opcional)</label><textarea id="fC" rows="3" placeholder="Motivo o detalle"></textarea></div>
     <div id="diasInfo" style="font-size:.82rem;color:#475569;margin-bottom:10px"></div>
+    <div id="backupInfo" style="font-size:.8rem;color:#475569;background:#f8fafc;border-left:4px solid #0141A2;border-radius:8px;padding:8px 12px;margin-bottom:10px"></div>
     <div style="text-align:right"><button class="btn-navy" onclick="crear()"><i class="bi bi-send me-1"></i>Enviar solicitud</button></div>
   </div>
   <div id="secLista" class="card-box" style="display:none">
@@ -297,6 +298,10 @@
       <p class="pie">Extracto cronológico: cada línea es un hecho con su fecha y el <b>saldo total</b> después de él. Abonos: 15 días legales al cumplir cada período más el feriado progresivo del art. 68; cargos: las vacaciones tomadas en días <b>hábiles</b> (descontando feriados). Los ajustes los propone RRHH y solo entran con la firma de la jefatura y la gerencia. El histórico traído de AVSOFT no tiene fechas de uso.</p>
     </body></html>`);
   }
+  // Back Up: quién asumirá las funciones durante las vacaciones (se activa solo al aprobarse)
+  (async()=>{ try{ const j=await(await fetch('/api/backups/mio',{headers:H})).json(); const b=j.data?.backup; const el=document.getElementById('backupInfo'); if(!el) return;
+    el.innerHTML = b&&b.id_suplente ? `<i class="bi bi-people me-1"></i>Durante estas vacaciones <b>${esc(b.suplente_nombre)}</b> asumirá todas tus funciones automáticamente (se activa el primer día y se desactiva al terminar, con correo a ambos). <a href="/recursos-humanos/mi-backup/">Cambiar mi Back Up</a>`
+      : `<i class="bi bi-exclamation-triangle me-1" style="color:#b45309"></i><b>No tienes suplente definido</b>: nadie asumirá tus funciones mientras estés fuera. <a href="/recursos-humanos/mi-backup/">Definir mi Back Up</a>`; }catch(e){} })();
   (async()=>{ await cargarPendientes(); cargarSaldo(); const qid=new URLSearchParams(location.search).get('id'); if(qid){tab('mias');} else tab('crear'); })();
 </script>
 <script src="/js/topnav.js"></script>

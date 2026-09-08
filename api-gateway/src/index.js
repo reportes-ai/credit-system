@@ -540,6 +540,7 @@ const PAGINAS = [
   ['/mantenedores/alertas', 'mantenedores/alertas/index.html'],
   ['/mantenedores/correos-programados', 'mantenedores/correos-programados/index.html'],
   ['/mantenedores/backups', 'mantenedores/backups/index.html'],
+  ['/recursos-humanos/mi-backup', 'recursos-humanos/mi-backup/index.html'],
   ['/mantenedores/tasas', 'mantenedores/tasas/index.html'],
   ['/mantenedores/uf', 'mantenedores/uf/index.html'],
   ['/mantenedores/vehiculos', 'mantenedores/vehiculos/index.html'],
