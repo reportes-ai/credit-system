@@ -227,3 +227,29 @@ test('bono_sobre_base_total=1: el bono aplica sobre toda la base, no solo sobre 
   assert.strictEqual(viejo.base_rdh, viejo.incentivo_base);
   assert.ok(viejo.bono_rdh > nuevo.bono_rdh);
 });
+
+/* Ejecutivos NUEVOS: menos de `minimo_meses_exencion` meses enteros en la empresa al
+   último día del mes → no están acogidos al mínimo (Pato, 08-09-2026). */
+const { mesesAntiguedad } = require('../shared/comision-ejecutivo');
+test('antigüedad en meses enteros al cierre del mes', () => {
+  assert.strictEqual(mesesAntiguedad('2026-06-08', '2026-08'), 2);   // 8-jun → 31-ago: 2 meses y días
+  assert.strictEqual(mesesAntiguedad('2026-05-18', '2026-08'), 3);   // 18-may → 31-ago: 3 meses cumplidos
+  assert.strictEqual(mesesAntiguedad('2026-06-22', '2026-06'), 0);
+  assert.strictEqual(mesesAntiguedad(null, '2026-08'), null);
+});
+test('con menos de 3 meses el ejecutivo comisiona aunque no llegue al mínimo', () => {
+  const v = vars({ minimo_meses_exencion: 3 });
+  const r = calcularComision([op({ monto_financiado: 18425364 })], v, '2026-08', { fecha_ingreso: '2026-06-08' });
+  assert.strictEqual(r.cumple_minimo, true);
+  assert.deepStrictEqual(r.exento_minimo, { fecha_ingreso: '2026-06-08', meses: 2, meses_exencion: 3 });
+  assert.strictEqual(r.incentivo_base, 184253.64);
+});
+test('cumplidos los 3 meses vuelve a regir el mínimo', () => {
+  const v = vars({ minimo_meses_exencion: 3 });
+  const r = calcularComision([op({ monto_financiado: 18425364 })], v, '2026-08', { fecha_ingreso: '2026-05-18' });
+  assert.strictEqual(r.cumple_minimo, false);
+});
+test('sin fecha de ingreso o con la variable en 0 nadie queda exento', () => {
+  assert.strictEqual(calcularComision([op({ monto_financiado: 1000000 })], vars({ minimo_meses_exencion: 3 }), '2026-08').cumple_minimo, false);
+  assert.strictEqual(calcularComision([op({ monto_financiado: 1000000 })], vars({ minimo_meses_exencion: 0 }), '2026-08', { fecha_ingreso: '2026-08-01' }).cumple_minimo, false);
+});

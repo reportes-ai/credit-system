@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Revisión Comisiones — AutoFácil</title><!-- v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
+  <title>Revisión Comisiones — AutoFácil</title><!-- v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -288,6 +288,7 @@ function renderizar(data, mes) {
 
   const conComision  = data.filter(d => d.cumple_minimo);
   const sinComision  = data.filter(d => !d.cumple_minimo);
+  window.fmtFechaCL = window.fmtFechaCL || (f => { const m = String(f||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : (f||''); });
   const totalMonto   = conComision.reduce((s,d) => s + (d.total_financiado||0), 0);
   const totalMontoAll= data.reduce((s,d) => s + (d.total_financiado||0), 0);
   const totalComis   = conComision.reduce((s,d) => s + (d.incentivo_final||0), 0);
@@ -439,6 +440,7 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
     ${ejecEstado === 'en_revision' ? `<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:9px 13px;font-size:.82rem;margin-bottom:14px"><i class="bi bi-arrow-counterclockwise me-1"></i><b>Enviada a revisión por el ejecutivo:</b> ${escHtml(d.ejec_comentario||'')}</div>` : ''}
     ${ejecEstado === 'aceptado' ? `<div style="background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:8px;padding:9px 13px;font-size:.82rem;margin-bottom:14px"><i class="bi bi-patch-check-fill me-1"></i>${aceptoSistema ? 'Aprobada por el <b>Sistema</b> — el ejecutivo no respondió dentro de los 2 días hábiles.' : 'El ejecutivo declaró su conformidad con el cálculo de sus comisiones.'}</div>` : ''}
 
+    ${d.exento_minimo ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:8px;padding:9px 13px;font-size:.82rem;margin-bottom:14px"><i class="bi bi-person-plus-fill me-1"></i><b>Sin mínimo mensual:</b> ingresó el ${fmtFechaCL(d.exento_minimo.fecha_ingreso)} (${d.exento_minimo.meses} mes${d.exento_minimo.meses===1?'':'es'} al cierre; el mínimo de ${fmt(d.minimo_monto)} rige desde los ${d.exento_minimo.meses_exencion} meses de antigüedad).</div>` : ''}
     ${sinComision ? `<div class="no-cumple" style="margin-bottom:16px"><i class="bi bi-x-circle-fill fs-5"></i>
       No cumple mínimo — Monto financiado: <strong>${fmt(d.total_financiado)}</strong> &nbsp;|&nbsp; Mínimo requerido: <strong>${fmt(d.minimo_monto)}</strong> &nbsp;|&nbsp; Diferencia: <strong>${fmt(d.total_financiado - (d.minimo_monto||0))}</strong>
     </div>` : ''}
@@ -507,7 +509,7 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
 
     <div class="total-final">
       <div><div class="tf-label">Incentivo Final Bruto</div><div class="tf-value">${fmt(d.incentivo_final)}</div></div>
-      <div style="text-align:right"><div class="tf-sc">Con semana corrida (× ${(d.factor_semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4})})${(d.descuento_aplicado||0)>0?' − descuentos':''}${(d.ajustes_op&&d.ajustes_op.length)?' ± ajustes':''}</div><div class="tf-value">${fmt(d.con_semana_corrida)}</div></div>
+      <div style="text-align:right"><div class="tf-sc">Con semana corrida (× ${(d.factor_semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2})} aprox.)${(d.descuento_aplicado||0)>0?' − descuentos':''}${(d.ajustes_op&&d.ajustes_op.length)?' ± ajustes':''}</div><div class="tf-value">${fmt(d.con_semana_corrida)}</div></div>
     </div>
 
     <button class="toggle-creditos" onclick="toggleCreditos('${idx}')">
@@ -790,6 +792,7 @@ function generarInforme() {
   const ejFiltro = document.getElementById('filtroEj').value;
   const datos = ejFiltro ? datosActuales.filter(d => d.ejecutivo === ejFiltro) : datosActuales;
   const MIN_MONTO = datos[0]?.minimo_monto || 0;   // paramétrico: comisiones_variables.minimo_monto
+  const notaExento = d => d.exento_minimo ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 16px;font-size:12.5px;color:#1e3a8a;margin:0 0 12px"><b>Sin mínimo mensual:</b> ingreso el ${fmtFechaCL(d.exento_minimo.fecha_ingreso)}, ${d.exento_minimo.meses} mes${d.exento_minimo.meses===1?'':'es'} de antigüedad al cierre del período; el mínimo de ${fmtN(MIN_MONTO)} rige a contar de los ${d.exento_minimo.meses_exencion} meses.</div>` : '';
   const minimo = new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(MIN_MONTO);
 
   const abrevFin = f => (f||'').toUpperCase().includes('UNIDAD') ? 'UNIDAD' : 'AUTOFIN';
@@ -1110,7 +1113,7 @@ function generarInforme() {
           : `En esta oportunidad <strong style="color:#dc2626">no se generó comisión</strong>, ya que el monto financiado del mes (<strong>${fmtN(d.total_financiado)}</strong>) no alcanzó el mínimo requerido de <strong>${fmtN(MIN_MONTO)}</strong>.`
         }
       </p>`;
-    cuerpo = saludo + bloqueEjecutivo(d) + explicacionCalculo(d) + firma;
+    cuerpo = saludo + notaExento(d) + bloqueEjecutivo(d) + explicacionCalculo(d) + firma;
   } else {
     const seccionCon = conComision.length
       ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#16a34a;margin:24px 0 12px;padding-bottom:6px;border-bottom:2px solid #bbf7d0">✔ Con Comisión — ${conComision.length} ejecutivo${conComision.length!==1?'s':''}</div>

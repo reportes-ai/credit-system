@@ -24,6 +24,7 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
       ['pct_24',        0.0075, '% base < 24 cuotas',             'Tasa aplicada al monto financiado con plazo MENOR a 24 meses',     'porcentaje'],
       ['pct_mas24',     0.0100, '% base ≥ 24 cuotas',             'Tasa aplicada al monto financiado con plazo IGUAL O MAYOR a 24 meses', 'porcentaje'],
       ['minimo_monto',  35000000,'Mínimo monto mes (CLP)',          'Si el total financiado del mes es menor a este valor, no hay bono','monto'],
+      ['minimo_meses_exencion', 3, 'Meses sin mínimo (ejecutivos nuevos)', 'Quien lleve MENOS de estos meses enteros en la empresa (fecha de ingreso en Usuarios, al último día del mes) no está acogido al mínimo mensual y comisiona desde la primera operación. 0 = todos con mínimo', 'factor'],
       ['factor_max',    0.66,   'Factor ajuste máximo',            'Cap máximo del factor de ajuste total (suma de los tres pesos)',   'factor'],
       ['peso_rdh',      0.33,   'Peso cruce RDH',                  'Peso del indicador de cruce de seguro RDH (incluye desgravamen) en el ajuste', 'factor'],
       ['peso_cesantia', 0.34,   'Peso cruce cesantía',             'Peso del indicador de cruce de seguro cesantía en el ajuste',     'factor'],
@@ -714,8 +715,18 @@ async function calcularMes(mes, varsOverride) {
     const ajustesPorEj = {};
     for (const a of ajRows) (ajustesPorEj[a.ejecutivo] = ajustesPorEj[a.ejecutivo] || []).push(a);
 
+    // Antigüedad: exención del mínimo para ejecutivos con menos de N meses (fecha_ingreso de Usuarios).
+    // Las versiones con vigencia anteriores a esta variable no la traen: se toma la viva.
+    if (vars.minimo_meses_exencion == null || Number.isNaN(Number(vars.minimo_meses_exencion))) {
+      const [[mx]] = await pool.query("SELECT valor FROM comisiones_variables WHERE clave='minimo_meses_exencion'").catch(() => [[null]]);
+      vars.minimo_meses_exencion = mx ? parseFloat(mx.valor) : 3;
+    }
+    const [usrs] = await pool.query(
+      "SELECT UPPER(TRIM(CONCAT(COALESCE(nombre,''),' ',COALESCE(apellido,'')))) nom, DATE_FORMAT(fecha_ingreso,'%Y-%m-%d') fi FROM usuarios WHERE fecha_ingreso IS NOT NULL").catch(() => [[]]);
+    const ingresoDe = {}; usrs.forEach(u => { ingresoDe[u.nom] = u.fi; });
+
     const resultado = Object.entries(map).map(([ejecutivo, creds]) => {
-      const calc = calcularComision(creds, vars, mes);
+      const calc = calcularComision(creds, vars, mes, { fecha_ingreso: ingresoDe[String(ejecutivo).toUpperCase().trim()] || null });
       const aprob = aprobMap[ejecutivo] || { estado: 'pendiente' };
 
       // Anotar cada crédito con su incentivo individual

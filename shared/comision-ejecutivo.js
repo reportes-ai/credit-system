@@ -49,7 +49,20 @@ function esPlazoMenor(plazo, vars) {
   return on(vars && vars.tramo_24_tasa_menor) ? p <= 24 : p < 24;
 }
 
-function calcularComision(creditos, vars, mes) {
+/* Meses ENTEROS de antigüedad al último día del mes de cálculo (fecha_ingreso YYYY-MM-DD).
+   Ej.: ingreso 08-06 → en agosto (al 31-08) lleva 2 meses → todavía no cumple 3. */
+function mesesAntiguedad(fechaIngreso, mes) {
+  const fi = String(fechaIngreso || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fi) || !/^\d{4}-\d{2}$/.test(mes || '')) return null;
+  const [y, m, d] = fi.split('-').map(Number);
+  const [my, mm] = mes.split('-').map(Number);
+  const ultimo = new Date(my, mm, 0).getDate();
+  let meses = (my - y) * 12 + (mm - m);
+  if (ultimo < d) meses -= 1;          // el "mes" aún no se completa al fin de mes
+  return Math.max(0, meses);
+}
+
+function calcularComision(creditos, vars, mes, opts = {}) {
   const {
     pct_24, pct_mas24, minimo_monto, factor_max,
     peso_rdh, peso_cesantia, peso_rep, peso_calidad,
@@ -64,7 +77,14 @@ function calcularComision(creditos, vars, mes) {
   // Total financiado (todos los OTORGADOS)
   const total_financiado = otorgados.reduce((s, c) => s + (parseFloat(c.monto_financiado) || 0), 0);
 
-  if (total_financiado < minimo_monto) {
+  /* Piso del mes: quien lleva menos de `minimo_meses_exencion` meses en la empresa (3 por
+     defecto, paramétrico) NO está acogido al mínimo — comisiona desde la primera op
+     (Pato, 08-09-2026; así la planilla pagó a Fabián y Bárbara en junio). */
+  const mesesEx = Number(vars.minimo_meses_exencion);
+  const antig = opts.fecha_ingreso ? mesesAntiguedad(opts.fecha_ingreso, mes) : null;
+  const exento_minimo = (mesesEx > 0 && antig != null && antig < mesesEx)
+    ? { fecha_ingreso: String(opts.fecha_ingreso).slice(0, 10), meses: antig, meses_exencion: mesesEx } : null;
+  if (!exento_minimo && total_financiado < minimo_monto) {
     return { cumple_minimo: false, total_creditos: otorgados.length, total_financiado, minimo_monto };
   }
 
@@ -150,6 +170,7 @@ function calcularComision(creditos, vars, mes) {
 
   return {
     cumple_minimo: true,
+    exento_minimo,
     total_creditos: otorgados.length,
     total_financiado,
     minimo_monto,
@@ -176,4 +197,4 @@ function calcularComision(creditos, vars, mes) {
 }
 
 
-module.exports = { calcularComision, factorSemanaCorrida, esPlazoMenor };
+module.exports = { calcularComision, factorSemanaCorrida, esPlazoMenor, mesesAntiguedad };
