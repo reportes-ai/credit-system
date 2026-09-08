@@ -32,7 +32,7 @@ app.use((req, res, next) => {
    cualquier diferencia de orden o espaciado la invalida. Solo se retiene para el
    webhook, no para las ~1.270 rutas restantes. */
 app.use(express.json({
-  limit: '10mb',
+  limit: '12mb',   // ODP: hasta 4 adjuntos, 7 MB en total → ~9,6 MB en base64 más el resto del cuerpo
   verify: (req, _res, buf) => {
     if (req.originalUrl && req.originalUrl.startsWith('/api/whatsapp/webhook')) req.rawBody = buf;
   },

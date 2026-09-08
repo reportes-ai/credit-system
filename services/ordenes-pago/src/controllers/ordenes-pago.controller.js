@@ -932,14 +932,21 @@ const crearOrden = async (req, res) => {
 
     /* Adjunto (factura/boleta) en el MISMO request de la emisión: así el correo
        automático de abajo ya sale con el documento. */
-    if (b.adjunto && b.adjunto.base64) {
+    /* Hasta 4 archivos y 7 MB en total (Pato, 08-09-2026). `adjunto` (uno) sigue
+       aceptándose por compatibilidad. Se guardan todos con el mismo motor
+       (guardarFacturaDoc) y adjuntosFactura() los recoge para el correo. */
+    const lista = Array.isArray(b.adjuntos) ? b.adjuntos.slice(0, 4) : (b.adjunto && b.adjunto.base64 ? [b.adjunto] : []);
+    const totalBytes = lista.reduce((s, a) => s + Math.floor(String(a.base64 || '').length * 3 / 4), 0);
+    if (totalBytes > 7 * 1024 * 1024) console.warn('[ordenes-pago adjuntos] superan 7 MB en total; se guardan igual los primeros', numero);
+    for (const a of lista) {
+      if (!a || !a.base64) continue;
       try {
         const pv = require('../../../postventa/src/controllers/postventa.controller');
         const out = await pv.guardarFacturaDoc({ origen: 'ODP', ref_id: r.insertId,
-          nombre: b.adjunto.nombre || 'documento', mime: b.adjunto.mime || null,
-          buffer: Buffer.from(String(b.adjunto.base64), 'base64'), usuario: nombreUsuario(req) });
+          nombre: a.nombre || 'documento', mime: a.mime || null,
+          buffer: Buffer.from(String(a.base64), 'base64'), usuario: nombreUsuario(req) });
         auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'factura_doc', entidad_id: out.id,
-          detalle: `Subió factura "${b.adjunto.nombre}" (ODP #${r.insertId}, ${Math.round(out.bytes / 1024)} KB)` });
+          detalle: `Subió documento "${a.nombre}" (ODP #${r.insertId}, ${Math.round(out.bytes / 1024)} KB)` });
       } catch (e) { console.error('[ordenes-pago adjunto]', e.message); }
     }
 

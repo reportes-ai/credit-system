@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v2.4 — Categoría con lista fija (Administrativos/Arriendos/Otros/Comisión Dealer/Comisión Parque/Saldo Precio), reemplaza el texto libre · v2.3 — "Se paga a: banco · tipo · cuenta" visible bajo el proveedor al elegirlo · v2.2 — banco/cuenta del proveedor solo criticos con pago por Transferencia (cheque/efectivo/tarjeta no los exigen) · v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
+  <!-- v2.5 — hasta 4 documentos adjuntos, 7 MB en total (todos viajan al correo de Contabilidad). v2.4 — Categoría con lista fija (Administrativos/Arriendos/Otros/Comisión Dealer/Comisión Parque/Saldo Precio), reemplaza el texto libre · v2.3 — "Se paga a: banco · tipo · cuenta" visible bajo el proveedor al elegirlo · v2.2 — banco/cuenta del proveedor solo criticos con pago por Transferencia (cheque/efectivo/tarjeta no los exigen) · v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -117,9 +117,9 @@
         <select id="fCtaCargo"><option value="">—</option></select>
       </div>
 
-      <div class="fld full"><label>Documento (factura / boleta)</label>
-        <input type="file" id="fDoc" accept=".pdf,.jpg,.jpeg,.png,.xml" style="font-size:.84rem">
-        <div style="font-size:.74rem;color:#94a3b8;margin-top:3px">Queda de respaldo en la orden y viaja adjunto en el correo a Contabilidad. Máx. 7 MB.</div>
+      <div class="fld full"><label>Documentos (factura / boleta / respaldos)</label>
+        <input type="file" id="fDoc" accept=".pdf,.jpg,.jpeg,.png,.xml" style="font-size:.84rem" multiple onchange="chkDocs()">
+        <div style="font-size:.74rem;color:#94a3b8;margin-top:3px">Quedan de respaldo en la orden y viajan adjuntos en el correo a Contabilidad. Hasta <b>4 archivos</b>, <b>7 MB en total</b>. <span id="docsInfo"></span></div>
       </div>
 
       <div class="fld full"><label>Observaciones</label><textarea id="fObs" maxlength="500"></textarea></div>
@@ -352,11 +352,15 @@ async function emitirDefinitivo(){
   try {
     // El adjunto viaja EN el mismo request de la emisión: así el correo automático
     // a Contabilidad sale con la factura incluida.
-    const fDoc = document.getElementById('fDoc').files && document.getElementById('fDoc').files[0];
-    if (fDoc) {
-      if (fDoc.size > 7*1024*1024) return fail('El documento adjunto debe pesar máximo 7 MB.');
-      const b64 = await new Promise((ok,ko)=>{ const fr=new FileReader(); fr.onload=()=>ok(String(fr.result).split(',')[1]); fr.onerror=ko; fr.readAsDataURL(fDoc); });
-      body.adjunto = { nombre: fDoc.name, mime: fDoc.type, base64: b64 };
+    // Hasta 4 archivos, 7 MB en total (Pato, 08-09-2026)
+    const files = Array.from((document.getElementById('fDoc').files)||[]);
+    const errDocs = validarDocs(files); if (errDocs) return fail(errDocs);
+    if (files.length) {
+      body.adjuntos = [];
+      for (const f of files) {
+        const b64 = await new Promise((ok,ko)=>{ const fr=new FileReader(); fr.onload=()=>ok(String(fr.result).split(',')[1]); fr.onerror=ko; fr.readAsDataURL(f); });
+        body.adjuntos.push({ nombre: f.name, mime: f.type, base64: b64 });
+      }
     }
     const r = await fetch('/api/ordenes-pago/ordenes', { method:'POST', headers:H, body: JSON.stringify(body) });
     const j = await r.json();
@@ -368,6 +372,18 @@ async function emitirDefinitivo(){
     } else fail(j.error||'Error al emitir.');
   } catch(e) { fail('Error de red.'); }
   btn.disabled=false; btn.innerHTML='<i class="bi bi-send-check me-1"></i>Emitir orden';
+}
+const MAX_DOCS = 4, MAX_BYTES = 7*1024*1024;
+function validarDocs(files){
+  if (files.length > MAX_DOCS) return `Máximo ${MAX_DOCS} archivos (seleccionaste ${files.length}).`;
+  const tot = files.reduce((s,f)=>s+f.size,0);
+  if (tot > MAX_BYTES) return `Los archivos suman ${(tot/1024/1024).toFixed(1)} MB: el máximo es 7 MB en total.`;
+  return null;
+}
+function chkDocs(){
+  const files = Array.from(document.getElementById('fDoc').files||[]), el = document.getElementById('docsInfo');
+  const err = validarDocs(files); const tot = files.reduce((s,f)=>s+f.size,0);
+  el.innerHTML = err ? `<span style="color:#dc2626;font-weight:700">${err}</span>` : (files.length ? `<span style="color:#16a34a">${files.length} archivo${files.length>1?'s':''} · ${(tot/1024/1024).toFixed(2)} MB</span>` : '');
 }
 function fail(m){ const e=document.getElementById('errMsg'); e.textContent=m; e.style.display='inline'; const b=document.getElementById('btnEmitir'); b.disabled=false; b.innerHTML='<i class="bi bi-send-check me-1"></i>Emitir orden'; }
 function nueva(){ location.reload(); }
