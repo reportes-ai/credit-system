@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
+  <!-- v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -87,7 +87,7 @@
     · <b>Gratificación legal</b> = 25% de (sueldo + comisiones + otros imponibles), tope 4,75 IMM ÷ 12.
     · <b>Imponible</b> topado a UF del mes × tope imponible para AFP/Salud.
     · <b>AFP</b> según administradora de la ficha (tasas en <i>rh_afp_tasas</i>) · <b>Salud</b> 7% legal · <b>AFC</b> 0,6% solo contrato indefinido.
-    · <b>Impuesto único</b>: tramos UTM paramétricos (<i>rh_impuesto_tramos</i>) sobre imponible − previsión.
+    · <b>Impuesto único</b>: tramos UTM paramétricos (<i>rh_impuesto_tramos</i>) sobre imponible − previsión − APV (régimen B, tope en UF del mantenedor).
     · <b>En este libro no se digita nada</b> — cada dato viene de su fuente: sueldo/AFP/salud/contrato/plan isapre de la <a href="/recursos-humanos/colaboradores/">ficha</a>; <b>días trabajados</b> de la fecha de ingreso y las <a href="/recursos-humanos/licencias/">licencias médicas</a>; <b>comisiones</b> del <a href="/comisiones/revision/">motor de Comisiones</a> (deben estar APROBADAS para emitir); <b>otros haberes</b> de <a href="/recursos-humanos/remuneraciones/adicionales/">Adicionales</a>; <b>otros descuentos</b> de <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a>.
     · <b>Emitir mes</b> congela las liquidaciones (inmutables), las publica en Mi Ficha y las envía por correo. Bloqueado si hay comisiones sin aprobar.
   </div>
@@ -261,7 +261,7 @@ function pintarLiq(l, d){
           ${fila('Salud ('+String(d.salud_pct||7).replace('.',',')+'%)', d.desc_salud)}
           ${fila('Adicional Isapre (plan '+String(d.plan_isapre_uf||'').replace('.',',')+' UF)', d.desc_salud_adicional)}
           ${fila('Seguro cesantía AFC ('+String(d.afc_pct||0).replace('.',',')+'%)', d.desc_afc)}
-          ${fila('Impuesto único 2ª categoría', d.impuesto)}
+          ${fila('Impuesto único 2ª categoría' + (d.apv_deducible>0 ? ` (base rebajada por APV ${$(d.apv_deducible)})` : ''), d.impuesto)}
           ${fila('Otros descuentos', d.otros_descuentos)}
           ${sub('TOTAL DESCUENTOS', d.total_descuentos, '#b91c1c')}
         </table>

@@ -76,7 +76,8 @@ require('../../../../shared/migrate').enFila('rrhh-remuneraciones', async () => 
       ('rem_afc_trabajador_pct', '0.6'),
       ('rem_salud_pct', '7'),
       ('rem_imm', '529000'),
-      ('rem_grat_tope_imm', '4.75')`);
+      ('rem_grat_tope_imm', '4.75'),
+      ('rem_apv_tope_uf', '50')`);
     // Haberes no imponibles fijos en la ficha
     await pool.query('ALTER TABLE rh_fichas ADD COLUMN colacion DECIMAL(10,0) NULL').catch(() => {});
     await pool.query('ALTER TABLE rh_fichas ADD COLUMN movilizacion DECIMAL(10,0) NULL').catch(() => {});
@@ -633,10 +634,17 @@ async function descuentosDelMes(mes) {
   const [rows] = await pool.query("SELECT * FROM rh_descuentos WHERE estado='VIGENTE'");
   const tc = rows.some(d => d.moneda && d.moneda !== 'CLP') ? await tcDelMes(mes) : null;
   const m = {};
+  /* APV (régimen B, art. 42 bis LIR): además de descontarse, REBAJA la base del
+     impuesto único con tope rem_apv_tope_uf (50 UF). Va en m.apv[id]. Detectado
+     cuadrando a Sevilla contra AVSOFT (08-09-2026): $809.544 de APV → $246.101 menos de impuesto. */
+  const apv = {};
   for (const d of rows) {
     const c = cuotaEnMes(d, mes, tc);
-    if (c != null) m[d.id_usuario] = (m[d.id_usuario] || 0) + c;
+    if (c == null) continue;
+    m[d.id_usuario] = (m[d.id_usuario] || 0) + c;
+    if (d.tipo === 'PERMANENTE' && /\bAPV\b/i.test(d.subtipo || '')) apv[d.id_usuario] = (apv[d.id_usuario] || 0) + c;
   }
+  Object.defineProperty(m, 'apv', { value: apv, enumerable: false });
   return m;
 }
 
@@ -695,7 +703,9 @@ function calcLiquidacion(inp, ind) {
      (08-09-2026). Con sueldo sobre el tope no cambia nada: el 7% ya es el máximo. */
   const topeSalud = R(topeImp * ind.rem_salud_pct / 100);
   const saludDeducible = Math.min(descSalud + descSaludAdicional, topeSalud);
-  const baseTrib = Math.max(0, imponible - descAfp - saludDeducible - descAfc);
+  // APV régimen B rebaja la base tributable, tope rem_apv_tope_uf UF (art. 42 bis LIR)
+  const apvDeducible = Math.min(R(inp.apv), R((ind.rem_apv_tope_uf || 0) * ind.uf));
+  const baseTrib = Math.max(0, imponible - descAfp - saludDeducible - descAfc - apvDeducible);
   const baseUtm = ind.utm > 0 ? baseTrib / ind.utm : 0;
   let impuesto = 0;
   for (const t of ind.tramos) {
@@ -719,7 +729,7 @@ function calcLiquidacion(inp, ind) {
     salud: inp.salud || null, salud_pct: ind.rem_salud_pct, desc_salud: descSalud,
     plan_isapre_uf: planUF || null, desc_salud_adicional: descSaludAdicional,
     afc_pct: esIndef ? ind.rem_afc_trabajador_pct : 0, desc_afc: descAfc, base_afc: baseAfc,
-    base_tributable: baseTrib, impuesto,
+    base_tributable: baseTrib, apv_deducible: apvDeducible, impuesto,
     otros_descuentos: otrosDesc, total_descuentos: totalDescuentos,
     liquido: totalHaberes - totalDescuentos,
     aporte_sis: aporteSis, aporte_afc_emp: aporteAfcEmp, aporte_mutual: aporteMutual,
@@ -878,6 +888,7 @@ const getMes = async (req, res) => {
         otros_imponibles: adics[e.id_usuario]?.imp || 0,
         otros_no_imponibles: adics[e.id_usuario]?.noimp || 0,
         otros_descuentos: descs[e.id_usuario] || 0,
+        apv: descs.apv[e.id_usuario] || 0,
       };
       return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo,
         licencia_dias: 30 - diasTrabajadosMes(mes, null, lics[e.id_usuario]),
@@ -925,6 +936,7 @@ const guardar = async (req, res) => {
         otros_imponibles: adics[emp.id_usuario]?.imp || 0,
         otros_no_imponibles: adics[emp.id_usuario]?.noimp || 0,
         otros_descuentos: descs[emp.id_usuario] || 0,
+        apv: descs.apv[emp.id_usuario] || 0,
       };
       const calc = calcLiquidacion(inp, ind);
       calc.comisiones_mes = mesAnteriorDe(mes);   // queda en el snapshot: la liquidación dice de qué mes son

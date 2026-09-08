@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Indicadores de Remuneraciones — AutoFácil</title>
-  <!-- v1.3 — navbar migrada al componente topnav -->
+  <!-- v1.4 — tope APV (UF/mes) que rebaja la base del impuesto único · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -60,6 +60,7 @@
       <div class="fld"><label>AFC empleador (%) — indefinidos</label><input id="rem_afc_emp_pct" type="number" step="0.1"></div>
       <div class="fld"><label>AFC empleador (%) — plazo fijo</label><input id="rem_afc_emp_pfijo_pct" type="number" step="0.1"></div>
       <div class="fld"><label>Mutual de seguridad (%)</label><input id="rem_mutual_pct" type="number" step="0.01"></div>
+      <div class="fld"><label>Tope APV rebaja impuesto (UF/mes)</label><input id="rem_apv_tope_uf" type="number" step="1"></div>
     </div>
   </div>
 
@@ -84,6 +85,7 @@
       <li><b>IMM y tope gratificación</b> → tope de la gratificación legal (25%, máx 4,75 IMM ÷ 12) en <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a>.</li>
       <li><b>Topes imponibles UF y AFC</b> → base de cotización AFP/Salud/AFC de las liquidaciones (usa la UF del mes del mantenedor <a href="/mantenedores/uf/">UF</a>).</li>
       <li><b>Salud legal %</b> → descuento de salud (Fonasa/Isapre 7% base) en las liquidaciones.</li>
+      <li><b>Tope APV</b> → el descuento permanente con concepto APV (en <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a>) rebaja la base del impuesto único hasta ese tope en UF (art. 42 bis LIR, régimen B).</li>
       <li><b>Tramos impuesto único</b> → impuesto de 2ª categoría de cada liquidación y del <a href="/recursos-humanos/remuneraciones/">libro de remuneraciones</a>.</li>
       <li>Las liquidaciones <b>EMITIDAS no cambian</b> (quedan congeladas); los cambios rigen desde el próximo cálculo.</li>
     </ul>
@@ -98,7 +100,7 @@ if (!token||!yo) location.href='/login.html';
 
 const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'application/json' };
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2600); }
-const CFG = ['rem_imm','rem_grat_tope_imm','rem_tope_imponible_uf','rem_tope_afc_uf','rem_afc_trabajador_pct','rem_salud_pct','rem_sis_pct','rem_afc_emp_pct','rem_afc_emp_pfijo_pct','rem_mutual_pct'];
+const CFG = ['rem_imm','rem_grat_tope_imm','rem_tope_imponible_uf','rem_tope_afc_uf','rem_afc_trabajador_pct','rem_salud_pct','rem_sis_pct','rem_afc_emp_pct','rem_afc_emp_pfijo_pct','rem_mutual_pct','rem_apv_tope_uf'];
 
 async function cargar(){
   const j = await (await fetch('/api/rrhh/remuneraciones/indicadores', { headers:H })).json();
