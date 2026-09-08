@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
+  <!-- v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -77,8 +77,9 @@
         <select id="fSubtipo" class="form-select form-select-sm" onchange="tipoUI()">
           <option>ORDEN TRIBUNAL</option><option>ORDEN TGR</option><option>APV</option><option>OTRO</option>
         </select></div>
-      <div style="flex:1.4 1 180px;min-width:150px;display:none" id="wOtro"><label class="form-label small fw-semibold mb-1">Describe el descuento</label>
-        <input id="fOtro" class="form-control form-control-sm" maxlength="200" placeholder="ej. Seguro complementario dental"></div>
+      <!-- Texto libre (Pato 08-09-2026): siempre visible; obligatorio solo en Permanente / TEXTO LIBRE -->
+      <div style="flex:1.4 1 180px;min-width:150px" id="wOtro"><label class="form-label small fw-semibold mb-1" id="lblOtro">Detalle (texto libre)</label>
+        <input id="fOtro" class="form-control form-control-sm" maxlength="200" placeholder="opcional: sale en la liquidación"></div>
       <div style="flex:0 0 auto;padding-bottom:6px;white-space:nowrap">
         <div class="form-check"><input type="checkbox" class="form-check-input" id="fPermD" onchange="permUI()">
           <label class="form-check-label small fw-semibold" for="fPermD" title="Monto mensual todos los meses hasta desmarcarlo">Permanente</label></div>
@@ -123,7 +124,7 @@
 
   <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.8rem">
     <div class="fw-bold mb-1"><i class="bi bi-diagram-3 me-1"></i>Cómo funcionan</div>
-    <b>Anticipo</b>: capital ÷ N meses, sin interés. <b>Préstamo al personal</b>: cuota francesa solo capital + interés; la tasa mensual <b>no puede superar la TMC vigente</b> (se valida contra la tabla de tasas sincronizada con la CMF). <b>Pago en exceso</b>: referencia al mes pagado de más, en 1 o más cuotas. <b>Permanente</b> (tribunal, TGR, APV, otro): monto mensual indefinido hasta que se anule. <b>Moneda</b>: el monto puede ingresarse en Pesos, UF, UTM o Dólares; en moneda distinta de pesos el descuento se guarda en su moneda y <b>cada mes se convierte a pesos con el indicador del mes</b> (UF del motor único; UTM y dólar del mantenedor de indicadores), por lo que la cuota en pesos varía mes a mes. Todas las cuotas parten en la <b>próxima remuneración</b> y caen solas en "Otros Dcto." del <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> (si editas la celda a mano, tu valor manda). Anular un descuento detiene las cuotas futuras; lo ya descontado en meses emitidos no se toca.
+    <b>Anticipo</b>: capital ÷ N meses, sin interés. <b>Préstamo al personal</b>: cuota francesa solo capital + interés; la tasa mensual <b>no puede superar la TMC vigente</b> (se valida contra la tabla de tasas sincronizada con la CMF). <b>Pago en exceso</b>: referencia al mes pagado de más, en 1 o más cuotas. <b>Permanente</b> (tribunal, TGR, APV, <b>TEXTO LIBRE</b> para cualquier concepto nuevo): monto mensual indefinido hasta que se anule. El campo <b>Detalle (texto libre)</b> es opcional en todos los tipos y sale en la liquidación. <b>★ TODO EL PERSONAL</b> en Colaborador aplica el mismo descuento (anticipo, pago en exceso o permanente; préstamos no) a todos los activos con ficha, saltando a quien ya tenga uno igual vigente. <b>Moneda</b>: el monto puede ingresarse en Pesos, UF, UTM o Dólares; en moneda distinta de pesos el descuento se guarda en su moneda y <b>cada mes se convierte a pesos con el indicador del mes</b> (UF del motor único; UTM y dólar del mantenedor de indicadores), por lo que la cuota en pesos varía mes a mes. Todas las cuotas parten en la <b>próxima remuneración</b> y caen solas en "Otros Dcto." del <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> (si editas la celda a mano, tu valor manda). Anular un descuento detiene las cuotas futuras; lo ya descontado en meses emitidos no se toca.
   </div>
 </div>
 
@@ -180,7 +181,9 @@ function tipoUI(){
   wTasa.style.display = t==='PRESTAMO' ? '' : 'none';
   wMesRef.style.display = t==='PAGO_EXCESO' ? '' : 'none';
   wSubtipo.style.display = t==='PERMANENTE' ? '' : 'none';
-  wOtro.style.display = (t==='PERMANENTE' && sub==='OTRO') ? '' : 'none';
+  const libre = t==='PERMANENTE' && sub==='OTRO';
+  document.getElementById('lblOtro').textContent = libre ? 'Concepto (texto libre) *' : 'Detalle (texto libre)';
+  document.getElementById('fOtro').placeholder = libre ? 'escribe el concepto tal como debe salir en la liquidación' : 'opcional: sale en la liquidación';
   document.getElementById('lblMonto').textContent = (t==='PERMANENTE' ? 'Monto mensual ' : 'Monto ') + SIM[moneda()];
   preview();
 }
@@ -212,11 +215,11 @@ async function cargar(){
   D = j.data;
   if (fColab.options.length<=1){
     const jd = await (await fetch('/api/rrhh/directorio',{headers:H})).json();
-    fColab.innerHTML = '<option value="">— elegir —</option>' + (jd.data||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
+    fColab.innerHTML = '<option value="">— elegir —</option><option value="TODOS">★ TODO EL PERSONAL (todos los activos con ficha)</option>' + (jd.data||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
   }
   if (Array.isArray(D.subtipos) && D.subtipos.length){
     const s = fSubtipo.value;
-    fSubtipo.innerHTML = D.subtipos.map(x=>`<option>${esc(x)}</option>`).join('');
+    fSubtipo.innerHTML = D.subtipos.map(x=>`<option value="${esc(x)}">${x==='OTRO'?'TEXTO LIBRE (otro concepto)':esc(x)}</option>`).join('');
     if (s && D.subtipos.includes(s)) fSubtipo.value = s;
   }
   document.getElementById('lblTmc').textContent = D.tmc!=null ? `(TMC ${String(D.tmc).replace('.',',')}%)` : '';
@@ -308,8 +311,13 @@ async function guardar(){
     tasa_pct: fTasa.value, mes_referencia: fMesRef.value, subtipo: fSubtipo.value, detalle_texto: fOtro.value };
   if (!body.id_usuario) return alert('Elige el colaborador');
   if (!body.monto) return alert('Ingresa el monto');
+  if (body.id_usuario==='TODOS') {
+    if (body.tipo==='PRESTAMO') return alert('Un préstamo se ingresa por persona (lleva convenio firmado)');
+    if (!confirm(`¿Aplicar este descuento (${fTipo.options[fTipo.selectedIndex].text}${body.tipo==='PERMANENTE'?' · '+fSubtipo.value:''}) de ${fmtO(body.monto)} a TODO el personal activo?\n\nQuien ya tenga uno igual vigente se salta.`)) return;
+  }
   const r = await fetch('/api/rrhh/remuneraciones/descuentos',{method:'POST',headers:H,body:JSON.stringify(body)});
   const j = await r.json(); if (!j.success) return alert(j.error);
+  if (j.data.creados != null) { alert(`Descuento aplicado a ${j.data.creados} personas:\n${j.data.personas.join(', ')}`); fColab.value=''; document.getElementById('fMonto').value=''; fOtro.value=''; return cargar(); }
   const cuotaMsg = body.moneda==='CLP' ? `$${fmt(j.data.valor_cuota)}` : `${fmtO(j.data.valor_cuota_origen, body.moneda)} (≈ $${fmt(j.data.valor_cuota)} hoy; se convierte cada mes)`;
   if (['ANTICIPO','PRESTAMO'].includes(body.tipo) && confirm(`Descuento guardado: ${j.data.cuotas||'mensual'} cuota(s) de ${cuotaMsg} desde ${j.data.mes_inicio}.\n\n¿Imprimir el CONVENIO para la firma del colaborador? (el firmado se sube después con el botón 📤 de la columna Convenio)`)) {
     imprimirConvenio({ id: j.data.id, tipo: body.tipo, nombre_actual: fColab.options[fColab.selectedIndex]?.text || '',

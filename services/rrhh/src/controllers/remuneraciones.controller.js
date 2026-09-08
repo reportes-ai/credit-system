@@ -542,10 +542,26 @@ const crearDescuento = async (req, res) => {
       catch (e) { return fail(res, e.message, 400); }
     }
     const monto = TC.aCLP(montoOrigen, tcHoy);   // referencia en pesos al día de ingreso
-    if (!idU || !(montoOrigen > 0)) return fail(res, 'Colaborador y monto son obligatorios', 400);
+    /* TODO EL PERSONAL (Pato 08-09-2026): id_usuario='TODOS' crea el mismo descuento a
+       cada activo con ficha (ej. cuota sindical, seguro colectivo). Se salta a quien ya
+       tenga un descuento VIGENTE del mismo tipo/subtipo/detalle, así no se duplica. */
+    const todos = String(b.id_usuario) === 'TODOS';
+    if (!(todos || idU) || !(montoOrigen > 0)) return fail(res, 'Colaborador y monto son obligatorios', 400);
     if (!['ANTICIPO', 'PRESTAMO', 'PAGO_EXCESO', 'PERMANENTE'].includes(tipo)) return fail(res, 'Tipo inválido', 400);
-    const [[colab]] = await pool.query("SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE id_usuario=?", [idU]);
-    if (!colab) return fail(res, 'Colaborador no encontrado', 404);
+    if (todos && tipo === 'PRESTAMO') return fail(res, 'Un préstamo se ingresa por persona (lleva convenio firmado)', 400);
+    let destinos;
+    if (todos) {
+      const [gente] = await pool.query(
+        `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre FROM usuarios u
+           JOIN rh_fichas f ON f.id_usuario=u.id_usuario
+          WHERE u.estado='activo' AND COALESCE(f.sueldo_base,0) > 0 ORDER BY nombre`);
+      destinos = gente;
+    } else {
+      const [[colab]] = await pool.query("SELECT id_usuario, TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE id_usuario=?", [idU]);
+      if (!colab) return fail(res, 'Colaborador no encontrado', 404);
+      destinos = [colab];
+    }
+    const colab = destinos[0];
     // Siempre parte en la PRÓXIMA remuneración (mes siguiente al actual)
     const mesInicio = mesMas(new Date().toISOString().slice(0, 7), 1);
     let cuotas = 1, valorCuota = monto, tasa = null, subtipo = null, detalle = null, mesRef = null;
@@ -573,19 +589,29 @@ const crearDescuento = async (req, res) => {
     } else { // PERMANENTE
       subtipo = String(b.subtipo || '').toUpperCase();
       if (!(await subtiposDesc()).includes(subtipo)) return fail(res, 'Subtipo inválido', 400);
-      if (subtipo === 'OTRO' && !String(b.detalle_texto || '').trim()) return fail(res, 'Describe el descuento permanente', 400);
-      detalle = String(b.detalle_texto || '').trim().slice(0, 200) || null;
+      if (subtipo === 'OTRO' && !String(b.detalle_texto || '').trim()) return fail(res, 'Describe el descuento (texto libre)', 400);
       cuotas = 0; valorCuota = monto; // mensual indefinido hasta anular
     }
-    const [r] = await pool.query(
-      `INSERT INTO rh_descuentos (id_usuario, tipo, subtipo, detalle_texto, mes_referencia, monto_total, tasa_pct, cuotas, valor_cuota, mes_inicio, creado_por, moneda, monto_origen, valor_cuota_origen)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [idU, tipo, subtipo, detalle, mesRef, monto, tasa, cuotas, valorCuota, mesInicio, nombreDe(u),
-       moneda, moneda === 'CLP' ? null : montoOrigen, moneda === 'CLP' ? null : cuotaOrigen]);
+    // Texto libre (Pato 08-09-2026): opcional en todos los tipos, obligatorio en PERMANENTE/OTRO
+    detalle = String(b.detalle_texto || '').trim().slice(0, 200) || null;
+    let r = null, creados = 0; const nombres = [];
+    for (const dest of destinos) {
+      if (todos) {
+        const [[ya]] = await pool.query("SELECT id FROM rh_descuentos WHERE id_usuario=? AND estado='VIGENTE' AND tipo=? AND COALESCE(subtipo,'')=COALESCE(?,'') AND COALESCE(detalle_texto,'')=COALESCE(?,'')", [dest.id_usuario, tipo, subtipo, detalle]);
+        if (ya) continue;
+      }
+      [r] = await pool.query(
+        `INSERT INTO rh_descuentos (id_usuario, tipo, subtipo, detalle_texto, mes_referencia, monto_total, tasa_pct, cuotas, valor_cuota, mes_inicio, creado_por, moneda, monto_origen, valor_cuota_origen)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [dest.id_usuario, tipo, subtipo, detalle, mesRef, monto, tasa, cuotas, valorCuota, mesInicio, nombreDe(u),
+         moneda, moneda === 'CLP' ? null : montoOrigen, moneda === 'CLP' ? null : cuotaOrigen]);
+      creados++; nombres.push(dest.nombre);
+    }
+    if (todos && !creados) return fail(res, 'Todo el personal ya tiene este descuento vigente', 400);
     const fmtOri = v => moneda === 'CLP' ? '$' + Math.round(v).toLocaleString('es-CL') : `${moneda} ${Number(v).toLocaleString('es-CL', { maximumFractionDigits: 4 })}`;
-    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'descuento', entidad_id: r.insertId,
-      detalle: `${tipo}${subtipo ? '/' + subtipo : ''} ${colab.nombre}: ${fmtOri(montoOrigen)}${moneda !== 'CLP' ? ` (≈ $${monto.toLocaleString('es-CL')} al ${moneda} de hoy)` : ''}${tasa != null ? ` al ${tasa}% mensual` : ''} en ${cuotas || '∞'} cuota(s) de ${fmtOri(cuotaOrigen)}${moneda !== 'CLP' ? ` (≈ $${valorCuota.toLocaleString('es-CL')}; se convierte cada mes al indicador del mes)` : ''} desde ${mesInicio}` });
-    ok(res, { id: r.insertId, valor_cuota: valorCuota, cuotas, mes_inicio: mesInicio, moneda, monto_origen: montoOrigen, valor_cuota_origen: cuotaOrigen, tc_hoy: tcHoy });
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'descuento', entidad_id: todos ? null : r.insertId,
+      detalle: `${tipo}${subtipo ? '/' + subtipo : ''}${detalle ? ' (' + detalle + ')' : ''} ${todos ? `a TODO EL PERSONAL (${creados})` : colab.nombre}: ${fmtOri(montoOrigen)}${moneda !== 'CLP' ? ` (≈ $${monto.toLocaleString('es-CL')} al ${moneda} de hoy)` : ''}${tasa != null ? ` al ${tasa}% mensual` : ''} en ${cuotas || '∞'} cuota(s) de ${fmtOri(cuotaOrigen)}${moneda !== 'CLP' ? ` (≈ $${valorCuota.toLocaleString('es-CL')}; se convierte cada mes al indicador del mes)` : ''} desde ${mesInicio}` });
+    ok(res, { id: r.insertId, valor_cuota: valorCuota, cuotas, mes_inicio: mesInicio, moneda, monto_origen: montoOrigen, valor_cuota_origen: cuotaOrigen, tc_hoy: tcHoy, creados: todos ? creados : undefined, personas: todos ? nombres : undefined });
   } catch (e) { console.error('[rrhh descuentos crear]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
