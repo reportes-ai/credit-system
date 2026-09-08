@@ -220,7 +220,7 @@ const CAUSALES_ADIC = {
   'BONO POR META': 1, 'DIFERENCIA DE SUELDO': 1,
   // Pato 08-09-2026: renta garantizada por un período (ej. ejecutivo nuevo) — imponibles,
   // se ingresan PERMANENTES con mes desde/hasta.
-  'SUELDO ASEGURADO': 1, 'BONO ASEGURADO': 1,
+  'SUELDO ASEGURADO': 1, 'BONO ASEGURADO': 1, 'VARIABLE ASEGURADO': 1,
   'VIÁTICO': 0, 'COLACIÓN ADICIONAL': 0, 'MOVILIZACIÓN ADICIONAL': 0,
   'ASIGNACIÓN DE CELULAR': 0, 'DEVOLUCIÓN DE DESCUENTO': 0, 'OTRO': null,
 };
