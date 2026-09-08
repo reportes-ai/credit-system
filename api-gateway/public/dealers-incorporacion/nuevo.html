@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v2.3 — NUEVO ORDEN de poderes del deposito: NO bloquean el envio a autorizacion; se firman y suben DESPUES de autorizada junto con la ficha firmada (obligatorios en Enviar Firmada) · v2.2 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js): datalist desde AF_BANCOS y normalizacion por AF_BANCO_CANON (alias CHILE/BCI/BBVA...). v2.1 — modo Modificacion precarga los locales adicionales existentes del dealer · v2.0 — multi-local: locales en OTROS parques con tabla de comision POR local (locales_json; al cerrar sella dealer_locales/dealer_comisiones) · v1.36 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
+  <!-- v2.4 — rechazada en el CIERRE: se sube la firmada corregida (+cédulas/poderes) y se reenvía directo al cierre sin repetir niveles (caso RADO SPA) · v2.3 — NUEVO ORDEN de poderes del deposito: NO bloquean el envio a autorizacion; se firman y suben DESPUES de autorizada junto con la ficha firmada (obligatorios en Enviar Firmada) · v2.2 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js): datalist desde AF_BANCOS y normalizacion por AF_BANCO_CANON (alias CHILE/BCI/BBVA...). v2.1 — modo Modificacion precarga los locales adicionales existentes del dealer · v2.0 — multi-local: locales en OTROS parques con tabla de comision POR local (locales_json; al cerrar sella dealer_locales/dealer_comisiones) · v1.36 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -428,12 +428,16 @@ let TIENE_FICHA = false; // ¿ya hay una ficha firmada subida?
 // Muestra/oculta cards y botones según el estado del flujo.
 function aplicarEstadoUI(estado, f){
   const editable = ['BORRADOR','RECHAZADA'].includes(estado);
+  // Rechazada en el CIERRE (ya firmada y autorizada): se corrige la firmada y se
+  // reenvía directo al cierre, sin repetir los niveles (08-09-2026).
+  const rechCierre = estado==='RECHAZADA' && f && f.rechazo_etapa==='CIERRE';
+  window.RECH_CIERRE = rechCierre;
   const show = (id,on)=>{ const e=$(id); if(e) e.style.display = on?'':'none'; };
   show('btnGuardar', editable);
   show('btnEnviar', editable);
-  show('btnImprimir', ['AUTORIZADA','PEND_CIERRE','APROBADA'].includes(estado));
-  show('btnEnviarFirmada', estado==='AUTORIZADA');
-  show('cardFirma', ['AUTORIZADA','PEND_CIERRE'].includes(estado));
+  show('btnImprimir', ['AUTORIZADA','PEND_CIERRE','APROBADA'].includes(estado) || rechCierre);
+  show('btnEnviarFirmada', estado==='AUTORIZADA' || rechCierre);
+  show('cardFirma', ['AUTORIZADA','PEND_CIERRE'].includes(estado) || rechCierre);
   const b=$('estadoBanner'); if(!b) return;
   const set=(bg,col,html)=>{ b.style.display='block'; b.style.background=bg; b.style.color=col; b.innerHTML=html; };
   if(estado==='PEND_AUTORIZACION') set('#fef9c3','#854d0e','<i class="bi bi-hourglass-split me-1"></i>En autorización'+(f&&f.nivel_actual_nombre?' — nivel: <b>'+escH(f.nivel_actual_nombre)+'</b>':'')+'. No editable hasta autorizar o rechazar.');
@@ -455,7 +459,7 @@ async function onEnviarFirmada(){
   }
   try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/enviar-firmada',{method:'POST',headers:H});
     const j=await r.json(); if(!j.success) throw new Error(j.error);
-    toast('Ficha firmada enviada al cierre ✓');
+    toast(window.RECH_CIERRE ? 'Ficha firmada corregida reenviada al cierre ✓' : 'Ficha firmada enviada al cierre ✓');
     setTimeout(()=>location.href='/dealers-incorporacion/mantencion.html',1200);
   }catch(e){ toast(e.message,true); }
 }
@@ -1119,7 +1123,10 @@ async function cargar(){
     window._pillEstado = f.estado;
     const pill = $('estadoPill'); if (pill){ pill.textContent = f.estado.replace('_',' '); pill.className = 'estado-pill e-'+f.estado; }
     if (f.tiene_ficha) { $('fileInfo').textContent = '✓ Ficha firmada ya cargada (puedes reemplazarla)'; $('fileInfo').style.display='block'; }
-    if (f.estado === 'RECHAZADA' && f.motivo_rechazo) {
+    if (f.estado === 'RECHAZADA' && f.rechazo_etapa === 'CIERRE' && f.motivo_rechazo) {
+      const b=$('boxRechazo'); b.style.display='block';
+      b.innerHTML = `<b><i class="bi bi-x-octagon me-1"></i>Rechazada en el CIERRE por ${escH(f.revisor_nombre||'Operaciones')}:</b> ${escH(f.motivo_rechazo)}<br><span style="font-size:.82rem">La ficha ya estaba autorizada: sube la <b>ficha firmada corregida</b> (y las cédulas o poderes que falten) en la sección de abajo y pulsa <b>Enviar firmada</b>; vuelve directo al cierre sin repetir las autorizaciones. Si además cambias datos, usa "Enviar" y pasará de nuevo por los niveles.</span>`;
+    } else if (f.estado === 'RECHAZADA' && f.motivo_rechazo) {
       const b=$('boxRechazo'); b.style.display='block';
       // XSS almacenado (auditoría 03-08-2026, A-2): el motivo lo escribe un revisor
       // y se inyectaba crudo en el DOM de quien abre la ficha. escH ya existía acá.
@@ -1157,7 +1164,7 @@ async function cargar(){
 /* ── Impresión: arma la ficha replicando el documento oficial ── */
 function celdaX(v,target){ return v===target ? 'X' : ''; }
 function imprimir(){
-  if(!['AUTORIZADA','PEND_CIERRE','APROBADA'].includes(ESTADO)){ toast('La ficha se imprime solo una vez AUTORIZADA por los niveles.', true); return; }
+  if(!['AUTORIZADA','PEND_CIERRE','APROBADA'].includes(ESTADO) && !window.RECH_CIERRE){ toast('La ficha se imprime solo una vez AUTORIZADA por los niveles.', true); return; }
   const o = recolectar();
   const _prevTitle = document.title;
   document.title = nombreFichaBase();   // nombre sugerido al "Guardar como PDF"

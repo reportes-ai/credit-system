@@ -102,6 +102,13 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS provincia VARCHAR(120) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS region VARCHAR(120) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS excepciones JSON NULL`);
+    /* En qué etapa se rechazó (08-09-2026): AUTORIZACION (niveles) o CIERRE (ya firmada).
+       Una rechazada en el CIERRE no vuelve a pasar por los niveles: el ejecutivo sube la
+       firmada corregida (+ cédulas/poderes) y la reenvía directo al cierre. Caso RADO SPA:
+       faltaba la firma conjunta de los dos administradores y no había forma de volver a
+       cargar la ficha. Backfill: rechazadas que ya tenían firmada = CIERRE. */
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS rechazo_etapa VARCHAR(15) NULL`);
+    await pool.query(`UPDATE dealer_fichas SET rechazo_etapa='CIERRE' WHERE estado='RECHAZADA' AND rechazo_etapa IS NULL AND (doc_ruta IS NOT NULL OR ficha_data IS NOT NULL)`).catch(() => {});
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS excepciones_comentarios JSON NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS diferencias JSON NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS rep_legal_origen VARCHAR(15) NULL`);
@@ -604,7 +611,7 @@ const obtener = async (req, res) => {
               excepciones, excepciones_comentarios, diferencias, firma_sospecha, firma_detalle, ficha_faltantes,
               ficha_nombre, ficha_mime, (ficha_data IS NOT NULL OR doc_ruta IS NOT NULL) AS tiene_ficha,
               tomada_por, tomada_por_nombre, fecha_tomada, revisor_id, revisor_nombre, fecha_revision,
-              motivo_rechazo, apelacion, id_dealer, id_dealer_origen, id_parque_creado, nivel_actual,
+              motivo_rechazo, rechazo_etapa, apelacion, id_dealer, id_dealer_origen, id_parque_creado, nivel_actual,
               socios, informes_resumen, informes_alerta_grave,
               part_especial, part_especial_por, part_especial_fecha, created_at, updated_at
        FROM dealer_fichas WHERE id = ?`, [req.params.id]);
@@ -729,12 +736,12 @@ const subirFicha = async (req, res) => {
   try {
     const { archivo_nombre, mime_type, archivo_data } = req.body || {};
     if (!archivo_data) return res.status(400).json({ success: false, data: null, error: 'Falta el archivo' });
-    const [[f]] = await pool.query('SELECT id_ejecutivo, estado FROM dealer_fichas WHERE id=?', [req.params.id]);
+    const [[f]] = await pool.query('SELECT id_ejecutivo, estado, rechazo_etapa FROM dealer_fichas WHERE id=?', [req.params.id]);
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
     if (f.id_ejecutivo !== req.usuario.id_usuario && req.usuario.perfil_nombre !== 'Administrador')
       return res.status(403).json({ success: false, data: null, error: 'Sin permiso' });
-    // La ficha firmada se sube DESPUÉS de la autorización (AUTORIZADA), o se reemplaza antes del cierre.
-    if (!['AUTORIZADA', 'PEND_CIERRE'].includes(f.estado))
+    // Rechazada en el CIERRE: se puede volver a subir la firmada corregida (08-09-2026).
+    if (!['AUTORIZADA', 'PEND_CIERRE'].includes(f.estado) && !(f.estado === 'RECHAZADA' && f.rechazo_etapa === 'CIERRE'))
       return res.status(400).json({ success: false, data: null, error: 'La ficha firmada se sube una vez AUTORIZADA' });
     const buffer = Buffer.from(archivo_data, 'base64');
     // Reemplazo de ficha firmada: la ruta anterior se borra recién después del UPDATE.
@@ -1079,7 +1086,11 @@ const enviarFirmada = async (req, res) => {
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
     if (f.id_ejecutivo !== req.usuario.id_usuario && req.usuario.perfil_nombre !== 'Administrador')
       return res.status(403).json({ success: false, data: null, error: 'Solo el ejecutivo que la creó puede enviarla' });
-    if (f.estado !== 'AUTORIZADA')
+    // Rechazada en el CIERRE (ya había pasado los niveles): vuelve directo al cierre con
+    // la firmada corregida, sin repetir autorizaciones. Los datos no cambiaron: si el
+    // ejecutivo los edita y usa "Enviar", va por la vía normal (niveles de nuevo).
+    const reenvioCierre = f.estado === 'RECHAZADA' && f.rechazo_etapa === 'CIERRE';
+    if (f.estado !== 'AUTORIZADA' && !reenvioCierre)
       return res.status(400).json({ success: false, data: null, error: 'La ficha debe estar AUTORIZADA para subir la firmada' });
     /* Desde la migración al bucket, el archivo puede vivir en `doc_ruta` con el
        blob en NULL: preguntar solo por `ficha_data` rechazaba fichas RECIÉN
@@ -1104,7 +1115,8 @@ const enviarFirmada = async (req, res) => {
     const firma = await verificarFirma(fichaBuf, f.ficha_mime);
     const cmpTexto = await compararFichaTexto(fichaBuf, f.ficha_mime, f);
     await pool.query(
-      `UPDATE dealer_fichas SET estado='PEND_CIERRE', firma_sospecha=?, firma_detalle=?, ficha_faltantes=? WHERE id=?`,
+      `UPDATE dealer_fichas SET estado='PEND_CIERRE', firma_sospecha=?, firma_detalle=?, ficha_faltantes=?,
+              tomada_por=NULL, tomada_por_nombre=NULL, fecha_tomada=NULL WHERE id=?`,
       [firma.sospecha, firma.detalle, JSON.stringify(cmpTexto.faltantes), f.id]);
     const ids = await idsConPermiso('dealer_ficha_revisar', req.usuario.id_usuario);
     await notificarEventoDealer('dealer_firmada', { idsBase: ids, ejecutivo: f.id_ejecutivo,
@@ -1114,7 +1126,7 @@ const enviarFirmada = async (req, res) => {
         + (cmpTexto.faltantes.length ? ` · ⚠ ${cmpTexto.faltantes.length} dato(s) no coinciden con el documento` : ''),
       href: '/dealers-incorporacion/mantencion.html?tab=revision', clave: `dealerficha:${f.id}:rev` });
     auditar({ req, accion: 'EDITAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
-      detalle: `Subió la ficha firmada de ${f.nombre_razon || f.rut || ''} para el cierre`, rut: f.rut });
+      detalle: `Subió la ficha firmada de ${f.nombre_razon || f.rut || ''} para el cierre${reenvioCierre ? ' (reenvío tras rechazo en el cierre: ' + String(f.motivo_rechazo || '').slice(0, 120) + ')' : ''}`, rut: f.rut });
     res.json({ success: true, data: { estado: 'PEND_CIERRE' }, error: null });
   } catch (e) { console.error('[fichas enviarFirmada]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -1408,8 +1420,8 @@ const rechazar = async (req, res) => {
     }
     const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
     await pool.query(
-      `UPDATE dealer_fichas SET estado='RECHAZADA', revisor_id=?, revisor_nombre=?, fecha_revision=NOW(), motivo_rechazo=? WHERE id=?`,
-      [req.usuario.id_usuario, nombre, motivo, req.params.id]);
+      `UPDATE dealer_fichas SET estado='RECHAZADA', rechazo_etapa=?, revisor_id=?, revisor_nombre=?, fecha_revision=NOW(), motivo_rechazo=? WHERE id=?`,
+      [['PEND_CIERRE', 'TOMADA'].includes(f.estado) ? 'CIERRE' : 'AUTORIZACION', req.usuario.id_usuario, nombre, motivo, req.params.id]);
     await pool.query('DELETE FROM notificaciones WHERE clave=? AND leida=0', [`dealerficha:${f.id}:rev`]).catch(() => {});
 
     await notificarEventoDealer('dealer_rechazada', { idsBase: [f.id_ejecutivo],
