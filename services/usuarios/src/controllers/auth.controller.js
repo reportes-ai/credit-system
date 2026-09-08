@@ -16,7 +16,7 @@ const login = async (req, res) => {
     let rows;
     try {
       [rows] = await pool.query(
-        `SELECT u.*, p.nombre AS perfil_nombre, p.solo_lectura AS perfil_solo_lectura
+        `SELECT u.*, p.nombre AS perfil_nombre, p.solo_lectura AS perfil_solo_lectura, p.max_sesiones AS perfil_max_sesiones
          FROM usuarios u
          JOIN perfiles p ON u.id_perfil = p.id_perfil
          WHERE u.email = ? AND u.estado = 'activo'`,
@@ -90,7 +90,12 @@ const login = async (req, res) => {
 
     await pool.query('UPDATE usuarios SET ultimo_acceso = NOW() WHERE id_usuario = ?', [usuario.id_usuario]);
     // Registrar sesión para el informe de desempeño (no bloqueante)
-    try { require('../../../desempeno/src/controllers/desempeno.controller').registrarLogin(usuario); } catch (e) {}
+    /* Sesión nueva + TOPE de sesiones simultáneas del perfil (cierra la más antigua).
+       Se espera el id de la sesión para meterlo en el token: así verifyToken sabe
+       qué sesión es este token y puede rechazarla si el tope la cerró después. */
+    let sid = null;
+    try { sid = await require('../../../desempeno/src/controllers/desempeno.controller').registrarLogin(usuario); } catch (e) {}
+    try { require('../../../../shared/middleware/auth').olvidarSesion(usuario.id_usuario); } catch (_) {}
     auditar({ req, usuario, accion: 'LOGIN', modulo: 'auth', entidad: 'usuario', entidad_id: usuario.id_usuario, detalle: 'Ingreso al sistema' });
 
     const payload = {
@@ -113,6 +118,9 @@ const login = async (req, res) => {
       /* Perfil de SOLO LECTURA (perfiles.solo_lectura, ej. "Demo"): el flag viaja
          en el token y verifyToken bloquea toda escritura — datos reales, no transaccional. */
       sl: Number(usuario.perfil_solo_lectura || 0) ? 1 : 0,
+      // Id de la sesión (sesiones_usuario.id): el tope de sesiones simultáneas cierra
+      // por sid; el latido y el logout también apuntan a ESTA sesión, no a "la última".
+      sid,
     };
 
     // Cuentas de propósito fijo (ej. TV) pueden tener sesión más larga (usuarios.sesion_horas).

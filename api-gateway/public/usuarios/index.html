@@ -842,6 +842,11 @@
             <label class="form-check-label" for="npSoloLectura" style="font-size:.88rem"><b>Solo lectura (demo)</b></label>
             <div class="form-text" style="font-size:.78rem">Los usuarios de este perfil ven datos reales pero NO pueden operar: toda escritura se bloquea en el servidor (mismo candado que "Ver como"). Ideal para demostraciones.</div>
           </div>
+          <div class="mb-2" style="margin-top:6px">
+            <label class="form-label" for="npMaxSesiones" style="font-size:.88rem;margin-bottom:2px"><b>Sesiones simultáneas</b></label>
+            <input type="number" class="form-control form-control-sm" id="npMaxSesiones" min="0" max="20" value="2" style="max-width:120px">
+            <div class="form-text" style="font-size:.78rem">Cuántos dispositivos pueden tener sesión abierta a la vez (2 = PC + celular). Al iniciar una sesión de más, se cierra la más antigua y la persona recibe un aviso. 0 = sin límite.</div>
+          </div>
           <div id="npError" class="alert alert-danger mt-2 d-none" style="font-size:.84rem"></div>
         </div>
         <div class="modal-footer">
@@ -2064,6 +2069,7 @@
       document.getElementById('npDescripcion').value = '';
       document.getElementById('npAmbito').value = 'todos';
       document.getElementById('npSoloLectura').checked = false;
+      document.getElementById('npMaxSesiones').value = 2;
       document.getElementById('npError').classList.add('d-none');
       document.getElementById('npModalTitulo').innerHTML = '<i class="bi bi-shield-plus me-2"></i>Nuevo Perfil';
       document.getElementById('npBtnGuardar').innerHTML = '<i class="bi bi-floppy me-1"></i>Crear perfil';
@@ -2077,6 +2083,7 @@
       document.getElementById('npDescripcion').value = descripcion || '';
       document.getElementById('npAmbito').value = (perfilesData.find(x => x.id_perfil === id)?.ambito_ejecutivos) || 'todos';
       document.getElementById('npSoloLectura').checked = !!Number(perfilesData.find(x => x.id_perfil === id)?.solo_lectura || 0);
+      { const ms = perfilesData.find(x => x.id_perfil === id)?.max_sesiones; document.getElementById('npMaxSesiones').value = (ms === undefined || ms === null) ? 2 : Number(ms); }
       document.getElementById('npError').classList.add('d-none');
       document.getElementById('npModalTitulo').innerHTML = '<i class="bi bi-pencil me-2"></i>Editar Perfil';
       document.getElementById('npBtnGuardar').innerHTML = '<i class="bi bi-floppy me-1"></i>Guardar cambios';
@@ -2094,10 +2101,11 @@
 
       const ambito = document.getElementById('npAmbito').value;
       const soloLectura = document.getElementById('npSoloLectura').checked ? 1 : 0;
+      const maxSesiones = Math.max(0, Math.min(20, parseInt(document.getElementById('npMaxSesiones').value, 10) || 0));
       const esEdicion = !!id;
       const data = esEdicion
-        ? await api('PUT',  `/api/perfiles/${id}`, { nombre, descripcion: desc || null, ambito_ejecutivos: ambito, solo_lectura: soloLectura })
-        : await api('POST', '/api/perfiles',        { nombre, descripcion: desc || null, ambito_ejecutivos: ambito, solo_lectura: soloLectura });
+        ? await api('PUT',  `/api/perfiles/${id}`, { nombre, descripcion: desc || null, ambito_ejecutivos: ambito, solo_lectura: soloLectura, max_sesiones: maxSesiones })
+        : await api('POST', '/api/perfiles',        { nombre, descripcion: desc || null, ambito_ejecutivos: ambito, solo_lectura: soloLectura, max_sesiones: maxSesiones });
 
       if (data?.success) {
         bootstrap.Modal.getInstance(document.getElementById('modalNuevoPerfil')).hide();

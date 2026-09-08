@@ -843,9 +843,10 @@ const createPerfil = async (req, res) => {
     if (ex) return res.status(400).json({ success: false, data: null, error: 'Ya existe un perfil con ese nombre' });
 
     const sl = req.body.solo_lectura ? 1 : 0;
+    const maxSes = Math.max(0, Math.min(20, parseInt(req.body.max_sesiones, 10)));
     let r;
     try {
-      [r] = await pool.query('INSERT INTO perfiles (nombre, descripcion, ambito_ejecutivos, solo_lectura) VALUES (?, ?, ?, ?)', [nombre.trim(), descripcion || null, amb, sl]);
+      [r] = await pool.query('INSERT INTO perfiles (nombre, descripcion, ambito_ejecutivos, solo_lectura, max_sesiones) VALUES (?, ?, ?, ?, ?)', [nombre.trim(), descripcion || null, amb, sl, Number.isFinite(maxSes) ? maxSes : 2]);
     } catch (_) {   // por si alguna columna aún no existe en este arranque
       [r] = await pool.query('INSERT INTO perfiles (nombre, descripcion) VALUES (?, ?)', [nombre.trim(), descripcion || null]);
     }
@@ -891,6 +892,10 @@ const updatePerfil = async (req, res) => {
       await pool.query('UPDATE perfiles SET nombre = ?, descripcion = ? WHERE id_perfil = ?', [nombre.trim(), descripcion || null, id]);
     }
     // Flag solo lectura (demo). Administrador nunca puede quedar en solo lectura.
+    if (req.body.max_sesiones !== undefined) {
+      const m = Math.max(0, Math.min(20, parseInt(req.body.max_sesiones, 10)));
+      if (Number.isFinite(m)) await pool.query('UPDATE perfiles SET max_sesiones=? WHERE id_perfil=?', [m, id]).catch(e => console.error('[perfiles max_sesiones]', e.message));
+    }
     if (req.body.solo_lectura !== undefined && perfil.nombre !== 'Administrador') {
       await pool.query('UPDATE perfiles SET solo_lectura=? WHERE id_perfil=?', [req.body.solo_lectura ? 1 : 0, id])
         .catch(e => console.error('[perfiles solo_lectura]', e.message));
@@ -2344,6 +2349,10 @@ require('../../../../shared/migrate').migrarAuto('perfiles_b41', async () => {
    en la matriz qué módulos mostrar). */
 require('../../../../shared/migrate').enFila('perfil-solo-lectura', async () => {
   await pool.query('ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS solo_lectura TINYINT(1) NOT NULL DEFAULT 0');
+  /* Sesiones simultáneas por perfil (Pato, 08-09-2026): tope paramétrico, 2 por
+     defecto (PC + celular); 0 = sin límite. Al superarlo, el login cierra la sesión
+     más antigua del usuario (desempeno.registrarLogin) y verifyToken la rechaza. */
+  await pool.query('ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS max_sesiones INT NOT NULL DEFAULT 2');
   await pool.query(`INSERT IGNORE INTO perfiles (nombre, descripcion, solo_lectura)
                     VALUES ('Demo', 'Demostración con datos reales: puede navegar y ver, no puede operar (solo lectura)', 1)`);
   await pool.query("UPDATE perfiles SET solo_lectura=1 WHERE nombre='Demo'");

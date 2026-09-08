@@ -430,6 +430,7 @@ require('../../../../shared/migrate').enFila('rrhh-descuentos', async () => {
   } catch (e) { console.error('[rrhh-descuentos migration]', e.message); }
 });
 const TC = require('../../../../shared/tipo-cambio');
+const { hoyISO: hoyChile } = require('../../../../shared/fecha-chile');
 
 const mesMas = (mes, n) => { const [y, m] = mes.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const difMeses = (a, b) => { const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number); return (yb - ya) * 12 + (mb - ma); };
@@ -473,7 +474,7 @@ const getDescuentos = async (req, res) => {
          FROM rh_descuentos d
         LEFT JOIN usuarios u ON u.id_usuario=d.id_usuario ORDER BY d.created_at DESC LIMIT 500`);
     const tc = await tcDelMes(mes);
-    const tcHoy = await TC.tiposCambio(new Date().toISOString().slice(0, 10));
+    const tcHoy = await TC.tiposCambio(hoyChile());
     const delMes = rows.filter(d => d.estado === 'VIGENTE' && cuotaEnMes(d, mes, tc) != null)
       .map(d => ({ ...d, cuota_mes: cuotaEnMes(d, mes, tc), cuota_num: (d.tipo === 'PERMANENTE' && !(Number(d.cuotas) > 0)) ? null : difMeses(d.mes_inicio, mes) + 1 }));
     const total_mes = delMes.reduce((s, d) => s + d.cuota_mes, 0);
@@ -493,7 +494,7 @@ const crearDescuento = async (req, res) => {
     const montoOrigen = moneda === 'CLP' ? Math.round(Number(b.monto) || 0) : Math.round((Number(b.monto) || 0) * 10000) / 10000;
     let tcHoy = 1;
     if (moneda !== 'CLP') {
-      try { tcHoy = await TC.tipoCambio(moneda, new Date().toISOString().slice(0, 10)); }
+      try { tcHoy = await TC.tipoCambio(moneda, hoyChile()); }
       catch (e) { return fail(res, e.message, 400); }
     }
     const monto = TC.aCLP(montoOrigen, tcHoy);   // referencia en pesos al día de ingreso

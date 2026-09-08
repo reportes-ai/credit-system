@@ -8,6 +8,7 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('./config/database');
 const { getUF } = require('./uf');
+const { hoyISO } = require('./fecha-chile');   // hoy en hora de Chile, nunca UTC
 
 const MONEDAS = ['CLP', 'UF', 'UTM', 'USD'];
 const ETIQUETA = { CLP: 'Pesos', UF: 'UF', UTM: 'UTM', USD: 'Dólares' };
@@ -43,8 +44,9 @@ async function tiposCambio(fechaISO) {
    mes todavía no termina (una cotización futura no existe). */
 function fechaDeMes(mes) {
   const [y, m] = String(mes).split('-').map(Number);
-  const fin = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
-  const hoy = new Date().toISOString().slice(0, 10);
+  const ultimo = new Date(y, m, 0).getDate();
+  const fin = `${y}-${String(m).padStart(2, '0')}-${String(ultimo).padStart(2, '0')}`;
+  const hoy = hoyISO();
   return fin < hoy ? fin : hoy;
 }
 

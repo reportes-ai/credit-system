@@ -35,6 +35,8 @@ require('../../../../shared/migrate').enFila('desempeno', async () => {
         ts         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_carta (id_carta), INDEX idx_user_ts (id_usuario, ts)
       )`);
+    // Sesión cerrada por el TOPE de sesiones simultáneas del perfil (08-09-2026)
+    await pool.query(`ALTER TABLE sesiones_usuario ADD COLUMN IF NOT EXISTS cerrada_limite TINYINT(1) NOT NULL DEFAULT 0`).catch(()=>{});
     // Comentario del aprobador al aprobar (no existía; al rechazar ya está motivo_rechazo)
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS comentario_aprobacion TEXT DEFAULT NULL`).catch(()=>{});
     console.log('[desempeno] tablas OK');
@@ -42,21 +44,51 @@ require('../../../../shared/migrate').enFila('desempeno', async () => {
 });
 
 /* ── Captura ─────────────────────────────────────────────────────── */
-// Llamado desde el login (registra una sesión nueva)
+// Llamado desde el login (registra una sesión nueva). Devuelve el id de la sesión.
+// TOPE de sesiones simultáneas (perfiles.max_sesiones, 2 por defecto, 0 = sin límite):
+// si el usuario ya tiene el máximo de sesiones vivas, se cierra la más antigua
+// (cerrada_limite=1) y verifyToken rechaza ese token en el próximo request.
+// "Viva" = sin logout, no cerrada por tope y con latido en las últimas 8 h (vida del token).
 async function registrarLogin(usuario) {
   try {
     const nombre = ((usuario.nombre || '') + ' ' + (usuario.apellido || '')).trim() || usuario.email;
-    await pool.query(
+    const max = Number(usuario.perfil_max_sesiones);
+    if (Number.isFinite(max) && max > 0) {
+      const [vivas] = await pool.query(
+        `SELECT id, login_at, last_seen FROM sesiones_usuario
+          WHERE id_usuario=? AND logout_at IS NULL AND cerrada_limite=0
+            AND last_seen > NOW() - INTERVAL 8 HOUR
+          ORDER BY last_seen ASC, id ASC`, [usuario.id_usuario]);
+      const sobran = vivas.length - (max - 1);   // la nueva ocupa un cupo
+      if (sobran > 0) {
+        const ids = vivas.slice(0, sobran).map(v => v.id);
+        await pool.query('UPDATE sesiones_usuario SET cerrada_limite=1, logout_at=NOW() WHERE id IN (?)', [ids]);
+        auditar({ usuario, accion: 'LOGOUT', modulo: 'auth', entidad: 'usuario', entidad_id: usuario.id_usuario,
+          detalle: `Se cerró ${ids.length} sesión(es) anterior(es) por el tope de ${max} sesiones simultáneas del perfil ${usuario.perfil_nombre || ''} (nuevo ingreso desde otro dispositivo)` });
+        try {
+          const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+          notificar([usuario.id_usuario], { tipo: 'auth', prioridad: 'normal',
+            titulo: 'Sesión cerrada en otro dispositivo',
+            mensaje: `Iniciaste sesión en un dispositivo nuevo y tu perfil permite ${max} sesión(es) a la vez: se cerró la más antigua. Si no fuiste tú, cambia tu contraseña.`,
+            href: '/' });
+        } catch (_) {}
+      }
+    }
+    const [r] = await pool.query(
       'INSERT INTO sesiones_usuario (id_usuario, nombre, perfil, login_at, last_seen) VALUES (?,?,?,NOW(),NOW())',
       [usuario.id_usuario, nombre, usuario.perfil_nombre || null]);
-  } catch (e) { console.error('[desempeno login]', e.message); }
+    return r.insertId;
+  } catch (e) { console.error('[desempeno login]', e.message); return null; }
 }
 
 // Heartbeat: actualiza last_seen de la sesión abierta más reciente (o crea una si no hay)
 const ping = async (req, res) => {
   try {
     const id = req.usuario.id_usuario;
-    const [r] = await pool.query(
+    // Con sid en el token late ESTA sesión (multi-dispositivo); tokens viejos, la última.
+    const [r] = req.usuario.sid
+      ? await pool.query('UPDATE sesiones_usuario SET last_seen = NOW() WHERE id = ? AND id_usuario = ? AND logout_at IS NULL', [req.usuario.sid, id])
+      : await pool.query(
       `UPDATE sesiones_usuario SET last_seen = NOW()
        WHERE id_usuario = ? AND logout_at IS NULL
          AND last_seen > (NOW() - INTERVAL 15 MINUTE)
@@ -72,7 +104,9 @@ const ping = async (req, res) => {
 
 const logout = async (req, res) => {
   try {
-    await pool.query(
+    // Salir en un dispositivo cierra SOLO esa sesión (sid); tokens viejos sin sid, todas.
+    if (req.usuario.sid) await pool.query('UPDATE sesiones_usuario SET logout_at = NOW() WHERE id = ? AND id_usuario = ? AND logout_at IS NULL', [req.usuario.sid, req.usuario.id_usuario]);
+    else await pool.query(
       `UPDATE sesiones_usuario SET logout_at = NOW() WHERE id_usuario = ? AND logout_at IS NULL`,
       [req.usuario.id_usuario]);
     auditar({ req, accion: 'LOGOUT', modulo: 'auth', entidad: 'usuario', entidad_id: req.usuario.id_usuario, detalle: 'Cierre de sesión' });

@@ -42,10 +42,19 @@ async function estadoSesion(id_usuario) {
     'SELECT estado, COALESCE(token_version, 0) AS tv FROM usuarios WHERE id_usuario = ?',
     [id_usuario]
   );
+  // Sesiones cerradas por el TOPE de sesiones simultáneas (sid en el token). Se
+  // piden junto con el estado, con la misma caché de 60 s: cero consultas extra.
+  let cerradas = [];
+  try {
+    const [cs] = await pool.query(
+      'SELECT id FROM sesiones_usuario WHERE id_usuario = ? AND cerrada_limite = 1 AND login_at > NOW() - INTERVAL 2 DAY', [id_usuario]);
+    cerradas = cs.map(x => Number(x.id));
+  } catch (_) {}
   const entry = {
     exp: Date.now() + CACHE_MS,
     tv: u ? Number(u.tv) : 0,
     activo: !!u && u.estado === 'activo',
+    cerradas,
   };
   cacheSesion.set(id_usuario, entry);
   return entry;
@@ -97,6 +106,10 @@ const verifyToken = async (req, res, next) => {
       // solo hecho de instalar esto.
       if (Number(payload.tv || 0) !== s.tv) {
         return res.status(401).json({ success: false, data: null, error: 'Tu sesión fue cerrada. Ingresa de nuevo.' });
+      }
+      // Tope de sesiones simultáneas del perfil: esta sesión la cerró un ingreso más nuevo.
+      if (payload.sid && Array.isArray(s.cerradas) && s.cerradas.includes(Number(payload.sid))) {
+        return res.status(401).json({ success: false, data: null, error: 'Esta sesión se cerró porque iniciaste sesión en otro dispositivo (tope de sesiones simultáneas de tu perfil). Ingresa de nuevo.' });
       }
     } catch (e) {
       console.error('[auth] no se pudo verificar la sesión (se deja pasar):', e.message);
