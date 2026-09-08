@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vacaciones — RRHH</title>
-  <!-- v1.11 — Ver comprobante / Descargar / QR en cada solicitud aprobada y en el extracto; correo al beneficiario con copia a RRHH con el comprobante adjunto al aprobar · v1.10 — cuenta corriente como EXTRACTO cronológico con saldo acumulado (no por período, modelo AVSOFT) · v1.9 — RRHH ya no recepciona: el comprobante (folio + PDF) se emite solo al aprobar y RRHH queda informado; el badge cuenta solo pendientes · v1.8 — badge visible (fix display) con N pendientes, saldo del solicitante por fila, y RECEPCION RRHH: firma FES, comprobante PDF verificable archivado en la carpeta digital · v1.7 — cartola rediseñada + saldos por línea jerárquica + ajustes con firma -->
+  <!-- v1.12 — RRHH: Reenviar correo del comprobante · v1.11 — Ver comprobante / Descargar / QR en cada solicitud aprobada y en el extracto; correo al beneficiario con copia a RRHH con el comprobante adjunto al aprobar · v1.10 — cuenta corriente como EXTRACTO cronológico con saldo acumulado (no por período, modelo AVSOFT) · v1.9 — RRHH ya no recepciona: el comprobante (folio + PDF) se emite solo al aprobar y RRHH queda informado; el badge cuenta solo pendientes · v1.8 — badge visible (fix display) con N pendientes, saldo del solicitante por fila, y RECEPCION RRHH: firma FES, comprobante PDF verificable archivado en la carpeta digital · v1.7 — cartola rediseñada + saldos por línea jerárquica + ajustes con firma -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx-style.min.js" defer></script>
   <style>
@@ -173,7 +173,7 @@
       const porRecep = VISTA==='bandeja' && ES_RRHH && s.estado==='APROBADA' && !s.recepcion_fecha;
       return `<tr><td>${esc(s.nombre||'')}${VISTA==='bandeja'&&s.saldo_disponible!=null?`<div style="font-size:.72rem;color:#0141A2">saldo: <b>${co(s.saldo_disponible)}</b> día(s) hábil(es)</div>`:''}</td>
       <td>${fd(s.fecha_desde)}</td><td>${fd(s.fecha_hasta)}</td><td><b>${s.dias}</b></td>
-      <td><span class="pill ${s.estado}">${s.estado}</span>${s.codigo_verificacion?`<div style="font-size:.68rem;color:#16a34a"><i class="bi bi-patch-check-fill"></i> folio ${esc(s.codigo_verificacion)} · <a href="#" onclick="verComprobante(${s.id});return false" style="color:#0141A2;font-weight:700">Ver comprobante</a> · <a href="#" onclick="verComprobante(${s.id},true);return false" style="color:#0141A2">Descargar</a> · <a href="/verificar/${esc(s.codigo_verificacion)}" target="_blank" style="color:#0141A2"><i class="bi bi-qr-code"></i> QR</a></div>`:(s.estado==='APROBADA'&&VISTA==='bandeja'&&ES_RRHH?'<div style="font-size:.68rem;color:#b45309">sin comprobante (aprobada antes del cierre automático)</div>':'')}${s.motivo_rechazo?`<div style="font-size:.7rem;color:#b91c1c">${esc(s.motivo_rechazo)}</div>`:''}</td>
+      <td><span class="pill ${s.estado}">${s.estado}</span>${s.codigo_verificacion?`<div style="font-size:.68rem;color:#16a34a"><i class="bi bi-patch-check-fill"></i> folio ${esc(s.codigo_verificacion)} · <a href="#" onclick="verComprobante(${s.id});return false" style="color:#0141A2;font-weight:700">Ver comprobante</a> · <a href="#" onclick="verComprobante(${s.id},true);return false" style="color:#0141A2">Descargar</a> · <a href="/verificar/${esc(s.codigo_verificacion)}" target="_blank" style="color:#0141A2"><i class="bi bi-qr-code"></i> QR</a>${ES_RRHH?` · <a href="#" onclick="reenviarComprobante(${s.id});return false" style="color:#b45309" title="Reenvía el correo con el comprobante al colaborador, con copia a RRHH"><i class="bi bi-envelope"></i> Reenviar correo</a>`:''}</div>`:(s.estado==='APROBADA'&&VISTA==='bandeja'&&ES_RRHH?'<div style="font-size:.68rem;color:#b45309">sin comprobante (aprobada antes del cierre automático)</div>':'')}${s.motivo_rechazo?`<div style="font-size:.7rem;color:#b91c1c">${esc(s.motivo_rechazo)}</div>`:''}</td>
       <td>${(VISTA==='bandeja'&&s.estado==='PENDIENTE')?`<button class="btn-mini ok" onclick="resolver(${s.id},'APROBADA')">Aprobar</button> <button class="btn-mini no" onclick="resolver(${s.id},'RECHAZADA')">Rechazar</button>`:''}
       ${porRecep?`<button class="btn-mini ok" style="background:#0141A2" onclick="recepcionar(${s.id})"><i class="bi bi-inbox-fill"></i> Recepcionar</button>`:''}</td></tr>`;}).join('');
   }
@@ -190,6 +190,11 @@
     }catch(e){ alert('No se pudo abrir el comprobante'); }
   }
   window.verComprobante = verComprobante;
+  async function reenviarComprobante(id){
+    if(!confirm('¿Reenviar el comprobante por correo al colaborador, con copia a recursos.humanos@autofacilchile.cl?')) return;
+    const j=await(await fetch(`/api/rrhh/vacaciones/${id}/reenviar-comprobante`,{method:'POST',headers:HJ})).json();
+    alert(j.success ? 'Correo enviado ✓' : (j.error||'No se pudo enviar'));
+  }
   /* RRHH cierra el flujo: firma FES + comprobante PDF con folio verificable en la carpeta digital */
   async function recepcionar(id){
     if(!confirm('¿Recepcionar esta solicitud aprobada?\n\nSe firmará electrónicamente (FES), se generará el comprobante PDF con la cadena de firmas y quedará archivado en la carpeta digital del colaborador.'))return;

@@ -309,28 +309,54 @@ async function cerrarVacaciones(s, u, ip, { automatico = false } = {}) {
   if (s.id_usuario) notificar([s.id_usuario], { tipo: 'RH_VACACIONES',
     titulo: '🌴 Comprobante de vacaciones emitido',
     mensaje: `Tu comprobante (folio ${codigo}) quedó en tu carpeta digital`, href: '/recursos-humanos/vacaciones/?id=' + s.id });
-  /* Correo al beneficiario con copia a RRHH, con el comprobante adjunto (firma
-     electrónica simple + QR) — Pato, 08-09-2026. No bloquea el cierre. */
-  try {
-    const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
-    const [[emu]] = await pool.query('SELECT email FROM usuarios WHERE id_usuario=?', [s.id_usuario]);
-    if (emu && emu.email) {
-      const APP = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');
-      const f = d => String(isoF(d)).split('-').reverse().join('-');
-      const html = envolverHTML(`
-        <h2 style="margin:0 0 10px;color:#012d70;font-size:18px">Vacaciones aprobadas</h2>
-        <p style="font-size:14px;color:#334155;line-height:1.6">Hola ${nombreEmp.split(' ')[0]}, tus vacaciones del <b>${f(s.fecha_desde)}</b> al <b>${f(s.fecha_hasta)}</b> (${habiles} día(s) hábil(es)) fueron <b>aprobadas</b>${s.resuelto_nombre ? ' por ' + s.resuelto_nombre : ''}.</p>
-        <p style="font-size:14px;color:#334155;line-height:1.6">Adjunto va tu <b>comprobante de vacaciones</b> con la cadena de firmas electrónicas simples y el código QR de verificación. Folio <b>${codigo}</b>.${saldo && saldo.disponibles != null ? ` Saldo disponible después de estas vacaciones: <b>${Number(saldo.disponibles).toLocaleString('es-CL', { maximumFractionDigits: 1 })}</b> día(s) hábil(es).` : ''}</p>
-        <p style="font-size:13px;color:#64748b;line-height:1.6">Puedes verificar la autenticidad del documento en <a href="${APP}/verificar/${codigo}" style="color:#0141A2">${APP}/verificar/${codigo}</a>. También queda archivado en tu carpeta digital (Mi Ficha).</p>
-        <p style="font-size:13px;color:#64748b">Recursos Humanos recibe copia de este correo.</p>`);
-      const r = await enviarCorreo({ to: emu.email, cc: 'recursos.humanos@autofacilchile.cl',
-        subject: `Comprobante de vacaciones — ${f(s.fecha_desde)} al ${f(s.fecha_hasta)} (folio ${codigo})`, html,
-        attachments: [{ filename: `Comprobante-Vacaciones-${isoF(s.fecha_desde)}-${codigo}.pdf`, content: buffer, contentType: 'application/pdf' }] });
-      if (!r || !r.ok) console.error('[vacaciones correo comprobante]', r && r.error);
-    }
-  } catch (e) { console.error('[vacaciones correo comprobante]', e.message); }
+  await correoComprobante(s, { codigo, buffer, nombreEmp, habiles, saldo }).catch(e => console.error('[vacaciones correo comprobante]', e.message));
   return { codigo, idDoc, nombreEmp };
 }
+
+/* Correo al beneficiario con copia a RRHH, con el comprobante adjunto (firma
+   electrónica simple + QR) — Pato, 08-09-2026. Lo usan el cierre automático al
+   aprobar y el botón "Reenviar comprobante" de RRHH. Devuelve el resultado del mailer. */
+async function correoComprobante(s, { codigo, buffer, nombreEmp, habiles, saldo }) {
+  const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
+  const isoF = d => (typeof d === 'string' ? d : new Date(d).toISOString()).slice(0, 10);
+  const [[emu]] = await pool.query('SELECT email FROM usuarios WHERE id_usuario=?', [s.id_usuario]);
+  if (!emu || !emu.email) return { ok: false, error: 'El colaborador no tiene correo en su ficha' };
+  const APP = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');
+  const f = d => String(isoF(d)).split('-').reverse().join('-');
+  const html = envolverHTML(`
+    <h2 style="margin:0 0 10px;color:#012d70;font-size:18px">Vacaciones aprobadas</h2>
+    <p style="font-size:14px;color:#334155;line-height:1.6">Hola ${String(nombreEmp || '').split(' ')[0]}, tus vacaciones del <b>${f(s.fecha_desde)}</b> al <b>${f(s.fecha_hasta)}</b> (${habiles} día(s) hábil(es)) fueron <b>aprobadas</b>${s.resuelto_nombre ? ' por ' + s.resuelto_nombre : ''}.</p>
+    <p style="font-size:14px;color:#334155;line-height:1.6">Adjunto va tu <b>comprobante de vacaciones</b> con la cadena de firmas electrónicas simples y el código QR de verificación. Folio <b>${codigo}</b>.${saldo && saldo.disponibles != null ? ` Saldo disponible después de estas vacaciones: <b>${Number(saldo.disponibles).toLocaleString('es-CL', { maximumFractionDigits: 1 })}</b> día(s) hábil(es).` : ''}</p>
+    <p style="font-size:13px;color:#64748b;line-height:1.6">Puedes verificar la autenticidad del documento en <a href="${APP}/verificar/${codigo}" style="color:#0141A2">${APP}/verificar/${codigo}</a>. También queda archivado en tu carpeta digital (Mi Ficha).</p>
+    <p style="font-size:13px;color:#64748b">Recursos Humanos recibe copia de este correo.</p>`);
+  const r = await enviarCorreo({ to: emu.email, cc: 'recursos.humanos@autofacilchile.cl',
+    subject: `Comprobante de vacaciones — ${f(s.fecha_desde)} al ${f(s.fecha_hasta)} (folio ${codigo})`, html,
+    attachments: [{ filename: `Comprobante-Vacaciones-${isoF(s.fecha_desde)}-${codigo}.pdf`, content: buffer, contentType: 'application/pdf' }] });
+  if (!r || !r.ok) console.error('[vacaciones correo comprobante]', r && r.error);
+  return r;
+}
+
+/* ── POST /vacaciones/:id/reenviar-comprobante — RRHH reenvía el correo con el PDF ya emitido ── */
+const reenviarComprobante = async (req, res) => {
+  try {
+    const u = req.usuario || {};
+    if (!(await esRRHH(u.id_usuario)) && u.perfil_nombre !== 'Administrador') return res.status(403).json({ success: false, data: null, error: 'Solo RRHH reenvía comprobantes' });
+    const [[s]] = await pool.query('SELECT * FROM rh_vacaciones WHERE id=?', [req.params.id]);
+    if (!s || !s.id_documento || !s.codigo_verificacion) return res.status(404).json({ success: false, data: null, error: 'La solicitud no tiene comprobante emitido' });
+    const [[d]] = await pool.query('SELECT archivo_data, doc_ruta FROM rh_documentos WHERE id=?', [s.id_documento]);
+    if (!d) return res.status(404).json({ success: false, data: null, error: 'Comprobante no encontrado en la carpeta digital' });
+    const buffer = await require('../../../../shared/almacen-docs').obtener({ ruta: d.doc_ruta, blob: d.archivo_data });
+    const [[emp]] = await pool.query('SELECT nombre, apellido, apellido_materno FROM usuarios WHERE id_usuario=?', [s.id_usuario]);
+    const nombreEmp = [emp?.nombre, emp?.apellido, emp?.apellido_materno].filter(Boolean).join(' ');
+    const isoF = x => (typeof x === 'string' ? x : new Date(x).toISOString()).slice(0, 10);
+    const habiles = require('../../../../shared/feriados').diasHabilesEntre(isoF(s.fecha_desde), isoF(s.fecha_hasta));
+    let saldo = null; try { saldo = await require('./vac-cuenta.controller').saldoCuenta(s.id_usuario); } catch (_) {}
+    const r = await correoComprobante(s, { codigo: s.codigo_verificacion, buffer, nombreEmp, habiles, saldo });
+    if (!r || !r.ok) return res.status(502).json({ success: false, data: null, error: (r && r.error) || 'No se pudo enviar el correo' });
+    auditar({ req, accion: 'ENVIAR', modulo: 'rrhh', entidad: 'vacaciones', entidad_id: s.id, detalle: `Reenvió por correo el comprobante de vacaciones #${s.id} de ${nombreEmp} (folio ${s.codigo_verificacion}), con copia a RRHH` });
+    res.json({ success: true, data: { enviado: true }, error: null });
+  } catch (e) { console.error('[rrhh reenviarComprobante]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
 
 /* ── GET /vacaciones/:id/comprobante — el PDF (dueño, su supervisor o RRHH) ── */
 const comprobanteVacaciones = async (req, res) => {
@@ -754,6 +780,6 @@ const pendientes = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: { count: 0 }, error: 'Error' }); }
 };
 
-module.exports = { cerrarVacaciones, comprobanteVacaciones, crearVacaciones, listarVacaciones, resolverVacaciones, recepcionarVacaciones, crearAntiguedad, listarAntiguedad, resolverAntiguedad, pendientes,
+module.exports = { cerrarVacaciones, comprobanteVacaciones, reenviarComprobante, crearVacaciones, listarVacaciones, resolverVacaciones, recepcionarVacaciones, crearAntiguedad, listarAntiguedad, resolverAntiguedad, pendientes,
   certEstado, certEmitir, certHistorial, listarEmpleados, cumpleEstado, cumpleHoy, getConfigApi, setConfigApi,
   cumplesProximos, getConfig };
