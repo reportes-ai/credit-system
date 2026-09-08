@@ -2135,9 +2135,24 @@ const subirDocumento = async (req, res) => {
 // GET /api/cartas/:id/documentos → lista (sin blob)
 const listarDocumentos = async (req, res) => {
   try {
+    /* Una carta CORREGIDA (-C1, -C2…) hereda los documentos de las que reemplaza: la carta de
+       Unidad, la cotización, etc. se subieron una vez a la carta original y no se copian
+       (una sola fuente). Sin esto la -C1 aparecía "sin carta de aprobación cargada"
+       (op 652505, Pato 08-09-2026). Se recorre la cadena corrige_a_id hasta la raíz. */
+    const ids = []; let cur = Number(req.params.id);
+    for (let i = 0; cur && i < 20; i++) {
+      ids.push(cur);
+      const [[c]] = await pool.query('SELECT corrige_a_id FROM cartas_aprobacion WHERE id=? LIMIT 1', [cur]);
+      cur = c && c.corrige_a_id ? Number(c.corrige_a_id) : null;
+    }
     const [rows] = await pool.query(
-      'SELECT id, tipo, nombre, mime, tamano, created_at FROM cartas_documentos WHERE id_carta=? ORDER BY tipo', [req.params.id]);
-    res.json({ success: true, data: rows, error: null });
+      `SELECT d.id, d.tipo, d.nombre, d.mime, d.tamano, d.created_at, d.id_carta, c.op_carta AS de_carta
+         FROM cartas_documentos d JOIN cartas_aprobacion c ON c.id = d.id_carta
+        WHERE d.id_carta IN (?) ORDER BY FIELD(d.id_carta, ${ids.map(() => '?').join(',')}), d.tipo`, [ids, ...ids]);
+    // Un tipo subido en la carta nueva manda sobre el de la original (re-subida = reemplaza)
+    const vistos = new Set(), data = [];
+    for (const r of rows) { if (vistos.has(r.tipo)) continue; vistos.add(r.tipo); data.push({ ...r, heredado: r.id_carta !== Number(req.params.id) }); }
+    res.json({ success: true, data, error: null });
   } catch (e) { console.error('[listarDocumentos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
