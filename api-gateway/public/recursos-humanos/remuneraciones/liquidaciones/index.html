@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
+  <!-- v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -252,7 +252,7 @@ function pintarLiq(l, d){
           ${fila('Otros imponibles', d.otros_imponibles)}
           ${fila('Gratificación legal (tope 4,75 IMM/12)', d.gratificacion)}
           ${sub('Total imponible', d.total_imponible)}
-          ${fila('Colación', d.colacion)}${fila('Movilización', d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
+          ${fila('Colación' + (d.dias!=null && d.dias!==30 && d.colacion ? ` (${d.dias}/30 días)` : ''), d.colacion)}${fila('Movilización' + (d.dias!=null && d.dias!==30 && d.movilizacion ? ` (${d.dias}/30 días)` : ''), d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
           ${sub('TOTAL HABERES', d.total_haberes)}
         </table>
         <table style="width:100%;border-collapse:collapse;font-size:.8rem">

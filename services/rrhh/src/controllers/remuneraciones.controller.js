@@ -593,7 +593,10 @@ function calcLiquidacion(inp, ind) {
      últimos 3 meses ENTEROS trabajados — la comisión del mes cae porque la
      persona no vendió estando de vacaciones, y este haber lo compensa. */
   const feriadoVar = R(inp.feriado_variable);
-  const colacion = R(inp.colacion), movilizacion = R(inp.movilizacion), otrosNoImp = R(inp.otros_no_imponibles);
+  /* Colación y movilización de la ficha son el monto del MES COMPLETO: van en 30avos igual
+     que el sueldo (ingreso parcial, licencias, baja). Pato 08-09-2026: Carmen y Romo
+     (ingreso 15-07) salían con los $45.000 enteros; AVSOFT les pagaba 16/30. */
+  const colacion = R(R(inp.colacion) * dias / 30), movilizacion = R(R(inp.movilizacion) * dias / 30), otrosNoImp = R(inp.otros_no_imponibles);
   const otrosDesc = R(inp.otros_descuentos);
 
   const baseGrat = sueldo + comisiones + feriadoVar + otrosImp;
@@ -918,7 +921,7 @@ async function enviarLiquidacionesCorreo(mes) {
       <p>Hola ${String(l.nombre || '').split(' ')[0]}, tu liquidación de sueldo de <b>${mesPalabras(mes)}</b> fue emitida:</p>
       <table style="border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;width:100%;max-width:460px">
         <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">HABERES</td></tr>
-        ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila('Comisiones' + (d.comisiones_mes ? ' ' + d.comisiones_mes : ''), d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación', d.colacion)}${fila('Movilización', d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
+        ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila('Comisiones' + (d.comisiones_mes ? ' ' + d.comisiones_mes : ''), d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación' + (d.dias != null && d.dias !== 30 && d.colacion ? ` (${d.dias}/30 días)` : ''), d.colacion)}${fila('Movilización' + (d.dias != null && d.dias !== 30 && d.movilizacion ? ` (${d.dias}/30 días)` : ''), d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
         <tr><td style="padding:3px 10px;font-weight:700">Total haberes</td><td style="padding:3px 10px;text-align:right;font-weight:700">${co(d.total_haberes)}</td></tr>
         <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">DESCUENTOS</td></tr>
         ${fila('AFP ' + (d.afp || ''), d.desc_afp, 1)}${fila('Salud 7%', d.desc_salud, 1)}${fila('Adicional Isapre', d.desc_salud_adicional, 1)}${fila('Seguro cesantía', d.desc_afc, 1)}${fila('Impuesto único', d.impuesto, 1)}${fila('Otros descuentos', d.otros_descuentos, 1)}
