@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adicionales de Remuneración — AutoFácil</title>
-  <!-- v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <!-- v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -52,8 +52,8 @@
         <select id="fColab" class="form-select form-select-sm"><option value="">— elegir —</option></select></div>
       <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Causal del pago</label>
         <select id="fCausal" class="form-select form-select-sm" onchange="causalUI()"></select></div>
-      <div class="col-md-3" id="wOtro" style="display:none"><label class="form-label small fw-semibold mb-1">Describe la causal</label>
-        <input id="fOtro" class="form-control form-control-sm" maxlength="200" placeholder="ej. Premio concurso interno"></div>
+      <div class="col-md-3" id="wOtro" style="display:none"><label class="form-label small fw-semibold mb-1">Concepto (texto libre)</label>
+        <input id="fOtro" class="form-control form-control-sm" maxlength="200" placeholder="escribe el concepto tal como debe salir en la liquidación"></div>
       <div class="col-md-2" id="wOtroImp" style="display:none"><label class="form-label small fw-semibold mb-1">¿Imponible?</label>
         <select id="fOtroImp" class="form-select form-select-sm"><option value="1">Sí, imponible</option><option value="0">No imponible</option></select></div>
       <!-- HORAS EXTRAS: se digitan las horas y el monto lo calcula el sistema con
@@ -207,7 +207,7 @@ async function cargar(){
   D = j.data;
   const sel = fCausal.value;
   CAUSALES = D.causales;
-  fCausal.innerHTML = Object.keys(CAUSALES).map(c=>`<option>${esc(c)}</option>`).join('');
+  fCausal.innerHTML = Object.keys(CAUSALES).map(c=>`<option value="${esc(c)}">${c==='OTRO'?'TEXTO LIBRE (otro concepto)':esc(c)}</option>`).join('');
   if (sel && CAUSALES[sel]!==undefined) fCausal.value = sel;
   if (!fColab.options.length || fColab.options.length===1){
     const jd = await (await fetch('/api/rrhh/directorio',{headers:H})).json();
