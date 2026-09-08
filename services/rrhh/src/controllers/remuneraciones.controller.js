@@ -420,9 +420,16 @@ require('../../../../shared/migrate').enFila('rrhh-descuentos', async () => {
         anulado_at    DATETIME NULL,
         INDEX idx_usuario (id_usuario), INDEX idx_mes (mes_inicio)
       )`);
+    /* MONEDA del descuento (Pato, 08-09-2026): Pesos, UF, UTM o Dólares. El monto y la
+       cuota se guardan en la moneda de ORIGEN y cada mes se convierten a pesos con el
+       indicador del mes (motor único shared/tipo-cambio.js); monto_total/valor_cuota
+       quedan en pesos al tipo de cambio del día de ingreso, solo de referencia. */
+    for (const col of ["moneda VARCHAR(5) NOT NULL DEFAULT 'CLP'", 'monto_origen DECIMAL(14,4) NULL', 'valor_cuota_origen DECIMAL(14,4) NULL'])
+      await pool.query(`ALTER TABLE rh_descuentos ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
     console.log('[rrhh-descuentos] listo');
   } catch (e) { console.error('[rrhh-descuentos migration]', e.message); }
 });
+const TC = require('../../../../shared/tipo-cambio');
 
 const mesMas = (mes, n) => { const [y, m] = mes.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const difMeses = (a, b) => { const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number); return (yb - ya) * 12 + (mb - ma); };
@@ -440,14 +447,19 @@ async function subtiposDesc() {
   return [...base, ...rows.map(r => r.nombre).filter(n => !base.includes(n)), 'OTRO'];
 }
 
-// Cuota del descuento VIGENTE d en el mes m (null si ese mes no le toca)
-const cuotaEnMes = (d, m) => {
+// Cuota del descuento VIGENTE d en el mes m, EN PESOS (null si ese mes no le toca).
+// tc = tipos de cambio del mes ({CLP:1, UF, UTM, USD}); en moneda extranjera la cuota
+// de origen se convierte con el indicador del mes; sin cotización cae a la referencia
+// en pesos del día de ingreso (valor_cuota) para que la liquidación nunca quede en 0.
+const cuotaEnMes = (d, m, tc) => {
   const k = difMeses(d.mes_inicio, m);
   if (k < 0) return null;
-  if (d.tipo === 'PERMANENTE') return Number(d.valor_cuota);   // mensual hasta anular
-  if (k >= d.cuotas) return null;                              // plan ya pagado
+  if (d.tipo !== 'PERMANENTE' && k >= d.cuotas) return null;   // plan ya pagado
+  const mon = String(d.moneda || 'CLP').toUpperCase();
+  if (mon !== 'CLP' && d.valor_cuota_origen != null && tc && tc[mon]) return TC.aCLP(d.valor_cuota_origen, tc[mon]);
   return Number(d.valor_cuota);
 };
+const tcDelMes = mes => TC.tiposCambio(TC.fechaDeMes(mes));
 
 const getDescuentos = async (req, res) => {
   try {
@@ -458,10 +470,13 @@ const getDescuentos = async (req, res) => {
                      AND rd.tipo='CONVENIO DESCUENTO' AND rd.nombre_archivo LIKE CONCAT('DESC-', d.id, '-%')) tiene_convenio
          FROM rh_descuentos d
         LEFT JOIN usuarios u ON u.id_usuario=d.id_usuario ORDER BY d.created_at DESC LIMIT 500`);
-    const delMes = rows.filter(d => d.estado === 'VIGENTE' && cuotaEnMes(d, mes) != null)
-      .map(d => ({ ...d, cuota_mes: cuotaEnMes(d, mes), cuota_num: d.tipo === 'PERMANENTE' ? null : difMeses(d.mes_inicio, mes) + 1 }));
+    const tc = await tcDelMes(mes);
+    const tcHoy = await TC.tiposCambio(new Date().toISOString().slice(0, 10));
+    const delMes = rows.filter(d => d.estado === 'VIGENTE' && cuotaEnMes(d, mes, tc) != null)
+      .map(d => ({ ...d, cuota_mes: cuotaEnMes(d, mes, tc), cuota_num: d.tipo === 'PERMANENTE' ? null : difMeses(d.mes_inicio, mes) + 1 }));
     const total_mes = delMes.reduce((s, d) => s + d.cuota_mes, 0);
-    ok(res, { mes, descuentos: rows, del_mes: delMes, total_mes, bloqueado: await mesEmitido(mes), tmc: await tmcVigente(), subtipos: await subtiposDesc() });
+    ok(res, { mes, descuentos: rows, del_mes: delMes, total_mes, bloqueado: await mesEmitido(mes), tmc: await tmcVigente(), subtipos: await subtiposDesc(),
+      monedas: TC.MONEDAS, tc_mes: tc, tc_hoy: tcHoy });
   } catch (e) { console.error('[rrhh descuentos get]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -470,17 +485,28 @@ const crearDescuento = async (req, res) => {
     const u = req.usuario || {}; const b = req.body || {};
     const idU = Number(b.id_usuario);
     const tipo = String(b.tipo || '').toUpperCase();
-    const monto = Math.round(Number(b.monto) || 0);
-    if (!idU || monto <= 0) return fail(res, 'Colaborador y monto son obligatorios', 400);
+    const moneda = String(b.moneda || 'CLP').toUpperCase();
+    if (!TC.MONEDAS.includes(moneda)) return fail(res, 'Moneda inválida (CLP, UF, UTM o USD)', 400);
+    // Monto en la moneda de ORIGEN: en pesos entero; en UF/UTM/USD con decimales.
+    const montoOrigen = moneda === 'CLP' ? Math.round(Number(b.monto) || 0) : Math.round((Number(b.monto) || 0) * 10000) / 10000;
+    let tcHoy = 1;
+    if (moneda !== 'CLP') {
+      try { tcHoy = await TC.tipoCambio(moneda, new Date().toISOString().slice(0, 10)); }
+      catch (e) { return fail(res, e.message, 400); }
+    }
+    const monto = TC.aCLP(montoOrigen, tcHoy);   // referencia en pesos al día de ingreso
+    if (!idU || !(montoOrigen > 0)) return fail(res, 'Colaborador y monto son obligatorios', 400);
     if (!['ANTICIPO', 'PRESTAMO', 'PAGO_EXCESO', 'PERMANENTE'].includes(tipo)) return fail(res, 'Tipo inválido', 400);
     const [[colab]] = await pool.query("SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE id_usuario=?", [idU]);
     if (!colab) return fail(res, 'Colaborador no encontrado', 404);
     // Siempre parte en la PRÓXIMA remuneración (mes siguiente al actual)
     const mesInicio = mesMas(new Date().toISOString().slice(0, 7), 1);
     let cuotas = 1, valorCuota = monto, tasa = null, subtipo = null, detalle = null, mesRef = null;
+    let cuotaOrigen = montoOrigen;   // cuota en la moneda de origen (la que se convierte cada mes)
     if (tipo === 'ANTICIPO') {
       cuotas = Math.max(1, Math.min(24, Number(b.cuotas) || 1));
       valorCuota = Math.round(monto / cuotas);
+      cuotaOrigen = montoOrigen / cuotas;
     } else if (tipo === 'PRESTAMO') {
       cuotas = Math.max(1, Math.min(48, Number(b.cuotas) || 1));
       tasa = Number(b.tasa_pct);
@@ -488,11 +514,15 @@ const crearDescuento = async (req, res) => {
       const tmc = await tmcVigente();
       if (tmc != null && tasa > tmc) return fail(res, `La tasa (${tasa}% mensual) supera la TMC vigente (${tmc}% mensual). Máximo legal: ${tmc}%.`, 400);
       valorCuota = cuotaFrancesa(monto, tasa, cuotas);
+      // En moneda extranjera la cuota francesa se calcula sobre el monto de origen y
+      // se convierte cada mes; en pesos es la de siempre.
+      cuotaOrigen = moneda === 'CLP' ? valorCuota : (valorCuota / tcHoy);
     } else if (tipo === 'PAGO_EXCESO') {
       if (!/^\d{4}-\d{2}$/.test(b.mes_referencia || '')) return fail(res, 'Indica el mes del pago en exceso', 400);
       mesRef = b.mes_referencia;
       cuotas = Math.max(1, Math.min(12, Number(b.cuotas) || 1));
       valorCuota = Math.round(monto / cuotas);
+      cuotaOrigen = montoOrigen / cuotas;
     } else { // PERMANENTE
       subtipo = String(b.subtipo || '').toUpperCase();
       if (!(await subtiposDesc()).includes(subtipo)) return fail(res, 'Subtipo inválido', 400);
@@ -501,12 +531,14 @@ const crearDescuento = async (req, res) => {
       cuotas = 0; valorCuota = monto; // mensual indefinido hasta anular
     }
     const [r] = await pool.query(
-      `INSERT INTO rh_descuentos (id_usuario, tipo, subtipo, detalle_texto, mes_referencia, monto_total, tasa_pct, cuotas, valor_cuota, mes_inicio, creado_por)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-      [idU, tipo, subtipo, detalle, mesRef, monto, tasa, cuotas, valorCuota, mesInicio, nombreDe(u)]);
+      `INSERT INTO rh_descuentos (id_usuario, tipo, subtipo, detalle_texto, mes_referencia, monto_total, tasa_pct, cuotas, valor_cuota, mes_inicio, creado_por, moneda, monto_origen, valor_cuota_origen)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [idU, tipo, subtipo, detalle, mesRef, monto, tasa, cuotas, valorCuota, mesInicio, nombreDe(u),
+       moneda, moneda === 'CLP' ? null : montoOrigen, moneda === 'CLP' ? null : cuotaOrigen]);
+    const fmtOri = v => moneda === 'CLP' ? '$' + Math.round(v).toLocaleString('es-CL') : `${moneda} ${Number(v).toLocaleString('es-CL', { maximumFractionDigits: 4 })}`;
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'descuento', entidad_id: r.insertId,
-      detalle: `${tipo}${subtipo ? '/' + subtipo : ''} ${colab.nombre}: $${monto.toLocaleString('es-CL')}${tasa != null ? ` al ${tasa}% mensual` : ''} en ${cuotas || '∞'} cuota(s) de $${valorCuota.toLocaleString('es-CL')} desde ${mesInicio}` });
-    ok(res, { id: r.insertId, valor_cuota: valorCuota, cuotas, mes_inicio: mesInicio });
+      detalle: `${tipo}${subtipo ? '/' + subtipo : ''} ${colab.nombre}: ${fmtOri(montoOrigen)}${moneda !== 'CLP' ? ` (≈ $${monto.toLocaleString('es-CL')} al ${moneda} de hoy)` : ''}${tasa != null ? ` al ${tasa}% mensual` : ''} en ${cuotas || '∞'} cuota(s) de ${fmtOri(cuotaOrigen)}${moneda !== 'CLP' ? ` (≈ $${valorCuota.toLocaleString('es-CL')}; se convierte cada mes al indicador del mes)` : ''} desde ${mesInicio}` });
+    ok(res, { id: r.insertId, valor_cuota: valorCuota, cuotas, mes_inicio: mesInicio, moneda, monto_origen: montoOrigen, valor_cuota_origen: cuotaOrigen, tc_hoy: tcHoy });
   } catch (e) { console.error('[rrhh descuentos crear]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -526,9 +558,10 @@ const anularDescuento = async (req, res) => {
 // Suma de cuotas de descuento del mes por usuario → alimenta el libro
 async function descuentosDelMes(mes) {
   const [rows] = await pool.query("SELECT * FROM rh_descuentos WHERE estado='VIGENTE'");
+  const tc = rows.some(d => d.moneda && d.moneda !== 'CLP') ? await tcDelMes(mes) : null;
   const m = {};
   for (const d of rows) {
-    const c = cuotaEnMes(d, mes);
+    const c = cuotaEnMes(d, mes, tc);
     if (c != null) m[d.id_usuario] = (m[d.id_usuario] || 0) + c;
   }
   return m;

@@ -111,24 +111,9 @@ require('../../../../shared/migrate').enFila('pagos-recurrentes', async () => {
 
 /* ── Helpers de negocio ──────────────────────────────────────────────────── */
 
-// Tipo de cambio del día a pesos. UF por el motor único; UTM y dólar del mantenedor
-// de indicadores (última cotización ≤ fecha). Sin cotización → error explícito: se
-// reintenta al día siguiente en vez de emitir una orden con un monto inventado.
-async function tipoCambio(moneda, fechaISO) {
-  if (moneda === 'CLP') return 1;
-  if (moneda === 'UF') {
-    const v = await getUF(fechaISO);
-    if (v) return v;
-    const [[u]] = await pool.query('SELECT valor FROM uf ORDER BY fecha DESC LIMIT 1');
-    if (u) return parseFloat(u.valor);
-    throw new Error('No hay UF cargada');
-  }
-  const tabla = moneda === 'UTM' ? 'utm' : moneda === 'USD' ? 'dolar' : null;
-  if (!tabla) throw new Error('Moneda no soportada: ' + moneda);
-  const [[r]] = await pool.query(`SELECT valor, fecha FROM ${tabla} WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1`, [fechaISO]);
-  if (!r) throw new Error(`No hay ${moneda} cargado en el mantenedor de indicadores`);
-  return parseFloat(r.valor);
-}
+// Tipo de cambio a pesos: motor único shared/tipo-cambio.js (lo comparte con los
+// Descuentos de Remuneración en UF/UTM/USD desde el 08-09-2026).
+const { tipoCambio } = require('../../../../shared/tipo-cambio');
 
 // {MES} {MES_ANTERIOR} {AÑO} {MES_NUM} según la fecha de vencimiento del período.
 function renderGlosa(glosa, vencISO) {
