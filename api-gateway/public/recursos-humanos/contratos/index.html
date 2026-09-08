@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.9 — onboarding: dialog dlgVer que faltaba (Plantilla de tareas no abría), botones + Onboarding / + Offboarding separados · v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
+<!-- v3.0 — anexo variable: el factor de cada indicador aplica SOLO sobre la Comisión Base de las ops con ese seguro (cláusulas 5ª, 6ª y ejemplo 8ª), calidad sobre la base total · v2.9 — onboarding: dialog dlgVer que faltaba (Plantilla de tareas no abría), botones + Onboarding / + Offboarding separados · v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -836,8 +836,14 @@ function anexVarEjecutivos(trab, firm){
   // Ejemplo numérico calculado con los MISMOS parámetros vigentes
   const m24=40000000, mM24=80000000, base=m24*c.pct_24 + mM24*c.pct_mas24;
   // Mismo orden del motor: primero el cumplimiento ponderado, luego el factor máximo.
-  const pond = 1*c.peso_rdh + .80*c.peso_cesantia + .60*c.peso_rep;
-  const fac = pond*c.factor_max, com = base*(1+fac);
+  /* Pato 08-09-2026: cada indicador aplica SOLO sobre la Comisión Base de las operaciones que
+     llevan ese seguro (igual que el motor con bono_sobre_base_total=0); calidad sobre la base total.
+     En el ejemplo la base de cada seguro es proporcional a su cruce (RDH 100%, cesantía 80%, reparación 60%). */
+  const exRdh=1, exCes=.80, exRep=.60, calOk=(c.peso_calidad||0)>0;
+  const bRdh=base*exRdh, bCes=base*exCes, bRep=base*exRep;
+  const fRdh=exRdh*c.peso_rdh*c.factor_max, fCes=exCes*c.peso_cesantia*c.factor_max, fRep=exRep*c.peso_rep*c.factor_max, fCal=calOk?1*c.peso_calidad*c.factor_max:0;
+  const inRdh=bRdh*fRdh, inCes=bCes*fCes, inRep=bRep*fRep, inCal=base*fCal;
+  const com=base+inRdh+inCes+inRep+inCal;
   const TH='padding:5px 8px;background:#eef4fb;border:1px solid #cbd5e1;font-weight:700;font-size:11.5px';
   const TD='padding:5px 8px;border:1px solid #cbd5e1;font-size:11.5px';
   bloqueDoc(`${cabeceraCon('')}
@@ -861,21 +867,22 @@ function anexVarEjecutivos(trab, firm){
       <tr><td style="${TD}">Cruce de Seguro de Cesantía</td><td style="${TD};text-align:center">${anexPct(c.peso_cesantia,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_cesantia,0)}</td></tr>
       <tr><td style="${TD}">Cruce de Seguro de Reparación Menor</td><td style="${TD};text-align:center">${anexPct(c.peso_rep,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_rep,0)}</td></tr>
       ${(c.peso_calidad||0)>0?`<tr><td style="${TD}">Calidad — colocación UNIDAD DE CRÉDITO</td><td style="${TD};text-align:center">${anexPct(c.peso_calidad,0)}</td><td style="${TD};text-align:center">Meta de ${c.meta_unidad||3} operaciones (todo o nada)</td></tr>`:''}</table>
-    <p><b>Cómo se calcula el Factor de Ajuste.</b> Se determina en dos pasos:</p>
+    <p><b>Cómo se calcula el Factor de Ajuste.</b> Cada indicador genera su propio factor y se aplica <b>únicamente sobre la Comisión Base de las operaciones que incorporan el respectivo seguro</b>, es decir, sobre las mismas operaciones con que se midió su cumplimiento:</p>
     <div style="background:#f6f8fb;border:1px solid #d9e2ef;border-radius:8px;padding:12px 16px;margin:8px 0 12px;font-size:12.5px">
-      <b>Paso 1 — Cumplimiento ponderado.</b> Se pondera el cumplimiento de los tres indicadores:<br>
-      <div style="text-align:center;margin:8px 0"><i>Cumplimiento ponderado = (Cruce RDH × ${anexPct(c.peso_rdh,0)}) + (Cruce Cesantía × ${anexPct(c.peso_cesantia,0)}) + (Cruce Reparación Menor × ${anexPct(c.peso_rep,0)})${(c.peso_calidad||0)>0?` + (Calidad × ${anexPct(c.peso_calidad,0)})`:''}</i></div>
-      <b>Paso 2 — Factor de Ajuste.</b> Ese cumplimiento ponderado se aplica sobre el incremento máximo pactado:<br>
-      <div style="text-align:center;margin:8px 0"><i>Factor de Ajuste = Cumplimiento ponderado × ${anexPct(c.factor_max)}</i></div>
-      De este modo, si los indicadores alcanzan el 100%, el cumplimiento ponderado es 100% y el Factor de Ajuste llega a su <b>máximo de ${anexPct(c.factor_max)}</b>. Si los tres quedan en 0%, el Factor es 0% y solo se paga la Comisión Base.
+      <b>Paso 1 — Factor de cada indicador.</b> Su cruce efectivo (si supera el umbral), por su ponderación, por el incremento máximo pactado:<br>
+      <div style="text-align:center;margin:8px 0"><i>Factor<sub>indicador</sub> = Cruce × Ponderación × ${anexPct(c.factor_max)}</i></div>
+      <b>Paso 2 — Incentivo de cada indicador.</b> Ese factor se aplica sobre la Comisión Base de las operaciones que llevan ese seguro:<br>
+      <div style="text-align:center;margin:8px 0"><i>Incentivo<sub>indicador</sub> = Comisión Base de las operaciones con el seguro × Factor<sub>indicador</sub></i></div>
+      ${(c.peso_calidad||0)>0?`El indicador de <b>Calidad</b>, por no estar asociado a un seguro, aplica su factor sobre la Comisión Base total.<br>`:''}
+      De este modo, si todos los indicadores alcanzan el 100% en la totalidad de las operaciones, el incremento llega a su <b>máximo de ${anexPct(c.factor_max)}</b> sobre la Comisión Base. Si quedan en 0%, solo se paga la Comisión Base. Una operación sin un seguro no genera incentivo por ese indicador.
     </div>
     <p><b>Reglas de los indicadores.</b> Los umbrales operan como <b>condición de activación</b> de cada indicador, de forma independiente: si un cruce no supera su umbral, ese indicador entra al cálculo con <b>cero</b>, sin afectar el aporte de los demás; superado el umbral, entra con el porcentaje de cruce efectivamente alcanzado. En consecuencia, el Cruce de Seguro RDH debe superar el <b>${anexPct(c.umbral_rdh,0)}</b> —esto es, prácticamente la totalidad de las operaciones del Universo de Medición debe incorporar dicho seguro—, el de Cesantía el ${anexPct(c.umbral_cesantia,0)} y el de Reparación Menor el ${anexPct(c.umbral_rep,0)}.${(c.peso_calidad||0)>0?` El indicador de <b>Calidad</b> opera de modo <b>todo o nada</b>: alcanzada la meta de ${c.meta_unidad||3} operaciones UNIDAD DE CRÉDITO entra con el 100%, por debajo con cero.`:''}</p>
 
     <p><b>Naturaleza del Factor de Ajuste.</b> Se deja expresa constancia de que el Factor de Ajuste <b>no constituye por sí mismo una comisión ni un bono</b>, ni forma parte de la contraprestación por el volumen de ventas —la que se remunera íntegramente mediante la Comisión Base—, sino un <b>incentivo adicional</b> destinado a premiar el sobrecumplimiento de <b>indicadores de gestión de carácter no monetario</b>, referidos a la correcta colocación de los seguros asociados al crédito. En consecuencia, su procedencia y su monto dependen exclusivamente del cumplimiento de dichos indicadores en cada Mes de Cálculo, se determinan mes a mes de forma independiente y <b>no constituyen un derecho adquirido</b>: su devengo en uno o más períodos no supone ni garantiza su devengo en los siguientes.</p>
 
     <p><b>SEXTO — Comisión mensual.</b> La comisión se determinará conforme a la siguiente fórmula:</p>
-    <div style="text-align:center;font-weight:700;margin:10px 0 12px;font-size:13.5px">Comisión Mensual = Comisión Base × ( 1 + Factor de Ajuste )</div>
-    <p>En consecuencia, el incremento máximo aplicable sobre la Comisión Base asciende a <b>${anexPct(c.factor_max)}</b>: con el Factor de Ajuste en su máximo, la comisión del mes equivale a <b>Comisión Base × 1,${String(Math.round((c.factor_max||0)*100)).padStart(2,'0')}</b>.</p>
+    <div style="text-align:center;font-weight:700;margin:10px 0 12px;font-size:13.5px">Comisión Mensual = Comisión Base + Σ Incentivo<sub>indicador</sub></div>
+    <p>donde cada Incentivo<sub>indicador</sub> es el de la cláusula quinta, calculado sobre la Comisión Base de las operaciones que incorporan el seguro respectivo. En consecuencia, el incremento máximo aplicable asciende a <b>${anexPct(c.factor_max)}</b> de la Comisión Base, y solo se alcanza cuando la totalidad de las operaciones del Universo de Medición incorpora todos los seguros medidos${(c.peso_calidad||0)>0?' y se cumple la meta de calidad':''}.</p>
 
     <p><b>SÉPTIMO — Semana corrida.</b> Conforme al artículo 45 del Código del Trabajo, la comisión e incentivo adicional así determinados se incrementarán por concepto de semana corrida.</p>
 
@@ -883,9 +890,12 @@ function anexVarEjecutivos(trab, firm){
     <table style="border-collapse:collapse;width:100%;margin:8px 0 12px">
       <tr><td style="${TD}">Monto Financiado: ${CLP(m24)} (bajo 24 meses) + ${CLP(mM24)} (24 meses o más)</td><td style="${TD};text-align:right">${CLP(m24+mM24)}</td></tr>
       <tr><td style="${TD}">Comisión Base: ${CLP(m24)} × ${anexPct(c.pct_24)} + ${CLP(mM24)} × ${anexPct(c.pct_mas24)}</td><td style="${TD};text-align:right">${CLP(base)}</td></tr>
-      <tr><td style="${TD}">Cumplimiento ponderado: (100% × ${anexPct(c.peso_rdh,0)}) + (80% × ${anexPct(c.peso_cesantia,0)}) + (60% × ${anexPct(c.peso_rep,0)})</td><td style="${TD};text-align:right">${anexPct(pond)}</td></tr>
-      <tr><td style="${TD}">Factor de Ajuste: ${anexPct(pond)} × ${anexPct(c.factor_max)}</td><td style="${TD};text-align:right">${anexPct(fac)}</td></tr>
-      <tr><td style="${TD}"><b>Incentivo Mensual: ${CLP(base)} × (1 + ${anexPct(fac)})</b></td><td style="${TD};text-align:right"><b>${CLP(com)}</b></td></tr></table>
+      <tr><td style="${TD}">Cruces del mes: RDH ${anexPct(exRdh,0)} · Cesantía ${anexPct(exCes,0)} · Reparación Menor ${anexPct(exRep,0)} (todos sobre su umbral)${calOk?' · Calidad: meta cumplida':''}</td><td style="${TD}"></td></tr>
+      <tr><td style="${TD}">Incentivo RDH: base de las ops con RDH ${CLP(bRdh)} × (${anexPct(exRdh,0)} × ${anexPct(c.peso_rdh,0)} × ${anexPct(c.factor_max)})</td><td style="${TD};text-align:right">${CLP(inRdh)}</td></tr>
+      <tr><td style="${TD}">Incentivo Cesantía: base de las ops con cesantía ${CLP(bCes)} × (${anexPct(exCes,0)} × ${anexPct(c.peso_cesantia,0)} × ${anexPct(c.factor_max)})</td><td style="${TD};text-align:right">${CLP(inCes)}</td></tr>
+      <tr><td style="${TD}">Incentivo Reparación Menor: base de las ops con reparación ${CLP(bRep)} × (${anexPct(exRep,0)} × ${anexPct(c.peso_rep,0)} × ${anexPct(c.factor_max)})</td><td style="${TD};text-align:right">${CLP(inRep)}</td></tr>
+      ${calOk?`<tr><td style="${TD}">Incentivo Calidad: Comisión Base ${CLP(base)} × (100% × ${anexPct(c.peso_calidad,0)} × ${anexPct(c.factor_max)})</td><td style="${TD};text-align:right">${CLP(inCal)}</td></tr>`:''}
+      <tr><td style="${TD}"><b>Comisión Mensual: ${CLP(base)} + ${CLP(inRdh+inCes+inRep+inCal)}</b></td><td style="${TD};text-align:right"><b>${CLP(com)}</b></td></tr></table>
     <p style="font-size:11.5px;color:#444">Sobre el monto así obtenido se aplica además el incremento por semana corrida que corresponda al mes, conforme a la cláusula séptima.</p>
 
     <p><b>NOVENO — Descuentos por prepago y anulación.</b> No se considerarán para el cálculo, o se descontarán de él según corresponda: (i) las operaciones <b>prepagadas íntegramente hasta el tercer mes</b> contado desde la fecha de vencimiento de la primera cuota, caso en el cual se descontará el <b>100%</b> de la comisión devengada por dicha operación; (ii) las operaciones <b>prepagadas íntegramente hasta el sexto mes</b> contado desde la fecha de vencimiento de la primera cuota, caso en el cual se descontará el <b>50%</b> de la comisión devengada por dicha operación; y (iii) las <b>operaciones anuladas</b>, descontándose la totalidad de la comisión asociada. El descuento se aplicará en la liquidación del mes en que se verifique el hecho y, de exceder la comisión de ese mes, el saldo se imputará a los meses siguientes, sin afectar en caso alguno el sueldo base.</p>
