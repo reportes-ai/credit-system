@@ -710,7 +710,8 @@ const updateEjecutivosUsuario = async (req, res) => {
     if (!Array.isArray(ejecutivos)) return res.status(400).json({ success: false, data: null, error: 'ejecutivos debe ser un array' });
     await pool.query(`DELETE FROM usuario_ejecutivos WHERE id_usuario = ?`, [req.params.id]);
     if (ejecutivos.length) {
-      const vals = ejecutivos.map(e => [req.params.id, e]);
+      // Siempre en MAYÚSCULAS: la BD es case-sensitive y creditos.ejecutivo va así (Hans no veía sus comisiones, 08-09-2026)
+      const vals = ejecutivos.map(e => [req.params.id, String(e).toUpperCase().replace(/\s+/g, ' ').trim()]);
       await pool.query(`INSERT INTO usuario_ejecutivos (id_usuario, ejecutivo) VALUES ?`, [vals]);
     }
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: req.params.id,

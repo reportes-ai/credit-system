@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Revisión Comisiones — AutoFácil</title><!-- v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
+  <title>Revisión Comisiones — AutoFácil</title><!-- v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -238,8 +238,11 @@ async function cargar() {
     }
 
     // Filtrar datos según asignación
+    // Cruce sin mayúsculas/tildes: usuario_ejecutivos puede venir "Hans Vargas" y creditos "HANS VARGAS"
+    const normEj = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
+    const asigN = new Set((_ejAsignados||[]).map(normEj));
     const datosPermitidos = esAdmin ? json.data
-      : json.data.filter(d => _ejAsignados.includes(d.ejecutivo));
+      : json.data.filter(d => asigN.has(normEj(d.ejecutivo)));
 
     // Poblar filtro de ejecutivos
     const sel = document.getElementById('filtroEj');
@@ -256,7 +259,7 @@ async function cargar() {
     // Si no es admin y solo hay un ejecutivo: bloquear selector
     if (!esAdmin) {
       sel.disabled = _ejAsignados.length <= 1;
-      if (_ejAsignados.length === 1) sel.value = _ejAsignados[0];
+      if (_ejAsignados.length === 1 && datosPermitidos.length) sel.value = datosPermitidos[0].ejecutivo;
     }
 
     // Aplicar filtro de ejecutivo si hay uno seleccionado
