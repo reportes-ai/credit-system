@@ -83,11 +83,18 @@ function registrar({ id_credito, req, accion, detalle, meta }) {
  * pueden toparse sobre la misma operación.
  * @param {string} opts.ref_origen clave única del hecho (ej. `otg_1234`)
  * @param {Date|string} [opts.fecha] fecha del hecho (por defecto, ahora)
+ * @param {object} [opts.actor] quién hizo el hecho cuando NO es quien manda el request
+ *   ({ nombre, id_usuario, perfil }). Nació el 08-09-2026: al otorgar se grababa el
+ *   nacimiento del crédito con la fecha real pero con el usuario que OTORGABA, y la
+ *   bitácora decía que Fabián "ingresó" a las 09:08 una op que insertó la carga Trinidad
+ *   de Bryan (op 26090275).
  */
-function registrarUnico({ id_credito, req, accion, detalle, meta, ref_origen, fecha }) {
+function registrarUnico({ id_credito, req, accion, detalle, meta, ref_origen, fecha, actor }) {
   (async () => {
     try {
-      const u  = req?.usuario;
+      const u  = actor
+        ? { nombre: actor.nombre, id_usuario: actor.id_usuario || null, perfil_nombre: actor.perfil || null }
+        : req?.usuario;
       const ip = req?.headers?.['x-forwarded-for']?.split(',')[0]?.trim()
                || req?.socket?.remoteAddress
                || null;

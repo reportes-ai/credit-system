@@ -1041,9 +1041,24 @@ const otorgar = async (req, res) => {
         [id, ca.id_credito_creado || 0, ca.id_financiera || 0]);
       if (crAud) {
         const nOp = crAud.num_op || crAud.numero_credito || crAud.id;
+        /* ¿Nació de una carga (Trinidad / masiva)? Entonces el "ingreso" NO lo hizo
+           quien otorga: se atribuye a la carga y a quien la subió (08-09-2026, op
+           26090275: la bitácora decía que Fabián la ingresó a las 09:08, y era la
+           carga Trinidad de Bryan con 116 inserts en 4 segundos). */
+        let actor = null, origenTxt = '';
+        try {
+          const [[cd]] = await pool.query(
+            `SELECT s.fuente, s.usuario, s.archivo FROM carga_detalle d
+               JOIN carga_sesiones s ON s.id = d.sesion_id
+              WHERE d.num_op = ? AND d.accion = 'insert' ORDER BY d.id LIMIT 1`, [crAud.num_op || 0]);
+          if (cd) {
+            actor = { nombre: `Carga ${cd.fuente === 'trinidad' ? 'Trinidad' : 'masiva'} (${cd.usuario || 'Sistema'})`, perfil: 'Carga' };
+            origenTxt = ` desde el archivo ${cd.archivo || cd.fuente}`;
+          }
+        } catch (_) {}
         audCred.registrarUnico({
-          id_credito: crAud.id, req, accion: 'CREDITO_CREADO', fecha: crAud.created_at,
-          detalle: `Operación N°${nOp} ingresada para ${crAud.nombre_cliente || ''}`.trim(),
+          id_credito: crAud.id, req, actor, accion: 'CREDITO_CREADO', fecha: crAud.created_at,
+          detalle: `Operación N°${nOp} ingresada${origenTxt} para ${crAud.nombre_cliente || ''}`.trim(),
           meta: { num_op: crAud.num_op, cliente: crAud.nombre_cliente, rut: crAud.rut_cliente,
                   financiera: crAud.financiera, monto_financiado: crAud.monto_financiado },
           ref_origen: `bc_cred_${crAud.id}`,
