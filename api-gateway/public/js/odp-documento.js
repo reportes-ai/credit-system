@@ -1,4 +1,4 @@
-/* v1.3 — montos negativos como "− $x" (retención de boleta que se descuenta). v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
+/* v1.4 — tabla "Ajuste de cartola" (adicionales/descuentos aprobados con su glosa) en la orden de comisión. v1.3 — montos negativos como "− $x" (retención de boleta que se descuenta). v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
    ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    MOTOR ÚNICO del documento "Solicitud de Pago" (Orden de Pago)
 
@@ -114,6 +114,11 @@ function docHTML(o){
       </td>
     </tr></tbody></table>
     ${tablaDetalle}
+    ${Array.isArray(o.ajustes)&&o.ajustes.length?`<table style="${Stbl}">
+      <colgroup><col style="width:22%"><col style="width:63%"><col style="width:15%"></colgroup>
+      <thead><tr><th style="${Sth}">Ajuste de cartola</th><th style="${Sth}">Glosa</th><th style="${Sth}">Monto</th></tr></thead>
+      <tbody>${o.ajustes.map(a=>`<tr><td style="${Std}">${escH(a.movimiento||'')}</td><td style="${Std}">${escH(a.glosa||'')}</td><td style="${Snum}">${a.movimiento==='DESCUENTO'?'− ':'+ '}${fmtMon(a.monto)}</td></tr>`).join('')}</tbody>
+    </table>`:''}
     <table style="${Sres}"><tbody>
       <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${escH(o.proveedor_nombre||'')}</td></tr>
       <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${escH(o.concepto||'')}</td></tr>

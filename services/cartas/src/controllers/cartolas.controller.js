@@ -76,10 +76,122 @@ require('../../../../shared/migrate').enFila('cartolas', async () => {
       const [[nc]] = await pool.query(`SELECT data_type dt FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='cartolas_movimientos' AND column_name='num_op'`);
       if (nc && String(nc.dt).toLowerCase() === 'varchar') await pool.query(`ALTER TABLE cartolas_movimientos MODIFY COLUMN num_op INT DEFAULT NULL`);
     } catch(e){ console.error('[num_op->int cartolas_movimientos]', e.message); }
+    /* ── ADICIONALES y DESCUENTOS de cartola (Pato, 08-09-2026) ──────────────────
+       Un movimiento manual sin operación: monto a favor (ADICIONAL) o en contra
+       (DESCUENTO) del dealer, con GLOSA (sale en la cartola y en la orden de pago)
+       y COMENTARIO interno (por qué). Lo aprueba el SUPERVISOR del digitador
+       (usuarios.id_supervisor) o un Administrador; mientras tanto no suma. */
+    await pool.query(`ALTER TABLE cartolas_movimientos MODIFY COLUMN movimiento ENUM('COMISION','PREPAGO','ANULACION','ADICIONAL','DESCUENTO') NOT NULL DEFAULT 'COMISION'`).catch(()=>{});
+    for (const col of ['glosa VARCHAR(200) DEFAULT NULL', 'comentario VARCHAR(600) DEFAULT NULL',
+      "aprobacion VARCHAR(12) DEFAULT NULL", 'creado_por VARCHAR(150) DEFAULT NULL', 'id_creado_por INT DEFAULT NULL',
+      'id_aprobador INT DEFAULT NULL', 'aprobado_por VARCHAR(150) DEFAULT NULL', 'aprobado_at DATETIME DEFAULT NULL', 'aprob_comentario VARCHAR(600) DEFAULT NULL']) {
+      await pool.query(`ALTER TABLE cartolas_movimientos ADD COLUMN IF NOT EXISTS ${col}`).catch(()=>{});
+    }
+    const [[modPV]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre LIKE 'Post Venta%' OR ruta LIKE '/postventa%' LIMIT 1");
+    for (const [nombre, codigo, heredaDe] of [
+      ['Cartolas — agregar adicional o descuento', 'cartola_ajuste_crear', 'aprob_cartolas'],
+      ['Cartolas — aprobar adicional o descuento (supervisor)', 'cartola_ajuste_aprobar', 'aprob_cartolas'],
+    ]) {
+      const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [codigo]);
+      if (!ex && modPV) {
+        await pool.query('INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,NULL,NULL)', [modPV.id_modulo, nombre, codigo]);
+        await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+          SELECT pp.id_perfil, (SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?), 1
+            FROM permisos_perfil pp JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
+           WHERE f.codigo=? AND pp.habilitado=1`, [codigo, heredaDe]);
+      }
+    }
     console.log('[cartolas] tablas OK');
   } catch (e) { console.error('[cartolas migration]', e.message); }
 });
+const AVISOS = require('../../../../shared/avisos');
+AVISOS.registrarAviso({
+  evento: 'cartola_ajuste_pendiente', modulo: 'Cartolas',
+  nombre: 'Adicional o descuento de cartola por aprobar',
+  descripcion: 'Un digitador agregó un adicional o descuento a la cartola de un dealer. Avisa al SUPERVISOR del digitador (ficha de Usuarios) que debe aprobarlo o rechazarlo; sin supervisor, al pool que aprueba ajustes.',
+  base_func: 'cartola_ajuste_aprobar', prioridad: 'alta', sonido_tipo: 'dingdong',
+});
+AVISOS.registrarAviso({
+  evento: 'cartola_ajuste_resuelto', modulo: 'Cartolas',
+  nombre: 'Adicional o descuento de cartola aprobado o rechazado',
+  descripcion: 'El supervisor resolvió un adicional/descuento de cartola. Avisa a quien lo digitó.',
+  base_func: 'cartola_ajuste_crear', prioridad: 'normal', sonido_tipo: 'campana',
+});
 const nombreUsuario = u => (u?.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : u?.email) || 'Usuario';
+
+/* Mes anterior en 'YYYY-MM' (hora Chile): la cartola de este mes lleva movimientos
+   con mes < mes actual, así que el ajuste nace fechado en el mes anterior. */
+function mesAnteriorChile() {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+  d.setDate(1); d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/* ── POST /api/cartolas/ajuste { rut_dealer, nombre_dealer, tipo, monto, glosa, comentario } ── */
+const crearAjuste = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const tipo = String(b.tipo || '').toUpperCase();
+    const monto = Math.round(Number(String(b.monto ?? '').toString().replace(/[^\d]/g, '')) || 0);
+    const glosa = String(b.glosa || '').trim().slice(0, 200);
+    const comentario = String(b.comentario || '').trim().slice(0, 600);
+    if (!['ADICIONAL', 'DESCUENTO'].includes(tipo)) return res.status(400).json({ success: false, data: null, error: 'Tipo inválido (ADICIONAL o DESCUENTO)' });
+    if (!(monto > 0)) return res.status(400).json({ success: false, data: null, error: 'El monto debe ser mayor a 0' });
+    if (!glosa) return res.status(400).json({ success: false, data: null, error: 'La glosa es obligatoria: es lo que verá el dealer en la cartola y la orden de pago' });
+    if (!comentario) return res.status(400).json({ success: false, data: null, error: 'El comentario es obligatorio: explica a qué se debe el ajuste' });
+    if (!b.rut_dealer && !b.nombre_dealer) return res.status(400).json({ success: false, data: null, error: 'Falta el dealer' });
+    const quien = nombreUsuario(req.usuario);
+    // Supervisor del digitador: aprueba él; sin supervisor, el pool del permiso.
+    const [[u]] = await pool.query('SELECT id_supervisor FROM usuarios WHERE id_usuario=?', [req.usuario.id_usuario]).catch(() => [[null]]);
+    const idSup = u && u.id_supervisor ? Number(u.id_supervisor) : null;
+    const [r] = await pool.query(
+      `INSERT INTO cartolas_movimientos (mes, movimiento, rut_dealer, nombre_dealer, comision, estado_comision, glosa, comentario,
+         aprobacion, creado_por, id_creado_por, id_aprobador, observaciones)
+       VALUES (?,?,?,?,?,'POR APROBAR',?,?,'PENDIENTE',?,?,?,?)`,
+      [mesAnteriorChile(), tipo, b.rut_dealer || null, b.nombre_dealer || null, monto, glosa, comentario,
+       quien, req.usuario.id_usuario, idSup, glosa]);
+    auditar({ req, accion: 'CREAR', modulo: 'cartolas', entidad: 'cartola_ajuste', entidad_id: r.insertId,
+      detalle: `${tipo} $${monto.toLocaleString('es-CL')} a ${b.nombre_dealer || b.rut_dealer}: "${glosa}" — ${comentario}` });
+    AVISOS.avisar('cartola_ajuste_pendiente', {
+      titulo: `⏰ ${tipo === 'ADICIONAL' ? 'Adicional' : 'Descuento'} de cartola por aprobar — ${b.nombre_dealer || b.rut_dealer}`,
+      mensaje: `${quien} agregó un ${tipo.toLowerCase()} de $${monto.toLocaleString('es-CL')} a la cartola de ${b.nombre_dealer || b.rut_dealer}. Glosa: "${glosa}". Motivo: ${comentario}. Requiere tu aprobación.`,
+      href: '/aprobaciones/?tab=cartolas', clave: 'cartola_ajuste:' + r.insertId,
+    }, idSup ? { soloA: [idSup] } : { excluir: [req.usuario.id_usuario] }).catch(() => {});
+    res.status(201).json({ success: true, data: { id: r.insertId, id_aprobador: idSup }, error: null });
+  } catch (e) { console.error('[cartolas crearAjuste]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ── PUT /api/cartolas/ajuste/:id { accion:'APROBAR'|'RECHAZAR', comentario } — supervisor ── */
+const resolverAjuste = async (req, res) => {
+  try {
+    const [[m]] = await pool.query("SELECT * FROM cartolas_movimientos WHERE id=? AND movimiento IN ('ADICIONAL','DESCUENTO') AND aprobacion='PENDIENTE'", [req.params.id]);
+    if (!m) return res.status(404).json({ success: false, data: null, error: 'Ajuste no encontrado o ya resuelto' });
+    const yo = req.usuario;
+    const esAdmin = yo.perfil_nombre === 'Administrador';
+    if (Number(m.id_creado_por) === Number(yo.id_usuario))
+      return res.status(403).json({ success: false, data: null, error: 'No puedes aprobar un ajuste que digitaste tú: lo resuelve tu supervisor.' });
+    if (!esAdmin && m.id_aprobador && Number(m.id_aprobador) !== Number(yo.id_usuario))
+      return res.status(403).json({ success: false, data: null, error: 'Este ajuste lo aprueba el supervisor de quien lo digitó (o un Administrador).' });
+    const aprobar = String(req.body.accion || '').toUpperCase() === 'APROBAR';
+    const comentario = String(req.body.comentario || '').trim().slice(0, 600);
+    if (!aprobar && !comentario) return res.status(400).json({ success: false, data: null, error: 'Para rechazar, el comentario es obligatorio' });
+    const quien = nombreUsuario(yo);
+    const estadoCom = aprobar ? (m.movimiento === 'ADICIONAL' ? 'A PAGAR' : 'A DESCONTAR') : 'RECHAZADO';
+    await pool.query(
+      `UPDATE cartolas_movimientos SET aprobacion=?, estado_comision=?, estado_usuario=?, estado_fecha=NOW(),
+         aprobado_por=?, aprobado_at=NOW(), aprob_comentario=? WHERE id=?`,
+      [aprobar ? 'APROBADA' : 'RECHAZADA', estadoCom, quien, quien, comentario || null, m.id]);
+    AVISOS.retirar('cartola_ajuste:' + m.id).catch(() => {});
+    auditar({ req, accion: aprobar ? 'APROBAR' : 'RECHAZAR', modulo: 'cartolas', entidad: 'cartola_ajuste', entidad_id: m.id,
+      detalle: `${m.movimiento} $${Number(m.comision).toLocaleString('es-CL')} a ${m.nombre_dealer || m.rut_dealer} ("${m.glosa}") ${aprobar ? 'APROBADO' : 'RECHAZADO'}${comentario ? ': ' + comentario : ''}` });
+    AVISOS.avisar('cartola_ajuste_resuelto', {
+      titulo: (aprobar ? '✅ Ajuste de cartola APROBADO' : '🔴 Ajuste de cartola RECHAZADO') + ' — ' + (m.nombre_dealer || m.rut_dealer),
+      mensaje: `${quien} ${aprobar ? 'aprobó' : 'rechazó'} el ${m.movimiento.toLowerCase()} de $${Number(m.comision).toLocaleString('es-CL')} ("${m.glosa}").${comentario ? ' ' + comentario : ''}`,
+      href: '/aprobaciones/?tab=cartolas',
+    }, { soloA: m.id_creado_por ? [m.id_creado_por] : null }).catch(() => {});
+    res.json({ success: true, data: { estado: aprobar ? 'APROBADA' : 'RECHAZADA', estado_comision: estadoCom }, error: null });
+  } catch (e) { console.error('[cartolas resolverAjuste]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
 
 /* ── POST /api/cartolas/sync ─────────────────────────────────────────
    1) Marca otorgado=1 en cartas cuya id_financiera existe en creditos (cr.num_op).
@@ -479,4 +591,32 @@ const enviarCorreoCartola = async (req, res) => {
   }
 };
 
-module.exports = { sync, getMovimientos, crearMovimiento, updateMovimiento, deleteMovimiento, getEnviadas, registrarEnvio, reversarEnvio, enviarCorreoCartola };
+/* Adicionales/descuentos APROBADOS que viajaron en la MISMA cartola enviada que la
+   comisión de una operación. Los usa la Orden de Pago de comisión (la factura del
+   dealer es por el total de la cartola, ajustes incluidos: sin esto la ODP no cuadra
+   y el pagador no sabe por qué). Devuelve [{ id, movimiento, glosa, monto }]. */
+async function ajustesDeCartolaPorOp(numOp) {
+  if (!numOp) return [];
+  try {
+    const [movs] = await pool.query(
+      `SELECT id, mes_cartola, rut_dealer FROM cartolas_movimientos
+        WHERE movimiento='COMISION' AND mes_cartola IS NOT NULL
+          AND (num_op = ? OR num_op IN (SELECT c.id_financiera FROM creditos c WHERE c.num_op = ?))
+        ORDER BY id DESC LIMIT 1`, [numOp, numOp]);
+    const m = movs[0]; if (!m) return [];
+    const [envs] = await pool.query(
+      `SELECT mov_ids FROM cartolas_enviadas WHERE mes = ? AND mov_ids LIKE ? ORDER BY id DESC LIMIT 5`,
+      [m.mes_cartola, '%' + m.id + '%']);
+    let ids = [];
+    for (const e of envs) {
+      try { const p = JSON.parse(e.mov_ids || '[]'); if (Array.isArray(p) && p.map(Number).includes(Number(m.id))) { ids = p.map(Number).filter(Boolean); break; } } catch (_) {}
+    }
+    if (!ids.length) return [];
+    const [aj] = await pool.query(
+      `SELECT id, movimiento, glosa, comision AS monto FROM cartolas_movimientos
+        WHERE id IN (?) AND movimiento IN ('ADICIONAL','DESCUENTO') AND aprobacion='APROBADA' ORDER BY id`, [ids]);
+    return aj.map(a => ({ id: a.id, movimiento: a.movimiento, glosa: a.glosa || a.movimiento, monto: Number(a.monto) || 0 }));
+  } catch (e) { console.error('[ajustesDeCartolaPorOp]', e.message); return []; }
+}
+
+module.exports = { sync, getMovimientos, crearMovimiento, updateMovimiento, deleteMovimiento, getEnviadas, registrarEnvio, reversarEnvio, enviarCorreoCartola, crearAjuste, resolverAjuste, ajustesDeCartolaPorOp };

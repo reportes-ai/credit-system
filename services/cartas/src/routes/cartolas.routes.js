@@ -16,6 +16,9 @@ router.post('/incorporar',        verifyToken, requireFunc('cartola_incorporar')
 router.get('/incorporaciones',    verifyToken, requireFunc('cartola_incorporar', 'cartola_incorp_aprobar'), inc.listarIncorporaciones);
 router.put('/incorporaciones/:id', verifyToken, requireFunc('cartola_incorp_aprobar'), inc.resolver);
 
+// Adicionales / descuentos de cartola: digita quien opera cartolas, aprueba su supervisor.
+router.post('/ajuste',      verifyToken, requireFunc('cartola_ajuste_crear'), c.crearAjuste);
+router.put('/ajuste/:id',   verifyToken, requireFunc('cartola_ajuste_aprobar'), c.resolverAjuste);
 router.post('/sync',        verifyToken, requireFunc('aprob_cartolas'), c.sync);
 router.get('/enviadas',     verifyToken, c.getEnviadas);
 router.post('/enviadas',    verifyToken, requireFunc('aprob_cartolas'), c.registrarEnvio);

@@ -2403,6 +2403,18 @@ const getOrdenPagoComision = async (req, res) => {
         WHERE ep.id_seguimiento = s.id AND ep.track='COMISION' AND ep.etapa='ORDEN DE PAGO EMITIDA')
       ORDER BY efa.fecha ASC, s.num_op ASC
     `);
+    /* Adicionales/descuentos aprobados de la cartola de cada op: la factura del
+       dealer es por el total de la cartola (ajustes incluidos), así que la orden
+       los lista con su glosa y los suma al cuadre (Pato, 08-09-2026). */
+    try {
+      const { ajustesDeCartolaPorOp } = require('../../../cartas/src/controllers/cartolas.controller');
+      const cache = new Map();
+      for (const r of rows) {
+        const k = String(r.num_op || '');
+        if (!cache.has(k)) cache.set(k, await ajustesDeCartolaPorOp(r.num_op));
+        r.ajustes = cache.get(k);
+      }
+    } catch (e) { console.error('[orden-pago-comision ajustes]', e.message); }
     res.json({ success: true, data: { rows }, error: null });
   } catch (e) {
     console.error('[postventa getOrdenPagoComision]', e.message);

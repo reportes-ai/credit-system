@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.69 (PDF de cartola: las que no eran la primera salian cortadas o en blanco — html2canvas solo captura dentro del viewport; se captura un clon en flujo al inicio del body con scroll 0) — v4.68 (abrir documento: muestra la causa real del servidor, p.ej. host sin acceso al almacén) — v4.67 (Rentabilidad de la carta aplica el corte por plazo del Modelo 2 UAC: op >= 36 cuotas = % fijo, no el tier del mes) — v4.66 (hora con segundos de creación en Revisión de Cartas Pendientes) — v4.65 — ?carta=ID abre directo una carta (puerta de entrada desde la ficha del crédito) · v4.64 — excepciones: lo que cuadra con pizarra se resume en "✓ Tasa OK · Comisión OK"; solo lo distinto se detalla · v4.63 — vigencia desde fecha carta O digitacion (lo mas tarde), igual que el servidor · v4.62 — participacion sugerida desde la TABLA PACTADA del local (motor /api/comision-dealer/tabla); la excepcion compara contra lo pactado · v4.61 — cartola con SECCIONES por local (subtotal por parque/calle) cuando el dealer curso en mas de una ubicacion · v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.70 (Revisión Cartolas: botón Adicional / Descuento por dealer — popup con tipo, monto, glosa (cartola + ODP) y comentario interno; queda POR APROBAR hasta que lo apruebe el supervisor del digitador, con campanita; suma en la cartola solo aprobado) — v4.69 (PDF de cartola: las que no eran la primera salian cortadas o en blanco — html2canvas solo captura dentro del viewport; se captura un clon en flujo al inicio del body con scroll 0) — v4.68 (abrir documento: muestra la causa real del servidor, p.ej. host sin acceso al almacén) — v4.67 (Rentabilidad de la carta aplica el corte por plazo del Modelo 2 UAC: op >= 36 cuotas = % fijo, no el tier del mes) — v4.66 (hora con segundos de creación en Revisión de Cartas Pendientes) — v4.65 — ?carta=ID abre directo una carta (puerta de entrada desde la ficha del crédito) · v4.64 — excepciones: lo que cuadra con pizarra se resume en "✓ Tasa OK · Comisión OK"; solo lo distinto se detalla · v4.63 — vigencia desde fecha carta O digitacion (lo mas tarde), igual que el servidor · v4.62 — participacion sugerida desde la TABLA PACTADA del local (motor /api/comision-dealer/tabla); la excepcion compara contra lo pactado · v4.61 — cartola con SECCIONES por local (subtotal por parque/calle) cuando el dealer curso en mas de una ubicacion · v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -616,6 +616,32 @@
       <span id="scResumen" style="font-size:.8rem;color:#64748b;margin-right:auto"></span>
       <button class="btn-mini" style="background:#f1f5f9;color:#475569" onclick="dlgSinCarta.close()">Cancelar</button>
       <button class="btn-mini bm-ok" style="padding:8px 18px" onclick="scIncorporar()"><i class="bi bi-check2-circle"></i> Incorporar seleccionadas</button>
+    </div>
+  </dialog>
+
+  <!-- Adicional / descuento de cartola: glosa (la ve el dealer en cartola y ODP) + comentario interno; lo aprueba el supervisor del digitador -->
+  <dialog id="dlgAjuste" style="border:none;border-radius:16px;padding:0;max-width:560px;width:94vw;box-shadow:0 24px 64px rgba(0,0,0,.35)">
+    <div style="background:linear-gradient(90deg,#012d70,#0255c5);color:#fff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;border-radius:16px 16px 0 0">
+      <div><b style="font-size:1rem"><i class="bi bi-plus-slash-minus"></i> Adicional o descuento en cartola</b>
+        <div style="font-size:.78rem;opacity:.85" id="ajDealer"></div></div>
+      <button class="btn-mini" style="background:rgba(255,255,255,.15);color:#fff" onclick="dlgAjuste.close()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div style="padding:16px 22px;display:grid;gap:12px;font-size:.85rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label style="display:grid;gap:4px;font-weight:700;font-size:.74rem;color:#475569;text-transform:uppercase">Tipo
+          <select id="ajTipo" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:.88rem;font-weight:400;text-transform:none"><option value="ADICIONAL">Adicional (a favor del dealer)</option><option value="DESCUENTO">Descuento (se resta)</option></select></label>
+        <label style="display:grid;gap:4px;font-weight:700;font-size:.74rem;color:#475569;text-transform:uppercase">Monto bruto (IVA incluido)
+          <input id="ajMonto" inputmode="numeric" placeholder="$0" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:.95rem;font-weight:800;text-align:right;text-transform:none" oninput="this.value=this.value.replace(/[^\d]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,'.')"></label>
+      </div>
+      <label style="display:grid;gap:4px;font-weight:700;font-size:.74rem;color:#475569;text-transform:uppercase">Glosa <span style="font-weight:400;text-transform:none">— la ve el dealer en la cartola y en la orden de pago</span>
+        <input id="ajGlosa" maxlength="200" placeholder="Ej: Bono por meta de agosto / Descuento por documento no entregado" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:.88rem;font-weight:400;text-transform:none"></label>
+      <label style="display:grid;gap:4px;font-weight:700;font-size:.74rem;color:#475569;text-transform:uppercase">Comentario interno <span style="font-weight:400;text-transform:none">— a qué se debe; lo lee tu supervisor</span>
+        <textarea id="ajComentario" maxlength="600" rows="3" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:.88rem;font-weight:400;text-transform:none;resize:vertical"></textarea></label>
+      <div style="font-size:.76rem;color:#64748b;background:#f8fafc;border-radius:8px;padding:8px 12px"><i class="bi bi-info-circle"></i> El ajuste queda <b>POR APROBAR</b> y no suma en la cartola hasta que lo apruebe tu supervisor (ficha de Usuarios). Se le avisa por la campanita.</div>
+    </div>
+    <div style="padding:13px 20px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn-mini" style="background:#f1f5f9;color:#475569" onclick="dlgAjuste.close()">Cancelar</button>
+      <button class="btn-mini bm-ok" id="ajBtn" style="padding:8px 18px" onclick="guardarAjuste()"><i class="bi bi-send"></i> Enviar a aprobación</button>
     </div>
   </dialog>
 
@@ -3796,6 +3822,47 @@ async function resolverIncorp(id, accion){
    La cartola incluye TODO lo pendiente (marcado A PAGAR / A DESCONTAR) que aún no
    ha salido en una cartola anterior (mes_cartola vacío), sin importar el mes de
    origen. El mes seleccionado arriba es el período en que se emite la cartola. */
+/* ── Adicional / descuento de cartola (Pato, 08-09-2026) ───────────────────── */
+function toast(msg, tipo){
+  let t = document.getElementById('afToast');
+  if (!t) { t = document.createElement('div'); t.id = 'afToast'; t.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:10px;color:#fff;font-weight:700;font-size:.86rem;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,.25);display:none'; document.body.appendChild(t); }
+  t.style.background = tipo === 'err' ? '#b91c1c' : '#15803d'; t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._h); t._h = setTimeout(() => { t.style.display = 'none'; }, 3500);
+}
+let AJ_CTX = null;
+function abrirAjuste(conc, rut){
+  AJ_CTX = { conc, rut };
+  document.getElementById('ajDealer').textContent = conc + (rut ? ' · RUT ' + fmtRUT(rut) : '');
+  ['ajMonto','ajGlosa','ajComentario'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ajTipo').value = 'ADICIONAL';
+  document.getElementById('dlgAjuste').showModal();
+}
+async function guardarAjuste(){
+  const b = { rut_dealer: AJ_CTX.rut || null, nombre_dealer: AJ_CTX.conc, tipo: document.getElementById('ajTipo').value,
+    monto: document.getElementById('ajMonto').value.replace(/\D/g,''), glosa: document.getElementById('ajGlosa').value.trim(),
+    comentario: document.getElementById('ajComentario').value.trim() };
+  if (!(Number(b.monto) > 0)) return toast('Ingresa el monto', 'err');
+  if (!b.glosa) return toast('La glosa es obligatoria', 'err');
+  if (!b.comentario) return toast('El comentario es obligatorio', 'err');
+  const btn = document.getElementById('ajBtn'); btn.disabled = true;
+  try {
+    const j = await fetch('/api/cartolas/ajuste', { method:'POST', headers: hdr(), body: JSON.stringify(b) }).then(r=>r.json());
+    if (!j.success) return toast(j.error || 'No se pudo guardar', 'err');
+    document.getElementById('dlgAjuste').close();
+    toast(j.data.id_aprobador ? 'Ajuste enviado a tu supervisor para aprobación' : 'Ajuste enviado a aprobación (sin supervisor en tu ficha: lo resuelve el pool)');
+    await cargarMovimientos(); renderRevCartolas();
+  } finally { btn.disabled = false; }
+}
+async function resolverAjuste(id, accion){
+  const comentario = prompt(accion==='APROBAR' ? 'Comentario (opcional):' : 'Motivo del rechazo (obligatorio):');
+  if (comentario === null) return;
+  if (accion==='RECHAZAR' && !comentario.trim()) return toast('El motivo es obligatorio', 'err');
+  const j = await fetch('/api/cartolas/ajuste/'+id, { method:'PUT', headers: hdr(), body: JSON.stringify({ accion, comentario }) }).then(r=>r.json());
+  if (!j.success) return toast(j.error || 'No se pudo resolver', 'err');
+  toast(accion==='APROBAR' ? 'Ajuste aprobado: ya suma en la cartola' : 'Ajuste rechazado');
+  await cargarMovimientos(); renderRevCartolas();
+}
+
 let REV_IDS = {};   // gi → [ids de movimientos del bloque] para el envío
 function renderRevCartolas(){
   const cont = document.getElementById('bloquesCartolas');
@@ -3805,7 +3872,10 @@ function renderRevCartolas(){
   // La cartola lleva operaciones hasta el ÚLTIMO DÍA DEL MES ANTERIOR: una
   // otorgada este mes entra recién en la cartola del mes siguiente (regla Pato
   // 10-08). m.mes es el mes de otorgamiento del movimiento.
-  const PEND = MOVS_ALL.filter(m => !m.mes_cartola && (m.estado_comision==='A PAGAR' || m.estado_comision==='A DESCONTAR')
+  const esAjuste = m => m.movimiento==='ADICIONAL' || m.movimiento==='DESCUENTO';
+  // Los ajustes POR APROBAR se muestran en el bloque (para que se vea que están
+  // pendientes del supervisor) pero no suman ni viajan en el envío.
+  const PEND = MOVS_ALL.filter(m => !m.mes_cartola && (m.estado_comision==='A PAGAR' || m.estado_comision==='A DESCONTAR' || (esAjuste(m) && m.estado_comision==='POR APROBAR'))
     && (!m.mes || m.mes < mesActual()));
   /* Agrupación por RUT del dealer, NO por nombre: el mismo RUT venía escrito de
      dos formas ("SOCIEDAD COMERCIAL ROJAS LIMITADA" y "... LTDA") y el dealer
@@ -3831,15 +3901,33 @@ function renderRevCartolas(){
   cont.innerHTML = nombres.map((key,gi)=>{
     const movs = grupos[key];
     const conc = NOMBRE[key];
-    REV_IDS[gi] = movs.map(m=>m.id);
+    REV_IDS[gi] = movs.filter(m=>m.estado_comision!=='POR APROBAR').map(m=>m.id);
     const rutC = movs.find(m=>m.rut_conc)?.rut_conc || '';
     const mailBD = movs.find(m=>m.mail)?.mail || DEALERS.find(d=>rutN(d.rut)===rutN(rutC))?.mail || '';
     const comisiones = movs.filter(m=>m.movimiento==='COMISION' && m.estado_comision==='A PAGAR').reduce((s,m)=>s+(+m.comision||0),0);
     const anulacion  = movs.filter(m=>m.movimiento==='ANULACION' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
     const prepago    = movs.filter(m=>m.movimiento==='PREPAGO' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
-    const subTotal = comisiones - anulacion - prepago;
+    // Adicionales / descuentos APROBADOS por el supervisor (los POR APROBAR no suman)
+    const adicionales = movs.filter(m=>m.movimiento==='ADICIONAL' && m.estado_comision==='A PAGAR').reduce((s,m)=>s+(+m.comision||0),0);
+    const descuentos  = movs.filter(m=>m.movimiento==='DESCUENTO' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
+    const subTotal = comisiones - anulacion - prepago + adicionales - descuentos;
+    const nOper = movs.filter(m=>!esAjuste(m)).length;
     const neto = Math.round(subTotal/IVA_FACTOR), iva = subTotal - neto;
-    const filaHTML = m=>`<tr>
+    const filaAjusteHTML = m=>{
+      const pend = m.estado_comision==='POR APROBAR';
+      const puedoAprobar = pend && puede('cartola_ajuste_aprobar') && Number(m.id_creado_por)!==Number(YO.id_usuario) && (ES_ADMIN || !m.id_aprobador || Number(m.id_aprobador)===Number(YO.id_usuario));
+      const esAd = m.movimiento==='ADICIONAL';
+      return `<tr style="background:${pend?'#fffbeb':'#f8fafc'}">
+      <td colspan="2" style="font-size:.74rem;color:#64748b">${pend?'<i class="bi bi-hourglass-split"></i> ':''}${escH(m.creado_por||'')}</td>
+      <td style="font-size:.74rem"><span class="est-mini" style="background:${esAd?'#dcfce7':'#fee2e2'};color:${esAd?'#15803d':'#b91c1c'}">${escH(m.movimiento)}</span></td>
+      <td colspan="4" style="font-size:.8rem"><b>${escH(m.glosa||'')}</b>${m.comentario?`<div style="font-size:.7rem;color:#64748b" data-html2canvas-ignore><i class="bi bi-chat-left-text"></i> ${escH(m.comentario)}</div>`:''}${m.aprob_comentario?`<div style="font-size:.7rem;color:#b45309" data-html2canvas-ignore>Supervisor: ${escH(m.aprob_comentario)}</div>`:''}</td>
+      <td style="text-align:right"><b>${esAd?'+':'−'}${fmtCLP(m.comision)}</b></td>
+      <td><span class="est-mini" style="background:${pend?'#fef3c7':esAd?'#dcfce7':'#fee2e2'};color:${pend?'#b45309':esAd?'#15803d':'#b91c1c'}">${escH(m.estado_comision)}</span></td>
+      <td style="font-size:.72rem;white-space:nowrap" data-html2canvas-ignore>${puedoAprobar
+        ? `<button class="btn-mini bm-ok" onclick="resolverAjuste(${m.id},'APROBAR')"><i class="bi bi-check2"></i> Aprobar</button><button class="btn-mini" style="background:#fee2e2;color:#b91c1c" onclick="resolverAjuste(${m.id},'RECHAZAR')"><i class="bi bi-x"></i> Rechazar</button>`
+        : (pend ? 'Espera al supervisor' : escH(m.aprobado_por ? 'Aprobó '+m.aprobado_por : ''))}</td>
+    </tr>`; };
+    const filaHTML = m=>esAjuste(m) ? filaAjusteHTML(m) : `<tr>
       <td>${escH(m.num_op||'')}</td><td>${escH(m.nuestro_num_op||'—')}</td><td style="font-size:.74rem">${escH(m.movimiento)}</td>
       <td style="font-size:.74rem">${escH(m.ejecutivo||'')}</td>
       <td>${escH(toTitle(m.nombre_cliente||''))}</td><td>${fmtRUT(m.rut_cliente||'')}</td>
@@ -3853,25 +3941,28 @@ function renderRevCartolas(){
        subtotal — así el dealer ve por qué la op de calle paga un % distinto. Con un
        solo local, la cartola se ve exactamente igual que siempre. */
     const ubicDe = m => String(m.ubicacion||'').toUpperCase().trim() || 'SIN UBICACIÓN';
-    const ubicsU = [...new Set(movs.map(ubicDe))];
+    const movsOp = movs.filter(m=>!esAjuste(m)), movsAj = movs.filter(esAjuste);
+    const ubicsU = [...new Set(movsOp.map(ubicDe))];
     let filas;
     if (ubicsU.length > 1) {
       const orden = ubicsU.sort((a,b)=> (a==='SIN UBICACIÓN')-(b==='SIN UBICACIÓN') || (a==='CALLE')-(b==='CALLE') || a.localeCompare(b));
       filas = orden.map(u=>{
-        const ms = movs.filter(m=>ubicDe(m)===u);
+        const ms = movsOp.filter(m=>ubicDe(m)===u);
         const st = ms.filter(m=>m.movimiento==='COMISION' && m.estado_comision==='A PAGAR').reduce((s,m)=>s+(+m.comision||0),0)
                  - ms.filter(m=>m.movimiento!=='COMISION' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
         return `<tr style="background:#eff6ff"><td colspan="7" style="font-weight:800;color:#0141A2;font-size:.76rem"><i class="bi bi-${u==='CALLE'?'shop':'car-front'}"></i> ${escH(u)} — ${ms.length} oper.</td><td style="text-align:right;font-weight:800;color:#0141A2">${fmtCLP(st)}</td><td colspan="2" style="font-size:.7rem;color:#64748b">subtotal local</td></tr>`
           + ms.map(filaHTML).join('');
       }).join('');
-    } else filas = movs.map(filaHTML).join('');
+    } else filas = movsOp.map(filaHTML).join('');
+    if (movsAj.length) filas += `<tr style="background:#eff6ff"><td colspan="10" style="font-weight:800;color:#0141A2;font-size:.76rem"><i class="bi bi-plus-slash-minus"></i> ADICIONALES Y DESCUENTOS</td></tr>` + movsAj.map(filaAjusteHTML).join('');
     return `<div class="card-af" style="margin-bottom:18px;padding:0;overflow:hidden" id="bloqueCta${gi}">
       <div style="background:linear-gradient(90deg,#012d70,#0255c5);color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <div>
           <div style="font-weight:800;font-size:.95rem">${escH(conc)}</div>
-          <div style="font-size:.72rem;opacity:.8">RUT: ${fmtRUT(rutC)} &middot; Cartola: ${nombreMes(mes)} &middot; ${movs.length} oper.</div>
+          <div style="font-size:.72rem;opacity:.8">RUT: ${fmtRUT(rutC)} &middot; Cartola: ${nombreMes(mes)} &middot; ${nOper} oper.${movsAj.length?` &middot; ${movsAj.length} ajuste(s)`:''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px" data-html2canvas-ignore>
+          ${puede('cartola_ajuste_crear') ? `<button class="btn-mini" style="padding:8px 12px;font-size:.8rem;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35)" title="Agregar un adicional o descuento a esta cartola (lo aprueba tu supervisor)" onclick="abrirAjuste(this.dataset.conc,this.dataset.rut)" data-conc="${escH(conc)}" data-rut="${escH(rutC)}"><i class="bi bi-plus-slash-minus"></i> Adicional / Descuento</button>` : ''}
           <input id="mailCta${gi}" value="${escH(mailBD)}" placeholder="correo@concesionario.cl" style="border:none;border-radius:7px;padding:6px 10px;font-size:.78rem;min-width:220px">
           <button class="btn-mini" style="padding:8px 12px;font-size:.8rem;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35)" title="Ver el PDF tal como se adjuntará" onclick="previewCartolaPDF(${gi},this.dataset.conc)" data-conc="${escH(conc)}"><i class="bi bi-file-earmark-pdf"></i> Ver PDF</button>
           <button class="btn-mini" style="padding:8px 12px;font-size:.8rem;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35)" title="Ver el correo tal como llegará al dealer" onclick="previewCorreoCartola(${gi},this.dataset.conc,${subTotal})" data-conc="${escH(conc)}"><i class="bi bi-envelope-open"></i> Ver correo</button>
@@ -3890,6 +3981,8 @@ function renderRevCartolas(){
             <tr><td>+ Comisiones Créditos</td><td style="text-align:right">${fmtCLP(comisiones)}</td></tr>
             <tr><td>− Reversas por Anulación</td><td style="text-align:right;color:#b91c1c">${fmtCLP(anulacion)}</td></tr>
             <tr><td>− Reversas por Prepago</td><td style="text-align:right;color:#b91c1c">${fmtCLP(prepago)}</td></tr>
+            ${adicionales ? `<tr><td>+ Adicionales</td><td style="text-align:right;color:#15803d">${fmtCLP(adicionales)}</td></tr>` : ''}
+            ${descuentos ? `<tr><td>− Descuentos</td><td style="text-align:right;color:#b91c1c">${fmtCLP(descuentos)}</td></tr>` : ''}
             <tr style="background:#fef9c3;font-weight:700"><td>Sub Total Comisión a Pagar</td><td style="text-align:right">${fmtCLP(subTotal)}</td></tr>
             <tr><td>Comisión Neta</td><td style="text-align:right">${fmtCLP(neto)}</td></tr>
             <tr><td>IVA (19%)</td><td style="text-align:right">${fmtCLP(iva)}</td></tr>

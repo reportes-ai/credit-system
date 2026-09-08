@@ -682,6 +682,12 @@ async function construirDocumento(oc) {
     }
   }
 
+  // Adicionales / descuentos de la cartola (con su glosa): la factura los incluye,
+  // el documento los muestra para que Tesorería sepa qué está pagando.
+  let ajustes = [];
+  if (esCom && row.num_op) {
+    try { ajustes = await require('../../../cartas/src/controllers/cartolas.controller').ajustesDeCartolaPorOp(row.num_op); } catch (_) {}
+  }
   // Saldo Precio de AUTOFIN: el documento desglosa Saldo + Transferencia + Limitación de
   // dominio; A pagar = la suma de los tres (exento). Los fijos viven en parametros_credito.
   let desglose = desgloseCom;
@@ -714,6 +720,7 @@ async function construirDocumento(oc) {
     numero_documento: esCom ? (row.numero_factura || null) : null,
     fecha_documento: esCom ? soloFecha(row.fecha_factura) : null,
     tratamiento, monto_bruto: bruto, monto_neto: neto, impuesto_pct: pct, impuesto_monto: imp, monto, desglose,
+    ajustes: ajustes.length ? ajustes : undefined,
     destino, deposito, sin_datos_banco: !deposito && !destino,
     fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
     metodo_pago: oc.metodo_pago, cuenta_pago: cuentaPago, estado, usuario_nombre: oc.usuario_nombre,
