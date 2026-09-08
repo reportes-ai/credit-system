@@ -272,8 +272,10 @@ async function cerrarVacaciones(s, u, ip, { automatico = false } = {}) {
     VALUES ('VACACIONES', ?, 'RRHH', ?, ?, ?, ?, ?)`, [s.id, u.id_usuario, firmante, uf?.cargo || '', ip, hash]);
 
   // 2. Folio verificable (QR /verificar/<codigo>)
-  const [[emp]] = await pool.query('SELECT nombre, apellido, rut, cargo FROM usuarios WHERE id_usuario=?', [s.id_usuario]);
-  const nombreEmp = s.nombre || [emp?.nombre, emp?.apellido].filter(Boolean).join(' ');
+  // Certificado = nombre COMPLETO (con apellido materno) y RUT con puntos (Pato, 08-09-2026).
+  const [[emp]] = await pool.query('SELECT nombre, apellido, apellido_materno, rut, cargo FROM usuarios WHERE id_usuario=?', [s.id_usuario]);
+  const nombreEmp = [emp?.nombre, emp?.apellido, emp?.apellido_materno].filter(Boolean).join(' ') || s.nombre || '';
+  try { const RC = require('../../../../api-gateway/public/js/rut-core'); if (emp && emp.rut && RC.formatear) emp.rut = RC.formatear(emp.rut); } catch (_) {}
   const { registrarVerificable } = require('../../../../shared/verificacion');
   const codigo = await registrarVerificable({
     tipo: 'COMPROBANTE_VACACIONES', ref_tabla: 'rh_vacaciones', ref_id: s.id,
