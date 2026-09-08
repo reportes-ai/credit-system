@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Revisión Comisiones — AutoFácil</title><!-- v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
+  <title>Revisión Comisiones — AutoFácil</title><!-- v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -452,7 +452,7 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
       <div class="metrica">
         <div class="m-label">Créditos otorgados</div>
         <div class="m-value">${d.total_creditos}</div>
-        <div class="m-sub">NCNU elegibles: ${d.ncnu_total}</div>
+        <div class="m-sub">NCNU elegibles: ${d.ncnu_total||0}</div>
       </div>
       <div class="metrica">
         <div class="m-label">Total financiado</div>
@@ -466,19 +466,19 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
       </div>
       ${conRdh ? `<div class="metrica ${colRdh}">
         <div class="m-label">Cruce RDH <span style="font-weight:400;color:#6b7280">· peso ${pct(d.peso_rdh)}</span></div>
-        <div class="m-value">${pct(d.cruce_rdh)} (${d.ncnu_rdh}/${d.ncnu_total})</div>
+        <div class="m-value">${pct(d.cruce_rdh)} (${d.ncnu_rdh||0}/${d.ncnu_total||0})</div>
         <div class="prog-bar"><div class="prog-bar-fill" style="width:${barRdh}%;background:${d.cumple_rdh?'#16a34a':'#dc2626'}"></div></div>
         <div class="m-sub">${d.cumple_rdh?'✓ Cumple':'✗ No cumple'} &nbsp;| mín: ${pct(d.umbral_rdh||0.99)} | ajuste: ${pct(d.ajuste_rdh)}</div>
       </div>` : ''}
       <div class="metrica ${colCes}">
         <div class="m-label">Cruce Cesantía <span style="font-weight:400;color:#6b7280">· peso ${pct(d.peso_cesantia)}</span></div>
-        <div class="m-value">${pct(d.cruce_cesantia)} (${d.ncnu_cesantia}/${d.ncnu_total})</div>
+        <div class="m-value">${pct(d.cruce_cesantia)} (${d.ncnu_cesantia||0}/${d.ncnu_total||0})</div>
         <div class="prog-bar"><div class="prog-bar-fill" style="width:${barCes}%;background:${d.cumple_cesantia?'#16a34a':'#dc2626'}"></div></div>
         <div class="m-sub">${d.cumple_cesantia?'✓ Cumple':'✗ No cumple'} &nbsp;| mín: ${pct(d.umbral_cesantia||0.65)} | ajuste: ${pct(d.ajuste_cesantia)}</div>
       </div>
       <div class="metrica ${colRep}">
         <div class="m-label">Cruce Rep. Menores <span style="font-weight:400;color:#6b7280">· peso ${pct(d.peso_rep)}</span></div>
-        <div class="m-value">${pct(d.cruce_reparaciones)} (${d.ncnu_rep}/${d.ncnu_total})</div>
+        <div class="m-value">${pct(d.cruce_reparaciones)} (${d.ncnu_rep||0}/${d.ncnu_total||0})</div>
         <div class="prog-bar"><div class="prog-bar-fill" style="width:${barRep}%;background:${d.cumple_reparaciones?'#16a34a':'#dc2626'}"></div></div>
         <div class="m-sub">${d.cumple_reparaciones?'✓ Cumple':'✗ No cumple'} &nbsp;| mín: ${pct(d.umbral_rep||0.50)} | ajuste: ${pct(d.ajuste_reparaciones)}</div>
       </div>
