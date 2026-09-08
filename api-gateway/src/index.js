@@ -531,6 +531,7 @@ const PAGINAS = [
   ['/comisiones', 'comisiones/index.html'],
   ['/comisiones/revision', 'comisiones/revision/index.html'],
   ['/comisiones/variables', 'comisiones/variables/index.html'],
+  ['/comisiones/nomina', 'comisiones/nomina/index.html'],
   ['/simulador', 'simulador/index.html'],
   ['/usuarios', 'usuarios/index.html'],
   ['/mantenedores', 'mantenedores/index.html'],

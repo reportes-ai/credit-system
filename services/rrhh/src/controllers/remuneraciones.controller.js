@@ -835,6 +835,13 @@ async function comisionesSinAprobar(mes, comis) {
 /* ── Comisiones del mes por colaborador (motor único de comisiones) ─────────── */
 async function comisionesDelMes(mes) {
   try {
+    /* NÓMINA GENERADA = FOTO (Pato, 08-09-2026): si el Analista de Operaciones ya generó la
+       nómina de comisiones del mes de producción, el libro lee ESOS montos y no vuelve a
+       calcular — un cambio posterior en los créditos no mueve lo que se paga. Solo cambia si
+       regenera la nómina ex profeso. Sin nómina, se calcula en vivo como siempre. */
+    const { montosNomina } = require('../../../comisiones/src/controllers/nomina.controller');
+    const nom = await montosNomina(mesAnteriorDe(mes));
+    if (nom) return nom.montos;
     const { calcularMes } = require('../../../comisiones/src/controllers/comisiones.controller');
     const filas = await calcularMes(mesAnteriorDe(mes));   // mes vencido
     const porNombre = {};
@@ -896,7 +903,9 @@ const getMes = async (req, res) => {
     });
     const emitidas = filas.filter(f => f.estado === 'EMITIDA').length;
     const sinAprobar = await comisionesSinAprobar(mes, comis);
-    ok(res, { mes, filas, comisiones_sin_aprobar: sinAprobar, comisiones_mes: mesAnteriorDe(mes),
+    let comisionesNomina = null;
+    try { const { montosNomina } = require('../../../comisiones/src/controllers/nomina.controller'); const n = await montosNomina(mesAnteriorDe(mes)); if (n) comisionesNomina = { version: n.version, generada_por: n.generada_por, created_at: n.created_at }; } catch (_) {}
+    ok(res, { mes, filas, comisiones_sin_aprobar: sinAprobar, comisiones_mes: mesAnteriorDe(mes), comisiones_nomina: comisionesNomina,
       indicadores: { uf: ind.uf, utm: ind.utm, imm: ind.rem_imm, tope_uf: ind.rem_tope_imponible_uf, salud_pct: ind.rem_salud_pct, afc_pct: ind.rem_afc_trabajador_pct, grat_tope_imm: ind.rem_grat_tope_imm, afps: ind.afps, tramos: ind.tramos },
       mes_emitido: emitidas > 0 && emitidas === filas.length });
   } catch (e) { console.error('[rrhh remuneraciones getMes]', e.message); fail(res, 'Error interno del servidor'); }

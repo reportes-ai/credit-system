@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nómina de Comisiones — AutoFácil</title>
+  <!-- v1.0 — nómina de comisiones por mes: monto a pagar, aprobación del supervisor y respuesta del ejecutivo con comentarios; Generar nómina = foto inmutable + correo a RRHH; regenerar ex profeso con motivo; historial de versiones (08-09-2026) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main { padding:24px 30px; max-width:1500px; margin:0 auto; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.2rem; opacity:.85; } .banner h2 { font-weight:700; margin:0; font-size:1.2rem; } .banner p { margin:2px 0 0; opacity:.85; font-size:.85rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 18px; margin-bottom:14px; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    th { background:#f8fafc; color:#475569; font-size:.64rem; text-transform:uppercase; padding:7px 8px; text-align:right; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+    th:first-child, td:first-child, th.l, td.l { text-align:left; }
+    td { padding:7px 8px; border-bottom:1px solid #f1f5f9; text-align:right; vertical-align:top; }
+    .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .pill { border-radius:9px; padding:2px 8px; font-size:.66rem; font-weight:800; white-space:nowrap; }
+    .p-apr { background:#dcfce7; color:#166534; } .p-pen { background:#fef3c7; color:#92400e; } .p-rec { background:#fee2e2; color:#991b1b; }
+    .p-ace { background:#dcfce7; color:#166534; } .p-rev { background:#ffedd5; color:#9a3412; } .p-sin { background:#f1f5f9; color:#64748b; }
+    .p-ex { background:#dbeafe; color:#1e40af; }
+    .com { font-size:.72rem; color:#475569; margin-top:2px; max-width:320px; white-space:normal; text-align:left; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:8px 16px; font-weight:700; font-size:.83rem; cursor:pointer; }
+    .btn-verde { background:#16a34a; color:#fff; border:none; border-radius:9px; padding:8px 16px; font-weight:700; font-size:.83rem; cursor:pointer; }
+    .btn-ghost { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:9px; padding:7px 12px; font-weight:600; font-size:.8rem; cursor:pointer; }
+    .btn-ghost.sm, .btn-navy.sm { padding:3px 8px; font-size:.7rem; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .kpi { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:10px 18px; }
+    .kpi .v { font-family:Consolas,monospace; font-weight:800; font-size:1.1rem; color:var(--navy); } .kpi .l { font-size:.68rem; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
+    .estado-nom { border-radius:10px; padding:11px 16px; font-size:.84rem; margin-bottom:12px; }
+    .estado-nom.viva { background:#fffbeb; border-left:4px solid #d97706; color:#78350f; }
+    .estado-nom.foto { background:#ecfdf5; border-left:4px solid #16a34a; color:#065f46; }
+    .estado-nom.dif { background:#fef2f2; border-left:4px solid #dc2626; color:#7f1d1d; }
+    .foot { background:#f7f9fc; border-left:4px solid #0255c5; border-radius:10px; padding:12px 18px; font-size:.78rem; color:#475569; line-height:1.7; }
+    dialog { border:none; border-radius:14px; padding:22px 26px; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:560px; width:95%; }
+    dialog::backdrop { background:rgba(15,23,42,.55); }
+    .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.86rem; z-index:3000; display:none; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Comisión Ejecutivos',href:'/comisiones/'},{label:'Nómina de Comisiones',icon:'bi-file-earmark-spreadsheet',current:true}]};</script>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-file-earmark-spreadsheet"></i><div><h2>Nómina de Comisiones</h2><p>Quién tiene variable en el mes y cuánto se le paga, con la aprobación del supervisor y la respuesta del ejecutivo. Al generarla queda congelada y se envía a Recursos Humanos para las liquidaciones.</p></div></div>
+
+  <div class="panel" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <label style="font-size:.8rem;font-weight:700;color:#374151">Mes de producción <input type="month" id="mes" class="form-control form-control-sm" style="display:inline-block;width:auto;margin-left:6px" onchange="cargar()"></label>
+    <span id="lblPago" style="font-size:.78rem;color:#64748b"></span>
+    <div style="flex:1"></div>
+    <button class="btn-ghost" onclick="exportar()"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button>
+    <button class="btn-ghost" id="btnDest" style="display:none" onclick="abrirDest()" title="A quién se envía la nómina"><i class="bi bi-envelope-at"></i></button>
+    <button class="btn-ghost" id="btnReenviar" style="display:none" onclick="reenviar()"><i class="bi bi-send me-1"></i>Reenviar a RRHH</button>
+    <button class="btn-navy" id="btnRegenerar" style="display:none" onclick="generar(true)"><i class="bi bi-arrow-repeat me-1"></i>Regenerar nómina</button>
+    <button class="btn-verde" id="btnGenerar" style="display:none" onclick="generar(false)"><i class="bi bi-people-fill me-1"></i>Generar nómina para Recursos Humanos</button>
+  </div>
+
+  <div id="estadoNom"></div>
+  <div class="d-flex gap-3 mb-3 flex-wrap" id="kpis"></div>
+
+  <div class="panel" style="padding:0;overflow:auto">
+    <table>
+      <thead><tr>
+        <th class="l">Ejecutivo</th><th>Créditos</th><th>Financiado</th><th>Incentivo</th><th>Con semana corrida</th><th>Descuentos</th><th>Ajustes</th><th>A pagar</th>
+        <th class="l">Aprobación supervisor</th><th class="l">Respuesta del ejecutivo</th><th class="l">Acciones</th>
+      </tr></thead>
+      <tbody id="tb"><tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:26px">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel" id="histPanel" style="display:none">
+    <div style="font-weight:800;font-size:.85rem;color:#0141A2;margin-bottom:6px"><i class="bi bi-clock-history me-1"></i>Versiones de la nómina de este mes</div>
+    <table><thead><tr><th>Versión</th><th class="l">Estado</th><th>Ejecutivos</th><th>Total a pagar</th><th>Sin aprobar</th><th class="l">Generada por</th><th class="l">Fecha</th><th class="l">Motivo</th><th class="l">Enviada a</th></tr></thead><tbody id="tbHist"></tbody></table>
+  </div>
+
+  <div class="foot">
+    <b><i class="bi bi-diagram-3 me-1"></i>Cómo funciona</b><br>
+    · Las filas son el <b>motor único de comisiones</b> (mismo cálculo que <a href="/comisiones/revision/">Revisión y Aprobación</a>): incentivo con semana corrida legal, menos descuentos por prepago/anulación, más/menos <a href="/comisiones/ajustes/">ajustes aprobados por operación</a>. "A pagar" es el monto imponible que va a la liquidación como Comisiones.<br>
+    · <b>Aprobación</b> es la del supervisor en Revisión; <b>Respuesta del ejecutivo</b> es lo que contestó al recibir su informe (aceptó / envió a revisión, con su comentario). El Analista de Operaciones revisa los comentarios, corrige lo que corresponda y vuelve a enviar el informe desde Revisión.<br>
+    · <b>Generar nómina</b>: toma una <b>foto</b> de la tabla, la envía por correo al destinatario configurado (<i class="bi bi-envelope-at"></i>, por defecto recursos.humanos@autofacilchile.cl) y desde ese momento el <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> del mes siguiente lee ESOS montos. <b>Un cambio posterior en los créditos no mueve lo que se paga.</b><br>
+    · <b>Regenerar</b> es una decisión ex profeso del Analista de Operaciones (motivo obligatorio, queda auditado); la versión anterior pasa al historial. Con las liquidaciones EMITIDAS ya no se puede regenerar.
+  </div>
+</div>
+
+<dialog id="dlgMotivo"><h5 style="font-weight:800;color:#0141A2">Regenerar la nómina</h5>
+  <p style="font-size:.84rem;color:#475569">La nómina vigente pasará al historial y se generará una nueva con el cálculo actual del motor. Es una decisión ex profeso: indica el motivo.</p>
+  <textarea id="txtMotivo" class="form-control" rows="3" placeholder="ej. se corrigió el seguro de cesantía de la op 88521 y se aprobó el ajuste de la op 88557"></textarea>
+  <div class="mt-3 d-flex gap-2 justify-content-end"><button class="btn-ghost" onclick="dlgMotivo.close()">Cancelar</button><button class="btn-navy" onclick="confirmarRegenerar()">Regenerar y enviar</button></div>
+</dialog>
+<dialog id="dlgDest"><h5 style="font-weight:800;color:#0141A2">Destinatarios de la nómina</h5>
+  <label class="form-label small fw-semibold mt-2">Para</label><input id="dPara" class="form-control form-control-sm" placeholder="recursos.humanos@autofacilchile.cl">
+  <label class="form-label small fw-semibold mt-2">CC (opcional)</label><input id="dCc" class="form-control form-control-sm" placeholder="separados por coma">
+  <div class="mt-3 d-flex gap-2 justify-content-end"><button class="btn-ghost" onclick="dlgDest.close()">Cancelar</button><button class="btn-navy" onclick="guardarDest()">Guardar</button></div>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const $ = v => '$'+Math.round(Number(v)||0).toLocaleString('es-CL');
+const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesTxt = m => { const [y,mm]=String(m).split('-'); return `${MESES[Number(mm)-1]} ${y}`; };
+const fdh = v => { if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('es-CL',{timeZone:'America/Santiago'})+' '+d.toLocaleTimeString('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit'}); };
+let D=null, PUEDE_GENERAR=false;
+function toast(m,ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.style.background=ok?'#16a34a':'#dc2626'; t.style.display='block'; setTimeout(()=>t.style.display='none',3500); }
+
+// Mes por defecto: el anterior (producción vencida que se paga este mes)
+(()=>{ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); document.getElementById('mes').value=d.toISOString().slice(0,7); })();
+
+(async()=>{ try{ const j=await (await fetch('/api/auth/mis-permisos?_='+Date.now(),{headers:H,cache:'no-store'})).json(); const f=new Set(j.funcionalidades||[]); PUEDE_GENERAR = yo?.perfil==='Administrador' || f.has('comisiones_nomina_generar'); }catch(_){}
+  cargar(); })();
+
+async function cargar(){
+  const mes=document.getElementById('mes').value; if(!mes) return;
+  const r=await fetch('/api/comisiones/nomina?mes='+mes,{headers:H}); const j=await r.json();
+  if(!j.success){ document.getElementById('tb').innerHTML=`<tr><td colspan="11" style="color:#991b1b;text-align:center">${esc(j.error)}</td></tr>`; return; }
+  D=j.data; document.getElementById('lblPago').innerHTML=`se paga en las liquidaciones de <b>${mesTxt(D.mes_pago)}</b>`;
+  render();
+}
+const pillAp = e => e==='aprobado'?'<span class="pill p-apr">APROBADA</span>':e==='rechazado'?'<span class="pill p-rec">RECHAZADA</span>':'<span class="pill p-pen">PENDIENTE</span>';
+const pillEj = e => e==='aceptado'?'<span class="pill p-ace">ACEPTÓ</span>':e==='en_revision'?'<span class="pill p-rev">ENVIÓ A REVISIÓN</span>':'<span class="pill p-sin">SIN RESPUESTA</span>';
+function render(){
+  const v=D.vigente, filas=D.filas||[];
+  const tot=filas.reduce((s,f)=>s+Number(f.monto_pagar||0),0), con=filas.filter(f=>Number(f.monto_pagar)>0), pend=con.filter(f=>f.estado_aprobacion!=='aprobado').length, rev=filas.filter(f=>f.ejec_estado==='en_revision').length;
+  document.getElementById('kpis').innerHTML=`<div class="kpi"><div class="v">${con.length}</div><div class="l">Con variable</div></div><div class="kpi"><div class="v">${$(tot)}</div><div class="l">Total a pagar</div></div><div class="kpi"><div class="v" style="color:${pend?'#b45309':'#16a34a'}">${pend}</div><div class="l">Sin aprobar</div></div><div class="kpi"><div class="v" style="color:${rev?'#9a3412':'#16a34a'}">${rev}</div><div class="l">Enviadas a revisión</div></div>`;
+  const en=document.getElementById('estadoNom');
+  if(v){
+    const difs=D.diferencias||[];
+    en.innerHTML=`<div class="estado-nom foto"><i class="bi bi-lock-fill me-1"></i><b>Nómina generada</b> — versión ${v.version}, ${fdh(v.created_at)} por ${esc(v.generada_por)}${v.enviada_at?` · enviada a ${esc(v.enviada_a)} el ${fdh(v.enviada_at)}`:' · <b>correo no enviado</b>'}. Estos montos son los que lee el libro de liquidaciones de ${mesTxt(D.mes_pago)}; no cambian por modificaciones en los créditos.</div>`
+      + (difs.length?`<div class="estado-nom dif"><i class="bi bi-exclamation-triangle me-1"></i><b>El motor hoy daría otro resultado</b> para ${difs.length} ejecutivo(s): ${difs.map(x=>`${esc(x.ejecutivo)} ${$(x.nomina)} → ${$(x.motor)} (${x.dif>0?'+':''}${$(x.dif)})`).join(' · ')}. Si corresponde pagar lo nuevo, regenera la nómina (ex profeso, con motivo).</div>`:'');
+  } else en.innerHTML=`<div class="estado-nom viva"><i class="bi bi-hourglass-split me-1"></i><b>Nómina aún no generada</b>: lo que ves es el cálculo vivo del motor y puede cambiar. Revisa los comentarios, corrige lo que corresponda y cuando esté conforme genera la nómina para Recursos Humanos.</div>`;
+  document.getElementById('btnGenerar').style.display = (PUEDE_GENERAR && !v) ? '' : 'none';
+  document.getElementById('btnRegenerar').style.display = (PUEDE_GENERAR && v) ? '' : 'none';
+  document.getElementById('btnReenviar').style.display = (PUEDE_GENERAR && v) ? '' : 'none';
+  document.getElementById('btnDest').style.display = PUEDE_GENERAR ? '' : 'none';
+  document.getElementById('tb').innerHTML = filas.length ? filas.map(f=>`<tr>
+    <td class="l"><b>${esc(f.ejecutivo)}</b>${f.rut?`<div style="font-size:.66rem;color:#94a3b8">${esc(f.rut)}</div>`:''}${Number(f.exento_minimo)?'<div><span class="pill p-ex" title="Menos de 3 meses en la empresa: no está acogido al mínimo">SIN MÍNIMO</span></div>':(!Number(f.cumple_minimo)?'<div><span class="pill p-rec">BAJO EL MÍNIMO</span></div>':'')}</td>
+    <td>${f.total_creditos}</td><td>${$(f.total_financiado)}</td><td>${$(f.incentivo_final)}</td><td>${$(f.con_semana_corrida)}</td>
+    <td style="color:#991b1b">${Number(f.descuentos)?'−'+$(f.descuentos):'—'}</td><td>${Number(f.ajustes)?(Number(f.ajustes)>0?'+':'−')+$(Math.abs(f.ajustes)):'—'}</td>
+    <td class="num">${$(f.monto_pagar)}</td>
+    <td class="l">${pillAp(f.estado_aprobacion)}${f.notas_aprobacion?`<div class="com">${esc(f.notas_aprobacion)}</div>`:''}</td>
+    <td class="l">${pillEj(f.ejec_estado)}${f.ejec_comentario?`<div class="com">“${esc(f.ejec_comentario)}”</div>`:''}</td>
+    <td class="l" style="white-space:nowrap"><a class="btn-ghost sm" href="/comisiones/revision/?mes=${D.mes}&ej=${encodeURIComponent(f.ejecutivo)}" title="Ver el detalle, aprobar y reenviar el informe">Revisar</a> <a class="btn-ghost sm" href="/comisiones/ajustes/" title="Modificar la comisión de una operación">Modificar</a></td>
+  </tr>`).join('') : '<tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:26px">Sin ejecutivos con producción en el mes</td></tr>';
+  const h=D.historial||[]; document.getElementById('histPanel').style.display=h.length?'':'none';
+  document.getElementById('tbHist').innerHTML=h.map(x=>`<tr><td>v${x.version}</td><td class="l">${x.vigente?'<span class="pill p-apr">VIGENTE</span>':'<span class="pill p-sin">HISTÓRICA</span>'}</td><td>${x.n_ejecutivos}</td><td class="num">${$(x.total_pagar)}</td><td>${x.pendientes_aprobacion||0}</td><td class="l">${esc(x.generada_por)}</td><td class="l">${fdh(x.created_at)}</td><td class="l">${esc(x.motivo||'')}</td><td class="l">${esc(x.enviada_a||'')}${x.enviada_at?'<div style="font-size:.66rem;color:#94a3b8">'+fdh(x.enviada_at)+'</div>':''}</td></tr>`).join('');
+}
+async function generar(regen){
+  if(regen){ document.getElementById('txtMotivo').value=''; return dlgMotivo.showModal(); }
+  const filas=D.filas||[], pend=filas.filter(f=>Number(f.monto_pagar)>0&&f.estado_aprobacion!=='aprobado').length;
+  if(!confirm(`¿Generar la nómina de comisiones de ${mesTxt(D.mes)} y enviarla a Recursos Humanos?\n\n${filas.filter(f=>Number(f.monto_pagar)>0).length} ejecutivos con variable, total ${$(filas.reduce((s,f)=>s+Number(f.monto_pagar||0),0))}.${pend?`\n\nOJO: ${pend} con comisión SIN APROBAR por el supervisor.`:''}\n\nDesde ese momento los montos quedan congelados para el libro de liquidaciones.`)) return;
+  await postGenerar({mes:D.mes});
+}
+async function confirmarRegenerar(){ const m=document.getElementById('txtMotivo').value.trim(); if(!m) return alert('Indica el motivo'); dlgMotivo.close(); await postGenerar({mes:D.mes,motivo:m}); }
+async function postGenerar(body){
+  const r=await fetch('/api/comisiones/nomina/generar',{method:'POST',headers:H,body:JSON.stringify(body)}); const j=await r.json();
+  if(!j.success) return toast(j.error,false);
+  toast(`Nómina v${j.data.version} generada: ${j.data.n_ejecutivos} ejecutivos, ${$(j.data.total)}${j.data.envio.enviado?' · enviada a '+j.data.envio.para.join(', '):' · correo NO enviado: '+j.data.envio.error}`, j.data.envio.enviado);
+  cargar();
+}
+async function reenviar(){ if(!D.vigente) return; const r=await fetch(`/api/comisiones/nomina/${D.vigente.id}/reenviar`,{method:'POST',headers:H}); const j=await r.json(); toast(j.success?'Reenviada a '+j.data.para.join(', '):j.error, j.success); if(j.success) cargar(); }
+function abrirDest(){ document.getElementById('dPara').value=D.destinatarios.para||''; document.getElementById('dCc').value=D.destinatarios.cc||''; dlgDest.showModal(); }
+async function guardarDest(){ const r=await fetch('/api/comisiones/nomina/destinatarios',{method:'PUT',headers:H,body:JSON.stringify({para:document.getElementById('dPara').value,cc:document.getElementById('dCc').value})}); const j=await r.json(); dlgDest.close(); toast(j.success?'Destinatarios guardados':j.error,j.success); if(j.success) cargar(); }
+function exportar(){
+  if(!D) return; const filas=[['Mes producción','Mes pago','Ejecutivo','RUT','Créditos','Financiado','Incentivo','Con semana corrida','Descuentos','Ajustes','A pagar','Aprobación','Notas aprobación','Respuesta ejecutivo','Comentario ejecutivo',D.vigente?'Nómina v'+D.vigente.version:'Cálculo vivo'],
+    ...(D.filas||[]).map(f=>[D.mes,D.mes_pago,f.ejecutivo,f.rut||'',f.total_creditos,Math.round(f.total_financiado),Math.round(f.incentivo_final),Math.round(f.con_semana_corrida),Math.round(f.descuentos),Math.round(f.ajustes),Math.round(f.monto_pagar),f.estado_aprobacion,f.notas_aprobacion||'',f.ejec_estado,f.ejec_comentario||''])];
+  const html='<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
+  const blob=new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'],{type:'application/vnd.ms-excel'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nomina-comisiones-'+D.mes+'.xls'; a.click(); URL.revokeObjectURL(a.href);
+}
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

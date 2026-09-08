@@ -37,4 +37,11 @@ router.get ('/ajustes/historia',     verifyToken, requireFunc('com_ejec_mod'),  
 router.post('/ajustes',              verifyToken, requireFunc('com_ejec_mod_solicitar'), aj.solicitar);
 router.post('/ajustes/:id/resolver', verifyToken, requireFunc('com_ejec_mod_aprobar'),   aj.resolver);
 
+// Nómina de comisiones: foto de lo que se paga, se manda a RRHH y congela el libro (08-09-2026)
+const nom = require('../controllers/nomina.controller');
+router.get ('/nomina',               verifyToken, requireFunc('comisiones_nomina', 'comisiones_revision'), nom.getNomina);
+router.post('/nomina/generar',       verifyToken, requireFunc('comisiones_nomina_generar'), nom.generar);
+router.post('/nomina/:id/reenviar',  verifyToken, requireFunc('comisiones_nomina_generar'), nom.reenviar);
+router.put ('/nomina/destinatarios', verifyToken, requireFunc('comisiones_nomina_generar'), nom.destinatarios);
+
 module.exports = router;

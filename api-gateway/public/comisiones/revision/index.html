@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Revisión Comisiones — AutoFácil</title><!-- v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
+  <title>Revisión Comisiones — AutoFácil</title><!-- v5.32 — aviso de nómina generada (montos congelados) y filtro ?mes&ej desde la Nómina. v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -161,6 +161,7 @@
     </div>
   </div>
 
+  <div id="avisoNomina" style="display:none;background:#ecfdf5;border-left:4px solid #16a34a;border-radius:10px;padding:10px 16px;font-size:.83rem;color:#065f46;margin:0 0 12px"></div>
   <div id="resultado"></div>
 </div>
 
@@ -227,6 +228,7 @@ async function cargar() {
     const json = await res.json();
     if (!json.success) { document.getElementById('resultado').innerHTML = `<div class="alert alert-danger">${json.error}</div>`; return; }
     datosActuales = json.data;
+    avisoNomina(mes);
 
     // Si no es admin: cargar ejecutivos asignados
     if (!esAdmin && _ejAsignados === null) {
@@ -262,7 +264,8 @@ async function cargar() {
       if (_ejAsignados.length === 1 && datosPermitidos.length) sel.value = datosPermitidos[0].ejecutivo;
     }
 
-    // Aplicar filtro de ejecutivo si hay uno seleccionado
+    // Aplicar filtro de ejecutivo si hay uno seleccionado (o el que viene desde la Nómina)
+    if (window._ejDesdeNomina) { sel.value = window._ejDesdeNomina; window._ejDesdeNomina = null; }
     const ejSel = document.getElementById('filtroEj').value;
     const datosFiltrados = ejSel ? datosPermitidos.filter(d => d.ejecutivo === ejSel) : datosPermitidos;
     renderizar(datosFiltrados, mes);
@@ -272,6 +275,19 @@ async function cargar() {
     document.getElementById('loadingSpinner').style.display = 'none';
   }
 }
+
+/* Nómina generada = lo que se paga está congelado; acá se sigue viendo el cálculo vivo */
+async function avisoNomina(mes) {
+  const el = document.getElementById('avisoNomina'); if (!el) return;
+  try {
+    const j = await (await fetch(`/api/comisiones/nomina?mes=${mes}&solo=vigente`, { headers: H })).json();
+    const v = j && j.success && j.data && j.data.vigente;
+    el.style.display = v ? '' : 'none';
+    if (v) el.innerHTML = `<i class="bi bi-lock-fill me-1"></i><b>Nómina de comisiones generada</b> (v${v.version}, ${new Date(v.created_at).toLocaleDateString('es-CL')} por ${v.generada_por}): lo que se paga en la liquidación está congelado en <a href="/comisiones/nomina/">Nómina de Comisiones</a>. Lo que ves aquí es el cálculo vivo; si debe pagarse distinto, el Analista de Operaciones regenera la nómina ex profeso.`;
+  } catch (_) { el.style.display = 'none'; }
+}
+// Llegada desde la Nómina: ?mes=YYYY-MM&ej=NOMBRE
+(() => { const q = new URLSearchParams(location.search); if (q.get('mes')) document.getElementById('filtroMes').value = q.get('mes'); if (q.get('ej')) window._ejDesdeNomina = q.get('ej'); })();
 
 function filtrarYRenderizar() {
   const ejFiltro = document.getElementById('filtroEj').value;

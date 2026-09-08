@@ -34,7 +34,7 @@
   </style>
 </head>
 <body>
-<!-- ── Topnav (componente) — v5.2 ── -->
+<!-- ── Topnav (componente) — v5.3: card Nómina de Comisiones ── -->
 <div id="af-topnav"></div>
 <script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Comisión Ejecutivos',icon:'bi-cash-coin',current:true}]};</script>
 
@@ -65,6 +65,12 @@
       <h5>Modificar Comisión Ejecutivo</h5>
       <p>Ajusta la comisión de una operación puntual con respaldo y doble firma: solicita un Analista de Operaciones y aprueba el Gerente de Operaciones. Incluye la historia de todas las modificaciones por mes y ejecutivo.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i> Acceder</span>
+    </a>
+    <a href="/comisiones/nomina/" class="module-card" id="cardNominaCom" style="display:none">
+      <div class="card-icon"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+      <h5>Nómina de Comisiones</h5>
+      <p>Quién tiene variable en el mes y cuánto se paga, con la aprobación del supervisor y la respuesta del ejecutivo (aceptado / enviado a revisión, con comentarios). Genera la nómina para Recursos Humanos: queda congelada y se envía por correo.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
     <a href="/comisiones/variables/" class="module-card" id="cardVariablesCom" style="display:none">
       <div class="card-icon"><i class="bi bi-sliders"></i></div>
@@ -101,6 +107,7 @@
     if (tiene('comisiones_variables')) { document.getElementById('cardVariablesCom').style.display = ''; alguna = true; }
     if (tiene('bono_jefe'))            { document.getElementById('cardBonoJefe').style.display = '';     alguna = true; }
     if (tiene('com_ejec_mod'))         { document.getElementById('cardAjustesCom').style.display = '';   alguna = true; }
+    if (tiene('comisiones_nomina'))    { document.getElementById('cardNominaCom').style.display = '';    alguna = true; }
     if (!alguna) document.getElementById('sinSubmodulos').style.display = '';
   })();
 </script>
