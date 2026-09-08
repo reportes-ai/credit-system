@@ -259,6 +259,7 @@ exports.getCuenta = async (req, res) => {
               DATE_FORMAT(m.periodo_hasta,'%Y-%m-%d') periodo_hasta, m.glosa,
               DATE_FORMAT(m.created_at,'%Y-%m-%d') fecha,
               DATE_FORMAT(v.fecha_desde,'%Y-%m-%d') uso_desde, DATE_FORMAT(v.fecha_hasta,'%Y-%m-%d') uso_hasta,
+              v.id id_solicitud, v.codigo_verificacion,
               TRIM(CONCAT_WS(' ', a.nombre, a.apellido)) autor
          FROM rh_vac_movimientos m
          LEFT JOIN rh_vacaciones v ON v.id = m.id_ref AND m.tipo='TOMADO'
@@ -323,6 +324,7 @@ exports.getCuenta = async (req, res) => {
       const fecha = (m.tipo === 'DEVENGO' || m.tipo === 'PROGRESIVO') && m.periodo_hasta ? sumaDia(m.periodo_hasta)
                   : (m.tipo === 'TOMADO' && m.uso_desde) ? m.uso_desde : m.fecha;
       return { id: m.id, tipo: m.tipo, fecha, dias: Number(m.dias), glosa: m.glosa, autor: m.autor,
+        id_solicitud: m.id_solicitud || null, codigo: m.codigo_verificacion || null,
         periodo_desde: m.periodo_desde, periodo_hasta: m.periodo_hasta, uso_desde: m.uso_desde, uso_hasta: m.uso_hasta,
         sin_fecha: m.tipo === 'TOMADO' && !m.uso_desde && /AVSOFT/i.test(m.glosa || '') };
     }).sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.id - b.id));

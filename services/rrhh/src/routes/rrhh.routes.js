@@ -12,6 +12,7 @@ router.get('/vacaciones',          verifyToken, requireFunc('rh_vacaciones', 'rh
 router.post('/vacaciones',         verifyToken, requireFunc('rh_vacaciones'), ctrl.crearVacaciones);
 router.post('/vacaciones/:id/resolver', verifyToken, requireFunc('rh_aprobar'), ctrl.resolverVacaciones);
 router.post('/vacaciones/:id/recepcionar', verifyToken, requireFunc('rh_aprobar'), ctrl.recepcionarVacaciones);
+router.get('/vacaciones/:id/comprobante', verifyToken, ctrl.comprobanteVacaciones);   // PDF con firmas + QR (dueño, supervisor, RRHH)
 
 // Antigüedad
 router.get('/antiguedad',          verifyToken, requireFunc('rh_antiguedad', 'rh_aprobar'), ctrl.listarAntiguedad);
