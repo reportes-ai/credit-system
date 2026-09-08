@@ -313,7 +313,23 @@ exports.getCuenta = async (req, res) => {
               TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) autor
          FROM rh_vac_ajustes a LEFT JOIN usuarios u ON u.id_usuario=a.creado_por
         WHERE a.id_usuario=? AND a.estado='PENDIENTE' ORDER BY a.id`, [objetivo]);
+    /* EXTRACTO cronológico con saldo ACUMULADO (Pato, 08-09-2026: "en saldo pon el
+       total, no el del período" — la vista por período era el modelo de AVSOFT).
+       Fecha del hecho: abono = aniversario (fin del período + 1); tomado = inicio
+       de las vacaciones (o su registro si no hay solicitud); ajuste = su registro. */
+    const sumaDia = d => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + 1); return isoF(x); };
+    const extracto = movs.map(m => {
+      const abono = Number(m.dias) > 0;
+      const fecha = (m.tipo === 'DEVENGO' || m.tipo === 'PROGRESIVO') && m.periodo_hasta ? sumaDia(m.periodo_hasta)
+                  : (m.tipo === 'TOMADO' && m.uso_desde) ? m.uso_desde : m.fecha;
+      return { id: m.id, tipo: m.tipo, fecha, dias: Number(m.dias), glosa: m.glosa, autor: m.autor,
+        periodo_desde: m.periodo_desde, periodo_hasta: m.periodo_hasta, uso_desde: m.uso_desde, uso_hasta: m.uso_hasta,
+        sin_fecha: m.tipo === 'TOMADO' && !m.uso_desde && /AVSOFT/i.test(m.glosa || '') };
+    }).sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.id - b.id));
+    let acum = 0;
+    for (const e of extracto) { acum = Math.round((acum + e.dias) * 10) / 10; e.saldo = acum; }
     ok(res, { movimientos: movs, periodos, abonos_sueltos: sueltosAbono, cargos_sin_periodo: sinPeriodo,
+      extracto, saldo_movimientos: acum,
       periodo_en_curso: enCurso, ajustes_pendientes: ajPend, ...saldo });
   } catch (e) { fail(res, e.message); }
 };

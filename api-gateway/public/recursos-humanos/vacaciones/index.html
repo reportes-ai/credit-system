@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vacaciones — RRHH</title>
-  <!-- v1.9 — RRHH ya no recepciona: el comprobante (folio + PDF) se emite solo al aprobar y RRHH queda informado; el badge cuenta solo pendientes · v1.8 — badge visible (fix display) con N pendientes, saldo del solicitante por fila, y RECEPCION RRHH: firma FES, comprobante PDF verificable archivado en la carpeta digital · v1.7 — cartola rediseñada + saldos por línea jerárquica + ajustes con firma -->
+  <!-- v1.10 — cuenta corriente como EXTRACTO cronológico con saldo acumulado (no por período, modelo AVSOFT) · v1.9 — RRHH ya no recepciona: el comprobante (folio + PDF) se emite solo al aprobar y RRHH queda informado; el badge cuenta solo pendientes · v1.8 — badge visible (fix display) con N pendientes, saldo del solicitante por fila, y RECEPCION RRHH: firma FES, comprobante PDF verificable archivado en la carpeta digital · v1.7 — cartola rediseñada + saldos por línea jerárquica + ajustes con firma -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx-style.min.js" defer></script>
   <style>
@@ -201,34 +201,30 @@
     const fmt = s => s ? s.split('-').reverse().join('-') : '—';
     const per = (a,b) => (a||b) ? `${fmt(a)} <span class="fl">→</span> ${fmt(b)}` : '<span class="si">sin fecha (histórico AVSOFT)</span>';
     const nombre = (SALDOS_DATA&&(SALDOS_DATA.saldos||[]).find(s=>s.id_usuario===idU)||{}).nombre || (yo.nombre+' '+(yo.apellido||''));
+    /* EXTRACTO cronológico con saldo ACUMULADO (Pato, 08-09-2026): una línea por
+       hecho —abono al cumplir el período, cargo al tomar vacaciones, ajuste— con la
+       fecha en que ocurrió y el saldo total después de cada uno. Antes se mostraba
+       agrupado por período con "saldo del período" (modelo AVSOFT). */
     let filas = '';
-    for (const p of (d.periodos||[])) {
-      const prog = p.detalle_abono.filter(a=>a.tipo==='PROGRESIVO').reduce((s,a)=>s+a.dias,0);
-      filas += `<tr class="per">
-        <td class="fecha">${per(p.desde,p.hasta)}</td>
-        <td>Feriado del período<span class="sub">${co(p.abonos-prog)} días legales${prog?` + ${co(prog)} progresivo (art. 68)`:''}</span></td>
-        <td class="num">${co(p.abonos)}</td><td class="num"></td><td class="num"></td></tr>`;
-      for (const c of p.consumos) filas += `<tr class="mov">
-        <td class="fecha sub2">${per(c.desde,c.hasta)}</td>
-        <td><span class="tag ${c.tipo==='AJUSTE'?'aj':'to'}">${c.tipo==='AJUSTE'?'Ajuste':'Vacaciones tomadas'}</span>
-            <span class="gl">${esc(c.glosa||'')}</span></td>
-        <td class="num"></td><td class="num neg">${co(c.dias)}</td><td class="num"></td></tr>`;
-      filas += `<tr class="sub-t"><td></td><td>Saldo del período</td><td class="num"></td><td class="num"></td>
-        <td class="num ${p.saldo>0?'ok':'cero'}">${co(p.saldo)}</td></tr>`;
+    const rango = (a,b) => (a&&b&&a!==b) ? `${fmt(a)} <span class="fl">→</span> ${fmt(b)}` : fmt(a||b);
+    for (const e of (d.extracto||[])) {
+      const esAb = e.dias > 0;
+      let tag, det;
+      if (e.tipo==='DEVENGO') { tag='<span class="tag ab">Feriado legal</span>'; det=`Período cumplido ${rango(e.periodo_desde,e.periodo_hasta)} — ${co(e.dias)} días`; }
+      else if (e.tipo==='PROGRESIVO') { tag='<span class="tag ab">Feriado progresivo</span>'; det=`Art. 68 · período ${rango(e.periodo_desde,e.periodo_hasta)}`; }
+      else if (e.tipo==='TOMADO') { tag='<span class="tag to">Vacaciones tomadas</span>'; det = e.uso_desde ? `${rango(e.uso_desde,e.uso_hasta)} (${co(-e.dias)} hábiles)` : esc(e.glosa||''); }
+      else { tag=`<span class="tag aj">Ajuste</span>`; det=`${esc(e.glosa||'')}${e.autor?` · registrado por ${esc(e.autor)}`:''}`; }
+      filas += `<tr class="mov">
+        <td class="fecha">${e.sin_fecha?'<span class="si">sin fecha (histórico AVSOFT)</span>':fmt(e.fecha)}</td>
+        <td>${tag}<span class="gl">${det}</span></td>
+        <td class="num">${esAb?co(e.dias):''}</td><td class="num neg">${esAb?'':co(-e.dias)}</td>
+        <td class="num ${e.saldo>0?'ok':e.saldo<0?'neg':'cero'}">${co(e.saldo)}</td></tr>`;
     }
-    for (const a of (d.abonos_sueltos||[])) filas += `<tr class="mov">
-      <td class="fecha">${fmt(a.fecha)}</td>
-      <td><span class="tag aj">${a.tipo==='AJUSTE'?'Ajuste':esc(a.tipo)}</span><span class="gl">${esc(a.glosa||'')}${a.autor?` · registrado por ${esc(a.autor)}`:''}</span></td>
-      <td class="num">${co(a.dias)}</td><td class="num"></td><td class="num"></td></tr>`;
-    for (const c of (d.cargos_sin_periodo||[])) filas += `<tr class="mov">
-      <td class="fecha">${per(c.desde,c.hasta)}</td>
-      <td><span class="tag sob">Sobregiro</span><span class="gl">${esc(c.glosa||'')}</span></td>
-      <td class="num"></td><td class="num neg">${co(c.dias)}</td><td class="num"></td></tr>`;
     if (d.periodo_en_curso) filas += `<tr class="per curso">
-      <td class="fecha">${per(d.periodo_en_curso.desde,d.periodo_en_curso.hasta)}</td>
-      <td>Período en curso<span class="sub">proporcional devengado a hoy</span></td>
+      <td class="fecha">${rango(d.periodo_en_curso.desde,d.periodo_en_curso.hasta)}</td>
+      <td>Período en curso<span class="sub">proporcional devengado a hoy (se deposita completo al cumplir el año)</span></td>
       <td class="num">${co(d.periodo_en_curso.proporcional)}</td><td class="num"></td>
-      <td class="num ok">${co(d.periodo_en_curso.proporcional)}</td></tr>`;
+      <td class="num ok">${co(d.disponibles)}</td></tr>`;
     const pend = (d.ajustes_pendientes||[]).map(a=>`<tr class="mov pendiente">
       <td class="fecha">${fmt(a.fecha)}</td>
       <td><span class="tag pen">Ajuste pendiente de firma</span><span class="gl">${esc(a.glosa)} · propuesto por ${esc(a.autor||'RRHH')} — paso ${a.paso+1} de 2</span></td>
@@ -258,7 +254,7 @@
       .fecha{white-space:nowrap;font-variant-numeric:tabular-nums;color:#334155;width:220px}
       .fl{color:#cbd5e1;padding:0 2px} .si{color:#cbd5e1;font-style:italic;font-size:.78rem}
       .tag{font-size:.7rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#64748b}
-      .tag.to{color:#0f766e} .tag.aj{color:#a16207} .tag.sob{color:#b91c1c} .tag.pen{color:#a16207}
+      .tag.to{color:#0f766e} .tag.aj{color:#a16207} .tag.sob{color:#b91c1c} .tag.pen{color:#a16207} .tag.ab{color:#1d4ed8}
       .num.neg{color:#b91c1c} .num.ok{color:#15803d;font-weight:700} .num.cero{color:#cbd5e1}
       tr.sub-t td{background:#fff;color:#94a3b8;font-size:.75rem;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #e2e8f0}
       tr.sub-t td.num.ok{font-size:.9rem;letter-spacing:0}
@@ -279,9 +275,7 @@
         <tbody>${(filas+pend)||'<tr><td colspan="5" style="padding:22px;text-align:center;color:#94a3b8">Sin movimientos aún — los períodos se depositan solos en cada aniversario.</td></tr>'}</tbody>
         <tfoot><tr><td colspan="4">Saldo disponible</td><td class="num">${co(d.disponibles)}</td></tr></tfoot>
       </table>
-      <p class="pie">Los días tomados se descuentan desde el período más antiguo hacia el más nuevo (FIFO) y se cuentan en días <b>hábiles</b>, descontando feriados legales.
-      Abonos: 15 días legales por período cumplido más el feriado progresivo del art. 68. Los ajustes los propone RRHH y solo entran a la cuenta con la firma de la jefatura y la gerencia.
-      El histórico traído de AVSOFT no tiene fechas de uso y se muestra sin período.</p>
+      <p class="pie">Extracto cronológico: cada línea es un hecho con su fecha y el <b>saldo total</b> después de él. Abonos: 15 días legales al cumplir cada período más el feriado progresivo del art. 68; cargos: las vacaciones tomadas en días <b>hábiles</b> (descontando feriados). Los ajustes los propone RRHH y solo entran con la firma de la jefatura y la gerencia. El histórico traído de AVSOFT no tiene fechas de uso.</p>
     </body></html>`);
   }
   (async()=>{ await cargarPendientes(); cargarSaldo(); const qid=new URLSearchParams(location.search).get('id'); if(qid){tab('mias');} else tab('crear'); })();
