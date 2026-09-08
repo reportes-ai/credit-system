@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adicionales de Remuneración — AutoFácil</title>
-  <!-- v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <!-- v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -69,7 +69,13 @@
         <div class="form-check"><input type="checkbox" class="form-check-input" id="fNoImp">
           <label class="form-check-label small fw-semibold" for="fNoImp" title="Manda sobre el default de la causal: este monto no paga AFP, salud ni impuesto">No imponible</label></div>
         <div class="form-check"><input type="checkbox" class="form-check-input" id="fPerm">
-          <label class="form-check-label small fw-semibold" for="fPerm" title="Se incluye TODOS los meses hasta que se desmarque">Permanente</label></div>
+          <label class="form-check-label small fw-semibold" for="fPerm" title="Se incluye TODOS los meses hasta que se desmarque o hasta el mes indicado">Permanente</label></div>
+        <!-- Vigencia: el mes de arriba es el DESDE; "Hasta" (inclusive) fija el último mes
+             que se paga (sueldo/bono asegurado por N meses). Vacío = hasta desmarcar. -->
+        <div id="wHasta" style="display:none" class="d-flex align-items-center gap-1">
+          <label class="small fw-semibold mb-0" for="fHasta">hasta</label>
+          <input type="month" id="fHasta" class="form-control form-control-sm" style="width:auto" title="Último mes que se paga (inclusive). Vacío = hasta desmarcar" onchange="hintImp()">
+        </div>
       </div>
       <div class="col-md-2 d-flex align-items-end">
         <button class="btn btn-sm btn-primary w-100" id="btnGuardar" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
@@ -94,6 +100,8 @@
   <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.8rem">
     <div class="fw-bold mb-1"><i class="bi bi-diagram-3 me-1"></i>Cómo se integran</div>
     Los adicionales <b>imponibles</b> entran como "Otros Imponibles" en el <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> del mes (pagan AFP/salud/impuesto); los <b>no imponibles</b> y los marcados <b>Líquido</b> entran como "Otros No Imponibles" (se pagan tal cual). Si en el libro editas esas celdas a mano, tu valor manda. Al <b>emitir</b> el mes, este módulo queda bloqueado.
+    <div class="mt-2"><b>SUELDO ASEGURADO / BONO ASEGURADO</b> → renta garantizada por un período (ej. ejecutivo nuevo): imponibles, se ingresan
+    marcando <b>Permanente</b> con el mes de arriba como <b>desde</b> y un mes <b>hasta</b> (inclusive); al pasar ese mes dejan de pagarse solos y quedan en la lista con su vigencia. Sin "hasta" = hasta desmarcar.</div>
     <div class="mt-2"><b>HORAS EXTRAS</b> → se digitan las <b>horas</b> y el monto lo calcula el sistema:
     <i>sueldo base × 7 ÷ (30 × jornada semanal) × 1,5</i> (art. 32 del Código del Trabajo). El sueldo base y la jornada salen de la
     <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a>; la jornada general (44 h) y el recargo (50%) son configurables
@@ -180,12 +188,14 @@ function hintImp(){
   const noImp = document.getElementById('fNoImp').checked;
   const perm = document.getElementById('fPerm').checked;
   const imp = (liq||noImp) ? false : (c==='OTRO' ? fOtroImp.value==='1' : CAUSALES[c]===1);
+  document.getElementById('wHasta').style.display = perm ? '' : 'none';
+  const hasta = perm ? document.getElementById('fHasta').value : '';
   document.getElementById('hintImp').innerHTML = (liq
     ? '<i class="bi bi-info-circle me-1"></i>Marcado <b>Líquido</b>: el colaborador recibe exactamente este monto (entra como haber no imponible).'
     : noImp
     ? '<i class="bi bi-info-circle me-1"></i>Marcado <b>No imponible</b>: este monto no paga AFP, salud ni impuesto, aunque la causal diga otra cosa.'
     : `<i class="bi bi-info-circle me-1"></i>${esc(c)} es <b>${imp?'IMPONIBLE (paga AFP, salud e impuesto)':'NO imponible (se paga tal cual)'}</b>.`)
-    + (perm ? ' <b>PERMANENTE</b>: se incluirá todos los meses hasta que se desmarque.' : '');
+    + (perm ? (hasta ? ` <b>Desde ${esc(fMes.value)} hasta ${esc(hasta)}</b> (inclusive): después deja de pagarse solo.` : ' <b>PERMANENTE</b>: se incluirá todos los meses hasta que se desmarque (o pon un mes "hasta").') : '');
 }
 document.addEventListener('change', e=>{ if (['fLiq','fOtroImp','fNoImp','fPerm'].includes(e.target.id)) hintImp(); });
 
@@ -231,13 +241,15 @@ function render(){
   // ── Lista bajo el formulario: cada adicional con sus etiquetas a la vista ──
   const MESES=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   const mesTxt = m => (MESES[Number(String(m).slice(5,7))]||m).toUpperCase();
+  // permanente_fin es el primer mes que YA NO se paga → el "hasta" visible es el anterior
+  const mesAnt = m => { let [y,mm]=String(m).split('-').map(Number); mm--; if(mm<1){mm=12;y--;} return `${y}-${String(mm).padStart(2,'0')}`; };
   document.getElementById('listaMes').innerHTML = D.adicionales.length ? '<div class="fw-bold small mb-1">Adicionales de este mes</div>'+D.adicionales.map(a=>`
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:9px;padding:7px 12px;margin-bottom:6px;background:${a.permanente?'#fbfdff':'#fff'}">
       <b style="font-size:.82rem">${esc(a.nombre_actual||a.nombre)}</b>
       <span class="small text-muted">${esc(a.causal)}${a.causal_texto?' — '+esc(a.causal_texto):''}</span>
       <span class="num" style="font-size:.85rem">$${fmt(a.monto)}</span>
       ${a.permanente
-        ? `<span class="pill" style="background:#e0e7ff;color:#3730a3" title="Se incluye todos los meses${a.heredado?' (viene de '+a.mes+')':''}">PERMANENTE${a.permanente_fin?' hasta '+a.permanente_fin:''}</span>`
+        ? `<span class="pill" style="background:#e0e7ff;color:#3730a3" title="Se incluye todos los meses${a.heredado?' (viene de '+a.mes+')':''}">${a.permanente_fin?'DESDE '+mesTxt(a.mes)+' '+String(a.mes).slice(0,4)+' HASTA '+mesTxt(mesAnt(a.permanente_fin))+' '+mesAnt(a.permanente_fin).slice(0,4):'PERMANENTE'}</span>`
         : `<span class="pill" style="background:#fef3c7;color:#92400e">SOLO ${mesTxt(a.mes)}</span>`}
       <span class="pill ${a.es_liquido?'liq':'noimp'}">${a.es_liquido?'LÍQUIDO':'BRUTO'}</span>
       <span class="pill ${a.imponible&&!a.es_liquido?'imp':'noimp'}">${a.imponible&&!a.es_liquido?'IMPONIBLE':'NO IMPONIBLE'}</span>
@@ -273,8 +285,10 @@ async function guardar(){
     causal_texto: fOtro.value, imponible: fOtroImp.value==='1', es_liquido: document.getElementById('fLiq').checked,
     no_imponible: document.getElementById('fNoImp').checked,
     permanente: document.getElementById('fPerm').checked,
+    hasta: document.getElementById('fPerm').checked ? (document.getElementById('fHasta').value || undefined) : undefined,
     monto: montoVal(), horas: esHE() ? horas : undefined };
   if (!body.id_usuario) return alert('Elige el colaborador');
+  if (body.hasta && body.hasta < body.mes) return alert('El mes "hasta" no puede ser anterior al mes desde');
   // En horas extras manda la cantidad de horas: el monto lo recalcula el servidor.
   if (esHE()) { if (!(horas > 0)) return alert('Indica cuántas horas extras se pagan'); }
   else if (!body.monto) return alert('Ingresa el monto');
@@ -283,6 +297,7 @@ async function guardar(){
   // listo para el siguiente: limpia colaborador/monto/otro, mantiene mes y causal
   fColab.value=''; document.getElementById('fMonto').value=''; fOtro.value=''; document.getElementById('fLiq').checked=false;
   document.getElementById('fNoImp').checked=false; document.getElementById('fPerm').checked=false;
+  document.getElementById('fHasta').value=''; document.getElementById('wHasta').style.display='none';
   document.getElementById('fHoras').value=''; document.getElementById('heDetalle').innerHTML='';
   fColab.focus();
   cargar();

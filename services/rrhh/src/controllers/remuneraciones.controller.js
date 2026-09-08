@@ -218,6 +218,9 @@ const getHoraExtra = async (req, res) => {
 const CAUSALES_ADIC = {
   'BONO DE DESEMPEÑO': 1, 'AGUINALDO': 1, 'HORAS EXTRAS': 1, 'COMISIÓN EXTRAORDINARIA': 1,
   'BONO POR META': 1, 'DIFERENCIA DE SUELDO': 1,
+  // Pato 08-09-2026: renta garantizada por un período (ej. ejecutivo nuevo) — imponibles,
+  // se ingresan PERMANENTES con mes desde/hasta.
+  'SUELDO ASEGURADO': 1, 'BONO ASEGURADO': 1,
   'VIÁTICO': 0, 'COLACIÓN ADICIONAL': 0, 'MOVILIZACIÓN ADICIONAL': 0,
   'ASIGNACIÓN DE CELULAR': 0, 'DEVOLUCIÓN DE DESCUENTO': 0, 'OTRO': null,
 };
@@ -247,6 +250,7 @@ async function causalesAdic() {
   return m;
 }
 
+const mesSiguiente = (mes) => { let [y, m] = String(mes).split('-').map(Number); m++; if (m > 12) { m = 1; y++; } return `${y}-${String(m).padStart(2, '0')}`; };
 const mesEmitido = async (mes) => {
   const [[e]] = await pool.query("SELECT COUNT(*) c FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
   return (e?.c || 0) > 0;
@@ -302,19 +306,26 @@ const crearAdicional = async (req, res) => {
     const esLiquido = b.es_liquido ? 1 : 0;
     // "No imponible" marcado a mano MANDA sobre el default de la causal
     const imponible = (esLiquido || b.no_imponible) ? 0 : (CAUS[causal] != null ? CAUS[causal] : (b.imponible ? 1 : 0));
-    const permanente = b.permanente ? 1 : 0;
+    /* Vigencia "desde / hasta" (Pato 08-09-2026): el mes del formulario es el DESDE;
+       `hasta` (AAAA-MM, inclusive) fija el último mes que se paga. Con hasta el
+       adicional es permanente sí o sí, y permanente_fin = mes siguiente al hasta
+       (la columna ya existía: primer mes en que YA NO se paga). Sin hasta = indefinido. */
+    const hasta = /^\d{4}-\d{2}$/.test(b.hasta || '') ? b.hasta : null;
+    if (hasta && hasta < mes) return fail(res, `El mes "hasta" (${hasta}) no puede ser anterior al mes desde (${mes})`, 400);
+    const permanente = (b.permanente || hasta) ? 1 : 0;
+    const permanenteFin = hasta ? mesSiguiente(hasta) : null;
     if (permanente && causal === 'HORAS EXTRAS') return fail(res, 'Las horas extras se digitan cada mes: no pueden ser permanentes', 400);
     const [[colab]] = await pool.query("SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE id_usuario=?", [idU]);
     if (!colab) return fail(res, 'Colaborador no encontrado', 404);
     const [r] = await pool.query(
-      'INSERT INTO rh_adicionales (mes, id_usuario, causal, causal_texto, imponible, es_liquido, permanente, monto, cantidad, valor_unitario, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-      [mes, idU, causal, causal === 'OTRO' ? String(b.causal_texto).trim().slice(0, 200) : null, imponible, esLiquido, permanente, monto, cantidad, valorUnitario, nombreDe(u)]);
+      'INSERT INTO rh_adicionales (mes, id_usuario, causal, causal_texto, imponible, es_liquido, permanente, permanente_fin, monto, cantidad, valor_unitario, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+      [mes, idU, causal, causal === 'OTRO' ? String(b.causal_texto).trim().slice(0, 200) : null, imponible, esLiquido, permanente, permanenteFin, monto, cantidad, valorUnitario, nombreDe(u)]);
     // El detalle deja el cálculo a la vista: sin el "10 h × $10.341" hay que
     // reconstruir a mano de dónde salió el monto cuando alguien lo pregunta.
     const glosaHE = cantidad ? ` (${cantidad} h × $${Math.round(valorUnitario).toLocaleString('es-CL')})` : '';
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: r.insertId,
-      detalle: `Adicional ${mes} ${colab.nombre}: ${causal}${causal === 'OTRO' ? ' (' + b.causal_texto + ')' : ''} $${monto.toLocaleString('es-CL')}${glosaHE}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}${permanente ? ' PERMANENTE' : ''}` });
-    ok(res, { id: r.insertId, imponible, es_liquido: esLiquido, permanente });
+      detalle: `Adicional ${mes} ${colab.nombre}: ${causal}${causal === 'OTRO' ? ' (' + b.causal_texto + ')' : ''} $${monto.toLocaleString('es-CL')}${glosaHE}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}${permanente ? (hasta ? ` desde ${mes} hasta ${hasta}` : ' PERMANENTE') : ''}` });
+    ok(res, { id: r.insertId, imponible, es_liquido: esLiquido, permanente, hasta });
   } catch (e) { console.error('[rrhh adicionales crear]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
