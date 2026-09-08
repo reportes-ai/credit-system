@@ -70,6 +70,16 @@ function sincronizarCreditoDesdeCarta(c, idCred) {
        (c.gastos != null ? Number(c.gastos) : null), idCred]
     ).catch(e => console.error('[carta→credito primas]', e.message));
   }
+  // Vehículo (tipo, año, patente, marca, modelo): la carta los trae y Trinidad NO
+  // (solo marca/modelo). Sin esto la ficha del crédito mostraba el vehículo vacío
+  // aunque la carta tuviera todo (op 26090275, 08-09-2026). Solo rellena.
+  pool.query(`UPDATE creditos SET
+      tipo_vehiculo = COALESCE(NULLIF(tipo_vehiculo,''), ?), anio = COALESCE(anio, ?),
+      patente = COALESCE(NULLIF(patente,''), ?), marca = COALESCE(NULLIF(marca,''), ?),
+      modelo = COALESCE(NULLIF(modelo,''), ?), updated_at = NOW() WHERE id = ?`,
+    [c.tipo_vehiculo || c.tipoVehiculo || null, parseInt(c.anio, 10) || null, c.patente || null,
+     c.marca || null, c.modelo || null, idCred]
+  ).catch(e => console.error('[carta→credito vehiculo]', e.message));
   // Plazo/tasa/vendedor: la carta los trae; el crédito de carga masiva a veces no.
   // El vendedor del crédito solo se rellena si está vacío o es el placeholder
   // "VENDEDOR (AFA) …" (que es nuestro ejecutivo, no el vendedor del dealer).
@@ -985,6 +995,13 @@ const otorgar = async (req, res) => {
             console.log(`[carta otorgar] num_op AutoFácil ${nuevo} asignado (antes ${cr.num_op}, id ${cr.id})`);
           }
         } catch (e) { console.error('[carta otorgar→num_op AF]', e.message); }
+        // Vehículo de la carta al crédito (solo rellena): tipo, año, patente, marca, modelo.
+        // La carga Trinidad no trae tipo/año/patente y la ficha del crédito quedaba vacía.
+        try {
+          const [[crV]] = await pool.query(`SELECT id FROM creditos WHERE (${cond.join(' OR ')}) LIMIT 1`, args);
+          if (crV) sincronizarCreditoDesdeCarta({ tipo_vehiculo: ca.tipo_vehiculo, anio: ca.anio, patente: ca.patente,
+            marca: ca.marca, modelo: ca.modelo, plazo: ca.plazo, vendedor: ca.vendedor }, crV.id);
+        } catch (e) { console.error('[carta otorgar→vehiculo]', e.message); }
         /* MOTOR DE CÁLCULO tras otorgar (Máxima 1 + recálculo automático en toda
            vía): sin esto el crédito quedaba con plazo/tasa/primas completos pero
            monto_comision_fin, com_* e ingreso_neto_total en NULL — "sin ingreso
