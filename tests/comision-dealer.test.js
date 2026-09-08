@@ -29,3 +29,15 @@ test('carta manda solo hacia abajo', () => {
   assert.equal(comisionDealerEfectiva({ calculada: 350000, carta: null }), 350000, 'sin carta → cálculo');
   assert.equal(comisionDealerEfectiva({ calculada: '350000', carta: '0' }), 350000, 'strings y cero');
 });
+
+test('con saldos compara PORCENTAJE y aplica el % pactado al saldo vigente', () => {
+  // Carta al 7,5% sobre saldo viejo 3.790.000 = 284.250; el negocio cursa con 3.990.000.
+  // En pesos la carta "ganaría" (284.250 < 299.250) sin que nadie negociara: en % son iguales → cálculo.
+  assert.equal(comisionDealerEfectiva({ calculada: 299250, carta: 284250, saldo: 3990000, saldoCarta: 3790000 }), 299250);
+  // Negociada a la baja (5% en vez de 7,5%): se mantiene el 5% sobre el saldo NUEVO, no el monto viejo.
+  assert.equal(comisionDealerEfectiva({ calculada: 299250, carta: 189500, saldo: 3990000, saldoCarta: 3790000 }), 199500);
+  // Carta con % mayor que la tabla → rige el cálculo.
+  assert.equal(comisionDealerEfectiva({ calculada: 299250, carta: 399000, saldo: 3990000, saldoCarta: 3990000 }), 299250);
+  // Sin saldo de carta → cae a la comparación en pesos.
+  assert.equal(comisionDealerEfectiva({ calculada: 299250, carta: 284250, saldo: 3990000, saldoCarta: 0 }), 284250);
+});

@@ -212,10 +212,10 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
   if (idsFin.length) {
     try {
       const [cs] = await pool.query(
-        `SELECT id_financiera, part_bruto FROM cartas_aprobacion
+        `SELECT id_financiera, part_bruto, saldo FROM cartas_aprobacion
           WHERE status='APROBADA' AND COALESCE(part_bruto,0) > 0 AND id_financiera IN (?)
           ORDER BY id ASC`, [idsFin]);
-      cs.forEach(c => partCartaDe.set(String(c.id_financiera), Number(c.part_bruto)));  // id mayor gana (vigente)
+      cs.forEach(c => partCartaDe.set(String(c.id_financiera), { part_bruto: Number(c.part_bruto), saldo: Number(c.saldo) || 0 }));  // id mayor gana (vigente)
     } catch (e) { /* sin tabla de cartas → se compara contra el cálculo */ }
   }
   for (const op of ops) {
@@ -228,12 +228,13 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
     for (const campo of campos) {
       // UAC: monto_comision_fin es dinámico (tier del mes), nunca se marca forzado.
       if (campo === 'monto_comision_fin' && esUAC) { forz.delete(campo); continue; }
-      const partCarta = campo === 'comdea_real' ? partCartaDe.get(String(op.id_financiera || '')) : undefined;
-      // Carta manda solo hacia abajo (motor único comisionDealerEfectiva, 08-09-2026).
+      const cartaInfo = campo === 'comdea_real' ? partCartaDe.get(String(op.id_financiera || '')) : undefined;
+      const partCarta = cartaInfo ? cartaInfo.part_bruto : undefined;
+      // Carta manda solo hacia abajo, comparando % (motor único comisionDealerEfectiva, 08-09-2026).
       // Un valor que coincide con la carta NO es "digitado a mano" aunque la carta
       // supere al cálculo: no se marca forzado, así el recálculo lo baja al efectivo.
       const esperado  = campo === 'comdea_real'
-        ? comisionDealerEfectiva({ calculada: calc[campo], carta: partCarta })
+        ? comisionDealerEfectiva({ calculada: calc[campo], carta: partCarta, saldo: op.saldo_precio, saldoCarta: cartaInfo && cartaInfo.saldo })
         : (parseFloat(calc[campo]) || 0);
       const valor = parseFloat(op[campo]) || 0;
       const dif = Math.abs(valor - esperado) > tol
@@ -302,10 +303,10 @@ async function recalcularMeses(meses, opciones = {}) {
     const partCartaDe = new Map();
     for (let i = 0; i < idsFin.length; i += 500) {
       const [cs] = await pool.query(
-        `SELECT id_financiera, part_bruto FROM cartas_aprobacion
+        `SELECT id_financiera, part_bruto, saldo FROM cartas_aprobacion
           WHERE status='APROBADA' AND COALESCE(part_bruto,0) > 0 AND id_financiera IN (?)
           ORDER BY id ASC`, [idsFin.slice(i, i + 500)]);
-      cs.forEach(c => partCartaDe.set(String(c.id_financiera), Number(c.part_bruto)));  // id mayor gana (vigente)
+      cs.forEach(c => partCartaDe.set(String(c.id_financiera), { part_bruto: Number(c.part_bruto), saldo: Number(c.saldo) || 0 }));  // id mayor gana (vigente)
     }
 
     // ── Conteo UAC (penetración de seguros no se recalcula aquí) ────
@@ -374,11 +375,12 @@ async function recalcularMeses(meses, opciones = {}) {
       // que el cálculo > cálculo (motor único comisionDealerEfectiva). Un "forzado"
       // cuyo valor es el de la carta vino de la carta, no de una mano: se recalcula
       // igual, si no la carta seguiría mandando hacia arriba por la puerta de atrás.
-      const partCarta = partCartaDe.get(String(op.id_financiera || ''));
+      const cartaInfo = partCartaDe.get(String(op.id_financiera || ''));
+      const partCarta = cartaInfo ? cartaInfo.part_bruto : undefined;
       const cdrGuardado = parseFloat(op.comdea_real) || 0;
       const forzadoAMano = forz.has('comdea_real') && !(partCarta > 0 && Math.abs(cdrGuardado - partCarta) <= 1);
       const eff_cdr = forzadoAMano ? cdrGuardado
-                    : comisionDealerEfectiva({ calculada: comdea_real, carta: partCarta });
+                    : comisionDealerEfectiva({ calculada: comdea_real, carta: partCarta, saldo: op.saldo_precio, saldoCarta: cartaInfo && cartaInfo.saldo });
       const eff_cpq = forz.has('com_parque')         ? (parseFloat(op.com_parque)         || 0) : com_parque_val;
 
       // 5. Ingreso neto total ─────────────────────────────────────────

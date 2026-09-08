@@ -911,9 +911,10 @@ const otorgar = async (req, res) => {
       if (ca.id_financiera)     { cond.push('num_op = ?'); args.push(ca.id_financiera); }
       // Participación PACTADA de la carta: al otorgar manda SOLO HACIA ABAJO (08-09-2026):
       // se escribe part_bruto si el crédito no tiene comisión o si la carta es MENOR que
-      // la calculada; si es mayor, queda la del motor. El recalcularPorOps de más abajo
-      // vuelve a resolver la precedencia con el motor único (comisionDealerEfectiva), y
-      // la cartola toma LEAST(part_bruto, comdea_real): dashboard y cartola muestran lo mismo.
+      // la calculada (primer corte en pesos). El recalcularPorOps de más abajo resuelve la
+      // precedencia definitiva con el motor único (comisionDealerEfectiva, comparando % y
+      // aplicando el % pactado al saldo vigente), y la cartola lee creditos.comdea_real:
+      // dashboard y cartola muestran lo mismo.
       const partB = Number(ca.part_bruto) || 0;
       if (cond.length) {
         await pool.query(
@@ -1011,11 +1012,9 @@ const otorgar = async (req, res) => {
        SELECT DATE_FORMAT(COALESCE(ca.fecha_otorgado, NOW()), '%Y-%m'),
               ca.id, ca.id_financiera, 'COMISION', ca.rut_dealer, ca.nombre_dealer,
               ca.ejecutivo, ca.cliente, ca.rut_cliente, ca.saldo,
-              /* Carta manda solo hacia abajo (08-09-2026): la MENOR entre la carta y la
-                 comisión vigente del crédito; si falta una, la otra. */
-              CASE WHEN COALESCE(ca.part_bruto,0) > 0 AND COALESCE(crx.comdea_real,0) > 0
-                   THEN LEAST(ca.part_bruto, crx.comdea_real)
-                   ELSE COALESCE(NULLIF(ca.part_bruto,0), crx.comdea_real) END,
+              /* La comisión vigente del CRÉDITO manda (08-09-2026): ya trae la precedencia del
+                 motor (carta solo hacia abajo, en %); la carta solo si el crédito no tiene. */
+              COALESCE(NULLIF(crx.comdea_real,0), ca.part_bruto),
               'PENDIENTE', ca.op_carta, ca.vendedor, ca.acreedor
          FROM cartas_aprobacion ca
          LEFT JOIN creditos crx ON crx.id = ca.id_credito_creado

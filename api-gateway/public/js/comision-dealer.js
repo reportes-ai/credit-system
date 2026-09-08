@@ -118,9 +118,20 @@
    *   calculada = comdea_real del motor (sobre los datos vigentes)
    *   carta     = part_bruto de la carta APROBADA vigente (0/null si no hay)
    */
-  function comisionDealerEfectiva({ calculada, carta }) {
+  /*   saldo      = saldo precio VIGENTE del crédito (opcional)
+   *   saldoCarta = saldo con que se armó la carta (opcional)
+   * Con ambos saldos la comparación es en PORCENTAJE (Pato, 08-09-2026): lo que se
+   * mantiene es la NEGOCIACIÓN (el % pactado más bajo aplicado al saldo vigente), no
+   * un monto viejo. Si el saldo subió después de la carta, comparar pesos habría
+   * pagado menos de la tabla sin que nadie lo negociara. Sin saldos, compara pesos. */
+  function comisionDealerEfectiva({ calculada, carta, saldo, saldoCarta }) {
     const calc = Math.round(parseFloat(calculada) || 0);
     const pc   = Math.round(parseFloat(carta) || 0);
+    const s    = parseFloat(saldo) || 0, sc = parseFloat(saldoCarta) || 0;
+    if (pc > 0 && s > 0 && sc > 0 && calc > 0) {
+      const pctCarta = pc / sc, pctCalc = calc / s;
+      return pctCarta < pctCalc - 1e-9 ? Math.round(s * pctCarta) : calc;
+    }
     if (pc > 0 && (calc <= 0 || pc < calc)) return pc;
     return calc;
   }
