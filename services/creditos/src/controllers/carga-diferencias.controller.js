@@ -1,14 +1,11 @@
 'use strict';
 /* ════════════════════════════════════════════════════════════════════════
    DIFERENCIAS ENTRE LA CARGA Y NUESTROS DATOS
-   La carga masiva NO pisa los montos de una operación que ya existe: acá se
-   digitaron y revisaron. Pero callar la diferencia deja el error pegado para
-   siempre (op 6251839: precio, pie, saldo y pagaré malos desde el alta, y
-   veinte cargas después seguían igual).
-   Por eso cada discrepancia queda en `carga_diferencias` y una persona decide:
-   dejar el nuestro, tomar el del archivo, o escribir un tercer valor (el del
-   pagaré, que es el documento que manda). El crédito solo cambia cuando
-   alguien elige — la carga nunca decide sola.
+   Desde el 08-09-2026 la carga PISA montos, vehículo y producto con la última
+   información del archivo (queda acá como RESUELTA por la carga, en Historial).
+   Lo que la carga NO decide sola —dealer, vendedor, fecha de otorgamiento y
+   cualquier op de mes cerrado— queda PENDIENTE y una persona elige: dejar el
+   nuestro, tomar el del archivo, o escribir un tercer valor.
    ════════════════════════════════════════════════════════════════════════ */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');

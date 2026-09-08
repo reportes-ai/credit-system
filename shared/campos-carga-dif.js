@@ -2,11 +2,13 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    QUÉ CAMPOS SE CONTRASTAN CONTRA EL ARCHIVO DE LA CARGA — catálogo único.
 
-   La carga masiva NO pisa lo que ya está digitado y revisado en el sistema, pero
-   callar la diferencia deja el error pegado para siempre (op 6251839: precio,
-   pie, saldo y pagaré malos desde el alta, veinte cargas después seguían igual).
-   Cada discrepancia se anota en `carga_diferencias` y una persona elige cuál
-   valor vale. La carga nunca decide sola.
+   Desde el 08-09-2026 (regla de Pato) LA ÚLTIMA INFORMACIÓN MANDA: la carga PISA
+   montos, vehículo y producto con lo que trae el archivo (meses abiertos, dentro
+   de la ventana) y deja la traza como diferencia RESUELTA por la carga. Lo que NO
+   se pisa —dealer, vendedor y fecha de otorgamiento— se anota PENDIENTE en
+   `carga_diferencias` y una persona elige. (Antes nada se pisaba: op 6251839
+   quedó veinte cargas con precio, pie, saldo y pagaré malos; op 26090275 cursó
+   con un Hyundai y el sistema seguía con el Suzuki de la primera foto.)
 
    Este archivo es la ÚNICA lista: la usa el que detecta (carga-trinidad) y el
    que resuelve (carga-diferencias). Antes la lista de campos vivía en un lado y

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Carga Trinidad — Carga Masiva AutoFácil</title><!-- acceso por matriz (antes solo Administrador hardcodeado) · v7.7 - columna Estado BS (antes Estado AF) | v7.6 - cada diferencia muestra el estado BS y el estado Trinidad de la op | v7.5 -->
+  <title>Carga Trinidad — Carga Masiva AutoFácil</title><!-- v7.8 - la ultima informacion manda: la carga pisa montos/vehiculo/producto, deja para elegir dealer/vendedor/fecha · acceso por matriz (antes solo Administrador hardcodeado) · v7.7 - columna Estado BS (antes Estado AF) | v7.6 - cada diferencia muestra el estado BS y el estado Trinidad de la op | v7.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -84,7 +84,7 @@
            operación nace con NUESTRO correlativo y el ID de Trinidad queda en ID
            Financiera. El texto viejo hacía buscar por un número que no es el que
            se guarda. -->
-      <p>Importa los Excel exportados desde Trinidad. <strong>Solicitudes</strong>: nuevos se insertan, existentes se actualizan (estado). <strong>Informe Canal AFA</strong>: complementa seguros, GPS, tipo vehículo y RUT (solo rellena lo vacío). Llave: <strong>ID Trinidad = ID Financiera</strong> del crédito; el N° de Operación es siempre nuestro correlativo AutoFácil.</p>
+      <p>Importa los Excel exportados desde Trinidad. <strong>La última información manda</strong>: nuevos se insertan; en los existentes se pisan montos, vehículo y producto con lo que trae el archivo (meses abiertos) y se recalculan comisión dealer y parque. <strong>No se pisan</strong> dealer, vendedor ni fecha de otorgamiento: esas diferencias quedan para elegir. <strong>Informe Canal AFA</strong>: seguros, GPS, tipo vehículo, tasa y RUT (el plazo solo si falta). Llave: <strong>ID Trinidad = ID Financiera</strong> del crédito; el N° de Operación es siempre nuestro correlativo AutoFácil.</p>
     </div>
   </div>
 
@@ -139,7 +139,7 @@
     <div id="triPaso3" style="display:none;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:20px">
       <div class="section-title"><i class="bi bi-check2-circle" style="color:#16a34a"></i>Resultado de la importación</div>
       <div id="triResultadoContent"></div>
-      <!-- Informe de diferencias: la carga NO pisa lo digitado, acá se elige cuál valor queda -->
+      <!-- Informe de diferencias: lo que la carga NO pisa (dealer, vendedor, fecha) — acá se elige cuál valor queda -->
       <div id="triDiferencias"></div>
     </div>
   </div>
@@ -271,8 +271,9 @@ async function triEjecutarImport() {
 /* ═══════════════════════════════════════════════════════════════════════════
    DIFERENCIAS CON EL ARCHIVO — qué dice el sistema y qué dice Trinidad.
 
-   La carga NO pisa lo que ya está digitado y revisado acá: donde los dos valores
-   no coinciden se muestra el par y una persona elige. Nada se aplica solo.
+   Desde el 08-09-2026 la carga PISA montos, vehículo y producto (la última
+   información manda). Acá llega lo que NO se pisa —dealer, vendedor, fecha de
+   otorgamiento— y una persona elige cuál valor queda.
 
    Lo que NO se elige queda PENDIENTE en /carga-masiva/diferencias/ — por eso los
    controles parten sin marcar: cerrar 300 casos con un default sería "revisado"

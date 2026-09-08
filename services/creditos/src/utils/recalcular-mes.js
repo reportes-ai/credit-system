@@ -19,7 +19,7 @@
 
 const pool = require('../../../../shared/config/database');
 const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
-const { comisionDealer } = require('../../../../api-gateway/public/js/comision-dealer');
+const { comisionDealer, comisionDealerEfectiva } = require('../../../../api-gateway/public/js/comision-dealer');
 const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { getUF } = require('../../../../shared/uf');
 const { aMes } = require('../../../../shared/utils/mes-cerrado');   // normaliza el mes venga como venga
@@ -229,8 +229,15 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
       // UAC: monto_comision_fin es dinámico (tier del mes), nunca se marca forzado.
       if (campo === 'monto_comision_fin' && esUAC) { forz.delete(campo); continue; }
       const partCarta = campo === 'comdea_real' ? partCartaDe.get(String(op.id_financiera || '')) : undefined;
-      const esperado  = partCarta != null ? partCarta : (parseFloat(calc[campo]) || 0);
-      const dif = Math.abs((parseFloat(op[campo]) || 0) - esperado) > tol;
+      // Carta manda solo hacia abajo (motor único comisionDealerEfectiva, 08-09-2026).
+      // Un valor que coincide con la carta NO es "digitado a mano" aunque la carta
+      // supere al cálculo: no se marca forzado, así el recálculo lo baja al efectivo.
+      const esperado  = campo === 'comdea_real'
+        ? comisionDealerEfectiva({ calculada: calc[campo], carta: partCarta })
+        : (parseFloat(calc[campo]) || 0);
+      const valor = parseFloat(op[campo]) || 0;
+      const dif = Math.abs(valor - esperado) > tol
+        && !(campo === 'comdea_real' && partCarta > 0 && Math.abs(valor - partCarta) <= tol);
       if (dif) forz.add(campo); else forz.delete(campo);
     }
     await pool.query('UPDATE creditos SET campos_forzados = ? WHERE id = ?',
@@ -363,10 +370,15 @@ async function recalcularMeses(meses, opciones = {}) {
       // se recalcula siempre con los valores EFECTIVOS (forzado o calculado).
       const forz   = forzadosSet(op.campos_forzados);
       const eff_mcf = forz.has('monto_comision_fin') ? (parseFloat(op.monto_comision_fin) || 0) : monto_comision_fin;
-      // Precedencia comisión dealer: forzado a mano > carta vigente > cálculo.
+      // Precedencia comisión dealer (08-09-2026): forzado A MANO > carta si es MENOR
+      // que el cálculo > cálculo (motor único comisionDealerEfectiva). Un "forzado"
+      // cuyo valor es el de la carta vino de la carta, no de una mano: se recalcula
+      // igual, si no la carta seguiría mandando hacia arriba por la puerta de atrás.
       const partCarta = partCartaDe.get(String(op.id_financiera || ''));
-      const eff_cdr = forz.has('comdea_real') ? (parseFloat(op.comdea_real) || 0)
-                    : (partCarta != null ? partCarta : comdea_real);
+      const cdrGuardado = parseFloat(op.comdea_real) || 0;
+      const forzadoAMano = forz.has('comdea_real') && !(partCarta > 0 && Math.abs(cdrGuardado - partCarta) <= 1);
+      const eff_cdr = forzadoAMano ? cdrGuardado
+                    : comisionDealerEfectiva({ calculada: comdea_real, carta: partCarta });
       const eff_cpq = forz.has('com_parque')         ? (parseFloat(op.com_parque)         || 0) : com_parque_val;
 
       // 5. Ingreso neto total ─────────────────────────────────────────

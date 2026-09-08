@@ -909,10 +909,11 @@ const otorgar = async (req, res) => {
       const cond = [], args = [];
       if (ca.id_credito_creado) { cond.push('id = ?'); args.push(ca.id_credito_creado); }
       if (ca.id_financiera)     { cond.push('num_op = ?'); args.push(ca.id_financiera); }
-      // Participación PACTADA de la carta: al otorgar manda sobre el cálculo. Concilia
-      // creditos.comdea_real = part_bruto para que el dashboard (lee comdea_real) y la
-      // cartola (usa COALESCE(part_bruto, comdea_real)) muestren el MISMO monto. Solo si
-      // la carta trae part_bruto (>0); si no, se respeta el comdea_real del motor.
+      // Participación PACTADA de la carta: al otorgar manda SOLO HACIA ABAJO (08-09-2026):
+      // se escribe part_bruto si el crédito no tiene comisión o si la carta es MENOR que
+      // la calculada; si es mayor, queda la del motor. El recalcularPorOps de más abajo
+      // vuelve a resolver la precedencia con el motor único (comisionDealerEfectiva), y
+      // la cartola toma LEAST(part_bruto, comdea_real): dashboard y cartola muestran lo mismo.
       const partB = Number(ca.part_bruto) || 0;
       if (cond.length) {
         await pool.query(
@@ -929,7 +930,7 @@ const otorgar = async (req, res) => {
                      curse definitiva (motor único shared/mes-atribucion). Con el CASE
                      anterior una fecha prellenada válida dejaba el mes viejo (07-09-2026). */
                   ${SET_MES_SQL(await mesCorte())},
-                  comdea_real = CASE WHEN ? > 0 THEN ? ELSE comdea_real END, updated_at=NOW()
+                  comdea_real = CASE WHEN ? > 0 AND (COALESCE(comdea_real,0) <= 0 OR ? < comdea_real) THEN ? ELSE comdea_real END, updated_at=NOW()
             WHERE (${cond.join(' OR ')})
               /* UPPER en las dos ramas: estas columnas tienen collation BINARIA
                  (utf8mb4_bin), o sea distinguen mayúsculas. La carga Trinidad
@@ -940,7 +941,7 @@ const otorgar = async (req, res) => {
                    /* Créditos de carga masiva: estado NULL, el estado vive en estado_credito.
                       Sin esta rama, otorgar la carta no movía la operación a OTORGADO. */
                    OR (estado IS NULL AND UPPER(COALESCE(estado_credito,'')) IN ('APROBADO','DIGITADO','PENDIENTE')))`,
-          [...valoresEtapa('OTORGADO'), partB, partB, ...args]
+          [...valoresEtapa('OTORGADO'), partB, partB, partB, ...args]
         ).then(async ([r]) => {
           /* El fallo era MUDO: si el UPDATE no tocaba ninguna fila, la carta
              quedaba otorgada y el crédito atrás, sin que nadie se enterara hasta
@@ -1010,7 +1011,11 @@ const otorgar = async (req, res) => {
        SELECT DATE_FORMAT(COALESCE(ca.fecha_otorgado, NOW()), '%Y-%m'),
               ca.id, ca.id_financiera, 'COMISION', ca.rut_dealer, ca.nombre_dealer,
               ca.ejecutivo, ca.cliente, ca.rut_cliente, ca.saldo,
-              COALESCE(NULLIF(ca.part_bruto,0), crx.comdea_real),
+              /* Carta manda solo hacia abajo (08-09-2026): la MENOR entre la carta y la
+                 comisión vigente del crédito; si falta una, la otra. */
+              CASE WHEN COALESCE(ca.part_bruto,0) > 0 AND COALESCE(crx.comdea_real,0) > 0
+                   THEN LEAST(ca.part_bruto, crx.comdea_real)
+                   ELSE COALESCE(NULLIF(ca.part_bruto,0), crx.comdea_real) END,
               'PENDIENTE', ca.op_carta, ca.vendedor, ca.acreedor
          FROM cartas_aprobacion ca
          LEFT JOIN creditos crx ON crx.id = ca.id_credito_creado

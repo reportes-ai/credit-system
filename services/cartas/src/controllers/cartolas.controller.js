@@ -116,7 +116,12 @@ const sync = async (req, res) => {
       SELECT DATE_FORMAT(COALESCE(ca.fecha_otorgado, NOW()), '%Y-%m'),
              ca.id, ca.id_financiera, 'COMISION', ca.rut_dealer, ca.nombre_dealer,
              ca.ejecutivo, ca.cliente, ca.rut_cliente, ca.saldo,
-             COALESCE(NULLIF(ca.part_bruto,0), crx.comdea_real),
+             /* Carta manda solo hacia abajo (08-09-2026): la MENOR entre la carta y la
+                comisión vigente del crédito (motor comisionDealerEfectiva); si falta
+                una de las dos, la otra. Antes la carta mandaba siempre. */
+             CASE WHEN COALESCE(ca.part_bruto,0) > 0 AND COALESCE(crx.comdea_real,0) > 0
+                  THEN LEAST(ca.part_bruto, crx.comdea_real)
+                  ELSE COALESCE(NULLIF(ca.part_bruto,0), crx.comdea_real) END,
              'PENDIENTE', ca.op_carta, ca.vendedor, ca.acreedor
       FROM cartas_aprobacion ca
       LEFT JOIN creditos crx ON crx.id = ca.id_credito_creado

@@ -6,6 +6,8 @@
  *   1. TABLA INDIVIDUAL del dealer (dealers.com_* / com_parque_*) si tiene ese tramo → MANDA.
  *   2. Si no, la PIZARRA (parametros_credito: dealer_pct_* parque, dealer_calle_pct_* calle),
  *      que es solo el default/semilla al crear la ficha de un dealer nuevo.
+ * Y sobre el resultado, la CARTA solo manda hacia abajo (comisionDealerEfectiva):
+ *   forzado a mano > carta si es MENOR que el cálculo > cálculo.
  *
  * Comisión parque = lo que se paga al DUEÑO del parque automotriz: arriendo (fijo) +
  * % del saldo precio, paramétrico por parque (parques_comisiones) con fallback a patio_pct.
@@ -105,5 +107,23 @@
     return { comdea_real, com_parque, arriendo, base_pct };
   }
 
-  return { comisionDealer, dealerTablePct, tablaDeUbicacion, normRutD, pizarraParque, pizarraCalle };
+  /**
+   * COMISIÓN DEALER EFECTIVA — precedencia única carta vs cálculo (Pato, 08-09-2026).
+   * La carta manda SOLO HACIA ABAJO: si la participación pactada en la carta es
+   * INFERIOR a la normal (tabla del dealer / pizarra sobre el saldo vigente), se
+   * mantiene la de la carta; si es igual o mayor, rige el cálculo. Así, cuando la
+   * carga masiva pisa el saldo precio, la comisión se recalcula sola y una carta
+   * armada con el saldo viejo no deja pegado un monto que ya no corresponde.
+   * (Antes la carta mandaba siempre: forzado > carta > cálculo.)
+   *   calculada = comdea_real del motor (sobre los datos vigentes)
+   *   carta     = part_bruto de la carta APROBADA vigente (0/null si no hay)
+   */
+  function comisionDealerEfectiva({ calculada, carta }) {
+    const calc = Math.round(parseFloat(calculada) || 0);
+    const pc   = Math.round(parseFloat(carta) || 0);
+    if (pc > 0 && (calc <= 0 || pc < calc)) return pc;
+    return calc;
+  }
+
+  return { comisionDealer, comisionDealerEfectiva, dealerTablePct, tablaDeUbicacion, normRutD, pizarraParque, pizarraCalle };
 });

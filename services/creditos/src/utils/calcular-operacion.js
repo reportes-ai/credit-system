@@ -7,7 +7,7 @@
 
 const pool = require('../../../../shared/config/database');
 const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
-const { comisionDealer } = require('../../../../api-gateway/public/js/comision-dealer');
+const { comisionDealer, comisionDealerEfectiva } = require('../../../../api-gateway/public/js/comision-dealer');
 const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { cargarTasas, getTasaByFecha } = require('./recalcular-mes');
 const { getUF } = require('../../../../shared/uf');
@@ -167,17 +167,17 @@ async function calcularOperacion(op) {
     arriendo_parque_calc = cd.arriendo;
   }
 
-  // La carta manda: si la operación tiene carta APROBADA con participación
-  // negociada (part_bruto), esa es la comisión dealer real — la cartola paga
-  // por la carta. Misma precedencia que el recálculo mensual: forzado a mano
-  // > carta vigente > cálculo (el forzado lo respetan los llamadores).
+  // La carta manda SOLO HACIA ABAJO (08-09-2026): si la participación pactada en la
+  // carta APROBADA es menor que el cálculo, se mantiene; si no, rige el cálculo.
+  // Misma precedencia que el recálculo mensual (motor único comisionDealerEfectiva):
+  // forzado a mano > carta menor > cálculo (el forzado lo respetan los llamadores).
   if (op.id_financiera) {
     try {
       const [cs] = await pool.query(
         `SELECT part_bruto FROM cartas_aprobacion
           WHERE status='APROBADA' AND COALESCE(part_bruto,0) > 0 AND id_financiera = ?
           ORDER BY id DESC LIMIT 1`, [String(op.id_financiera)]);
-      if (cs[0]) comdea_real = Number(cs[0].part_bruto);
+      if (cs[0]) comdea_real = comisionDealerEfectiva({ calculada: comdea_real, carta: cs[0].part_bruto });
     } catch (e) { /* sin tabla de cartas → queda el cálculo */ }
   }
 

@@ -175,6 +175,50 @@ async function anotarDiferencias(idCredito, actual, archivo, origen) {
   }));
 }
 
+/* ── LA ÚLTIMA INFORMACIÓN MANDA (regla de Pato, 08-09-2026) ─────────────────
+   La carga PISA con lo que trae el archivo: montos, vehículo, producto. Las
+   excepciones son el DEALER y el VENDEDOR (de quién es el negocio: eso lo dice la
+   carta y se resuelve a mano en Diferencias), los meses cerrados y lo que quede
+   fuera de la ventana de contraste. La comisión dealer y parque se recalculan
+   después con el motor (carta manda solo hacia abajo: comisionDealerEfectiva).
+   Cada valor pisado queda en carga_diferencias como RESUELTA por la carga y en
+   el historial de cambios de la sesión: se pisa, pero nunca en silencio.
+   Caso que lo originó: op 26090275 nació de la carga con un Suzuki de $9,79 M y
+   el negocio cursó con un Hyundai de $8,49 M; veinte cargas después seguía igual. */
+const CAMPOS_PISAN = CAMPOS_DIF.filter(c => !['automotora', 'vendedor', 'fecha_otorgado'].includes(c.col));
+async function pisarDesdeArchivo(idCredito, actual, f, origen, cambiosLog) {
+  const sets = [], vals = [], pisados = [];
+  for (const c of CAMPOS_PISAN) {
+    const nuevo = f[c.col];
+    const vacio = nuevo === null || nuevo === undefined || String(nuevo).trim() === '' || (c.tipo === 'peso' && !(Number(nuevo) > 0));
+    if (vacio || !difieren(c, actual[c.col], nuevo)) continue;
+    sets.push(`${c.col} = ?`); vals.push(nuevo);
+    pisados.push({ campo: c.col, etiqueta: c.etiqueta, antes: aTexto(c, actual[c.col]), despues: aTexto(c, nuevo) });
+  }
+  if (!sets.length) return [];
+  // La cuota depende de monto+tasa+plazo: si cambió el pagaré, se recalcula con el motor único.
+  const montoNuevo = pisados.some(p => p.campo === 'monto_financiado') ? Number(f.monto_financiado) : 0;
+  if (montoNuevo > 0 && Number(actual.tascli_real) > 0 && Number(actual.plazo) > 0) {
+    try {
+      const core = require('../../../../api-gateway/public/js/rentabilidad-core');
+      const cu = Math.round(core.cuotaFrancesa(montoNuevo, Number(actual.tascli_real) / 100, Number(actual.plazo)));
+      if (cu > 0) { sets.push('cuota = ?'); vals.push(cu); }
+    } catch (_) {}
+  }
+  await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, [...vals, idCredito]);
+  for (const p of pisados) {
+    actual[p.campo] = f[p.campo];   // para que el contraste posterior lo vea ya igual
+    cambiosLog.push({ num_op: actual.num_op || actual.id_financiera, campo: p.campo, valor_anterior: p.antes, valor_nuevo: p.despues });
+    // Traza en Diferencias: queda RESUELTA por la carga (uk_dif admite UNA resuelta por campo).
+    await pool.query("DELETE FROM carga_diferencias WHERE id_credito=? AND campo=? AND estado IN ('PENDIENTE','RESUELTA')", [idCredito, p.campo]);
+    await pool.query(
+      `INSERT INTO carga_diferencias (id_credito, num_op, id_financiera, campo, valor_sistema, valor_archivo, origen, estado, eleccion, valor_elegido, resuelto_por, resuelto_at)
+       VALUES (?,?,?,?,?,?,?,'RESUELTA','ARCHIVO',?,'Carga (última información manda)',NOW())`,
+      [idCredito, actual.num_op || null, actual.id_financiera || null, p.campo, p.antes, p.despues, (origen || '').slice(0, 120), p.despues]);
+  }
+  return pisados;
+}
+
 /* ── Carga mapa de estados desde BD (con fallback hardcoded) ────── */
 async function cargarMapaEstados() {
   try {
@@ -425,9 +469,10 @@ function esArchivoCanal(buffer) {
   } catch { return false; }
 }
 
-/* ── Complementa creditos con datos del Informe Canal (fill-only) ──
-   Solo RELLENA lo vacío (montos 0/NULL, strings NULL); nunca pisa datos
-   existentes ni toca meses cerrados. Match por num_op o id_financiera. */
+/* ── Complementa creditos con datos del Informe Canal ──
+   Desde el 08-09-2026 la última información MANDA: seguros, vehículo y tasa se
+   pisan cuando difieren (meses abiertos). El plazo sigue fill-only (derivado,
+   ±1 ambiguo). Match por num_op o id_financiera. */
 async function aplicarCanal(mapaCanal, log) {
   const corteMes = await mesCorte();
   const ids = Object.keys(mapaCanal).map(Number);
@@ -467,13 +512,19 @@ async function aplicarCanal(mapaCanal, log) {
         cerrado = cerradoCache[mesStr];
       }
       const sets = [], vals = [];
-      if (!cerrado) for (const c of MONTOS) if ((f[c] || 0) > 0 && !(Number(r[c]) > 0)) { sets.push(`${c} = ?`); vals.push(f[c]); }
-      for (const c of TEXTOS) if (f[c] && !normStr(r[c])) { sets.push(`${c} = ?`); vals.push(f[c]); }
-      for (const c of NUMS) if ((f[c] || 0) > 0 && !(Number(r[c]) > 0)) { sets.push(`${c} = ?`); vals.push(f[c]); }
-      // Cuota francesa (motor único) si queda completa la tripleta monto+tasa+plazo y no hay cuota
-      const tasaFin = (f.tascli_real || 0) > 0 && !(Number(r.tascli_real) > 0) ? f.tascli_real : Number(r.tascli_real);
+      /* La última información manda (08-09-2026): seguros, vehículo y tasa se PISAN con
+         el Canal cuando difieren (meses abiertos). El PLAZO sigue fill-only: se deriva de
+         fechas y es ±1 ambiguo, lo digitado manda. */
+      if (!cerrado) for (const c of MONTOS) if ((f[c] || 0) > 0 && Math.abs(Number(r[c] || 0) - Number(f[c])) > 1) { sets.push(`${c} = ?`); vals.push(f[c]); }
+      for (const c of TEXTOS) if (f[c] && normStr(r[c]) !== normStr(f[c])) { sets.push(`${c} = ?`); vals.push(f[c]); }
+      if (!cerrado && (f.tascli_real || 0) > 0 && Math.abs(Number(r.tascli_real || 0) - Number(f.tascli_real)) > 0.0005) { sets.push('tascli_real = ?'); vals.push(f.tascli_real); }
+      if ((f.plazo || 0) > 0 && !(Number(r.plazo) > 0)) { sets.push('plazo = ?'); vals.push(f.plazo); }
+      // Cuota francesa (motor único) cuando queda completa la tripleta monto+tasa+plazo y
+      // no hay cuota, o cuando la tasa cambió (la cuota vieja ya no cuadra con su crédito).
+      const tasaCambio = sets.includes('tascli_real = ?');
+      const tasaFin = (f.tascli_real || 0) > 0 && (tasaCambio || !(Number(r.tascli_real) > 0)) ? f.tascli_real : Number(r.tascli_real);
       const plazoFin = (f.plazo || 0) > 0 && !(Number(r.plazo) > 0) ? f.plazo : Number(r.plazo);
-      if (!(Number(r.cuota) > 0) && Number(r.monto_financiado) > 0 && tasaFin > 0 && plazoFin > 0) {
+      if ((!(Number(r.cuota) > 0) || tasaCambio) && Number(r.monto_financiado) > 0 && tasaFin > 0 && plazoFin > 0) {
         try {
           const core = require('../../../../api-gateway/public/js/rentabilidad-core');
           const cu = Math.round(core.cuotaFrancesa(Number(r.monto_financiado), tasaFin / 100, plazoFin));
@@ -622,7 +673,7 @@ exports.importar = async (req, res) => {
        'YYYY-MM'. Por eso el período se compara SIEMPRE contra este campo, ya
        formateado por SQL, y nunca contra `mes` directo. */
     const COLS_ACT = `valor_vehiculo, pie, saldo_precio, monto_financiado,
-              marca, modelo, automotora, vendedor, producto,
+              marca, modelo, automotora, vendedor, producto, tascli_real, plazo,
               DATE_FORMAT(mes,'%Y-%m') AS mes_txt,
               DATE_FORMAT(fecha_otorgado,'%Y-%m-%d') AS fecha_otorgado`;
     // Traer registros actuales (por num_op propio)
@@ -741,11 +792,15 @@ exports.importar = async (req, res) => {
              fechaEq, fechaEq, fechaEq ? fechaEq.slice(0, 7) + '-01' : null, String(f.num_op)]
           );
           actualizados++;
-          // Diferencias de montos contra el archivo → cola para resolver a mano
+          // La última información manda: se pisan montos/vehículo/producto (no dealer ni
+          // vendedor, no meses cerrados); lo que no se pisa queda en Diferencias para decidir.
           try {
             const act = existAfMap[String(f.num_op)];
-            if (act && enVentana(act, f) && !(await isMesCerrado(act.mes_txt || '')))
+            if (act && enVentana(act, f) && !(await isMesCerrado(act.mes_txt || ''))) {
+              const pis = await pisarDesdeArchivo(act.id, act, f, nombreArchivo, cambiosLog);
+              if (pis.length) log.push(`✎ ${f.num_op}: pisado con el archivo → ${pis.map(p => p.etiqueta).join(', ')}`);
               difsCorrida.push(...await anotarDiferencias(act.id, act, f, nombreArchivo));
+            }
           } catch (e) { console.error('[dif AF]', e.message); }
           log.push(`↔ Sincronizado en AF ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
           if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIdFinanciera.push(String(f.num_op));
@@ -789,8 +844,11 @@ exports.importar = async (req, res) => {
           );
           actualizados++;
           try {
-            if (actual.id && enVentana(actual, f) && !(await isMesCerrado(actual.mes_txt || '')))
+            if (actual.id && enVentana(actual, f) && !(await isMesCerrado(actual.mes_txt || ''))) {
+              const pis = await pisarDesdeArchivo(actual.id, actual, f, nombreArchivo, cambiosLog);
+              if (pis.length) log.push(`✎ ${f.num_op}: pisado con el archivo → ${pis.map(p => p.etiqueta).join(', ')}`);
               difsCorrida.push(...await anotarDiferencias(actual.id, actual, f, nombreArchivo));
+            }
           } catch (e) { console.error('[dif]', e.message); }
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
           if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIds.push(f.num_op);
@@ -921,7 +979,9 @@ exports.importar = async (req, res) => {
       ventana_txt: meses.length > 1 ? `${meses[0]} a ${meses[meses.length - 1]}` : meses[0],
       fuera_ventana: fueraVentana,
     };
-    if (difsCorrida.length) log.push(`⚖ ${difsCorrida.length} diferencia(s) con el archivo en ${diferencias.operaciones} operación(es) — nada se pisó, hay que elegir`);
+    const nPisados = cambiosLog.filter(c => c.campo !== 'estado_autofin').length;
+    if (nPisados) log.push(`✎ ${nPisados} valor(es) pisados con la última información del archivo (montos/vehículo/producto; traza en Diferencias → Historial)`);
+    if (difsCorrida.length) log.push(`⚖ ${difsCorrida.length} diferencia(s) de dealer/vendedor/fecha con el archivo en ${diferencias.operaciones} operación(es) — esas no se pisan, hay que elegir`);
     if (fueraVentana) log.push(`⏭ ${fueraVentana} operación(es) fuera del período contrastado (${diferencias.ventana_txt}) — no se compararon`);
 
     return res.json({
