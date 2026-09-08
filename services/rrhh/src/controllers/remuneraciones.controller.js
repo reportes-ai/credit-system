@@ -454,7 +454,9 @@ async function subtiposDesc() {
 const cuotaEnMes = (d, m, tc) => {
   const k = difMeses(d.mes_inicio, m);
   if (k < 0) return null;
-  if (d.tipo !== 'PERMANENTE' && k >= d.cuotas) return null;   // plan ya pagado
+  // Plan ya pagado. PERMANENTE con cuotas=0 es indefinido; con cuotas>0 es un tope
+  // (crédito social "016/027": termina solo en la cuota 27 — carga AVSOFT 08-09-2026).
+  if ((d.tipo !== 'PERMANENTE' || Number(d.cuotas) > 0) && k >= d.cuotas) return null;
   const mon = String(d.moneda || 'CLP').toUpperCase();
   if (mon !== 'CLP' && d.valor_cuota_origen != null && tc && tc[mon]) return TC.aCLP(d.valor_cuota_origen, tc[mon]);
   return Number(d.valor_cuota);
@@ -473,7 +475,7 @@ const getDescuentos = async (req, res) => {
     const tc = await tcDelMes(mes);
     const tcHoy = await TC.tiposCambio(new Date().toISOString().slice(0, 10));
     const delMes = rows.filter(d => d.estado === 'VIGENTE' && cuotaEnMes(d, mes, tc) != null)
-      .map(d => ({ ...d, cuota_mes: cuotaEnMes(d, mes, tc), cuota_num: d.tipo === 'PERMANENTE' ? null : difMeses(d.mes_inicio, mes) + 1 }));
+      .map(d => ({ ...d, cuota_mes: cuotaEnMes(d, mes, tc), cuota_num: (d.tipo === 'PERMANENTE' && !(Number(d.cuotas) > 0)) ? null : difMeses(d.mes_inicio, mes) + 1 }));
     const total_mes = delMes.reduce((s, d) => s + d.cuota_mes, 0);
     ok(res, { mes, descuentos: rows, del_mes: delMes, total_mes, bloqueado: await mesEmitido(mes), tmc: await tmcVigente(), subtipos: await subtiposDesc(),
       monedas: TC.MONEDAS, tc_mes: tc, tc_hoy: tcHoy });
