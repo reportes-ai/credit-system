@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
+  <!-- v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -41,6 +41,7 @@
     <li class="nav-item"><a class="nav-link active" href="#" id="tabI" onclick="tab('I');return false"><i class="bi bi-plus-circle me-1"></i>Ingresar</a></li>
     <li class="nav-item"><a class="nav-link" href="#" id="tabM" onclick="tab('M');return false"><i class="bi bi-calendar-month me-1"></i>Cuotas del mes</a></li>
     <li class="nav-item"><a class="nav-link" href="#" id="tabT" onclick="tab('T');return false"><i class="bi bi-list-ul me-1"></i>Todos los descuentos</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabA" onclick="tab('A');return false"><i class="bi bi-x-circle me-1"></i>Anulados <span id="nAnul" class="badge rounded-pill text-bg-secondary"></span></a></li>
   </ul>
 
   <div class="d-flex gap-2 align-items-end mb-3">
@@ -111,6 +112,15 @@
     </div>
   </div>
 
+  <!-- Anulados aparte (Pato, 08-09-2026): con fecha y quién los anuló; los vigentes quedan limpios en "Todos" -->
+  <div id="secA" style="display:none">
+    <div class="d-flex justify-content-end mb-2"><button class="btn btn-sm btn-outline-success" onclick="exportar('A')"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button></div>
+    <div class="panel" style="padding:0;overflow:auto">
+      <table><thead><tr><th>Colaborador</th><th>Tipo</th><th>Detalle</th><th class="text-right">Capital</th><th>Cuotas</th><th class="text-right">Valor cuota</th><th>Inicio</th><th>Ingresado por</th><th>Anulado el</th><th>Anulado por</th></tr></thead>
+      <tbody id="tbAnul"><tr><td colspan="10" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
   <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.8rem">
     <div class="fw-bold mb-1"><i class="bi bi-diagram-3 me-1"></i>Cómo funcionan</div>
     <b>Anticipo</b>: capital ÷ N meses, sin interés. <b>Préstamo al personal</b>: cuota francesa solo capital + interés; la tasa mensual <b>no puede superar la TMC vigente</b> (se valida contra la tabla de tasas sincronizada con la CMF). <b>Pago en exceso</b>: referencia al mes pagado de más, en 1 o más cuotas. <b>Permanente</b> (tribunal, TGR, APV, otro): monto mensual indefinido hasta que se anule. <b>Moneda</b>: el monto puede ingresarse en Pesos, UF, UTM o Dólares; en moneda distinta de pesos el descuento se guarda en su moneda y <b>cada mes se convierte a pesos con el indicador del mes</b> (UF del motor único; UTM y dólar del mantenedor de indicadores), por lo que la cuota en pesos varía mes a mes. Todas las cuotas parten en la <b>próxima remuneración</b> y caen solas en "Otros Dcto." del <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> (si editas la celda a mano, tu valor manda). Anular un descuento detiene las cuotas futuras; lo ya descontado en meses emitidos no se toca.
@@ -151,9 +161,9 @@ function monedaUI(){
 }
 
 function tab(m){
-  tabI.classList.toggle('active',m==='I'); tabM.classList.toggle('active',m==='M'); tabT.classList.toggle('active',m==='T');
-  secI.style.display=m==='I'?'':'none'; secM.style.display=m==='M'?'':'none'; secT.style.display=m==='T'?'':'none';
+  for (const k of ['I','M','T','A']) { document.getElementById('tab'+k).classList.toggle('active', m===k); document.getElementById('sec'+k).style.display = m===k ? '' : 'none'; }
 }
+const fdh = v => { if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('es-CL',{timeZone:'America/Santiago'})+' '+d.toLocaleTimeString('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit'}); };
 
 /* Checkbox Permanente ↔ tipo PERMANENTE: son la misma cosa, sincronizados
    en los dos sentidos (marcarlo cambia el tipo; elegir el tipo lo marca). */
@@ -252,7 +262,21 @@ function render(){
     <td class="text-right num">$${fmt(d.cuota_mes)} ${origenTxt(d)}</td>
     <td>${esc(d.creado_por||'')}</td></tr>`).join('')
     || '<tr><td colspan="6" class="text-center text-muted py-3">Sin descuentos este mes</td></tr>';
-  document.getElementById('tbTodos').innerHTML = D.descuentos.map(d=>`<tr style="${d.estado==='ANULADO'?'opacity:.55':''}">
+  const vigentes = D.descuentos.filter(d=>d.estado!=='ANULADO'), anulados = D.descuentos.filter(d=>d.estado==='ANULADO');
+  document.getElementById('nAnul').textContent = anulados.length || '';
+  document.getElementById('tbAnul').innerHTML = anulados.map(d=>`<tr>
+    <td>${esc(d.nombre_actual||d.nombre)}</td>
+    <td><span class="pill ${d.tipo}">${esc(tipoTxt(d))}</span></td>
+    <td>${esc(d.detalle_texto||'')}</td>
+    <td class="text-right num">${d.moneda&&d.moneda!=='CLP'?fmtO(d.monto_origen,d.moneda):'$'+fmt(d.monto_total)}</td>
+    <td>${d.cuotas||'mensual'}</td>
+    <td class="text-right num">${d.moneda&&d.moneda!=='CLP'?fmtO(d.valor_cuota_origen,d.moneda):'$'+fmt(d.valor_cuota)}</td>
+    <td>${d.mes_inicio}</td>
+    <td>${esc(d.creado_por||'')}</td>
+    <td style="white-space:nowrap">${fdh(d.anulado_at)}</td>
+    <td><b>${esc(d.anulado_por||'')}</b></td></tr>`).join('')
+    || '<tr><td colspan="10" class="text-center text-muted py-3">Sin descuentos anulados</td></tr>';
+  document.getElementById('tbTodos').innerHTML = vigentes.map(d=>`<tr>
     <td>${esc(d.nombre_actual||d.nombre)}</td>
     <td><span class="pill ${d.tipo}">${esc(tipoTxt(d))}</span></td>
     <td>${esc(d.detalle_texto||'')}</td>
@@ -267,7 +291,7 @@ function render(){
       ${d.tiene_convenio?'<i class="bi bi-patch-check-fill text-success" title="Convenio firmado en la carpeta digital"></i>'
         :`<i class="bi bi-upload text-primary" style="cursor:pointer" title="Subir convenio FIRMADO (va a la carpeta digital)" onclick="subirConvenio(${d.id})"></i> <span style="color:#dc2626;font-size:.68rem;font-weight:700">SIN FIRMA</span>`}`:''}</td>
     <td>${d.estado==='VIGENTE'?`<i class="bi bi-x-circle text-danger" style="cursor:pointer" title="Anular (detiene cuotas futuras)" onclick="anular(${d.id})"></i>`:''}</td></tr>`).join('')
-    || '<tr><td colspan="11" class="text-center text-muted py-3">Sin descuentos registrados</td></tr>';
+    || '<tr><td colspan="11" class="text-center text-muted py-3">Sin descuentos vigentes</td></tr>';
 }
 
 async function nuevoConceptoDesc(){
@@ -346,12 +370,15 @@ function exportar(m){
     ? [['Mes','Colaborador','Tipo','Detalle','Cuota','Monto del mes','Ingresado por'],
        ...D.del_mes.map(d=>[fMes.value,d.nombre_actual||d.nombre,tipoTxt(d),d.detalle_texto||'',d.cuota_num?`${d.cuota_num} de ${d.cuotas}`:'mensual',d.cuota_mes,d.creado_por||'']),
        [],['','','','','TOTAL',D.total_mes]]
-    : [['Colaborador','Tipo','Detalle','Capital','Tasa','Cuotas','Valor cuota','Inicio','Estado'],
-       ...D.descuentos.map(d=>[d.nombre_actual||d.nombre,tipoTxt(d),d.detalle_texto||'',d.monto_total,d.tasa_pct||'',d.cuotas||'mensual',d.valor_cuota,d.mes_inicio,d.estado])];
+    : m==='A'
+    ? [['Colaborador','Tipo','Detalle','Capital','Cuotas','Valor cuota','Inicio','Ingresado por','Anulado el','Anulado por'],
+       ...D.descuentos.filter(d=>d.estado==='ANULADO').map(d=>[d.nombre_actual||d.nombre,tipoTxt(d),d.detalle_texto||'',d.monto_total,d.cuotas||'mensual',d.valor_cuota,d.mes_inicio,d.creado_por||'',fdh(d.anulado_at),d.anulado_por||''])]
+    : [['Colaborador','Tipo','Detalle','Moneda','Capital','Tasa','Cuotas','Valor cuota','Inicio','Estado'],
+       ...D.descuentos.filter(d=>d.estado!=='ANULADO').map(d=>[d.nombre_actual||d.nombre,tipoTxt(d),d.detalle_texto||'',d.moneda||'CLP',d.monto_total,d.tasa_pct||'',d.cuotas||'mensual',d.valor_cuota,d.mes_inicio,d.estado])];
   const html = '<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c==null?'':c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
   const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'],{type:'application/vnd.ms-excel'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = (m==='M'?'descuentos-mes-'+fMes.value:'descuentos-todos')+'.xls'; a.click(); URL.revokeObjectURL(a.href);
+  a.download = (m==='M'?'descuentos-mes-'+fMes.value:m==='A'?'descuentos-anulados':'descuentos-vigentes')+'.xls'; a.click(); URL.revokeObjectURL(a.href);
 }
 
 tipoUI(); cargar();
