@@ -441,9 +441,37 @@ const listarOrdenes = async (req, res) => {
     const yo = (req.usuario || {});
     const dobleP = await segregacion.exigeDoblePersona();
     const nombreYo = String([yo.nombre, yo.apellido].filter(Boolean).join(' ')).trim().toLowerCase();
+    /* Dealer de respaldo por N° de operación del concepto: 2.181 órdenes pagadas
+       migradas y las que apuntan a un seguimiento re-migrado no tienen seguimiento
+       vivo, así que el JOIN no encuentra el dealer y la columna salía "—" (Pato,
+       08-09-2026). El crédito sí sabe de quién es la operación. */
+    const opsSinDealer = new Set();
+    for (const r of rows) {
+      if (r.origen === 'GENERAL') continue;
+      if (r.origen === 'SALDO' ? r.s_dealer : r.c_dealer) continue;
+      const m = String(r.concepto || '').match(/OP\s+(\d+)/i);
+      if (m) opsSinDealer.add(m[1]);
+    }
+    const dealerPorOp = new Map();
+    if (opsSinDealer.size) {
+      const lista = [...opsSinDealer];
+      const [cs] = await pool.query(
+        `SELECT c.num_op, c.id_financiera, COALESCE(NULLIF(d.nombre_razon,''), NULLIF(d.nombre_indexa,''), c.automotora) AS dealer
+           FROM creditos c LEFT JOIN dealers d ON d.id_dealer = c.id_dealer
+          WHERE c.num_op IN (?) OR c.id_financiera IN (?)`, [lista, lista]).catch(() => [[]]);
+      for (const c of cs) {
+        if (!c.dealer) continue;
+        if (c.num_op != null) dealerPorOp.set(String(c.num_op), c.dealer);
+        if (c.id_financiera) dealerPorOp.set(String(c.id_financiera), c.dealer);
+      }
+    }
     let data = rows.map(r => {
       const esGen = r.origen === 'GENERAL';
-      const proveedor = esGen ? r.g_prov : (r.origen === 'SALDO' ? r.s_dealer : r.c_dealer);
+      let proveedor = esGen ? r.g_prov : (r.origen === 'SALDO' ? r.s_dealer : r.c_dealer);
+      if (!proveedor && !esGen) {
+        const m = String(r.concepto || '').match(/OP\s+(\d+)/i);
+        if (m && dealerPorOp.has(m[1])) proveedor = dealerPorOp.get(m[1]);
+      }
       let estado;
       if (r.anulada) estado = 'ANULADA';
       else if (esGen) estado = r.g_estado || 'EMITIDA';
