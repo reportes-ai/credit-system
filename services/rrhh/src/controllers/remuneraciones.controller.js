@@ -221,6 +221,8 @@ const CAUSALES_ADIC = {
   // Pato 08-09-2026: renta garantizada por un período (ej. ejecutivo nuevo) — imponibles,
   // se ingresan PERMANENTES con mes desde/hasta.
   'SUELDO ASEGURADO': 1, 'BONO ASEGURADO': 1, 'VARIABLE ASEGURADO': 1,
+  // Aguinaldos/bonos de temporada: imponibles (art. 41 CT). Se pueden asignar a TODO el personal.
+  'BONO FIESTAS PATRIAS': 1, 'BONO NAVIDAD': 1, 'BONO VACACIONES': 1,
   'VIÁTICO': 0, 'COLACIÓN ADICIONAL': 0, 'MOVILIZACIÓN ADICIONAL': 0,
   'ASIGNACIÓN DE CELULAR': 0, 'DEVOLUCIÓN DE DESCUENTO': 0, 'OTRO': null,
 };
@@ -280,8 +282,40 @@ const crearAdicional = async (req, res) => {
     const mes = b.mes;
     if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'Mes inválido', 400);
     if (await mesEmitido(mes)) return fail(res, `Las remuneraciones de ${mes} ya fueron EMITIDAS: el mes está bloqueado para nuevos adicionales.`, 423);
+    const causal = String(b.causal || '').toUpperCase().trim();
+    /* TODO EL PERSONAL (Pato 08-09-2026): id_usuario='TODOS' crea el mismo adicional
+       para cada colaborador activo con ficha (bono Fiestas Patrias, Navidad, vacaciones…).
+       Quien ya tenga esa misma causal en el mes se salta, así se puede repetir sin duplicar. */
+    const todos = String(b.id_usuario) === 'TODOS';
+    if (todos) {
+      if (causal === 'HORAS EXTRAS') return fail(res, 'Las horas extras se digitan por persona', 400);
+      const [gente] = await pool.query(
+        `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre FROM usuarios u
+           JOIN rh_fichas f ON f.id_usuario=u.id_usuario
+          WHERE u.estado='activo' AND COALESCE(f.sueldo_base,0) > 0
+            AND u.id_usuario NOT IN (SELECT id_usuario FROM rh_adicionales WHERE mes=? AND causal=?)
+          ORDER BY nombre`, [mes, causal]);
+      if (!gente.length) return fail(res, 'Todo el personal ya tiene esta causal este mes', 400);
+      let creados = 0;
+      for (const g of gente) {
+        const j = await crearUno({ ...b, id_usuario: g.id_usuario }, req, { silencioso: true });
+        if (j && j.ok) creados++; else if (j && j.error) return fail(res, j.error, j.status || 400);
+      }
+      auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', detalle: `Adicional ${mes} a TODO EL PERSONAL (${creados}): ${causal} $${Math.round(Number(b.monto) || 0).toLocaleString('es-CL')}${b.es_liquido ? ' LÍQUIDO' : ''}` });
+      return ok(res, { creados, personas: gente.map(g => g.nombre) });
+    }
+    const j = await crearUno(b, req);
+    if (j.error) return fail(res, j.error, j.status || 400);
+    ok(res, j.data);
+  } catch (e) { console.error('[rrhh adicionales crear]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+// Un adicional para UNA persona (motor único: lo usa el alta individual y "todo el personal")
+async function crearUno(b, req, { silencioso = false } = {}) {
+    const u = req.usuario || {}; const mes = b.mes;
     const idU = Number(b.id_usuario);
     const causal = String(b.causal || '').toUpperCase().trim();
+    const fail = (error, status) => ({ error, status });
 
     /* HORAS EXTRAS: el monto SIEMPRE lo recalcula el servidor a partir de las
        horas. Tomar el monto que manda la pantalla dejaría el pago a merced de
@@ -291,18 +325,18 @@ const crearAdicional = async (req, res) => {
     let cantidad = null, valorUnitario = null;
     if (causal === 'HORAS EXTRAS') {
       const horas = Number(b.horas ?? b.cantidad);
-      if (!(horas > 0)) return fail(res, 'Indica cuántas horas extras se pagan', 400);
-      if (horas > 60) return fail(res, `${horas} horas es demasiado para un mes: el tope legal son 2 horas diarias (art. 31). Revisa el dato.`, 400);
+      if (!(horas > 0)) return fail('Indica cuántas horas extras se pagan', 400);
+      if (horas > 60) return fail(`${horas} horas es demasiado para un mes: el tope legal son 2 horas diarias (art. 31). Revisa el dato.`, 400);
       const { montoHorasExtras } = require('../../../../shared/horas-extras');
       const calc = montoHorasExtras(horas, await baseHE(idU));
-      if (!calc.aplica) return fail(res, calc.motivo, 400);
+      if (!calc.aplica) return fail(calc.motivo, 400);
       monto = calc.monto; cantidad = horas; valorUnitario = calc.valor_hora_extra;
     }
 
-    if (!idU || monto <= 0) return fail(res, 'Colaborador y monto son obligatorios', 400);
+    if (!idU || monto <= 0) return fail('Colaborador y monto son obligatorios', 400);
     const CAUS = await causalesAdic();
-    if (!(causal in CAUS)) return fail(res, 'Causal no válida', 400);
-    if (causal === 'OTRO' && !String(b.causal_texto || '').trim()) return fail(res, 'Describe la causal en "Otro"', 400);
+    if (!(causal in CAUS)) return fail('Causal no válida', 400);
+    if (causal === 'OTRO' && !String(b.causal_texto || '').trim()) return fail('Describe la causal en "Otro"', 400);
     const esLiquido = b.es_liquido ? 1 : 0;
     // "No imponible" marcado a mano MANDA sobre el default de la causal
     const imponible = (esLiquido || b.no_imponible) ? 0 : (CAUS[causal] != null ? CAUS[causal] : (b.imponible ? 1 : 0));
@@ -311,23 +345,22 @@ const crearAdicional = async (req, res) => {
        adicional es permanente sí o sí, y permanente_fin = mes siguiente al hasta
        (la columna ya existía: primer mes en que YA NO se paga). Sin hasta = indefinido. */
     const hasta = /^\d{4}-\d{2}$/.test(b.hasta || '') ? b.hasta : null;
-    if (hasta && hasta < mes) return fail(res, `El mes "hasta" (${hasta}) no puede ser anterior al mes desde (${mes})`, 400);
+    if (hasta && hasta < mes) return fail(`El mes "hasta" (${hasta}) no puede ser anterior al mes desde (${mes})`, 400);
     const permanente = (b.permanente || hasta) ? 1 : 0;
     const permanenteFin = hasta ? mesSiguiente(hasta) : null;
-    if (permanente && causal === 'HORAS EXTRAS') return fail(res, 'Las horas extras se digitan cada mes: no pueden ser permanentes', 400);
+    if (permanente && causal === 'HORAS EXTRAS') return fail('Las horas extras se digitan cada mes: no pueden ser permanentes', 400);
     const [[colab]] = await pool.query("SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE id_usuario=?", [idU]);
-    if (!colab) return fail(res, 'Colaborador no encontrado', 404);
+    if (!colab) return fail('Colaborador no encontrado', 404);
     const [r] = await pool.query(
       'INSERT INTO rh_adicionales (mes, id_usuario, causal, causal_texto, imponible, es_liquido, permanente, permanente_fin, monto, cantidad, valor_unitario, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
       [mes, idU, causal, causal === 'OTRO' ? String(b.causal_texto).trim().slice(0, 200) : null, imponible, esLiquido, permanente, permanenteFin, monto, cantidad, valorUnitario, nombreDe(u)]);
     // El detalle deja el cálculo a la vista: sin el "10 h × $10.341" hay que
     // reconstruir a mano de dónde salió el monto cuando alguien lo pregunta.
     const glosaHE = cantidad ? ` (${cantidad} h × $${Math.round(valorUnitario).toLocaleString('es-CL')})` : '';
-    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: r.insertId,
+    if (!silencioso) auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: r.insertId,
       detalle: `Adicional ${mes} ${colab.nombre}: ${causal}${causal === 'OTRO' ? ' (' + b.causal_texto + ')' : ''} $${monto.toLocaleString('es-CL')}${glosaHE}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}${permanente ? (hasta ? ` desde ${mes} hasta ${hasta}` : ' PERMANENTE') : ''}` });
-    ok(res, { id: r.insertId, imponible, es_liquido: esLiquido, permanente, hasta });
-  } catch (e) { console.error('[rrhh adicionales crear]', e.message); fail(res, 'Error interno del servidor'); }
-};
+    return { ok: true, data: { id: r.insertId, imponible, es_liquido: esLiquido, permanente, hasta } };
+}
 
 const eliminarAdicional = async (req, res) => {
   try {
