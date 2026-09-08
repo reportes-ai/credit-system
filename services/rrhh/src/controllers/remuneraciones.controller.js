@@ -608,16 +608,21 @@ function calcLiquidacion(inp, ind) {
   const afpPct = parseFloat((ind.afps.find(a => a.afp === String(inp.afp || '').toUpperCase()) || {}).tasa_pct) || 0;
   const descAfp = inp.afp ? R(baseCotiz * afpPct / 100) : 0;
   const descSalud = R(baseCotiz * ind.rem_salud_pct / 100);
-  // Plan Isapre pactado en UF: lo que exceda el 7% legal es "adicional isapre"
-  // (descuento al líquido, pero NO rebaja la base tributable — solo el 7% legal).
+  // Plan Isapre pactado en UF: lo que exceda el 7% legal es "adicional isapre" (descuento al líquido).
   const planUF = Number(inp.plan_isapre_uf) || 0;
   const descSaludAdicional = planUF > 0 ? Math.max(0, R(planUF * ind.uf) - descSalud) : 0;
   const esIndef = String(inp.tipo_contrato || '').toUpperCase() === 'INDEFINIDO';
   const baseAfc = Math.min(imponible, R(ind.rem_tope_afc_uf * ind.uf));
   const descAfc = esIndef ? R(baseAfc * ind.rem_afc_trabajador_pct / 100) : 0;
 
-  // Impuesto único 2ª categoría sobre la base tributable (imponible − previsión), tramos en UTM
-  const baseTrib = Math.max(0, imponible - descAfp - descSalud - descAfc);
+  /* Impuesto único 2ª categoría sobre la base tributable (imponible − previsión), tramos en UTM.
+     La cotización de SALUD deducible es la pactada COMPLETA (7% + adicional Isapre) con tope
+     del 7% del tope imponible — art. 42 N°1 LIR / art. 18 DL 3.500. Antes solo se rebajaba
+     el 7% legal: a Sandra Ayala (plan 4 UF) le salía impuesto $10.608 y AVSOFT $8.243
+     (08-09-2026). Con sueldo sobre el tope no cambia nada: el 7% ya es el máximo. */
+  const topeSalud = R(topeImp * ind.rem_salud_pct / 100);
+  const saludDeducible = Math.min(descSalud + descSaludAdicional, topeSalud);
+  const baseTrib = Math.max(0, imponible - descAfp - saludDeducible - descAfc);
   const baseUtm = ind.utm > 0 ? baseTrib / ind.utm : 0;
   let impuesto = 0;
   for (const t of ind.tramos) {
