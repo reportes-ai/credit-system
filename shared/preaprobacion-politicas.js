@@ -26,6 +26,12 @@ const DEFAULTS = {
   wsp_pie_expres_pct:     40,          // % de pie desde el cual la aprobación es instantánea/exprés — TODOS los canales
   informes_codigos:       '',          // códigos DealerNet a consultar en la preevaluación (CSV; vacío = todos los activos)
   ia_modelo:              'auto',      // modelo IA del reporte crediticio de la preevaluación ('auto' = el del Subsistema IA)
+  // Aviso al ejecutivo del dealer y su jefe comercial (Zona - Parque - Dealer) — shared/preaprobacion-aviso.js
+  aviso_ejecutivo_activo:     'SI',                    // SI | NO
+  aviso_ejecutivo_resultados: 'PREAPROBADO',           // CSV de resultados que avisan: PREAPROBADO,REVISION (vacío = todos)
+  aviso_ejecutivo_cc:         '',                      // copias adicionales (correos separados por coma)
+  aviso_ejecutivo_asunto:     'Preaprobación {codigo} — dealer {dealer} ({resultado})',
+  aviso_ejecutivo_msg:        'El dealer {dealer} generó la preaprobación N° {codigo} a las {hora} hrs del {fecha} con las siguientes condiciones:',
   // Mensajes al cliente según resultado ({pie} = % de pie informado). Un solo set para todos los canales.
   msg_aprobado_expres:    '🎉 *¡Excelente! Tu preevaluación salió muy bien.*\nCon tu pie del {pie}% solo necesitas:\n📇 Cédula de identidad vigente\n🏠 Una cuenta que acredite tu domicilio\n👥 3 referencias personales\n\n¡Y te puedes llevar el auto para la casa *el mismo día*! 🚗💨 ¿Coordinamos con un ejecutivo?',
   msg_sev_bueno:          '🎉 *¡Buenas noticias! Tu preevaluación salió bien.*\nDato: si llegas a un pie del {pie_expres}%, el trámite es exprés (solo cédula, acreditar domicilio y 3 referencias) y te llevas el auto el mismo día 🚗. ¿Te conecto con un ejecutivo para armar tu crédito?',

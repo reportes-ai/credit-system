@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v100.8 -->
+<!-- v100.9 — aviso al ejecutivo del dealer y su jefe comercial (Zona - Parque - Dealer) en cada preaprobación: activo, resultados, copias, asunto, texto -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -52,6 +52,9 @@
     <div class="fila" id="filaIA"></div>
   </div>
   <div class="card-x"><h5><i class="bi bi-chat-square-text me-1"></i>Mensajes al cliente según resultado</h5><div id="grpMsg"></div></div>
+  <div class="card-x"><h5><i class="bi bi-envelope-paper me-1"></i>Aviso al ejecutivo del dealer y su jefe comercial</h5>
+    <p style="font-size:.8rem;color:#64748b;margin:0 0 6px">Cada preaprobación que genera un dealer avisa por correo al <b>ejecutivo asignado a ese dealer</b> y al <b>jefe comercial</b> de ese ejecutivo, según la base <a href="/mantenedores/dealers/" target="_blank">Zona - Parque - Dealer</a> (ejecutivo 1, ejecutivo 2 y jefe; los correos salen de la ficha de Usuarios). Si el dealer no está en la base, va a todos los Jefes Comerciales. El correo lleva dealer, N°, fecha y hora, nombre del cliente (informes DealerNet), RUT, valor del vehículo, pie, saldo precio y renta informada.</p>
+    <div id="grpAviso"></div></div>
 
   <button class="btn-save" onclick="guardar()"><i class="bi bi-check2-circle me-1"></i>Guardar cambios</button><span id="msg"></span>
 
@@ -65,6 +68,7 @@
       <li><b>Antigüedad máx. default</b> → solo aplica si la <a href="/politica/" target="_blank">matriz de Política de Crédito</a> no define antigüedad para USADO; si la define, manda la matriz.</li>
       <li><b>Informes DealerNet a consultar</b> → qué productos pide la preevaluación del bot (gasto de saldo DealerNet); vacío = todos los activos del <a href="/mantenedores/dealernet/" target="_blank">mantenedor DealerNet</a>.</li>
       <li><b>Modelo de IA</b> → reporte crediticio automático de la preevaluación; "auto" usa el configurado en el <a href="/mantenedores/ia/" target="_blank">Subsistema IA</a>.</li>
+      <li><b>Aviso al ejecutivo y su jefe</b> → correo automático en cada preaprobación del <a href="/portal-dealer/" target="_blank">Portal del Dealer</a> al ejecutivo y jefe del dealer según <a href="/mantenedores/dealers/" target="_blank">Zona - Parque - Dealer</a> (activo, resultados, copias, asunto y texto). Detalle completo en el <a href="/preaprobaciones/" target="_blank">Repositorio de Preaprobaciones</a>.</li>
     </ul>
   </div>
 </div>
@@ -79,8 +83,9 @@ const GRUPOS = {
   grpInfo:  ['max_protestos','max_deuda_morosa','max_deuda_vencida','max_deuda_castigada'],
   grpWsp:   ['wsp_severidad_max','wsp_pie_expres_pct'],
   grpMsg:   ['msg_aprobado_expres','msg_sev_bueno','msg_sev_regular','msg_sev_malo'],
+  grpAviso: ['aviso_ejecutivo_activo','aviso_ejecutivo_resultados','aviso_ejecutivo_cc','aviso_ejecutivo_asunto','aviso_ejecutivo_msg'],
 };
-const TXTAREA = new Set(GRUPOS.grpMsg);
+const TXTAREA = new Set([...GRUPOS.grpMsg, 'aviso_ejecutivo_msg']);
 const LBL = {
   carga_max_pct:'Carga máxima (% de la renta)', plazos:'Plazos evaluados (meses, separados por coma)',
   tolerancia_renta_pct:'Tolerancia renta declarada vs interna (%)', precio_min:'Precio mínimo del vehículo ($)',
@@ -90,6 +95,8 @@ const LBL = {
   wsp_severidad_max:'Severidad DealerNet máxima que preaprueba', wsp_pie_expres_pct:'Pie exprés / aprobación instantánea (%)',
   msg_aprobado_expres:'Mensaje APROBACIÓN INSTANTÁNEA (exprés)', msg_sev_bueno:'Mensaje APROBACIÓN — severidad BUENA',
   msg_sev_regular:'Mensaje APROBACIÓN — severidad REGULAR', msg_sev_malo:'Mensaje RECHAZO — severidad MALA',
+  aviso_ejecutivo_activo:'Avisar al ejecutivo y su jefe', aviso_ejecutivo_resultados:'Resultados que avisan (PREAPROBADO, REVISION)',
+  aviso_ejecutivo_cc:'Copias adicionales (correos)', aviso_ejecutivo_asunto:'Asunto del correo', aviso_ejecutivo_msg:'Texto del encabezado',
 };
 const MONTO = new Set(['precio_min','precio_max','max_deuda_morosa','max_deuda_vencida','max_deuda_castigada']);
 const PCT   = new Set(['carga_max_pct','tolerancia_renta_pct','wsp_pie_expres_pct']);
@@ -108,6 +115,8 @@ async function cargar(){
       let input;
       if (TXTAREA.has(k))
         input = `<textarea id="v_${k}" rows="4" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 10px;font-size:.85rem;width:100%">${String(p.valor).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`;
+      else if (k === 'aviso_ejecutivo_activo')
+        input = `<select id="v_${k}">${['SI','NO'].map(s=>`<option ${String(p.valor).toUpperCase()===s?'selected':''}>${s}</option>`).join('')}</select>`;
       else if (k === 'wsp_severidad_max')
         input = `<select id="v_${k}">${['bueno','regular','malo'].map(s=>`<option ${p.valor===s?'selected':''}>${s}</option>`).join('')}</select>`;
       else if (MONTO.has(k))

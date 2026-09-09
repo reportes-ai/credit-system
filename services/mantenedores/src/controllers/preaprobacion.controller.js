@@ -27,9 +27,14 @@ const DESCS = {
   msg_sev_bueno:          'Mensaje cuando la severidad DealerNet es BUENA. {pie_expres} = % de pie exprés',
   msg_sev_regular:        'Mensaje cuando la severidad DealerNet es REGULAR. {pie_expres} = % de pie exprés',
   msg_sev_malo:           'Mensaje de rechazo (severidad MALA o grave)',
+  aviso_ejecutivo_activo:     'Avisar por correo al ejecutivo del dealer y a su jefe comercial cuando el dealer genera una preaprobación (SI | NO)',
+  aviso_ejecutivo_resultados: 'Resultados que gatillan el aviso, separados por coma: PREAPROBADO, REVISION (vacío = todos)',
+  aviso_ejecutivo_cc:         'Copias adicionales del aviso (correos separados por coma)',
+  aviso_ejecutivo_asunto:     'Asunto del aviso. Placeholders: {codigo} {dealer} {fecha} {hora} {resultado}',
+  aviso_ejecutivo_msg:        'Texto de encabezado del aviso (antes de la tabla con cliente, RUT, valor, pie, saldo y renta). Mismos placeholders',
 };
 const IA_MODELOS = ['auto', 'claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-4-8'];
-const MSG_KEYS = ['msg_aprobado_expres', 'msg_sev_bueno', 'msg_sev_regular', 'msg_sev_malo'];
+const MSG_KEYS = ['msg_aprobado_expres', 'msg_sev_bueno', 'msg_sev_regular', 'msg_sev_malo', 'aviso_ejecutivo_asunto', 'aviso_ejecutivo_msg'];
 
 /* ─── Migración + seed (funcionalidad bajo módulo Mantenedores) ────── */
 require('../../../../shared/migrate').enFila('preaprobacion', async () => {
@@ -99,6 +104,12 @@ const update = async (req, res) => {
         val = val.slice(0, 600);
       } else if (k === 'ia_modelo') {
         if (!IA_MODELOS.includes(val)) return res.status(400).json({ success: false, data: null, error: 'Modelo IA inválido' });
+      } else if (k === 'aviso_ejecutivo_activo') {
+        val = val.toUpperCase() === 'SI' ? 'SI' : 'NO';
+      } else if (k === 'aviso_ejecutivo_resultados') {
+        val = val.split(',').map(s => s.trim().toUpperCase()).filter(s => ['PREAPROBADO', 'REVISION'].includes(s)).join(',');
+      } else if (k === 'aviso_ejecutivo_cc') {
+        val = val.split(/[,;]/).map(s => s.trim()).filter(s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)).join(',');
       } else if (k === 'informes_codigos') {
         val = val.split(',').map(s => s.trim()).filter(s => /^\d+$/.test(s)).join(',');   // CSV de códigos; vacío = todos
       } else if (k === 'plazos') {

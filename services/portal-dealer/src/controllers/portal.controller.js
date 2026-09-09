@@ -973,6 +973,13 @@ exports.preaprobar = async (req, res) => {
       checklist, ia_informe_id: dn.ia_informe_id, ia_nivel_riesgo: dn.ia_nivel_riesgo, informes: dn.informes,
     });
 
+    // Aviso al ejecutivo del dealer + su jefe comercial (Zona - Parque - Dealer) — motor único, paramétrico, nunca bloquea
+    require('../../../../shared/preaprobacion-aviso').avisarEjecutivo({
+      id, codigo, dealer_nombre: (req.dealer && (req.dealer.nombre || req.dealer.dealer)) || null, rut_dealer: req.dealer && req.dealer.rut || null,
+      rut_cliente: rut, precio, pie, anio, renta: renta || null, fuente_renta: fuenteRenta, resultado, opciones, created_at: new Date(),
+    }).then(r => { if (r && r.ok) console.log('[preaprobacion aviso] ' + codigo + ' → ' + r.to.join(', ') + ' (' + r.origen + ')'); else if (r && r.motivo && r.motivo !== 'desactivado' && r.motivo !== 'resultado excluido') console.warn('[preaprobacion aviso] ' + codigo + ': ' + r.motivo); })
+      .catch(e => console.error('[preaprobacion aviso]', e.message));
+
     // Al dealer: SOLO veredicto, cuotas y correlativo — nunca el detalle del cliente
     return res.json({ success: true, data: { id, codigo, resultado, opciones, motivos: motivosPub }, error: null });
   } catch (err) {
