@@ -127,7 +127,8 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
       )
     `);
     // Segunda etapa: respuesta del ejecutivo (acepta / envía a revisión con comentario)
-    for (const col of ["ejec_estado VARCHAR(20) DEFAULT 'pendiente'", 'ejec_comentario TEXT', 'ejec_por INT DEFAULT NULL', 'ejec_at DATETIME DEFAULT NULL']) {
+    // foto_json: valores FIRMES al aprobar (Operaciones) — el motor los devuelve tal cual mientras siga aprobada
+    for (const col of ["ejec_estado VARCHAR(20) DEFAULT 'pendiente'", 'ejec_comentario TEXT', 'ejec_por INT DEFAULT NULL', 'ejec_at DATETIME DEFAULT NULL', 'foto_json JSON DEFAULT NULL']) {
       try { await pool.query(`ALTER TABLE comisiones_aprobaciones ADD COLUMN IF NOT EXISTS ${col}`); } catch (e) {}
     }
   } catch (e) {
@@ -695,7 +696,7 @@ async function calcularMes(mes, varsOverride) {
 
     // Obtener aprobaciones existentes
     const [aprobs] = await pool.query(
-      'SELECT ejecutivo, estado, notas, aprobado_at, ejec_estado, ejec_comentario, ejec_at, ejec_por FROM comisiones_aprobaciones WHERE mes = ?',
+      'SELECT ejecutivo, estado, notas, aprobado_at, aprobado_por, ejec_estado, ejec_comentario, ejec_at, ejec_por, foto_json FROM comisiones_aprobaciones WHERE mes = ?',
       [mes]
     );
     const aprobMap = {};
@@ -779,7 +780,24 @@ async function calcularMes(mes, varsOverride) {
         calc.con_semana_corrida += difTotal;
       }
 
-      return { ejecutivo, mes, ...calc, estado: aprob.estado, notas: aprob.notas, aprobado_at: aprob.aprobado_at,
+      // VALORES FIRMES: aprobada por Operaciones = se devuelve la foto guardada al aprobar,
+      // no el cálculo vivo (cambios en créditos, seguros o variables NO la mueven). Rechazar
+      // o volver a aprobar la reemplaza. Las simulaciones (varsOverride) siempre van en vivo.
+      let congelado = null;
+      if (!varsOverride && aprob.estado === 'aprobado' && aprob.foto_json) {
+        try {
+          const foto = typeof aprob.foto_json === 'string' ? JSON.parse(aprob.foto_json) : aprob.foto_json;
+          if (foto && typeof foto === 'object') {
+            const porOp = foto._creditos || {};
+            delete foto._creditos;
+            for (const k of Object.keys(calc)) if (!(k in foto)) delete calc[k];
+            Object.assign(calc, foto);
+            creds.forEach(c => { const f = porOp[String(c.num_op)]; if (f) Object.assign(c, f); });
+            congelado = { at: aprob.aprobado_at, por: aprob.aprobado_por };
+          }
+        } catch (_) {}
+      }
+      return { ejecutivo, mes, ...calc, estado: aprob.estado, notas: aprob.notas, aprobado_at: aprob.aprobado_at, congelado,
         ejec_estado: aprob.ejec_estado || 'pendiente', ejec_comentario: aprob.ejec_comentario || null, ejec_at: aprob.ejec_at || null, ejec_por: aprob.ejec_por || null, creditos: creds };
     });
 
@@ -897,15 +915,34 @@ const enviarResumen = async (req, res) => {
 /* ── POST /api/comisiones/aprobar ────────────────────────────────────────── */
 const aprobar = async (req, res) => {
   try {
-    const { ejecutivo, mes, estado, notas, incentivo_final, con_semana_corrida } = req.body;
+    const { ejecutivo, mes, estado, notas } = req.body;
+    let { incentivo_final, con_semana_corrida } = req.body;
     if (!ejecutivo || !mes || !estado) return res.status(400).json({ success: false, data: null, error: 'Faltan campos requeridos' });
+    // FOTO FIRME al aprobar: se toma del motor único en ese instante (con descuentos y
+    // ajustes incluidos) y queda en la misma fila de la aprobación (un solo hogar).
+    let fotoJson = null;
+    if (estado === 'aprobado') {
+      await pool.query("UPDATE comisiones_aprobaciones SET foto_json=NULL WHERE ejecutivo=? AND mes=?", [ejecutivo, mes]);   // recalcular en vivo antes de fotografiar
+      const fila = (await calcularMes(mes)).find(f => f.ejecutivo === ejecutivo);
+      if (!fila) return res.status(404).json({ success: false, data: null, error: 'El ejecutivo no tiene cálculo en ' + mes });
+      const { creditos, estado: _e, notas: _n, aprobado_at: _a, congelado: _c, ejec_estado: _s, ejec_comentario: _k, ejec_at: _t, ejec_por: _p, ejecutivo: _ej, mes: _m, ...foto } = fila;
+      foto._creditos = {};
+      for (const c of (creditos || [])) {
+        const f = {};
+        for (const k of ['incentivo_base_credito', 'bono_cesantia_credito', 'bono_rep_credito', 'bono_calidad_credito', 'incentivo_adicional_credito', 'ajuste_comision']) if (c[k] !== undefined) f[k] = c[k];
+        if (Object.keys(f).length) foto._creditos[String(c.num_op)] = f;
+      }
+      fotoJson = JSON.stringify(foto);
+      incentivo_final = fila.incentivo_final || 0;
+      con_semana_corrida = fila.con_semana_corrida || 0;
+    }
     await pool.query(
-      `INSERT INTO comisiones_aprobaciones (ejecutivo, mes, estado, incentivo_final, con_semana_corrida, aprobado_por, aprobado_at, notas)
-       VALUES (?,?,?,?,?,?,NOW(),?)
+      `INSERT INTO comisiones_aprobaciones (ejecutivo, mes, estado, incentivo_final, con_semana_corrida, aprobado_por, aprobado_at, notas, foto_json)
+       VALUES (?,?,?,?,?,?,NOW(),?,?)
        ON DUPLICATE KEY UPDATE estado=VALUES(estado), incentivo_final=VALUES(incentivo_final),
          con_semana_corrida=VALUES(con_semana_corrida), aprobado_por=VALUES(aprobado_por),
-         aprobado_at=NOW(), notas=VALUES(notas)`,
-      [ejecutivo, mes, estado, incentivo_final || 0, con_semana_corrida || 0, req.usuario.id_usuario, notas || null]
+         aprobado_at=NOW(), notas=VALUES(notas), foto_json=VALUES(foto_json)`,
+      [ejecutivo, mes, estado, incentivo_final || 0, con_semana_corrida || 0, req.usuario.id_usuario, notas || null, fotoJson]
     );
     // Al aprobar Operaciones: reinicia la respuesta del ejecutivo (limpia comentario previo,
     // reinicia el reloj de 2 días hábiles) y le avisa que espera su aprobación.
