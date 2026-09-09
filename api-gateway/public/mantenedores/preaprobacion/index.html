@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v100.9 — aviso al ejecutivo del dealer y su jefe comercial (Zona - Parque - Dealer) en cada preaprobación: activo, resultados, copias, asunto, texto -->
+<!-- v100.10 — botón Enviarme un correo de prueba del aviso al ejecutivo. v100.9 — aviso al ejecutivo del dealer y su jefe comercial (Zona - Parque - Dealer) en cada preaprobación: activo, resultados, copias, asunto, texto -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -54,7 +54,11 @@
   <div class="card-x"><h5><i class="bi bi-chat-square-text me-1"></i>Mensajes al cliente según resultado</h5><div id="grpMsg"></div></div>
   <div class="card-x"><h5><i class="bi bi-envelope-paper me-1"></i>Aviso al ejecutivo del dealer y su jefe comercial</h5>
     <p style="font-size:.8rem;color:#64748b;margin:0 0 6px">Cada preaprobación que genera un dealer avisa por correo al <b>ejecutivo asignado a ese dealer</b> y al <b>jefe comercial</b> de ese ejecutivo, según la base <a href="/mantenedores/dealers/" target="_blank">Zona - Parque - Dealer</a> (ejecutivo 1, ejecutivo 2 y jefe; los correos salen de la ficha de Usuarios). Si el dealer no está en la base, va a todos los Jefes Comerciales. El correo lleva dealer, N°, fecha y hora, nombre del cliente (informes DealerNet), RUT, valor del vehículo, pie, saldo precio y renta informada.</p>
-    <div id="grpAviso"></div></div>
+    <div id="grpAviso"></div>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+      <button type="button" onclick="pruebaAviso(this)" style="background:#fff;color:#0255c5;border:1.5px solid #0255c5;border-radius:8px;padding:7px 14px;font-size:.84rem;font-weight:600;cursor:pointer"><i class="bi bi-envelope-check me-1"></i>Enviarme un correo de prueba</button>
+      <span style="font-size:.76rem;color:#94a3b8">Manda el aviso de la última preaprobación registrada SOLO a tu correo (indica a quién habría ido en producción). Guarda antes si cambiaste el asunto o el texto.</span>
+    </div></div>
 
   <button class="btn-save" onclick="guardar()"><i class="bi bi-check2-circle me-1"></i>Guardar cambios</button><span id="msg"></span>
 
@@ -140,6 +144,14 @@ async function cargar(){
   document.getElementById('filaIA').innerHTML =
     `<label>Modelo de IA<small>${pIA.descripcion||''}</small></label>
      <select id="v_ia_modelo">${(j.ia_modelos||['auto']).map(m=>`<option ${pIA.valor===m?'selected':''}>${m}</option>`).join('')}</select>`;
+}
+async function pruebaAviso(btn){
+  const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = 'Enviando…';
+  try {
+    const j = await (await fetch('/api/preaprobacion-politicas/prueba-aviso', { method:'POST', headers:H, body:'{}' })).json();
+    btn.innerHTML = j.success ? '✓ Enviado a ' + j.data.to + ' (' + j.data.codigo + ')' : '✗ ' + (j.error || 'Error');
+  } catch (e) { btn.innerHTML = '✗ Error de red'; }
+  setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 8000);
 }
 async function guardar(){
   const valores = {};

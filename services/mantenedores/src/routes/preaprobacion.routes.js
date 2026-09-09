@@ -8,5 +8,6 @@ const c = require('../controllers/preaprobacion.controller');
 // Políticas de Preaprobación (portal dealer + WhatsApp) — mantenedor
 router.get('/', verifyToken, requireFunc('mant_preaprobacion'), c.getAll);
 router.put('/', verifyToken, requireFunc('mant_preaprobacion'), c.update);
+router.post('/prueba-aviso', verifyToken, requireFunc('mant_preaprobacion'), c.pruebaAviso);
 
 module.exports = router;

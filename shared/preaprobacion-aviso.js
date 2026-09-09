@@ -85,14 +85,16 @@ const rellenar = (t, v) => String(t || '').replace(/\{(\w+)\}/g, (m, k) => (k in
 
 /* Punto de entrada: pre = fila de portal_preaprobaciones (id, codigo, dealer_nombre,
    rut_dealer, rut_cliente, precio, pie, renta, fuente_renta, resultado, opciones, created_at). */
-async function avisarEjecutivo(pre) {
+async function avisarEjecutivo(pre, opts = {}) {
   const { getPoliticas } = require('./preaprobacion-politicas');
   const POL = await getPoliticas();
-  if (String(POL.aviso_ejecutivo_activo).toUpperCase() !== 'SI') return { ok: false, motivo: 'desactivado' };
+  const prueba = !!(opts.to);   // correo de prueba: va SOLO a opts.to, sin mirar activo/resultados
+  if (!prueba && String(POL.aviso_ejecutivo_activo).toUpperCase() !== 'SI') return { ok: false, motivo: 'desactivado' };
   const permitidos = String(POL.aviso_ejecutivo_resultados || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
-  if (permitidos.length && !permitidos.includes(String(pre.resultado).toUpperCase())) return { ok: false, motivo: 'resultado excluido' };
+  if (!prueba && permitidos.length && !permitidos.includes(String(pre.resultado).toUpperCase())) return { ok: false, motivo: 'resultado excluido' };
 
-  const [nombre, dest] = await Promise.all([nombreCliente(pre.rut_cliente), destinatariosDealer(pre.rut_dealer)]);
+  const [nombre, destReal] = await Promise.all([nombreCliente(pre.rut_cliente), destinatariosDealer(pre.rut_dealer)]);
+  const dest = prueba ? { to: [opts.to], nombres: [], origen: destReal.origen } : destReal;
   if (!dest.to.length) return { ok: false, motivo: 'sin destinatarios' };
 
   const cuando = pre.created_at ? new Date(pre.created_at) : new Date();
@@ -121,10 +123,11 @@ async function avisarEjecutivo(pre) {
       ${ops.length ? '<tr><td><b>Cuotas ofrecidas</b></td><td>' + ops.map(o => o.plazo + ' cuotas de ' + fmtCLP(o.cuota)).join(' · ') + '</td></tr>' : ''}
     </table>
     <p style="margin-top:12px"><b>Contacta al dealer</b> para ver si requiere asistencia o si generamos el crédito para el cliente.</p>
+    ${prueba ? '<p style="background:#fef3c7;padding:8px;border-radius:6px;font-size:12px"><b>CORREO DE PRUEBA</b> — en producción habría ido a: ' + esc(destReal.nombres.join(', ') || destReal.to.join(', ') || '(sin destinatarios)') + '</p>' : ''}
     <p style="font-size:12px;color:#64748b">Ficha completa en <a href="https://afbs.autofacilchile.cl/preaprobaciones/">Repositorio de Preaprobaciones</a>. Destinatarios según ${dest.origen === 'ZONA' ? 'la base Zona - Parque - Dealer' : 'perfil Jefe Comercial (dealer sin asignación en Zona - Parque - Dealer)'}.</p>`);
-  const cc = String(POL.aviso_ejecutivo_cc || '').split(/[,;]/).map(s => s.trim()).filter(s => /@/.test(s));
-  const r = await enviarCorreo({ to: dest.to.join(','), cc: cc.length ? cc.join(',') : undefined, subject: rellenar(POL.aviso_ejecutivo_asunto, vars), html });
-  return { ok: !!(r && r.ok !== false), to: dest.to, nombres: dest.nombres, origen: dest.origen, nombre };
+  const cc = prueba ? [] : String(POL.aviso_ejecutivo_cc || '').split(/[,;]/).map(s => s.trim()).filter(s => /@/.test(s));
+  const r = await enviarCorreo({ to: dest.to.join(','), cc: cc.length ? cc.join(',') : undefined, subject: (prueba ? '[PRUEBA] ' : '') + rellenar(POL.aviso_ejecutivo_asunto, vars), html });
+  return { ok: !!(r && r.ok !== false), error: r && r.error, to: dest.to, nombres: dest.nombres, origen: dest.origen, nombre, destReal: destReal.nombres };
 }
 
 module.exports = { avisarEjecutivo, nombreCliente, destinatariosDealer };

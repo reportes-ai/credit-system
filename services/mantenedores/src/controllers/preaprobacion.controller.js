@@ -136,4 +136,23 @@ const update = async (req, res) => {
   }
 };
 
-module.exports = { getAll, update };
+/* ─── POST /api/preaprobacion-politicas/prueba-aviso — manda el aviso de la última
+   preaprobación (o la del código indicado) SOLO al correo del usuario que pulsa. ── */
+const pruebaAviso = async (req, res) => {
+  try {
+    const to = req.usuario?.email;
+    if (!to) return res.status(400).json({ success: false, data: null, error: 'Tu usuario no tiene correo' });
+    const codigo = String(req.body?.codigo || '').trim();
+    const [[pre]] = await pool.query(
+      'SELECT * FROM portal_preaprobaciones ' + (codigo ? 'WHERE codigo=? ' : '') + 'ORDER BY id DESC LIMIT 1', codigo ? [codigo] : []);
+    if (!pre) return res.status(404).json({ success: false, data: null, error: 'No hay preaprobaciones registradas' });
+    const r = await require('../../../../shared/preaprobacion-aviso').avisarEjecutivo(pre, { to });
+    if (!r.ok) return res.status(500).json({ success: false, data: null, error: r.error || r.motivo || 'No se pudo enviar' });
+    res.json({ success: true, data: { codigo: pre.codigo, to, habria_ido_a: r.destReal, cliente: r.nombre }, error: null });
+  } catch (e) {
+    console.error('[preaprobacion pruebaAviso]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getAll, update, pruebaAviso };
