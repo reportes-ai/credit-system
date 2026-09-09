@@ -41,6 +41,7 @@ require('../../../shared/migrate').enFila('seguimiento-cartas', async () => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`);
     await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS seguimiento_carta_id INT NULL');
+    await pool.query('ALTER TABLE wsp_mensajes ADD COLUMN IF NOT EXISTS estado_at DATETIME NULL').catch(() => {});
     // Card bajo el módulo WhatsApp (anti-hardcode)
     const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='wsp_seg_cartas' LIMIT 1");
     if (!ex) {
@@ -179,7 +180,11 @@ async function correr({ real = false } = {}) {
 /* ── API ── */
 exports.listar = async (_req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM wsp_seguimiento_cartas ORDER BY id DESC LIMIT 300');
+    const [rows] = await pool.query(`
+      SELECT s.*,
+             (SELECT m.estado_envio FROM wsp_mensajes m WHERE m.id_conversacion=s.id_conversacion AND m.direccion='OUT' AND m.created_at>=s.created_at ORDER BY m.id LIMIT 1) AS entrega,
+             (SELECT m.estado_at   FROM wsp_mensajes m WHERE m.id_conversacion=s.id_conversacion AND m.direccion='OUT' AND m.created_at>=s.created_at ORDER BY m.id LIMIT 1) AS entrega_at
+        FROM wsp_seguimiento_cartas s ORDER BY s.id DESC LIMIT 300`);
     const cfg = await getCfg();
     res.json({ success: true, data: { activo: !!cfg.seg_cartas_activo, seguimientos: rows }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }

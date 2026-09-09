@@ -176,6 +176,7 @@ require('../../../../shared/migrate').enFila('whatsapp', async () => {
         autor_nombre    VARCHAR(200) NULL,
         mensaje         TEXT         NOT NULL,
         estado_envio    VARCHAR(10)  NULL,
+        estado_at       DATETIME     NULL,
         wamid           VARCHAR(120) NULL,
         created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_conv (id_conversacion)
@@ -984,10 +985,18 @@ exports.webhookReceive = async (req, res) => {
             texto: m.text?.body || '',
           });
         }
-        // Estados de entrega (sent/delivered/read/failed) de mensajes salientes —
-        // hoy solo actualiza las Automatizaciones de Cobranza (wamid guardado al enviar).
+        // Estados de entrega (sent/delivered/read/failed) de mensajes salientes:
+        // Automatizaciones de Cobranza + TODO mensaje guardado con wamid (bot, seguimiento
+        // de cartas, campañas, ejecutivo). Nunca retrocede (LEIDO no vuelve a ENTREGADO).
+        const RANGO = { ENVIADO: 1, ENTREGADO: 2, LEIDO: 3, ERROR: 9 };
+        const MAPA = { sent: 'ENVIADO', delivered: 'ENTREGADO', read: 'LEIDO', failed: 'ERROR' };
         for (const st of v.statuses || []) {
           require('../automatizacion-cobranza').marcarEstado(st.id, st.status).catch(() => {});
+          const nuevo = MAPA[String(st.status || '').toLowerCase()];
+          if (nuevo && st.id) {
+            const casos = Object.entries(RANGO).filter(([, r]) => r < RANGO[nuevo]).map(([k]) => k);
+            pool.query(`UPDATE wsp_mensajes SET estado_envio=?, estado_at=NOW() WHERE wamid=? AND (estado_envio IS NULL OR estado_envio IN (${casos.map(() => '?').join(',') || "''"}))`, [nuevo, st.id, ...casos]).catch(() => {});
+          }
         }
       }
     }

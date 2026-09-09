@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — fecha y hora del envío; click en la fila abre la conversación completa con el dealer -->
+<!-- v1.2 — estado de entrega de Meta (enviado / entregado / leído) bajo el envío y en el chat. v1.1 — fecha y hora del envío; click en la fila abre la conversación completa con el dealer -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -94,6 +94,8 @@ const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token'), 'Content
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fmt = n => (n==null||n==='') ? '—' : '$'+Math.round(+n).toLocaleString('es-CL');
+const ENTREGA = { LEIDO:['✓✓ Leído','#1d4ed8'], ENTREGADO:['✓✓ Entregado','#374151'], ENVIADO:['✓ Enviado','#6b7280'], ERROR:['✗ No entregado','#b91c1c'] };
+const entregaHtml = s => { if (s.estado!=='ENVIADO') return ''; const e = ENTREGA[s.entrega]; return `<div style="font-size:.68rem;margin-top:3px;color:${e?e[1]:'#9ca3af'}" title="${e&&s.entrega_at?esc(fechaHora(s.entrega_at)):''}">${e?e[0]:'sin confirmación de Meta aún'}</div>`; };
 const fechaHora = d => { if (!d) return '—'; const x = new Date(d); if (isNaN(x)) return String(d).slice(0,16).replace('T',' '); return x.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}) + ' ' + x.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); };
 async function verConv(id){
   const j = await fetch('/api/whatsapp/seguimiento-cartas/'+id+'/conversacion', { headers:H }).then(r=>r.json()).catch(()=>({}));
@@ -108,7 +110,7 @@ async function verConv(id){
     return `<div style="align-self:${out?'flex-end':'flex-start'};max-width:82%;background:${out?'#dcf8c6':'#fff'};border-radius:10px;padding:7px 10px;font-size:.84rem;box-shadow:0 1px 1px rgba(0,0,0,.1)">
       <div style="font-size:.68rem;color:#6b7280;font-weight:700">${esc(quien)}</div>
       <div style="white-space:pre-wrap">${esc(m.mensaje)}</div>
-      <div style="font-size:.66rem;color:#9ca3af;text-align:right;margin-top:2px">${fechaHora(m.created_at)}${out && m.estado_envio ? ' · '+esc(m.estado_envio) : ''}</div></div>`;
+      <div style="font-size:.66rem;color:#9ca3af;text-align:right;margin-top:2px">${fechaHora(m.created_at)}${out && m.estado_envio ? ' · '+(ENTREGA[m.estado_envio]?ENTREGA[m.estado_envio][0]:esc(m.estado_envio)) : ''}</div></div>`;
   }).join('') : '<div class="muted" style="text-align:center;padding:20px">Sin mensajes registrados (envío simulado o con error).</div>';
   $('dlgConv').showModal();
   $('convBody').scrollTop = $('convBody').scrollHeight;
@@ -130,7 +132,7 @@ async function cargar(){
       <td style="white-space:nowrap">${esc(s.telefono||'—')}</td>
       <td>${esc(s.cliente||'—')}</td><td>${esc(s.vehiculo||'—')}</td><td>${fmt(s.saldo)}</td>
       <td style="white-space:nowrap">${s.vence?String(s.vence).slice(0,10):'—'}</td>
-      <td><span class="pill ${s.estado==='ENVIADO'?'ok':s.estado==='SIMULADO'?'info':'err'}" title="${esc(s.error_msg||'')}">${esc(s.estado)}</span></td>
+      <td><span class="pill ${s.estado==='ENVIADO'?'ok':s.estado==='SIMULADO'?'info':'err'}" title="${esc(s.error_msg||'')}">${esc(s.estado)}</span>${entregaHtml(s)}</td>
       <td>${r?`<span class="pill ${r[1]}">${r[0]}</span>`:'<span class="muted">sin respuesta aún</span>'}</td>
       <td>${esc(s.financiado_por||'—')}</td><td>${MOTL[s.motivo]||'—'}</td>
       <td style="font-size:.76rem;color:#6b7280">${esc(s.resumen||'')}</td></tr>`;
