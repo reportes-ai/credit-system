@@ -225,7 +225,7 @@ const CAUSALES_ADIC = {
   // Aguinaldos/bonos de temporada: imponibles (art. 41 CT). Se pueden asignar a TODO el personal.
   'BONO FIESTAS PATRIAS': 1, 'BONO NAVIDAD': 1, 'BONO VACACIONES': 1,
   'VIÁTICO': 0, 'COLACIÓN ADICIONAL': 0, 'MOVILIZACIÓN ADICIONAL': 0,
-  'ASIGNACIÓN DE CELULAR': 0, 'DEVOLUCIÓN DE DESCUENTO': 0, 'OTRO': null,
+  'DEVOLUCIÓN DE DESCUENTO': 0, 'OTRO': null,   // 'ASIGNACIÓN DE CELULAR' salió 09-09-2026: la causal vigente es ASIGNACION CELULAR (concepto del usuario)
 };
 
 /* v5 (v213.37): adicionales PERMANENTES (se repiten todos los meses hasta
