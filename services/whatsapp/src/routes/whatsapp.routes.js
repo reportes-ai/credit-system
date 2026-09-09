@@ -43,6 +43,7 @@ router.post('/aviso-vencimiento/plantillas',verifyToken, requireFunc('wsp_config
 // Seguimiento de Cartas de Aprobación a dealers (Facilito)
 const segCartas = require('../seguimiento-cartas');
 router.get('/seguimiento-cartas',              verifyToken, requireFunc('wsp_seg_cartas', 'wsp_config'), segCartas.listar);
+router.get('/seguimiento-cartas/:id/conversacion', verifyToken, requireFunc('wsp_seg_cartas', 'wsp_config'), segCartas.conversacion);
 router.put('/seguimiento-cartas/activo',       verifyToken, requireFunc('wsp_seg_cartas', 'wsp_config'), segCartas.setActivo);
 router.post('/seguimiento-cartas/probar',      verifyToken, requireFunc('wsp_seg_cartas', 'wsp_config'), segCartas.simularCorrida);
 router.post('/seguimiento-cartas/correr',      verifyToken, requireFunc('wsp_seg_cartas', 'wsp_config'), segCartas.correrAhora);

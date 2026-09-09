@@ -184,6 +184,17 @@ exports.listar = async (_req, res) => {
     res.json({ success: true, data: { activo: !!cfg.seg_cartas_activo, seguimientos: rows }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
+/* GET /seguimiento-cartas/:id/conversacion — el chat completo de ese seguimiento (historial) */
+exports.conversacion = async (req, res) => {
+  try {
+    const [[seg]] = await pool.query('SELECT id, id_conversacion, op_carta, dealer, telefono, cliente FROM wsp_seguimiento_cartas WHERE id=?', [parseInt(req.params.id) || 0]);
+    if (!seg) return res.status(404).json({ success: false, data: null, error: 'Seguimiento no encontrado' });
+    let mensajes = [];
+    if (seg.id_conversacion)
+      [mensajes] = await pool.query('SELECT id, direccion, origen, autor_nombre, mensaje, estado_envio, created_at FROM wsp_mensajes WHERE id_conversacion=? ORDER BY id', [seg.id_conversacion]);
+    res.json({ success: true, data: { ...seg, mensajes }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
 exports.setActivo = async (req, res) => {
   try {
     await pool.query('UPDATE wsp_config SET seg_cartas_activo=? WHERE id=1', [req.body && req.body.activo ? 1 : 0]);
