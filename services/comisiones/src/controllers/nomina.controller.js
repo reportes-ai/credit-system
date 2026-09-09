@@ -84,7 +84,7 @@ async function filasVivas(mes) {
   const datos = await calcularMes(mes);
   const [usrs] = await pool.query("SELECT UPPER(TRIM(CONCAT(COALESCE(nombre,''),' ',COALESCE(apellido,'')))) nom, rut FROM usuarios").catch(() => [[]]);
   const rutDe = {}; usrs.forEach(u => { rutDe[u.nom] = u.rut; });
-  return datos.filter(d => !d.renta_fija).map(d => {   // renta FIJA (ficha RRHH) no va en la nómina
+  return datos.filter(d => !d.renta_fija && !d.externo).map(d => {   // renta FIJA (ficha RRHH) y externos (no usuarios) no van en la nómina
     const cumple = !!d.cumple_minimo;
     const pagar = cumple ? R(d.con_semana_corrida) : 0;
     return {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Revisión Comisiones — AutoFácil</title><!-- v5.35 — aviso Renta fija (no comisiona) desde la ficha RRHH. v5.34 — sello Valores firmes: aprobada por Operaciones = foto congelada, no se recalcula. v5.33 — Aprobar/Rechazar por permiso comisiones_aprobar (Analista de Operaciones), no solo Administrador. v5.32 — aviso de nómina generada (montos congelados) y filtro ?mes&ej desde la Nómina. v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
+  <title>Revisión Comisiones — AutoFácil</title><!-- v5.36 — ejecutivos EXTERNOS (nombre de la carga que no es usuario) fuera de las tarjetas, en un aviso ámbar. v5.35 — aviso Renta fija (no comisiona) desde la ficha RRHH. v5.34 — sello Valores firmes: aprobada por Operaciones = foto congelada, no se recalcula. v5.33 — Aprobar/Rechazar por permiso comisiones_aprobar (Analista de Operaciones), no solo Administrador. v5.32 — aviso de nómina generada (montos congelados) y filtro ?mes&ej desde la Nómina. v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -161,6 +161,7 @@
     </div>
   </div>
 
+  <div id="avisoExternos" style="display:none;background:#fffbeb;border-left:4px solid #d97706;border-radius:10px;padding:10px 16px;font-size:.82rem;color:#78350f;margin:0 0 12px"></div>
   <div id="avisoNomina" style="display:none;background:#ecfdf5;border-left:4px solid #16a34a;border-radius:10px;padding:10px 16px;font-size:.83rem;color:#065f46;margin:0 0 12px"></div>
   <div id="resultado"></div>
 </div>
@@ -251,8 +252,14 @@ async function cargar() {
     // Cruce sin mayúsculas/tildes: usuario_ejecutivos puede venir "Hans Vargas" y creditos "HANS VARGAS"
     const normEj = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
     const asigN = new Set((_ejAsignados||[]).map(normEj));
-    const datosPermitidos = esAdmin ? json.data
-      : json.data.filter(d => asigN.has(normEj(d.ejecutivo)));
+    // Externos: nombres de la carga que no son usuarios de la Suite (AutoFin/dealer). Van a un aviso, no a las tarjetas.
+    const externos = json.data.filter(d => d.externo);
+    const avEx = document.getElementById('avisoExternos');
+    if (avEx) { avEx.style.display = externos.length ? '' : 'none';
+      if (externos.length) avEx.innerHTML = `<i class="bi bi-person-x me-1"></i><b>Nombres en los créditos que no son ejecutivos de AutoFácil</b> (vienen de la carga AutoFin/dealer; no comisionan ni van a la nómina): ${externos.map(d => `<b>${d.ejecutivo}</b> (${(d.creditos||[]).length} solicitud${(d.creditos||[]).length===1?'':'es'}${d.total_creditos?', '+d.total_creditos+' otorgada'+(d.total_creditos===1?'':'s'):''})`).join(' · ')}. Si alguno SÍ es nuestro, créalo en Usuarios; si una op otorgada debe llevar otro ejecutivo, corrígela en Créditos.`; }
+    const base = json.data.filter(d => !d.externo);
+    const datosPermitidos = esAdmin ? base
+      : base.filter(d => asigN.has(normEj(d.ejecutivo)));
 
     // Poblar filtro de ejecutivos
     const sel = document.getElementById('filtroEj');

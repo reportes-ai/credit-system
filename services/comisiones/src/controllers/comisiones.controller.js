@@ -731,9 +731,17 @@ async function calcularMes(mes, varsOverride) {
       `SELECT UPPER(TRIM(CONCAT(COALESCE(u.nombre,''),' ',COALESCE(u.apellido,'')))) nom
          FROM rh_fichas f JOIN usuarios u ON u.id_usuario=f.id_usuario WHERE f.tipo_renta='FIJA'`).catch(() => [[]]);
     const rentaFija = new Set(rf.map(r => r.nom));
+    // Ejecutivo EXTERNO: nombre que trae la carga (Trinidad/AutoFin) pero no es usuario de la Suite
+    // (ej. Daniza Rodríguez, 09-09-2026: 22 solicitudes AutoFin, ninguna otorgada). Se calcula igual,
+    // pero la Revisión lo aparta en un aviso y la nómina lo excluye. Cruce sin tildes ni mayúsculas.
+    const normN = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const [todosU] = await pool.query("SELECT nombre, apellido FROM usuarios").catch(() => [[]]);
+    const nombresU = new Set();
+    for (const u of todosU) { nombresU.add(normN(u.nombre + ' ' + (u.apellido || ''))); nombresU.add(normN(String(u.nombre || '').split(/\s+/)[0] + ' ' + (u.apellido || ''))); }
 
     const resultado = Object.entries(map).map(([ejecutivo, creds]) => {
       const calc = calcularComision(creds, vars, mes, { fecha_ingreso: ingresoDe[String(ejecutivo).toUpperCase().trim()] || null });
+      if (nombresU.size && !nombresU.has(normN(ejecutivo))) calc.externo = true;
       if (rentaFija.has(String(ejecutivo).toUpperCase().trim())) {
         calc.renta_fija = true;
         calc.incentivo_final = 0; calc.con_semana_corrida = 0; calc.con_semana_corrida_bruto = 0;
