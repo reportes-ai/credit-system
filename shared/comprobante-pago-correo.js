@@ -38,8 +38,9 @@ function tablaComprobanteHTML({ cuotas, total, origen }) {
   const condHTML = (condMora + condGastos) > 0 ? `
     <div style="margin:0 0 14px;font-size:13px">
       <div style="font-weight:700;color:#15803d;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Condonación otorgada</div>
-      ${condGastos > 0 ? `<div>Gastos de cobranza condonados: <b style="color:#15803d">-${clp(condGastos)}</b></div>` : ''}
-      ${condMora > 0 ? `<div>Intereses por mora condonados: <b style="color:#15803d">-${clp(condMora)}</b></div>` : ''}
+      <div>Total a pagar: <b>${clp(Number(total) + condMora + condGastos)}</b></div>
+      ${condMora > 0 ? `<div>Condonación interés por mora: <b style="color:#15803d">-${clp(condMora)}</b></div>` : ''}
+      ${condGastos > 0 ? `<div>Condonación gastos de cobranza: <b style="color:#15803d">-${clp(condGastos)}</b></div>` : ''}
     </div>` : '';
   return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 14px">
       <thead>

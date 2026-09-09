@@ -92,9 +92,14 @@ function generarComprobantePDF({ credito = {}, pagos = [], trxNum, cajaNombre, h
       row('Vencimiento', fmtD(p1.fecha_vencimiento));
       row('Fecha de Pago', fmtD(p1.fecha_pago), VERDE);
       if (cajaNombre) row('Caja', cajaNombre);
+      // Orden pedido por Pato (09-09-2026): cuota, interés por mora, gastos de cobranza (montos COMPLETOS,
+      // antes de condonar), Total a pagar; luego las condonaciones y el Total pagado.
+      const moraFull = Number(p1.interes_mora_total != null ? p1.interes_mora_total : p1.interes_mora) || 0;
+      const gastosFull = Number(p1.gastos_cobranza_total != null ? p1.gastos_cobranza_total : p1.gastos_cobranza) || 0;
       row('Monto Cuota', clp(p1.monto_cuota));
-      if (Number(p1.interes_mora) > 0) row('Int. por Mora', clp(p1.interes_mora), ROJO);
-      if (Number(p1.gastos_cobranza) > 0) row('Gtos. Cobranza', clp(p1.gastos_cobranza), ROJO);
+      if (moraFull > 0) row('Interés por Mora', clp(moraFull), ROJO);
+      if (gastosFull > 0) row('Gastos de Cobranza', clp(gastosFull), ROJO);
+      if (moraFull > 0 || gastosFull > 0) row('Total a Pagar', clp((Number(p1.monto_cuota) || 0) + moraFull + gastosFull));
     } else {
       row('Fecha de Pago', fmtD(p1.fecha_pago), VERDE);
       if (cajaNombre) row('Caja', cajaNombre);
@@ -136,19 +141,21 @@ function generarComprobantePDF({ credito = {}, pagos = [], trxNum, cajaNombre, h
     const condGastos = Math.max(0, Math.round(pagos.reduce((s, p) =>
       s + (Number(p.gastos_cobranza_total != null ? p.gastos_cobranza_total : p.gastos_cobranza) || 0), 0) - sumK('gastos_cobranza')));
     if (condMora + condGastos > 0) {
+      if (isMulti) row('Total a Pagar', clp(Number(totalPagado) + condMora + condGastos));
       hr(); secTitle('Condonación Otorgada', '#15803d');
-      if (condGastos > 0) row('Gastos de cobranza condonados', '-' + clp(condGastos), '#15803d');
-      if (condMora > 0) row('Intereses por mora condonados', '-' + clp(condMora), '#15803d');
+      if (condMora > 0) row('Condonación Interés por Mora', '-' + clp(condMora), '#15803d');
+      if (condGastos > 0) row('Condonación Gastos de Cobranza', '-' + clp(condGastos), '#15803d');
       doc.y += 4;
     }
 
     /* ── Total ── */
-    doc.roundedRect(X, doc.y, W, 40, 8).fillColor(AZUL).fill();
+    const yBox = doc.y;   // ambas líneas se posicionan desde el MISMO origen (antes doc.y ya había avanzado tras el rótulo)
+    doc.roundedRect(X, yBox, W, 40, 8).fillColor(AZUL).fill();
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#ffffff')
-      .text(`TOTAL PAGADO${isMulti ? ` (${pagos.length} CUOTAS)` : ''}`, X + 16, doc.y + 15);
-    doc.font('Helvetica-Bold').fontSize(15)
-      .text(clp(totalPagado), X, doc.y - 3, { width: W - 16, align: 'right' });
-    doc.y += 30;
+      .text(`TOTAL PAGADO${isMulti ? ` (${pagos.length} CUOTAS)` : ''}`, X + 16, yBox + 16, { lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(15).fillColor('#ffffff')
+      .text(clp(totalPagado), X, yBox + 12, { width: W - 16, align: 'right', lineBreak: false });
+    doc.y = yBox + 40 + 10;
 
     /* ── Pie ── */
     doc.moveTo(X, doc.y).lineTo(X + W, doc.y).lineWidth(0.8).strokeColor(LINEA).dash(2, { space: 2 }).stroke().undash();
