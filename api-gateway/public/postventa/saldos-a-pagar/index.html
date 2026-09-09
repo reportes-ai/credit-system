@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -136,8 +136,10 @@
       <div class="val"><span id="cntPag">0</span> ops X <span id="montoPag">$0</span></div>
     </div>
     <div class="stat selb">
-      <div class="lbl">Seleccionadas</div>
-      <div class="val"><span id="selN">0</span> ops X <span id="selM">$0</span></div>
+      <div class="lbl">Enviadas a pago (por confirmar)</div>
+      <div class="val"><span id="envN">0</span> ops X <span id="envM">$0</span></div>
+      <div class="sub" id="envSub"></div>
+      <div class="sub" style="margin-top:4px">Seleccionadas sin enviar: <b><span id="selN">0</span> ops X <span id="selM">$0</span></b></div>
       <div class="sub" id="selSub"></div>
     </div>
     <div class="stat fondos">
@@ -372,6 +374,11 @@ function recalc(){
   const sel = seleccionadas(), env = enviadas();
   document.getElementById('selN').textContent = sel.length;
   document.getElementById('selM').textContent = fmt(sum(sel));
+  // Lo que Tesorería va a pagar hoy = lo ya ENVIADO A PAGO (Pato, 09-09-2026: el cuadro mostraba 0 con 4 enviadas)
+  document.getElementById('envN').textContent = env.length;
+  document.getElementById('envM').textContent = fmt(sum(env));
+  const envSub = document.getElementById('envSub');
+  if (envSub) envSub.textContent = env.length ? (env.length + ' orden(es) listas para nómina y confirmación') : 'Nada enviado a pago todavía';
   /* Aviso de sobregiro: lo seleccionado no puede pasar el "Disponible para asignar"
      (fondos del día menos lo ya pagado y lo ya enviado a pago). Mismo cálculo que
      usan las propuestas, para que ambos números cuenten la misma historia. */
