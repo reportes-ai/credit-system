@@ -88,11 +88,13 @@ exports.vcf = async (req, res) => {
     const [[e]] = await pool.query('SELECT organizacion, web, telefono, email FROM credenciales_empresa WHERE id=1');
     const EMP = e || {};
     const nom = String(u.nombre || '').trim(), ape = [u.apellido, u.apellido_materno].filter(Boolean).join(' ').trim();
-    const tel = String(u.telefono || '').replace(/[^\d+]/g, ''), telEmp = String(EMP.telefono || '').replace(/[^\d+]/g, '');
+    const tel = String(u.telefono || '').replace(/[^\d+]/g, '');
     const lineas = ['BEGIN:VCARD', 'VERSION:3.0', `N:${ape};${nom};;;`, `FN:${nom} ${ape}`.trim(),
       `ORG:${EMP.organizacion || 'AutoFácil Crédito Automotriz'}`, u.cargo ? `TITLE:${u.cargo}` : '',
-      tel ? `TEL;TYPE=CELL:${tel}` : '', telEmp ? `TEL;TYPE=WORK:${telEmp}` : '',
-      u.email ? `EMAIL:${u.email}` : '', EMP.email ? `EMAIL;TYPE=WORK:${EMP.email}` : '',
+      // SOLO los datos de la persona: si va el teléfono/correo de la empresa, el iPhone cruza el
+      // número con un contacto existente (09-09-2026: el "teléfono de la empresa" era el de Pato y
+      // el vCard de Noelia aparecía como Patricio Escobar, sin su foto).
+      tel ? `TEL;TYPE=CELL:${tel}` : '', u.email ? `EMAIL:${u.email}` : '',
       EMP.web ? `URL:${EMP.web}` : ''];
     const m = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(String(u.foto || ''));
     if (m) {
