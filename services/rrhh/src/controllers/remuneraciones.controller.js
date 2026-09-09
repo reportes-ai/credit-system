@@ -861,7 +861,8 @@ const getMes = async (req, res) => {
     const [emps] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) AS nombre,
               CONCAT(UPPER(COALESCE(u.nombre,'')), ' ', UPPER(COALESCE(u.apellido,''))) AS nombre_corto,
-              u.rut, u.cargo, u.fecha_ingreso, u.fecha_baja, f.sueldo_base, f.afp, f.salud, f.tipo_contrato, f.colacion, f.movilizacion, f.plan_isapre_uf
+              u.rut, u.cargo, u.fecha_ingreso, u.fecha_baja, f.sueldo_base, f.afp, f.salud, f.tipo_contrato, f.colacion, f.movilizacion, f.plan_isapre_uf,
+              f.banco_pago, f.tipo_cuenta_pago, f.num_cuenta_pago
          FROM usuarios u JOIN rh_fichas f ON f.id_usuario = u.id_usuario
         WHERE (u.estado='activo' OR DATE_FORMAT(u.fecha_baja,'%Y-%m') >= ?)
           AND COALESCE(f.sueldo_base,0) > 0
@@ -882,7 +883,8 @@ const getMes = async (req, res) => {
       if (g && g.estado === 'EMITIDA') {
         // Emitida = congelada: se devuelve el snapshot tal cual
         let det = {}; try { det = typeof g.detalle === 'string' ? JSON.parse(g.detalle) : (g.detalle || {}); } catch (_) {}
-        return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo, estado: 'EMITIDA', id_liq: g.id, ...det };
+        return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo, estado: 'EMITIDA', id_liq: g.id,
+                 banco_pago: e.banco_pago, tipo_cuenta_pago: e.tipo_cuenta_pago, num_cuenta_pago: e.num_cuenta_pago, ...det };
       }
       const inp = {
         sueldo_base: e.sueldo_base, afp: e.afp, salud: e.salud, tipo_contrato: e.tipo_contrato,
@@ -898,6 +900,7 @@ const getMes = async (req, res) => {
         apv: descs.apv[e.id_usuario] || 0,
       };
       return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo,
+        banco_pago: e.banco_pago, tipo_cuenta_pago: e.tipo_cuenta_pago, num_cuenta_pago: e.num_cuenta_pago,
         licencia_dias: 30 - diasTrabajadosMes(mes, null, lics[e.id_usuario]),
         estado: g ? 'BORRADOR' : 'SIN GUARDAR', id_liq: g?.id || null, comisiones_mes: mesAnteriorDe(mes), ...calcLiquidacion(inp, ind) };
     });
@@ -1038,7 +1041,9 @@ const getLiquidacion = async (req, res) => {
     const rrhh = await tieneFunc(u.id_usuario, 'rh_remuneraciones').catch(() => false) || await tieneFunc(u.id_usuario, 'rh_aprobar').catch(() => false);
     if (String(l.id_usuario) !== String(u.id_usuario) && !rrhh) return fail(res, 'Sin permiso', 403);
     let det = {}; try { det = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) {}
-    ok(res, { ...l, detalle: det });
+    // Cuenta de depósito: de la ficha (fuente única, la misma que usa Nómina Banco)
+    const [[fb]] = await pool.query('SELECT banco_pago, tipo_cuenta_pago, num_cuenta_pago FROM rh_fichas WHERE id_usuario=? LIMIT 1', [l.id_usuario]).catch(() => [[null]]);
+    ok(res, { ...l, detalle: det, banco_pago: fb?.banco_pago || null, tipo_cuenta_pago: fb?.tipo_cuenta_pago || null, num_cuenta_pago: fb?.num_cuenta_pago || null });
   } catch (e) { fail(res, 'Error interno del servidor'); }
 };
 

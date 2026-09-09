@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
+  <!-- v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -281,8 +281,10 @@ function pintarLiq(l, d){
       </div>
       <div style="padding:26px 24px 18px;display:grid;grid-template-columns:1fr 1fr;gap:40px;font-size:.7rem;color:#64748b;text-align:center">
         <div><div style="border-top:1px solid #94a3b8;padding-top:5px;margin-top:24px">FIRMA EMPLEADOR</div></div>
-        <div><div style="border-top:1px solid #94a3b8;padding-top:5px;margin-top:24px">FIRMA TRABAJADOR — RECIBÍ CONFORME</div></div>
+        <div><div style="border-top:1px solid #94a3b8;padding-top:5px;margin-top:24px">FIRMA TRABAJADOR — RECIBÍ CONFORME</div>
+          <div style="font-size:.62rem;color:#64748b;text-align:justify;margin-top:6px;line-height:1.35">Certifico que he recibido a entera satisfacción los valores contenidos en la presente liquidación de sueldo, por lo cual no tengo ningún cargo o reclamo posterior que efectuar a mi empleador.</div></div>
       </div>
+      ${l.banco_pago || l.num_cuenta_pago ? `<div style="padding:0 24px 14px;font-size:.68rem;color:#475569"><i class="bi bi-bank me-1"></i>Líquido depositado en <b>${esc(l.banco_pago||'—')}</b>${l.tipo_cuenta_pago?' · '+esc(l.tipo_cuenta_pago):''}${l.num_cuenta_pago?' · N° '+esc(l.num_cuenta_pago):''}</div>` : ''}
     </div>
     <div style="margin-top:10px;font-size:.68rem;color:#94a3b8">Estado: ${esc(l.estado)}${l.emitido_at?' · emitida el '+new Date(l.emitido_at).toLocaleDateString('es-CL')+' por '+esc(l.emitido_por||''):''}</div>`;
   dlgLiq.showModal();
