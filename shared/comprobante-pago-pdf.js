@@ -97,8 +97,8 @@ function generarComprobantePDF({ credito = {}, pagos = [], trxNum, cajaNombre, h
       const moraFull = Number(p1.interes_mora_total != null ? p1.interes_mora_total : p1.interes_mora) || 0;
       const gastosFull = Number(p1.gastos_cobranza_total != null ? p1.gastos_cobranza_total : p1.gastos_cobranza) || 0;
       row('Monto Cuota', clp(p1.monto_cuota));
-      if (moraFull > 0) row('Interés por Mora', clp(moraFull), ROJO);
-      if (gastosFull > 0) row('Gastos de Cobranza', clp(gastosFull), ROJO);
+      if (moraFull > 0) row('Interés por Mora', clp(moraFull));
+      if (gastosFull > 0) row('Gastos de Cobranza', clp(gastosFull));
       if (moraFull > 0 || gastosFull > 0) row('Total a Pagar', clp((Number(p1.monto_cuota) || 0) + moraFull + gastosFull));
     } else {
       row('Fecha de Pago', fmtD(p1.fecha_pago), VERDE);
