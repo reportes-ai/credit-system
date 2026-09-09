@@ -145,6 +145,30 @@ require('../../../../shared/migrate').enFila('usuarios', async () => {
 /* Backfill: fecha y autor de las suspensiones YA hechas, desde la auditoría
    (accion ELIMINAR, detalle 'Usuario suspendido'). Sin rastro en auditoría,
    queda al menos la fecha_baja. */
+/* Red de seguridad (cada arranque): todo Ejecutivo activo que figure como creditos.ejecutivo
+   y no se tenga asignado a sí mismo en usuario_ejecutivos queda asignado. Sin esta fila el
+   ejecutivo entra a Revisión de Comisiones y ve "Sin créditos" (09-09-2026). Cruce sin
+   tildes ni mayúsculas; inserta el nombre tal como está en creditos. */
+require('../../../../shared/migrate').enFila('usuarios-autoasignacion-ejecutivos', async () => {
+  try {
+    const norm = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const [us] = await pool.query(`SELECT u.id_usuario, u.nombre, u.apellido FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+                                    WHERE u.estado='activo' AND p.nombre LIKE 'Ejecutivo%'`);
+    if (!us.length) return;
+    const [ej] = await pool.query("SELECT DISTINCT ejecutivo FROM creditos WHERE ejecutivo IS NOT NULL AND fecha_otorgado >= DATE_SUB(CURDATE(), INTERVAL 18 MONTH)");
+    const enCred = new Map(ej.map(e => [norm(e.ejecutivo), e.ejecutivo]));
+    const [asig] = await pool.query('SELECT id_usuario, ejecutivo FROM usuario_ejecutivos');
+    const tiene = new Set(asig.map(a => a.id_usuario + '|' + norm(a.ejecutivo)));
+    for (const u of us) {
+      const full = norm(u.nombre + ' ' + u.apellido), corto = norm(String(u.nombre).split(/\s+/)[0] + ' ' + u.apellido);
+      const clave = enCred.has(full) ? full : (enCred.has(corto) ? corto : null);
+      if (!clave || tiene.has(u.id_usuario + '|' + clave)) continue;
+      await pool.query('INSERT IGNORE INTO usuario_ejecutivos (id_usuario, ejecutivo) VALUES (?,?)', [u.id_usuario, String(enCred.get(clave)).toUpperCase()]);
+      console.log('✓ usuario_ejecutivos: autoasignado', u.id_usuario, enCred.get(clave));
+    }
+  } catch (e) { console.error('[usuarios autoasignación ejecutivos]', e.message); }
+});
+
 require('../../../../shared/migrate').migrar('usuarios-suspendido-backfill-v1', async () => {
   await pool.query(`
     UPDATE usuarios u
@@ -389,6 +413,16 @@ const createUsuario = async (req, res) => {
       'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, fecha_ingreso, fecha_nacimiento, cargo, sexo, externo, jefatura_desde, debe_cambiar_clave, password_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())',
       [RUT.normalizar(rut) || rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, req.body.externo ? 1 : 0, jdCrear || null]
     );
+
+    // Un ejecutivo se ve a SÍ MISMO en Revisión de Comisiones: la asignación propia nace con
+    // el usuario (caso Bárbara/Karen/Romo/Carmen/Durán, 09-09-2026: sin fila en usuario_ejecutivos
+    // no veían sus comisiones). Nombre en MAYÚSCULAS como en creditos.ejecutivo.
+    try {
+      const [[pf]] = await pool.query('SELECT nombre FROM perfiles WHERE id_perfil=?', [id_perfil]);
+      if (pf && /^Ejecutivo/i.test(pf.nombre))
+        await pool.query('INSERT IGNORE INTO usuario_ejecutivos (id_usuario, ejecutivo) VALUES (?,?)',
+          [result.insertId, `${nombre} ${apellido}`.replace(/\s+/g, ' ').trim().toUpperCase()]);
+    } catch (e) { console.error('[usuarios autoasignación ejecutivo]', e.message); }
 
     auditar({ req, accion: 'CREAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: result.insertId,
       detalle: `Creó el usuario ${nombre} ${apellido} (${email}) con perfil #${id_perfil}` +
