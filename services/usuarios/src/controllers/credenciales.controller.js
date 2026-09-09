@@ -57,6 +57,24 @@ async function asegurarTokens(ids) {
   return map;
 }
 
+/* JPEG sin segmentos APP1/APP2 (EXIF, perfil ICC): Chrome incrusta un perfil ICC al exportar
+   el canvas y algunos importadores de contactos (iOS) descartan la foto. Recorre los segmentos
+   hasta el inicio del scan y copia solo lo necesario. Si algo no calza, devuelve el original. */
+function jpegLimpio(buf) {
+  try {
+    if (buf[0] !== 0xFF || buf[1] !== 0xD8) return buf;
+    const partes = [Buffer.from([0xFF, 0xD8])]; let i = 2;
+    while (i + 4 <= buf.length && buf[i] === 0xFF) {
+      const marker = buf[i + 1];
+      if (marker === 0xDA) { partes.push(buf.subarray(i)); return Buffer.concat(partes); }   // SOS: el resto va entero
+      const len = buf.readUInt16BE(i + 2);
+      if (!(marker === 0xE1 || marker === 0xE2)) partes.push(buf.subarray(i, i + 2 + len));  // salta APP1/APP2
+      i += 2 + len;
+    }
+    return buf;
+  } catch (_) { return buf; }
+}
+
 /* ── GET /api/credenciales/vcf/:token — PÚBLICO: la tarjeta de contacto con foto ── */
 exports.vcf = async (req, res) => {
   try {
@@ -79,9 +97,11 @@ exports.vcf = async (req, res) => {
     const m = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(String(u.foto || ''));
     if (m) {
       const tipo = m[1].toLowerCase() === 'png' ? 'PNG' : (m[1].toLowerCase() === 'webp' ? 'WEBP' : 'JPEG');
-      const b64 = m[2].replace(/[\r\n]/g, '');
-      // plegado a 75 caracteres (RFC 2426): primera línea con la propiedad, siguientes con un espacio
-      const cab = `PHOTO;ENCODING=b;TYPE=${tipo}:`;
+      let b64 = m[2].replace(/[\r\n]/g, '');
+      if (tipo === 'JPEG') b64 = jpegLimpio(Buffer.from(b64, 'base64')).toString('base64');
+      // plegado a 75 caracteres (RFC 2426): primera línea con la propiedad, siguientes con un espacio.
+      // ENCODING=BASE64 (forma 2.1) la entienden todos los importadores, incluido iOS; "b" no siempre.
+      const cab = `PHOTO;ENCODING=BASE64;TYPE=${tipo}:`;
       let out = cab + b64.slice(0, 75 - cab.length);
       for (let i = 75 - cab.length; i < b64.length; i += 74) out += '\r\n ' + b64.slice(i, i + 74);
       lineas.push(out);
