@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nómina de Comisiones — AutoFácil</title>
-  <!-- v1.0 — nómina de comisiones por mes: monto a pagar, aprobación del supervisor y respuesta del ejecutivo con comentarios; Generar nómina = foto inmutable + correo a RRHH; regenerar ex profeso con motivo; historial de versiones (08-09-2026) -->
+  <!-- v1.1 — cuadros Aprobadas, Aceptadas y Sin respuesta del ejecutivo. v1.0 — nómina de comisiones por mes: monto a pagar, aprobación del supervisor y respuesta del ejecutivo con comentarios; Generar nómina = foto inmutable + correo a RRHH; regenerar ex profeso con motivo; historial de versiones (08-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -130,7 +130,8 @@ const pillEj = e => e==='aceptado'?'<span class="pill p-ace">ACEPTÓ</span>':e==
 function render(){
   const v=D.vigente, filas=D.filas||[];
   const tot=filas.reduce((s,f)=>s+Number(f.monto_pagar||0),0), con=filas.filter(f=>Number(f.monto_pagar)>0), pend=con.filter(f=>f.estado_aprobacion!=='aprobado').length, rev=filas.filter(f=>f.ejec_estado==='en_revision').length;
-  document.getElementById('kpis').innerHTML=`<div class="kpi"><div class="v">${con.length}</div><div class="l">Con variable</div></div><div class="kpi"><div class="v">${$(tot)}</div><div class="l">Total a pagar</div></div><div class="kpi"><div class="v" style="color:${pend?'#b45309':'#16a34a'}">${pend}</div><div class="l">Sin aprobar</div></div><div class="kpi"><div class="v" style="color:${rev?'#9a3412':'#16a34a'}">${rev}</div><div class="l">Enviadas a revisión</div></div>`;
+  const apr=con.filter(f=>f.estado_aprobacion==='aprobado').length, acep=con.filter(f=>f.ejec_estado==='aceptado').length, sinResp=con.filter(f=>f.estado_aprobacion==='aprobado' && (!f.ejec_estado || f.ejec_estado==='pendiente')).length;
+  document.getElementById('kpis').innerHTML=`<div class="kpi"><div class="v">${con.length}</div><div class="l">Con variable</div></div><div class="kpi"><div class="v">${$(tot)}</div><div class="l">Total a pagar</div></div><div class="kpi"><div class="v" style="color:#16a34a">${apr}</div><div class="l">Aprobadas por Operaciones</div></div><div class="kpi"><div class="v" style="color:#16a34a">${acep}</div><div class="l">Aceptadas por el ejecutivo</div></div><div class="kpi"><div class="v" style="color:${sinResp?'#b45309':'#16a34a'}">${sinResp}</div><div class="l">Sin respuesta del ejecutivo</div></div><div class="kpi"><div class="v" style="color:${pend?'#b45309':'#16a34a'}">${pend}</div><div class="l">Sin aprobar</div></div><div class="kpi"><div class="v" style="color:${rev?'#9a3412':'#16a34a'}">${rev}</div><div class="l">Enviadas a revisión</div></div>`;
   const en=document.getElementById('estadoNom');
   if(v){
     const difs=D.diferencias||[];
