@@ -192,7 +192,7 @@ Reglas de diseño que se derivan de este principio:
 ## Motores automáticos: un solo interruptor (`shared/scheduler.js`)
 > **Toda tarea de fondo se registra con `programar()`, nunca con un `setInterval` suelto.**
 
-Hay **29 motores** que actúan sin que nadie los llame: aprueban comisiones, desisten aprobados
+Hay **30 motores** que actúan sin que nadie los llame: aprueban comisiones, desisten aprobados
 vencidos, cierran castigos, generan devengos de vacaciones, escalan tickets y workflows, mandan
 correos programados y cobranza.
 

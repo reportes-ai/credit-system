@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v3.2 — "Sale desde": remitente parametrico por plantilla (cuentas habilitadas del mailer); cartolas dealer/parque nacen desde comisiones@ · v3.1 — campo CCO (copia oculta) editable en cada plantilla de correo · v3.0 — correo ODP a Contabilidad: campo Con copia (CC) parametrico junto al destinatario · v2.9 — navbar migrada al componente topnav · v2.7 — los montos seguidos salen como tabla en el correo · v2.6 — el cuerpo se envia con parrafos de verdad (bug: la prueba lo mandaba todo pegado) · v2.5 — cuerpos en texto plano legible (el motor los pasa a HTML) + cada correo dice a quien va dirigido · v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
+  <!-- v3.4 — Momento en que la comisión pasa A PAGAR (cierre de mes / inmediato). v3.3 — Corte de la cartola (mes anterior / inmediato). v3.2 — "Sale desde": remitente parametrico por plantilla (cuentas habilitadas del mailer); cartolas dealer/parque nacen desde comisiones@ · v3.1 — campo CCO (copia oculta) editable en cada plantilla de correo · v3.0 — correo ODP a Contabilidad: campo Con copia (CC) parametrico junto al destinatario · v2.9 — navbar migrada al componente topnav · v2.7 — los montos seguidos salen como tabla en el correo · v2.6 — el cuerpo se envia con parrafos de verdad (bug: la prueba lo mandaba todo pegado) · v2.5 — cuerpos en texto plano legible (el motor los pasa a HTML) + cada correo dice a quien va dirigido · v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -116,6 +116,19 @@
          dealer + los correos del circuito de parques. Viven acá, junto al resto de
          los correos de Post Venta, para que todo se administre en un solo lugar. -->
     <div style="margin-top:22px;border-top:2px solid #e2e8f0;padding-top:16px">
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;margin:0 0 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div><b style="color:#0141A2"><i class="bi bi-calendar-check me-1"></i>Corte de la cartola</b><div style="font-size:.76rem;color:#64748b">Qué comisiones marcadas A PAGAR entran en la cartola que se emite este mes.</div></div>
+        <select id="corteCartola" class="form-select form-select-sm" style="width:auto" onchange="guardarCorte()">
+          <option value="MES_ANTERIOR">Hasta el cierre del mes anterior (lo marcado este mes sale en la cartola siguiente)</option>
+          <option value="INMEDIATO">Inmediato (entra apenas se marca A PAGAR)</option>
+        </select><span id="msgCorte" style="font-size:.78rem;color:#16a34a"></span>
+        <div style="flex-basis:100%;height:0"></div>
+        <div><b style="color:#0141A2"><i class="bi bi-hourglass-split me-1"></i>Cuándo pasa a COMISIÓN A PAGAR</b><div style="font-size:.76rem;color:#64748b">La comisión del dealer queda "a pagar" una vez recibidos los fondos del saldo precio.</div></div>
+        <select id="momentoAPagar" class="form-select form-select-sm" style="width:auto" onchange="guardarMomento()">
+          <option value="CIERRE_MES">El último día del mes (todo lo que recibió fondos en el mes)</option>
+          <option value="INMEDIATO">Inmediato (al marcar FONDOS RECIBIDOS)</option>
+        </select><span id="msgMomento" style="font-size:.78rem;color:#16a34a"></span>
+      </div>
       <h6 style="font-weight:800;color:#0141A2;margin:0 0 4px"><i class="bi bi-envelope-at me-1"></i>Correos de Cartolas, Comisiones y Parques</h6>
       <div class="ph" style="margin:0 0 12px">Texto, destinatarios por perfil, copia (CC) e interruptor de cada correo automático. El cuerpo se escribe en <b>texto normal</b> y el sistema le da el formato al enviarlo: una línea en blanco separa párrafos, y <b>dos o más líneas seguidas del tipo «Concepto: $monto» salen como tabla</b> (si la etiqueta empieza con TOTAL, la fila va destacada). Cada correo indica <b>a quién va dirigido</b>; los perfiles y el CC son copias que se suman. Cada uno se guarda por separado y queda auditado; <b>Prueba</b> lo manda con datos de ejemplo solo a la casilla que indiques.</div>
       <div id="plantCont"><div style="color:#94a3b8;font-size:.82rem;padding:14px 0">Cargando correos…</div></div>
@@ -205,6 +218,8 @@ function pintaCorreos(){
   document.getElementById('sActivo').checked = s.activo !== false;
   // Remitentes habilitados (los verificados en el motor de correo)
   const CTAS = CFG._cuentas_remitente || [{clave:'sistema',label:'Sistema (afbs@)'}];
+  const sc = document.getElementById('corteCartola'); if (sc) sc.value = CFG.cartola_corte_marcado === 'INMEDIATO' ? 'INMEDIATO' : 'MES_ANTERIOR';
+  const sm = document.getElementById('momentoAPagar'); if (sm) sm.value = CFG.comision_a_pagar_momento === 'INMEDIATO' ? 'INMEDIATO' : 'CIERRE_MES';
   const opts = CTAS.map(x=>`<option value="${x.clave}">${x.label}</option>`).join('');
   document.getElementById('sRemitente').innerHTML = opts;
   document.getElementById('cRemitente').innerHTML = opts;
@@ -221,6 +236,16 @@ function pintaCorreos(){
   document.getElementById('psAsunto').value = ps.asunto; document.getElementById('psCuerpo').value = ps.cuerpo; document.getElementById('psFirma').value = ps.firma || '';
 }
 
+async function guardarMomento(){
+  const v = document.getElementById('momentoAPagar').value, m = document.getElementById('msgMomento');
+  const j = await fetch('/api/postventa/config/comision_a_pagar_momento', { method:'PUT', headers:H, body: JSON.stringify({ valor: v }) }).then(r=>r.json()).catch(()=>null);
+  m.textContent = j && j.success ? '✓ Guardado' : '✗ No se pudo guardar'; setTimeout(()=>m.textContent='', 3000);
+}
+async function guardarCorte(){
+  const v = document.getElementById('corteCartola').value, m = document.getElementById('msgCorte');
+  const j = await fetch('/api/postventa/config/cartola_corte_marcado', { method:'PUT', headers:H, body: JSON.stringify({ valor: v }) }).then(r=>r.json()).catch(()=>null);
+  m.textContent = j && j.success ? '✓ Guardado' : '✗ No se pudo guardar'; setTimeout(()=>m.textContent='', 3000);
+}
 async function guardarCorreos(){
   const btn = document.getElementById('btn-correo'), msg = document.getElementById('msg-correo');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Guardando…'; msg.style.display='none';

@@ -301,6 +301,13 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
     };
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)',
       ['correo_pago_saldo', JSON.stringify(CORREO_PAGO_SALDO)]);
+    // Corte de la cartola (Pato, 09-09-2026): lo marcado A PAGAR dentro del mes en curso sale en la
+    // cartola del mes siguiente (MES_ANTERIOR). INMEDIATO = como antes (entra apenas se marca).
+    await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)', ['cartola_corte_marcado', JSON.stringify('MES_ANTERIOR')]);
+    // Momento en que la comisión pasa a COMISION A PAGAR (Pato, 09-09-2026): CIERRE_MES = el último día
+    // del mes, para todo lo que tuvo FONDOS RECIBIDOS en ese mes (motor abajo). INMEDIATO = al marcar
+    // FONDOS RECIBIDOS, como era hasta hoy.
+    await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)', ['comision_a_pagar_momento', JSON.stringify('CIERRE_MES')]);
     // Parche idempotente: alinear el asunto del saldo al formato de comisión (solo si conserva el default viejo).
     try {
       const [[rc]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_orden_saldo'");
@@ -520,7 +527,7 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
         OR (m.id_carta IS NULL AND (CAST(m.num_op AS CHAR) = CAST(c.num_op AS CHAR) OR CAST(m.num_op AS CHAR) = CAST(c.id_financiera AS CHAR)))
       JOIN postventa_seguimiento s ON s.id_credito = c.id
       JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track='COMISION' AND e.etapa='COMISION A PAGAR'
-      SET m.estado_comision='A PAGAR', m.estado_usuario='Sistema', m.estado_fecha=NOW()
+      SET m.estado_comision='A PAGAR', m.estado_usuario='Sistema', m.estado_fecha=e.fecha
       WHERE m.movimiento='COMISION' AND m.estado_comision='PENDIENTE'
         AND m.mes_cartola IS NULL
         AND NOT EXISTS (SELECT 1 FROM postventa_etapas pg
@@ -1129,16 +1136,28 @@ const getAll = async (req, res) => {
 /* ── COMISION A PAGAR automática: se marca cuando el saldo precio de la misma
    operación queda con FONDOS RECIBIDOS (la comisión se paga con la plata en mano).
    Se llama desde setEtapa y desde los flujos de ODP de saldo que fuerzan esa etapa. */
-async function marcarComisionAPagar(ids) {
+async function momentoComisionAPagar() {
+  try { const [[r]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='comision_a_pagar_momento'"); const v = r ? JSON.parse(r.valor) : null; return v === 'INMEDIATO' ? 'INMEDIATO' : 'CIERRE_MES'; }
+  catch (_) { return 'CIERRE_MES'; }
+}
+/* opts.forzar = viene del motor de cierre de mes (marca aunque el momento sea CIERRE_MES);
+   opts.fecha  = fecha de la etapa y del estado en la cartola (el motor usa el último día del mes). */
+async function marcarComisionAPagar(ids, opts = {}) {
   if (!Array.isArray(ids)) ids = [ids];
   ids = ids.map(Number).filter(Boolean);
   if (!ids.length) return;
+  // Con CIERRE_MES la marca la pone el motor el último día del mes: aquí solo queda COMISION PENDIENTE.
+  if (!opts.forzar && (await momentoComisionAPagar()) === 'CIERRE_MES') {
+    await pool.query('INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?', [ids.map(id => [id, 'COMISION', 'COMISION PENDIENTE', 'Sistema'])]).catch(() => {});
+    return;
+  }
+  const fecha = opts.fecha || new Date();
   const vals = [];
   for (const id of ids) {
-    vals.push([id, 'COMISION', 'COMISION PENDIENTE', 'Sistema']);
-    vals.push([id, 'COMISION', 'COMISION A PAGAR', 'Sistema']);
+    vals.push([id, 'COMISION', 'COMISION PENDIENTE', 'Sistema', fecha]);
+    vals.push([id, 'COMISION', 'COMISION A PAGAR', 'Sistema', fecha]);
   }
-  await pool.query('INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?', [vals])
+  await pool.query('INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha) VALUES ?', [vals])
     .catch(e => console.error('[postventa comisionAPagar]', e.message));
   // Emisión de Cartolas: el movimiento COMISION de la operación pasa solo de
   // PENDIENTE → A PAGAR (el dropdown sigue editable; A DESCONTAR y los cambios
@@ -1153,13 +1172,49 @@ async function marcarComisionAPagar(ids) {
       ON (ca.id_credito_creado IS NOT NULL AND c.id = ca.id_credito_creado)
       OR (m.id_carta IS NULL AND (CAST(m.num_op AS CHAR) = CAST(c.num_op AS CHAR) OR CAST(m.num_op AS CHAR) = CAST(c.id_financiera AS CHAR)))
     JOIN postventa_seguimiento s ON s.id_credito = c.id
-    SET m.estado_comision='A PAGAR', m.estado_usuario='Sistema', m.estado_fecha=NOW()
+    SET m.estado_comision='A PAGAR', m.estado_usuario='Sistema', m.estado_fecha=?
     WHERE s.id IN (${ph}) AND m.movimiento='COMISION' AND m.estado_comision='PENDIENTE'
       AND m.mes_cartola IS NULL
       AND NOT EXISTS (SELECT 1 FROM postventa_etapas pg
-        WHERE pg.id_seguimiento = s.id AND pg.track='COMISION' AND pg.etapa='COMISION PAGADA')`, ids)
+        WHERE pg.id_seguimiento = s.id AND pg.track='COMISION' AND pg.etapa='COMISION PAGADA')`, [fecha, ...ids])
     .catch(e => console.error('[postventa comisionAPagar cartola]', e.message));
 }
+
+/* ── MOTOR: COMISION A PAGAR al cierre de mes (Pato, 09-09-2026) ───────────────
+   "FONDOS RECIBIDOS marcaba COMISION A PAGAR al tiro; eso debe suceder el último día
+   del mes". Cada vuelta: toda operación con FONDOS RECIBIDOS (o saldo pagado) fechado
+   ANTES del mes en curso (Chile) y sin COMISION A PAGAR ni COMISION PAGADA queda marcada
+   con fecha = último día de su mes a las 23:59:59. Idempotente: corre cada 6 h y al
+   arrancar, así el 1 de cada mes a primera hora ya está hecho y no depende de que el
+   proceso esté vivo justo a las 23:59 del último día. Con momento INMEDIATO no hace nada. */
+async function comisionAPagarCierreMes() {
+  try {
+    if ((await momentoComisionAPagar()) !== 'CIERRE_MES') return;
+    const hoyCL = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });   // YYYY-MM-DD
+    const iniMes = hoyCL.slice(0, 7) + '-01';
+    const [pend] = await pool.query(`
+      SELECT s.id, DATE_FORMAT(MIN(e.fecha), '%Y-%m') AS mes_fondos
+        FROM postventa_seguimiento s
+        JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track='SALDO' AND e.etapa IN ('FONDOS RECIBIDOS','SALDO PRECIO PAGADO')
+       WHERE e.fecha < ?
+         AND NOT EXISTS (SELECT 1 FROM postventa_etapas x WHERE x.id_seguimiento = s.id AND x.track='COMISION' AND x.etapa IN ('COMISION A PAGAR','COMISION PAGADA'))
+         AND NOT EXISTS (SELECT 1 FROM postventa_reversas r WHERE r.id_seguimiento = s.id)
+       GROUP BY s.id`, [iniMes]);
+    if (!pend.length) return;
+    // agrupar por mes de fondos → fecha = último día de ese mes 23:59:59
+    const porMes = {};
+    for (const r of pend) (porMes[r.mes_fondos] = porMes[r.mes_fondos] || []).push(r.id);
+    let n = 0;
+    for (const [mes, ids] of Object.entries(porMes)) {
+      const [y, m] = mes.split('-').map(Number);
+      const ultimo = new Date(y, m, 0, 23, 59, 59);   // día 0 del mes siguiente = último día de este mes
+      await marcarComisionAPagar(ids, { forzar: true, fecha: ultimo });
+      n += ids.length;
+    }
+    console.log(`[postventa comision-a-pagar-cierre-mes] ${n} operación(es) marcadas COMISION A PAGAR al cierre de mes`);
+  } catch (e) { console.error('[postventa comision-a-pagar-cierre-mes]', e.message); }
+}
+require('../../../../shared/scheduler').programar('postventa-comision-a-pagar-cierre-mes', comisionAPagarCierreMes, 6 * 60 * 60 * 1000, { arranqueMs: 45000 });
 
 /* Rut del dealer resuelto igual que getAll (creditos → dealers → seguimiento) */
 async function rutDealerDe(idSeguimiento) {
@@ -1415,7 +1470,7 @@ const setEtapa = async (req, res) => {
     if (track === 'PARQUE' && etapa === 'COMISION A PAGAR')
       return res.status(400).json({ success: false, data: null, error: 'Etapa de sistema — no editable' });
     if (track === 'COMISION' && etapa === 'COMISION A PAGAR')
-      return res.status(400).json({ success: false, data: null, error: '"COMISION A PAGAR" se marca automáticamente al marcar FONDOS RECIBIDOS en el track Saldo Precio de la operación' });
+      return res.status(400).json({ success: false, data: null, error: '"COMISION A PAGAR" la marca el sistema: el último día del mes para toda operación que tuvo FONDOS RECIBIDOS en ese mes (o al tiro, si el mantenedor de Post Venta está en modo Inmediato)' });
     // CARTOLA ENVIADA es automática (la marca el envío desde Emisión de Cartolas),
     // pero se puede marcar a mano para el caso de borde real: una cartola emitida
     // y enviada FUERA del ciclo (op que no estaba marcada al enviar) dejaba la
