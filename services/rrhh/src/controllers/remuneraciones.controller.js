@@ -386,7 +386,15 @@ async function adicionalesDelMes(mes) {
        FROM rh_adicionales
       WHERE mes=? OR (permanente=1 AND mes<? AND (permanente_fin IS NULL OR permanente_fin>?))
       GROUP BY id_usuario`, [mes, mes, mes]);
-  const m = {}; rows.forEach(r => m[r.id_usuario] = { imp: Number(r.imp), noimp: Number(r.noimp) });
+  const m = {}; rows.forEach(r => m[r.id_usuario] = { imp: Number(r.imp), noimp: Number(r.noimp), items: [] });
+  // Detalle por ítem: la liquidación muestra cada adicional con su nombre (ej. "Asignación de celular (no imponible)")
+  const [det] = await pool.query(
+    `SELECT id_usuario, causal, causal_texto, monto, imponible, es_liquido FROM rh_adicionales
+      WHERE mes=? OR (permanente=1 AND mes<? AND (permanente_fin IS NULL OR permanente_fin>?)) ORDER BY id`, [mes, mes, mes]).catch(() => [[]]);
+  const titulo = t => String(t || '').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+  det.forEach(r => { if (m[r.id_usuario]) m[r.id_usuario].items.push({
+    nombre: titulo(r.causal === 'OTRO' && r.causal_texto ? r.causal_texto : r.causal),
+    monto: Number(r.monto), imponible: !!(r.imponible && !r.es_liquido), liquido: !!r.es_liquido }); });
   return m;
 }
 
@@ -724,6 +732,7 @@ function calcLiquidacion(inp, ind) {
     dias, sueldo_base: sueldo, comisiones, feriado_variable: feriadoVar, feriado_var_dias: inp.feriado_var_dias || 0, otros_imponibles: otrosImp, gratificacion,
     total_imponible: imponible, base_cotizacion: baseCotiz,
     colacion, movilizacion, otros_no_imponibles: otrosNoImp,
+    adicionales: Array.isArray(inp.adicionales) ? inp.adicionales : [],   // detalle por ítem (nombre, monto, imponible)
     total_haberes: totalHaberes,
     afp: inp.afp || null, afp_pct: afpPct, desc_afp: descAfp,
     salud: inp.salud || null, salud_pct: ind.rem_salud_pct, desc_salud: descSalud,
@@ -896,6 +905,7 @@ const getMes = async (req, res) => {
         feriado_var_dias: ferVar[e.id_usuario]?.dias || 0,
         otros_imponibles: adics[e.id_usuario]?.imp || 0,
         otros_no_imponibles: adics[e.id_usuario]?.noimp || 0,
+        adicionales: adics[e.id_usuario]?.items || [],
         otros_descuentos: descs[e.id_usuario] || 0,
         apv: descs.apv[e.id_usuario] || 0,
       };
