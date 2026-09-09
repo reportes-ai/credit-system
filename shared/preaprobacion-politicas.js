@@ -30,7 +30,7 @@ const DEFAULTS = {
   aviso_ejecutivo_activo:     'SI',                    // SI | NO
   aviso_ejecutivo_resultados: 'PREAPROBADO',           // CSV de resultados que avisan: PREAPROBADO,REVISION (vacío = todos)
   aviso_ejecutivo_cc:         '',                      // copias adicionales (correos separados por coma)
-  aviso_ejecutivo_asunto:     'Preaprobación {codigo} — dealer {dealer} ({resultado})',
+  aviso_ejecutivo_asunto:     '🚨 Preaprobación {codigo} — dealer {dealer} ({resultado})',
   aviso_ejecutivo_msg:        'El dealer {dealer} generó la preaprobación N° {codigo} a las {hora} hrs del {fecha} con las siguientes condiciones:',
   // Mensajes al cliente según resultado ({pie} = % de pie informado). Un solo set para todos los canales.
   msg_aprobado_expres:    '🎉 *¡Excelente! Tu preevaluación salió muy bien.*\nCon tu pie del {pie}% solo necesitas:\n📇 Cédula de identidad vigente\n🏠 Una cuenta que acredite tu domicilio\n👥 3 referencias personales\n\n¡Y te puedes llevar el auto para la casa *el mismo día*! 🚗💨 ¿Coordinamos con un ejecutivo?',
