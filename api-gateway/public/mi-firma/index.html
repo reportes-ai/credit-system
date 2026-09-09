@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Firma de Correo — AutoFácil</title>
+  <!-- v1.0 — firma de correo corporativa por persona (datos de la ficha, fuente única): copiar como HTML para Gmail/Outlook o descargar como imagen -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .wrap { max-width:960px; margin:22px auto; padding:0 18px 60px; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:18px 26px; margin-bottom:16px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.1rem; opacity:.85; } .banner h2 { font-weight:700; margin:0; font-size:1.15rem; } .banner p { margin:2px 0 0; opacity:.85; font-size:.83rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:14px; }
+    .panel h5 { font-weight:800; color:var(--navy); font-size:.95rem; margin:0 0 10px; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:9px 18px; font-weight:700; font-size:.86rem; cursor:pointer; }
+    .btn-ghost { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:9px; padding:8px 14px; font-weight:600; font-size:.84rem; cursor:pointer; }
+    .preview { border:1px dashed #cbd5e1; border-radius:10px; padding:18px; background:#fff; overflow:auto; }
+    .paso { display:flex; gap:10px; font-size:.84rem; color:#334155; margin:6px 0; } .paso b { color:var(--navy); min-width:22px; }
+    .falta { background:#fef2f2; border-left:4px solid #dc2626; border-radius:8px; padding:9px 13px; font-size:.82rem; color:#7f1d1d; margin-bottom:12px; }
+    .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.86rem; z-index:3000; display:none; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Mi Firma de Correo',icon:'bi-pen',current:true}]};</script>
+
+<div class="wrap">
+  <div class="banner"><i class="bi bi-pen"></i><div><h2>Mi Firma de Correo</h2><p>Tu firma corporativa se arma sola con los datos de tu ficha. Cópiala en Gmail u Outlook una vez y listo.</p></div></div>
+
+  <div id="falta" class="falta" style="display:none"></div>
+
+  <div class="panel">
+    <h5><i class="bi bi-eye me-1"></i>Así se ve tu firma</h5>
+    <div class="preview" id="preview">Cargando…</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center">
+      <button class="btn-navy" onclick="copiarFirma(this)"><i class="bi bi-clipboard-check me-1"></i>Copiar firma</button>
+      <button class="btn-ghost" onclick="descargarPng()"><i class="bi bi-image me-1"></i>Descargar como imagen (PNG)</button>
+      <span style="font-size:.78rem;color:#64748b">La firma copiada mantiene el teléfono, el correo y la web clicables. La imagen sirve si tu correo no acepta firmas HTML.</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h5><i class="bi bi-google me-1"></i>Instalarla en Gmail</h5>
+    <div class="paso"><b>1</b><span>Pulsa <b>Copiar firma</b> arriba.</span></div>
+    <div class="paso"><b>2</b><span>En Gmail: engranaje ⚙ → <b>Ver todos los ajustes</b> → pestaña <b>General</b> → sección <b>Firma</b> → <b>Crear nueva</b> (ponle un nombre).</span></div>
+    <div class="paso"><b>3</b><span>Haz clic dentro del cuadro de la firma y pega con <b>Ctrl+V</b>. Abajo, en "Valores predeterminados de firma", elígela para correos nuevos y respuestas.</span></div>
+    <div class="paso"><b>4</b><span>Baja hasta el final y pulsa <b>Guardar cambios</b>.</span></div>
+  </div>
+
+  <div class="panel">
+    <h5><i class="bi bi-microsoft me-1"></i>Instalarla en Outlook</h5>
+    <div class="paso"><b>1</b><span>Pulsa <b>Copiar firma</b> arriba.</span></div>
+    <div class="paso"><b>2</b><span>Outlook de escritorio: <b>Archivo → Opciones → Correo → Firmas…</b> → <b>Nueva</b>. Outlook web: ⚙ → <b>Cuenta → Firmas</b>.</span></div>
+    <div class="paso"><b>3</b><span>Pega con <b>Ctrl+V</b> en el editor de la firma y márcala como predeterminada para mensajes nuevos y respuestas. <b>Guardar</b>.</span></div>
+  </div>
+
+  <div class="panel" style="font-size:.8rem;color:#475569">
+    <b><i class="bi bi-info-circle me-1"></i>De dónde salen los datos:</b> nombre, cargo, teléfono y correo vienen de tu ficha de Usuarios (si algo está mal, pídele a RRHH que lo corrija en Colaboradores); dirección, web y teléfono de la empresa vienen de <b>Credenciales Corporativas → Datos de la empresa</b>. Al cambiar un dato, vuelve aquí y copia la firma de nuevo.
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="/js/html2canvas.min.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let FIRMA_HTML = '', D = null;
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2500); }
+const fmtTel = t => { const d=String(t||'').replace(/[^\d]/g,''); if(d.length===11 && d.startsWith('56')) return '+56 '+d[2]+' '+d.slice(3,7)+' '+d.slice(7); if(d.length===9) return '+56 '+d[0]+' '+d.slice(1,5)+' '+d.slice(5); return t||''; };
+
+/* Firma en tabla con estilos en línea: es lo único que Gmail y Outlook respetan igual. */
+function armar(d){
+  const base = location.origin;
+  const nombre = [d.nombre, d.apellido, d.apellido_materno].filter(Boolean).join(' ').toUpperCase();
+  const tel = fmtTel(d.telefono), telRaw = String(d.telefono||'').replace(/[^\d+]/g,'');
+  const web = d.empresa.web || 'https://www.autofacilchile.cl';
+  const webTxt = web.replace(/^https?:\/\//,'');
+  const fila = (icono, contenido) => `<tr><td style="padding:2px 8px 2px 0;vertical-align:middle;width:22px"><img src="${base}/img/firma-${icono}.png" width="16" height="16" alt="" style="display:block;border:0"></td><td style="padding:2px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#333333;vertical-align:middle">${contenido}</td></tr>`;
+  return `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif">
+  <tr>
+    <td style="padding:0 18px 0 0;vertical-align:middle;border-right:2px solid #0141A2"><a href="${web}" target="_blank" style="text-decoration:none"><img src="${base}/img/firma-autofacil.png" width="150" alt="AutoFácil Crédito Automotriz" style="display:block;border:0;width:150px"></a></td>
+    <td style="padding:0 0 0 18px;vertical-align:middle">
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;color:#333333;letter-spacing:.5px">${esc(nombre)}</div>
+      ${d.cargo ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#009AFE;margin:2px 0 8px">${esc(d.cargo)}</div>` : '<div style="height:8px"></div>'}
+      <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse">
+        ${tel ? fila('tel', `<a href="tel:${telRaw}" style="color:#333333;text-decoration:none">${esc(tel)}</a>`) : ''}
+        ${d.email ? fila('mail', `<a href="mailto:${esc(d.email)}" style="color:#333333;text-decoration:none">${esc(d.email)}</a>`) : ''}
+        ${fila('web', `<a href="${web}" target="_blank" style="color:#333333;text-decoration:none">${esc(webTxt)}</a>`)}
+      </table>
+    </td>
+  </tr>
+  ${d.empresa.direccion ? `<tr><td colspan="2" style="padding:12px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#555555;border-top:1px solid #dddddd"><img src="${base}/img/firma-pin.png" width="12" height="12" alt="" style="vertical-align:middle;border:0;margin-right:4px">${esc(d.empresa.direccion)}</td></tr>` : ''}
+</table>`;
+}
+
+async function cargar(){
+  const j = await (await fetch('/api/credenciales/mi-firma', { headers:H })).json();
+  if (!j.success) { document.getElementById('preview').textContent = j.error || 'No se pudo cargar'; return; }
+  D = j.data;
+  const faltan = [];
+  if (!D.cargo) faltan.push('cargo'); if (!D.telefono) faltan.push('teléfono corporativo'); if (!D.email) faltan.push('correo');
+  const f = document.getElementById('falta');
+  if (faltan.length) { f.style.display=''; f.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i>Tu ficha no tiene <b>${faltan.join(', ')}</b>: la firma sale sin ese dato. Pídele a RRHH que lo complete en Colaboradores y vuelve a copiarla.`; }
+  FIRMA_HTML = armar(D);
+  document.getElementById('preview').innerHTML = FIRMA_HTML;
+}
+async function copiarFirma(btn){
+  const plano = [[D.nombre,D.apellido].filter(Boolean).join(' '), D.cargo, fmtTel(D.telefono), D.email, D.empresa.web, D.empresa.direccion].filter(Boolean).join('\n');
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([FIRMA_HTML],{type:'text/html'}), 'text/plain': new Blob([plano],{type:'text/plain'}) })]);
+    } else throw new Error('no-clipboard');
+  } catch(e) {
+    const tmp=document.createElement('div'); tmp.contentEditable='true'; tmp.style.cssText='position:fixed;left:-9999px'; tmp.innerHTML=FIRMA_HTML; document.body.appendChild(tmp);
+    const rg=document.createRange(); rg.selectNodeContents(tmp); const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(rg); document.execCommand('copy'); sel.removeAllRanges(); tmp.remove();
+  }
+  const orig = btn.innerHTML; btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Copiada — pégala en tu correo'; setTimeout(()=>btn.innerHTML=orig, 3500);
+}
+async function descargarPng(){
+  const el = document.getElementById('preview');
+  const canvas = await html2canvas(el, { scale: 3, backgroundColor: '#ffffff', useCORS: true });
+  const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = 'firma-' + String(D.nombre||'').toLowerCase().replace(/\s+/g,'-') + '.png'; a.click();
+  toast('Imagen descargada');
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

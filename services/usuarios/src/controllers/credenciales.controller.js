@@ -152,6 +152,18 @@ exports.empresaPut = async (req, res) => {
   } catch (e) { errSrv(res, e, 'credenciales empresaPut'); }
 };
 
+/* ── GET /api/credenciales/mi-firma — datos para la firma de correo del usuario logueado.
+   Fuente única: ficha de Usuarios (nombre, cargo, teléfono corporativo, correo) + datos de la
+   empresa de Credenciales Corporativas (web, dirección, teléfono). La firma se arma en /mi-firma/. */
+exports.miFirma = async (req, res) => {
+  try {
+    const [[u]] = await pool.query('SELECT nombre, apellido, apellido_materno, cargo, telefono, email FROM usuarios WHERE id_usuario=?', [req.usuario.id_usuario]);
+    if (!u) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
+    const [[e]] = await pool.query('SELECT organizacion, direccion, web, telefono, email FROM credenciales_empresa WHERE id=1');
+    res.json({ success: true, data: { ...u, empresa: e || {} }, error: null });
+  } catch (e) { errSrv(res, e, 'credenciales miFirma'); }
+};
+
 /* ── GET /api/credenciales/mi-foto — foto del usuario logueado (avatar topnav) ── */
 exports.miFoto = async (req, res) => {
   try {
