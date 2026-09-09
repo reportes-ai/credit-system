@@ -21,7 +21,7 @@ router.post('/variables/modelos/:id/aplicar', verifyToken, requireFunc('comision
 // ajustes-vigentes (más abajo) queda abierto: lo lee reportería de rentabilidad.
 router.get('/calculo',            verifyToken, requireFunc('comisión_ejecutivos_ver'), ctrl.getCalculo);
 router.get('/ejecutivos',         verifyToken, requireFunc('comisión_ejecutivos_ver'), ctrl.getEjecutivos);
-router.post('/aprobar',           verifyToken, requireFunc('comisiones_revision'),  ctrl.aprobar);
+router.post('/aprobar',           verifyToken, requireFunc('comisiones_aprobar'),   ctrl.aprobar);
 router.put('/op-independiente',   verifyToken, requireFunc('comisiones_revision'),  ctrl.marcarIndependiente);
 router.post('/ejecutivo-responder', verifyToken,                                   ctrl.ejecutivoResponder);
 router.get('/resumen-config',     verifyToken, requireFunc('comisiones_revision'), ctrl.getResumenConfig);

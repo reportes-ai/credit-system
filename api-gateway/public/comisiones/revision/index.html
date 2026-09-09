@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Revisión Comisiones — AutoFácil</title><!-- v5.32 — aviso de nómina generada (montos congelados) y filtro ?mes&ej desde la Nómina. v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
+  <title>Revisión Comisiones — AutoFácil</title><!-- v5.33 — Aprobar/Rechazar por permiso comisiones_aprobar (Analista de Operaciones), no solo Administrador. v5.32 — aviso de nómina generada (montos congelados) y filtro ?mes&ej desde la Nómina. v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -173,7 +173,15 @@ const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
 const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
-const esAdmin = yo?.perfil === 'Administrador';
+// "esAdmin" = puede aprobar/rechazar y ve a TODOS los ejecutivos: Administrador o permiso comisiones_aprobar (paramétrico, Perfiles)
+let esAdmin = yo?.perfil === 'Administrador';
+async function cargarPermisos() {
+  if (esAdmin) return;
+  try {
+    const j = await (await fetch('/api/auth/mis-permisos?_=' + Date.now(), { cache:'no-store', headers:H })).json();
+    if ((j.funcionalidades || []).includes('comisiones_aprobar')) { esAdmin = true; const _ba = document.getElementById('btnAlertas'); if (_ba) _ba.style.display = ''; }
+  } catch (_) {}
+}
 let _ejAsignados = null; // null = sin restricción (admin), [] = sin asignación, ['nombre',...] = filtro
 if (esAdmin) { const _ba = document.getElementById('btnAlertas'); if (_ba) _ba.style.display = ''; }
 
@@ -1220,7 +1228,7 @@ function copiarEmailHtml() {
   w.document.close();
 }
 
-cargar();
+cargarPermisos().then(cargar);
 </script>
 
 <dialog id="dlgDeclaracion" style="border:none;border-radius:14px;padding:0;max-width:520px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">

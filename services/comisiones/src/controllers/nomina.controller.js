@@ -68,6 +68,11 @@ require('../../../../shared/migrate').enFila('comisiones-nomina', async () => {
   const idMod = mod ? mod.id_modulo : 150001;
   await pool.query(`INSERT IGNORE INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Nómina de Comisiones', 'comisiones_nomina', '/comisiones/nomina/', 'bi-file-earmark-spreadsheet')`, [idMod]);
   await pool.query(`INSERT IGNORE INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Nómina de Comisiones — generar y enviar a RRHH (Analista de Operaciones)', 'comisiones_nomina_generar', NULL, NULL)`, [idMod]);
+  // Aprobar/rechazar comisiones en Revisión: antes solo perfil Administrador (hardcode); ahora permiso paramétrico
+  await pool.query(`INSERT IGNORE INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Revisión — aprobar/rechazar comisiones (Operaciones)', 'comisiones_aprobar', NULL, NULL)`, [idMod]);
+  const [[fAp]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='comisiones_aprobar' LIMIT 1");
+  if (fAp) await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+    SELECT id_perfil, ?, 1 FROM perfiles WHERE nombre IN ('Administrador','Analista de Operaciones')`, [fAp.id_funcionalidad]);
   // Destinatario paramétrico (mismo mantenedor del resumen)
   await pool.query(`CREATE TABLE IF NOT EXISTS comisiones_resumen_config (clave VARCHAR(40) PRIMARY KEY, valor VARCHAR(500) NOT NULL DEFAULT '', updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
   await pool.query("INSERT IGNORE INTO comisiones_resumen_config (clave, valor) VALUES ('nomina_para', 'recursos.humanos@autofacilchile.cl'), ('nomina_cc', '')");
