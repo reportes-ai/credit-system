@@ -26,6 +26,9 @@ require('../../../../shared/migrate').enFila('credenciales', async () => {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
     await pool.query(`INSERT IGNORE INTO credenciales_empresa (id, organizacion, web) VALUES (1, 'AutoFácil Crédito Automotriz', 'https://www.autofacilchile.cl')`);
+    // token público del vCard con foto (el QR apunta a /api/credenciales/vcf/<token>)
+    await pool.query('ALTER TABLE credenciales_usuario ADD COLUMN IF NOT EXISTS token VARCHAR(32) NULL').catch(() => {});
+    await pool.query('ALTER TABLE credenciales_usuario ADD UNIQUE INDEX idx_token (token)').catch(() => {});
     const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='credenciales' LIMIT 1");
     if (!ex) {
       await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (1,'Credenciales Corporativas','credenciales','/credenciales/','bi-person-badge')");
@@ -35,6 +38,61 @@ require('../../../../shared/migrate').enFila('credenciales', async () => {
     }
   } catch (e) { console.error('[credenciales migration]', e.message); }
 });
+
+/* Token público por usuario (32 hex): se crea la primera vez que se necesita y no cambia,
+   así una credencial impresa sigue sirviendo. Una foto no cabe en un QR (aunque sea chica
+   son varios KB → código ilegible), por eso el QR lleva una URL corta y el teléfono descarga
+   el .vcf con la foto incrustada (iPhone y Android lo abren en Contactos). */
+async function asegurarTokens(ids) {
+  if (!ids.length) return {};
+  const [rows] = await pool.query('SELECT id_usuario, token FROM credenciales_usuario WHERE id_usuario IN (?)', [ids]);
+  const map = {}; rows.forEach(r => { map[r.id_usuario] = r.token; });
+  for (const id of ids) {
+    if (map[id]) continue;
+    const t = require('crypto').randomBytes(16).toString('hex');
+    await pool.query('INSERT INTO credenciales_usuario (id_usuario, token) VALUES (?,?) ON DUPLICATE KEY UPDATE token=COALESCE(token, VALUES(token))', [id, t]);
+    const [[r]] = await pool.query('SELECT token FROM credenciales_usuario WHERE id_usuario=?', [id]);
+    map[id] = r.token;
+  }
+  return map;
+}
+
+/* ── GET /api/credenciales/vcf/:token — PÚBLICO: la tarjeta de contacto con foto ── */
+exports.vcf = async (req, res) => {
+  try {
+    const token = String(req.params.token || '').replace(/[^a-f0-9]/g, '');
+    if (token.length !== 32) return res.status(404).send('No encontrado');
+    const [[u]] = await pool.query(`
+      SELECT u.nombre, u.apellido, u.apellido_materno, u.cargo, u.telefono, u.email, c.foto
+        FROM credenciales_usuario c JOIN usuarios u ON u.id_usuario=c.id_usuario
+       WHERE c.token=? AND u.estado='activo'`, [token]);
+    if (!u) return res.status(404).send('Credencial no vigente');
+    const [[e]] = await pool.query('SELECT organizacion, web, telefono, email FROM credenciales_empresa WHERE id=1');
+    const EMP = e || {};
+    const nom = String(u.nombre || '').trim(), ape = [u.apellido, u.apellido_materno].filter(Boolean).join(' ').trim();
+    const tel = String(u.telefono || '').replace(/[^\d+]/g, ''), telEmp = String(EMP.telefono || '').replace(/[^\d+]/g, '');
+    const lineas = ['BEGIN:VCARD', 'VERSION:3.0', `N:${ape};${nom};;;`, `FN:${nom} ${ape}`.trim(),
+      `ORG:${EMP.organizacion || 'AutoFácil Crédito Automotriz'}`, u.cargo ? `TITLE:${u.cargo}` : '',
+      tel ? `TEL;TYPE=CELL:${tel}` : '', telEmp ? `TEL;TYPE=WORK:${telEmp}` : '',
+      u.email ? `EMAIL:${u.email}` : '', EMP.email ? `EMAIL;TYPE=WORK:${EMP.email}` : '',
+      EMP.web ? `URL:${EMP.web}` : ''];
+    const m = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(String(u.foto || ''));
+    if (m) {
+      const tipo = m[1].toLowerCase() === 'png' ? 'PNG' : (m[1].toLowerCase() === 'webp' ? 'WEBP' : 'JPEG');
+      const b64 = m[2].replace(/[\r\n]/g, '');
+      // plegado a 75 caracteres (RFC 2426): primera línea con la propiedad, siguientes con un espacio
+      const cab = `PHOTO;ENCODING=b;TYPE=${tipo}:`;
+      let out = cab + b64.slice(0, 75 - cab.length);
+      for (let i = 75 - cab.length; i < b64.length; i += 74) out += '\r\n ' + b64.slice(i, i + 74);
+      lineas.push(out);
+    }
+    lineas.push('END:VCARD');
+    const body = lineas.filter(Boolean).join('\r\n') + '\r\n';
+    const nombreArchivo = (`${nom} ${ape}`.trim() || 'contacto').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ]/g, '').replace(/\s+/g, '-');
+    res.set({ 'Content-Type': 'text/vcard; charset=utf-8', 'Content-Disposition': `inline; filename="${nombreArchivo}.vcf"`, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+    res.send(body);
+  } catch (e) { console.error('[credenciales vcf]', e.message); res.status(500).send('Error'); }
+};
 
 const errSrv = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
 
@@ -48,6 +106,8 @@ exports.listar = async (_req, res) => {
       WHERE u.estado='activo'
         AND COALESCE(u.protegido, 0) = 0   -- las cuentas de sistema no llevan credencial
       ORDER BY u.nombre, u.apellido`);
+    const tokens = await asegurarTokens(rows.map(r => r.id_usuario));
+    rows.forEach(r => { r.token = tokens[r.id_usuario] || null; });
     res.json({ success: true, data: rows, error: null });
   } catch (e) { errSrv(res, e, 'credenciales listar'); }
 };

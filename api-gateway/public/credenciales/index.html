@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.4 — QR legible: UTF-8 (tildes), vCard liviana (61 módulos en vez de 77), margen 4, 30 mm sin suavizado. v1.3 -->
+<!-- v1.5 — el QR apunta a /api/credenciales/vcf/<token>: el teléfono descarga el contacto CON FOTO (QR chico y muy legible). v1.4 — QR legible: UTF-8 (tildes), vCard liviana (61 módulos en vez de 77), margen 4, 30 mm sin suavizado. v1.3 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -197,6 +197,8 @@ function vCard(u){
   // Sin dirección ni segundos teléfonos/correos: cada campo extra agranda el QR y a 3 cm
   // el teléfono deja de leerlo (con todo, salía de 77 módulos = 0,34 mm por módulo).
 }
+/* El QR apunta a la URL pública del vCard (con la FOTO incrustada, que no cabe en un QR);
+   si el usuario no tuviera token, cae al vCard en texto (sin foto). */
 function qrDataUrl(texto){
   // UTF-8 obligatorio: el modo por defecto codifica "AutoFácil" en Latin-1 y el teléfono lee basura.
   qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
@@ -237,7 +239,7 @@ async function generar(){
       </div>
       <div class="cred reverso">
         <div class="titulo">ESCANEA Y GUARDA MI CONTACTO</div>
-        <div class="qrbox"><img class="qr" src="${qrDataUrl(vCard(u))}"></div>
+        <div class="qrbox"><img class="qr" src="${qrDataUrl(u.token ? (location.origin + '/api/credenciales/vcf/' + u.token) : vCard(u))}"></div>
         <div class="pie">${esc((u.nombre||'').split(' ')[0])} ${esc(u.apellido||'')} · AutoFácil Crédito Automotriz</div>
       </div>`);
   }
