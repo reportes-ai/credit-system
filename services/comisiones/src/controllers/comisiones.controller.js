@@ -725,9 +725,20 @@ async function calcularMes(mes, varsOverride) {
     const [usrs] = await pool.query(
       "SELECT UPPER(TRIM(CONCAT(COALESCE(nombre,''),' ',COALESCE(apellido,'')))) nom, DATE_FORMAT(fecha_ingreso,'%Y-%m-%d') fi FROM usuarios WHERE fecha_ingreso IS NOT NULL").catch(() => [[]]);
     const ingresoDe = {}; usrs.forEach(u => { ingresoDe[u.nom] = u.fi; });
+    // Renta FIJA (ficha RRHH → Tipo de renta): contrato especial sin variable. Se calcula igual
+    // (para ver su producción y cruces) pero NO comisiona: incentivo y monto a pagar en 0.
+    const [rf] = await pool.query(
+      `SELECT UPPER(TRIM(CONCAT(COALESCE(u.nombre,''),' ',COALESCE(u.apellido,'')))) nom
+         FROM rh_fichas f JOIN usuarios u ON u.id_usuario=f.id_usuario WHERE f.tipo_renta='FIJA'`).catch(() => [[]]);
+    const rentaFija = new Set(rf.map(r => r.nom));
 
     const resultado = Object.entries(map).map(([ejecutivo, creds]) => {
       const calc = calcularComision(creds, vars, mes, { fecha_ingreso: ingresoDe[String(ejecutivo).toUpperCase().trim()] || null });
+      if (rentaFija.has(String(ejecutivo).toUpperCase().trim())) {
+        calc.renta_fija = true;
+        calc.incentivo_final = 0; calc.con_semana_corrida = 0; calc.con_semana_corrida_bruto = 0;
+        calc.bono_cesantia = 0; calc.bono_reparaciones = 0; calc.bono_calidad = 0;
+      }
       const aprob = aprobMap[ejecutivo] || { estado: 'pendiente' };
 
       // Anotar cada crédito con su incentivo individual
@@ -779,6 +790,8 @@ async function calcularMes(mes, varsOverride) {
         calc.total_ajustes_op = difTotal;
         calc.con_semana_corrida += difTotal;
       }
+
+      if (calc.renta_fija) { calc.con_semana_corrida = 0; calc.con_semana_corrida_bruto = 0; calc.descuento_aplicado = 0; calc.total_ajustes_op = 0; }
 
       // VALORES FIRMES: aprobada por Operaciones = se devuelve la foto guardada al aprobar,
       // no el cálculo vivo (cambios en créditos, seguros o variables NO la mueven). Rechazar
