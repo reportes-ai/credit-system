@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 -->
+<!-- v1.4 — QR legible: UTF-8 (tildes), vCard liviana (61 módulos en vez de 77), margen 4, 30 mm sin suavizado. v1.3 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -40,7 +40,7 @@
     .cred.reverso { background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2mm; }
     .cred.reverso .titulo { color:#fff; font-weight:800; font-size:3.6mm; letter-spacing:.5px; border:1px solid rgba(255,255,255,.6); padding:1mm 4mm; border-radius:1.5mm; }
     .cred.reverso .qrbox { background:#fff; padding:2mm; border-radius:2mm; }
-    .cred.reverso img.qr { width:26mm; height:26mm; display:block; }
+    .cred.reverso img.qr { width:30mm; height:30mm; display:block; image-rendering:pixelated; image-rendering:crisp-edges; }
     .cred.reverso .pie { color:rgba(255,255,255,.85); font-size:2.6mm; }
 
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -191,14 +191,17 @@ function vCard(u){
   return ['BEGIN:VCARD','VERSION:3.0',
     `N:${ape};${nom};;;`, `FN:${nom} ${ape}`.trim(),
     `ORG:${EMP.organizacion||'AutoFácil Crédito Automotriz'}`, u.cargo?`TITLE:${u.cargo}`:'',
-    tel?`TEL;TYPE=CELL:${tel}`:'', telEmp?`TEL;TYPE=WORK:${telEmp}`:'',
-    u.email?`EMAIL:${u.email}`:'', EMP.email?`EMAIL;TYPE=WORK:${EMP.email}`:'',
-    EMP.direccion?`ADR;TYPE=WORK:;;${String(EMP.direccion).replace(/,/g,'\\,')};;;;`:'',
+    tel?`TEL;TYPE=CELL:${tel}`:'', (!tel && telEmp)?`TEL;TYPE=WORK:${telEmp}`:'',
+    u.email?`EMAIL:${u.email}`:'', (!u.email && EMP.email)?`EMAIL;TYPE=WORK:${EMP.email}`:'',
     EMP.web?`URL:${EMP.web}`:'','END:VCARD'].filter(Boolean).join('\n');
+  // Sin dirección ni segundos teléfonos/correos: cada campo extra agranda el QR y a 3 cm
+  // el teléfono deja de leerlo (con todo, salía de 77 módulos = 0,34 mm por módulo).
 }
 function qrDataUrl(texto){
+  // UTF-8 obligatorio: el modo por defecto codifica "AutoFácil" en Latin-1 y el teléfono lee basura.
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
   const qr = qrcode(0,'M'); qr.addData(texto, 'Byte'); qr.make();
-  return qr.createDataURL(5, 2);
+  return qr.createDataURL(8, 4);   // 8 px por módulo, zona de silencio de 4 módulos (norma)
 }
 const fFecha = d => d ? String(d).slice(0,10).split('-').reverse().join('/') : '—';
 
