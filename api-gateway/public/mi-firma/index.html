@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Firma de Correo — AutoFácil</title>
-  <!-- v1.0 — firma de correo corporativa por persona (datos de la ficha, fuente única): copiar como HTML para Gmail/Outlook o descargar como imagen -->
+  <!-- v1.1 — logo GIF animado (brillo en loop). v1.0 — firma de correo corporativa por persona (datos de la ficha, fuente única): copiar como HTML para Gmail/Outlook o descargar como imagen -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -84,7 +84,7 @@ function armar(d){
   const fila = (icono, contenido) => `<tr><td style="padding:2px 8px 2px 0;vertical-align:middle;width:22px"><img src="${base}/img/firma-${icono}.png" width="16" height="16" alt="" style="display:block;border:0"></td><td style="padding:2px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#333333;vertical-align:middle">${contenido}</td></tr>`;
   return `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif">
   <tr>
-    <td style="padding:0 18px 0 0;vertical-align:middle;border-right:2px solid #0141A2"><a href="${web}" target="_blank" style="text-decoration:none"><img src="${base}/img/firma-autofacil.png" width="150" alt="AutoFácil Crédito Automotriz" style="display:block;border:0;width:150px"></a></td>
+    <td style="padding:0 18px 0 0;vertical-align:middle;border-right:2px solid #0141A2"><a href="${web}" target="_blank" style="text-decoration:none"><img src="${base}/img/firma-autofacil.gif" width="150" alt="AutoFácil Crédito Automotriz" style="display:block;border:0;width:150px"></a></td>
     <td style="padding:0 0 0 18px;vertical-align:middle">
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;color:#333333;letter-spacing:.5px">${esc(nombre)}</div>
       ${d.cargo ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#009AFE;margin:2px 0 8px">${esc(d.cargo)}</div>` : '<div style="height:8px"></div>'}
