@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v2.4 — rechazada en el CIERRE: se sube la firmada corregida (+cédulas/poderes) y se reenvía directo al cierre sin repetir niveles (caso RADO SPA) · v2.3 — NUEVO ORDEN de poderes del deposito: NO bloquean el envio a autorizacion; se firman y suben DESPUES de autorizada junto con la ficha firmada (obligatorios en Enviar Firmada) · v2.2 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js): datalist desde AF_BANCOS y normalizacion por AF_BANCO_CANON (alias CHILE/BCI/BBVA...). v2.1 — modo Modificacion precarga los locales adicionales existentes del dealer · v2.0 — multi-local: locales en OTROS parques con tabla de comision POR local (locales_json; al cerrar sella dealer_locales/dealer_comisiones) · v1.36 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
+  <!-- v2.5 — fix: en AUTORIZADA/PEND_CIERRE los inputs de Poder Simple y Poderes del Rep. Legal quedaban deshabilitados (no se podia subir el poder). v2.4 — rechazada en el CIERRE: se sube la firmada corregida (+cédulas/poderes) y se reenvía directo al cierre sin repetir niveles (caso RADO SPA) · v2.3 — NUEVO ORDEN de poderes del deposito: NO bloquean el envio a autorizacion; se firman y suben DESPUES de autorizada junto con la ficha firmada (obligatorios en Enviar Firmada) · v2.2 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js): datalist desde AF_BANCOS y normalizacion por AF_BANCO_CANON (alias CHILE/BCI/BBVA...). v2.1 — modo Modificacion precarga los locales adicionales existentes del dealer · v2.0 — multi-local: locales en OTROS parques con tabla de comision POR local (locales_json; al cerrar sella dealer_locales/dealer_comisiones) · v1.36 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -1154,6 +1154,10 @@ async function cargar(){
       if (['AUTORIZADA','PEND_CIERRE'].includes(f.estado)) {
         if ($('fileFicha') && f.estado==='AUTORIZADA') $('fileFicha').disabled=false;
         if ($('fileCedulas')) $('fileCedulas').disabled=false;
+        // Los poderes del depósito a tercero se firman y suben DESPUÉS de autorizada (v2.3):
+        // el bloqueo general los dejaba en gris y Bryan no podía subir el Poder Simple (09-09-2026).
+        if ($('filePoderSimple')) $('filePoderSimple').disabled=false;
+        if ($('filePoderRepLegal')) $('filePoderRepLegal').disabled=false;
       }
     }
     aplicarEstadoUI(f.estado, f);
