@@ -1,4 +1,4 @@
-/* v1.4 — tabla "Ajuste de cartola" (adicionales/descuentos aprobados con su glosa) en la orden de comisión. v1.3 — montos negativos como "− $x" (retención de boleta que se descuenta). v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
+/* v1.5 — tacho junto a cada adjunto cuando la orden lo permite (puede_borrar_adjuntos + hook AF_ODP_QUITAR_ADJUNTO). v1.4 — tabla "Ajuste de cartola" (adicionales/descuentos aprobados con su glosa) en la orden de comisión. v1.3 — montos negativos como "− $x" (retención de boleta que se descuenta). v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
    ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    MOTOR ÚNICO del documento "Solicitud de Pago" (Orden de Pago)
 
@@ -124,7 +124,7 @@ function docHTML(o){
       <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${escH(o.concepto||'')}</td></tr>
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
       <tr><td style="${SresL}">Documento</td><td style="${SresV}">${escH(o.tipo_documento||'—')}${docNum&&o.numero_documento?' N° '+escH(o.numero_documento):''}${o.fecha_documento?' · '+fdate(o.fecha_documento):''}</td></tr>
-      ${Array.isArray(o.facturas)&&o.facturas.length?`<tr><td style="${SresL}">Factura adjunta</td><td style="${SresV}">${o.facturas.map(f=>`<a href="#" onclick="AF_ODP_DOC.verFactura(${f.id});return false" style="color:#0141A2;font-weight:700;text-decoration:none">📎 ${escH(f.nombre)}</a>`).join(' · ')}</td></tr>`:''}
+      ${Array.isArray(o.facturas)&&o.facturas.length?`<tr><td style="${SresL}">Factura adjunta</td><td style="${SresV}">${o.facturas.map(f=>`<a href="#" onclick="AF_ODP_DOC.verFactura(${f.id});return false" style="color:#0141A2;font-weight:700;text-decoration:none">📎 ${escH(f.nombre)}</a>${o.puede_borrar_adjuntos&&typeof window.AF_ODP_QUITAR_ADJUNTO==='function'?` <a href="#" onclick="AF_ODP_QUITAR_ADJUNTO(${f.id},'${escH(f.nombre).replace(/'/g,'&#39;')}');return false" title="Quitar este archivo (lo subiste por error o quieres reemplazarlo)" style="color:#b91c1c;text-decoration:none;font-size:.85em" data-html2canvas-ignore>🗑</a>`:''}`).join(' · ')}</td></tr>`:''}
       ${o.deposito ? `
       <tr><td style="${SresL}">Depositar en</td><td style="${SresV}"><b>${escH(o.deposito.banco||'—')}</b> · ${
         o.deposito.tipo_cuenta ? escH(o.deposito.tipo_cuenta)

@@ -824,6 +824,7 @@ const getDocumento = async (req, res) => {
       }
       data.facturas = facturas;
     } catch (_) { data.facturas = []; }
+    data.puede_borrar_adjuntos = await puedeBorrarAdjuntos(req, oc);
     // Trazabilidad al pie: SIEMPRE en vivo, igual que los adjuntos.
     data.traza = await construirTraza(oc);
     // Datos del timbre "PAGADO" (caja, fecha y hora del pago), formateados en hora de Chile.
@@ -1013,6 +1014,48 @@ const adjuntarRespaldo = async (req, res) => {
     res.json({ success: true, data: { id: out.id }, error: null });
   } catch (e) {
     console.error('[ordenes-pago adjuntarRespaldo]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ¿Puede este usuario quitar adjuntos de la orden? Quien la EMITIÓ (o Admin / permiso
+   ordenes_pago_anular), y solo mientras no esté PAGADA ni ANULADA: pagada, el respaldo
+   es parte del comprobante. Motor único para el flag del documento y para el DELETE. */
+async function puedeBorrarAdjuntos(req, oc) {
+  if (!oc || oc.pagada || oc.anulada) return false;
+  const yo = req.usuario || {};
+  const nombreYo = norm(`${yo.nombre || ''} ${yo.apellido || ''}`).toLowerCase();
+  const emitidaPorMi = (oc.id_usuario != null && yo.id_usuario != null && Number(oc.id_usuario) === Number(yo.id_usuario))
+    || (oc.id_usuario == null && nombreYo && String(oc.usuario_nombre || '').trim().toLowerCase() === nombreYo);
+  if (emitidaPorMi) return true;
+  try { return await tieneFunc(yo.id_usuario, 'ordenes_pago_anular'); } catch (_) { return false; }
+}
+
+/* DELETE /api/ordenes-pago/ordenes/:id/adjunto/:docId — quitar un respaldo subido por error
+   (para reemplazarlo). Regla del almacén: capturar doc_ruta ANTES del DELETE, borrar el objeto DESPUÉS. */
+const quitarRespaldo = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id), docId = parseInt(req.params.docId);
+    const [[oc]] = await pool.query('SELECT id, numero, origen, origen_id, id_usuario, usuario_nombre, pagada, anulada FROM op_correlativos WHERE id=?', [id]);
+    if (!oc) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+    if (oc.pagada || oc.anulada) return res.status(409).json({ success: false, data: null, error: 'La orden ya está ' + (oc.pagada ? 'pagada' : 'anulada') + ': el respaldo no se puede quitar' });
+    if (!(await puedeBorrarAdjuntos(req, oc))) return res.status(403).json({ success: false, data: null, error: 'Solo quien emitió la orden puede quitar sus adjuntos' });
+    let origen = null, ref = null;
+    if (oc.origen === 'GENERAL') { origen = 'ODP'; ref = oc.origen_id; }
+    else if (oc.origen === 'PARQUE') { origen = 'PARQUE'; ref = oc.origen_id; }
+    else if (oc.origen === 'COMISION') {
+      const [[po]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes_comision WHERE id=?', [oc.origen_id]);
+      if (po) { origen = 'COMISION'; ref = po.id_seguimiento; }
+    }
+    const [[f]] = await pool.query('SELECT id, doc_ruta, nombre FROM postventa_factura_docs WHERE id=? AND origen=? AND ref_id=?', [docId, origen, ref]);
+    if (!f) return res.status(404).json({ success: false, data: null, error: 'El archivo no pertenece a esta orden' });
+    await pool.query('DELETE FROM postventa_factura_docs WHERE id=?', [f.id]);
+    await require('../../../../shared/almacen-docs').borrar(f.doc_ruta);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'ordenes-pago', entidad: 'factura_doc', entidad_id: f.id,
+      detalle: `Quitó el respaldo "${f.nombre}" de ${oc.numero || id}` });
+    res.json({ success: true, data: { id: f.id }, error: null });
+  } catch (e) {
+    console.error('[ordenes-pago quitarRespaldo]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
@@ -1484,5 +1527,6 @@ module.exports = {
   pagarOrden, miCajaOP, anularOrdenPostventa,
   calcularDoc,   // motor único del impuesto de la ODP (lo reusa Pagos Recurrentes)
   adjuntarRespaldo,
+  quitarRespaldo,
   getComprasAPagar, enviarComprasAPago, deshacerEnvioCompras, getFondosCompras, setFondosCompras,
 };
