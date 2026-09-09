@@ -666,7 +666,7 @@ async function indicadores(mes) {
   const utm = parseFloat(utmRow?.valor) || 0;
   const [afps] = await pool.query('SELECT afp, tasa_pct, codigo_previred FROM rh_afp_tasas ORDER BY afp');
   const [tramos] = await pool.query('SELECT desde_utm, hasta_utm, factor, rebaja_utm FROM rh_impuesto_tramos ORDER BY desde_utm');
-  return { ...cfg, uf, utm, afps, tramos };
+  return { ...cfg, uf, utm, afps, tramos, salud: await catalogo('SALUD'), bancos: await catalogo('BANCO') };
 }
 
 /* ── MOTOR ÚNICO: liquidación de un colaborador ─────────────────────────────── */
@@ -1258,6 +1258,16 @@ const putIndicadores = async (req, res) => {
       const cod = /^\d{2}$/.test(String(a.codigo_previred || '')) ? String(a.codigo_previred) : null;
       await pool.query('INSERT INTO rh_afp_tasas (afp, tasa_pct, codigo_previred) VALUES (?,?,?) ON DUPLICATE KEY UPDATE tasa_pct=VALUES(tasa_pct), codigo_previred=COALESCE(VALUES(codigo_previred), codigo_previred)', [nombre, tasa, cod]);
     }
+    // Catálogos Isapres / Bancos: upsert por nombre (código + activo); nunca se borra, se desactiva
+    for (const [tipo, lista, re] of [['SALUD', b.salud, /^\d{2}$/], ['BANCO', b.bancos, /^\d{3}$/]]) {
+      if (!Array.isArray(lista)) continue;
+      for (const r of lista) {
+        const nombre = String(r.nombre || '').toUpperCase().replace(/\s+/g, ' ').trim(); const cod = String(r.codigo || '').trim();
+        if (!nombre || !re.test(cod)) continue;
+        await pool.query('INSERT INTO rh_catalogo (tipo, codigo, nombre, activo) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE codigo=VALUES(codigo), activo=VALUES(activo)',
+          [tipo, cod, nombre, r.activo === 0 || r.activo === false || r.activo === '0' ? 0 : 1]);
+      }
+    }
     // Tramos de impuesto: reemplazo completo si vienen (validados)
     if (Array.isArray(b.tramos) && b.tramos.length >= 2) {
       const val = b.tramos.map(t => [parseFloat(t.desde_utm), t.hasta_utm == null || t.hasta_utm === '' ? null : parseFloat(t.hasta_utm), parseFloat(t.factor), parseFloat(t.rebaja_utm)]);
@@ -1400,6 +1410,42 @@ const PREV_SALUD = { FONASA: '07', BANMEDICA: '01', 'BANMÉDICA': '01', CONSALUD
   'CRUZ BLANCA': '05', 'ISAPRE CRUZ BLANCA S.A.': '05', 'NUEVA MASVIDA': '10', 'NUEVA MAS VIDA': '10', ISALUD: '11',
   FUNDACION: '12', 'FUNDACIÓN': '12', 'CRUZ DEL NORTE': '25', ESENCIAL: '28', ESCENCIAL: '28' };
 
+/* ── CATÁLOGO ÚNICO de Isapres (código Previred, Tabla N°16) y Bancos (código SBIF) ──
+   Pato, 09-09-2026: "todo tiene código, es mejor así". La ficha elige de esta lista
+   (nunca texto libre), el Archivo Previred y la Nómina Banco leen el código de acá.
+   Las AFP ya viven en rh_afp_tasas (tasa + código Previred), no se duplican. */
+const CAT_SALUD_SEED = [['07','FONASA'],['01','BANMEDICA'],['02','CONSALUD'],['03','VIDA TRES'],['04','COLMENA'],['05','CRUZ BLANCA'],
+  ['10','NUEVA MASVIDA'],['11','ISALUD'],['12','FUNDACION'],['25','CRUZ DEL NORTE'],['28','ESENCIAL']];
+const CAT_BANCO_SEED = [['001','BANCO DE CHILE'],['009','INTERNACIONAL'],['012','BANCO ESTADO'],['014','SCOTIABANK'],['016','BCI'],['028','BICE'],
+  ['031','HSBC'],['037','SANTANDER'],['039','ITAU'],['049','SECURITY'],['051','FALABELLA'],['053','RIPLEY'],['055','CONSORCIO'],['672','COOPEUCH'],['730','TENPO'],['730','MERCADO PAGO']];
+require('../../../../shared/migrate').enFila('rh-catalogo', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_catalogo (
+    id INT AUTO_INCREMENT PRIMARY KEY, tipo VARCHAR(10) NOT NULL, codigo VARCHAR(6) NOT NULL, nombre VARCHAR(60) NOT NULL,
+    activo TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_tipo_nombre (tipo, nombre), KEY idx_tipo (tipo))`);
+  for (const [c, n] of CAT_SALUD_SEED) await pool.query('INSERT IGNORE INTO rh_catalogo (tipo, codigo, nombre) VALUES (?,?,?)', ['SALUD', c, n]);
+  for (const [c, n] of CAT_BANCO_SEED) await pool.query('INSERT IGNORE INTO rh_catalogo (tipo, codigo, nombre) VALUES (?,?,?)', ['BANCO', c, n]);
+});
+async function catalogo(tipo) {
+  const [rows] = await pool.query('SELECT codigo, nombre, activo FROM rh_catalogo WHERE tipo=? ORDER BY nombre', [tipo]).catch(() => [[]]);
+  return rows;
+}
+/* Código por nombre (sin tildes ni mayúsculas; acepta "ISAPRE CRUZ BLANCA S.A." → CRUZ BLANCA). */
+function codigoDe(lista, nombre) {
+  const n = String(nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  if (!n) return null;
+  const norm = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+  const ex = lista.find(r => norm(r.nombre) === n); if (ex) return ex.codigo;
+  const inc = lista.find(r => n.includes(norm(r.nombre))); return inc ? inc.codigo : null;
+}
+/* GET /api/rrhh/remuneraciones/catalogo — AFP + SALUD + BANCO para los selectores de la ficha (cualquier usuario logueado) */
+const getCatalogo = async (_req, res) => {
+  try {
+    const [afps] = await pool.query('SELECT afp AS nombre, codigo_previred AS codigo FROM rh_afp_tasas ORDER BY afp');
+    ok(res, { afp: afps, salud: (await catalogo('SALUD')).filter(r => r.activo), banco: (await catalogo('BANCO')).filter(r => r.activo) });
+  } catch (e) { fail(res, 'Error interno del servidor'); }
+};
+
 require('../../../../shared/migrate').enFila('previred-config', async () => {
   await pool.query(`CREATE TABLE IF NOT EXISTS rh_previred_config (
     id TINYINT PRIMARY KEY, ccaf VARCHAR(2) DEFAULT '00', mutual VARCHAR(2) DEFAULT '02', sucursal_mutual VARCHAR(3) DEFAULT ''
@@ -1425,6 +1471,7 @@ async function getPrevired(req, res) {
     const [[cfg]] = await pool.query('SELECT * FROM rh_previred_config WHERE id=1');
     // Códigos AFP desde el mantenedor (rh_afp_tasas), fallback a la tabla oficial
     const [afpsCod] = await pool.query('SELECT afp, codigo_previred FROM rh_afp_tasas');
+    const catSalud = await catalogo('SALUD');   // Isapres: código Previred desde el catálogo único
     const afpCodDe = n => { const k = String(n || '').toUpperCase().trim();
       return (afpsCod.find(a => a.afp === k) || {}).codigo_previred || PREV_AFP[k]; };
     // Cargas familiares: tramo y cargas de la ficha + hijos marcados como carga (fuente única)
@@ -1461,7 +1508,7 @@ async function getPrevired(req, res) {
       const [rutNum, dv] = rutFull.split('-');
       const nombreCompleto = `${l.unombre || ''}`.trim();
       const afpCod = afpCodDe(d.afp);
-      const saludCod = PREV_SALUD[String(d.salud || '').toUpperCase().trim()];
+      const saludCod = codigoDe(catSalud, d.salud) || PREV_SALUD[String(d.salud || '').toUpperCase().trim()];
       const esFonasa = saludCod === '07';
       const esIsapre = saludCod && !esFonasa;
       if (!rutNum || !dv) { avisos.push(`${l.nombre}: RUT inválido — línea omitida`); continue; }
@@ -1627,18 +1674,20 @@ async function getNominaBanco(req, res) {
     if (!liqs.length) return fail(res, `No hay liquidaciones EMITIDAS para ${mes}. Emite el mes primero.`, 404);
     const avisos = [], filas = [];
     let total = 0;
+    const catBanco = await catalogo('BANCO');   // código SBIF desde el catálogo único (fallback: mapa BANCOS_SBIF)
     for (const l of liqs) {
       const liquido = Math.round(Number(l.liquido) || 0);
       if (liquido <= 0) { avisos.push(`${l.nombre}: líquido $0 — omitido`); continue; }
       const bancoNom = String(l.banco_pago || '').toUpperCase().trim();
-      const bancoCod = Object.keys(BANCOS_SBIF).find(k => bancoNom.includes(k));
+      const bancoCodCat = codigoDe(catBanco, bancoNom);
+      const bancoCod = bancoCodCat ? bancoNom : Object.keys(BANCOS_SBIF).find(k => bancoNom.includes(k));
       const cuenta = String(l.num_cuenta_pago || '').replace(/[.\s-]/g, '');
       if (!bancoNom || !cuenta) avisos.push(`${l.nombre}: falta ${!bancoNom ? 'banco' : 'N° de cuenta'} en la ficha — completa Colaboradores → Previsión y Pago`);
       else if (!bancoCod) avisos.push(`${l.nombre}: banco "${l.banco_pago}" sin código SBIF conocido — revisa el nombre en la ficha`);
       // CuentaRUT: el número es el RUT sin DV
       const esRut = /RUT/i.test(String(l.tipo_cuenta_pago || '')) || /RUT/i.test(bancoNom);
       filas.push({ rut: String(l.rut || '').replace(/\./g, '').toUpperCase(), nombre: l.nombre,
-        banco: l.banco_pago || '', banco_cod: bancoCod ? BANCOS_SBIF[bancoCod] : '',
+        banco: l.banco_pago || '', banco_cod: bancoCodCat || (bancoCod ? BANCOS_SBIF[bancoCod] : ''),
         tipo_cuenta: esRut ? 'CUENTA RUT' : String(l.tipo_cuenta_pago || 'CORRIENTE').toUpperCase(),
         cuenta, monto: liquido, email: l.email || '', glosa: `SUELDO ${mes}` });
       total += liquido;
@@ -1647,7 +1696,7 @@ async function getNominaBanco(req, res) {
   } catch (e) { fail(res, e.message); }
 }
 
-module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores,
+module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   permanenteAdicional, crearConceptoAdic, crearConceptoDesc,
   getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };

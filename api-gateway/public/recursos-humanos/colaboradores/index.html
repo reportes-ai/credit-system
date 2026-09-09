@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
+  <!-- v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -113,9 +113,18 @@ const REQ = '<span style="color:#dc2626;font-weight:800" title="Obligatorio para
 const inp = (id, lbl, val, type='text', req) => `<div class="fld"><label>${lbl}${req?REQ:''}</label><input id="${id}" type="${type}" value="${esc(val==null?'':val)}" ${req&&(val==null||val==='')?'style="border-color:#fca5a5"':''}></div>`;
 const sel = (id, lbl, val, ops, req) => `<div class="fld"><label>${lbl}${req?REQ:''}</label><select id="${id}" ${req&&!val?'style="border-color:#fca5a5"':''}><option value=""></option>${ops.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select></div>`;
 
+let CAT = null;   // catálogo AFP / Salud / Bancos con código (mantenedor Indicadores de Remuneraciones)
+async function catalogo(){
+  if (CAT) return CAT;
+  try { const j = await (await fetch('/api/rrhh/remuneraciones/catalogo', { headers:H })).json(); if (j.success) CAT = j.data; } catch(_) {}
+  return CAT || { afp:[], salud:[], banco:[] };
+}
+// Lista del catálogo + el valor actual si no está (fichas antiguas), para no perderlo al guardar
+const opsCat = (lista, val) => { const n = (lista||[]).map(r=>r.nombre); if (val && !n.includes(val)) n.push(val); return n; };
 async function abrir(id){
   const j = await (await fetch('/api/rrhh/ficha/'+id, { headers:H })).json();
   if (!j.success) return alert(j.error||'Error');
+  const C = await catalogo();
   FICHA = j.data;
   const u = FICHA.usuario, f = FICHA.ficha || {};
   document.getElementById('dTitulo').textContent = [u.nombre,u.apellido,u.apellido_materno].filter(Boolean).join(' ') + (u.rut?' · '+u.rut:'');
@@ -169,11 +178,11 @@ async function abrir(id){
     </div>
     <div class="sec">Previsión y pago (confidencial)</div>
     <div class="grid3">
-      ${sel('f_afp','AFP',f.afp,['CAPITAL','CUPRUM','HABITAT','MODELO','PLANVITAL','PROVIDA','UNO'],1)}
-      ${sel('f_salud','Salud',f.salud,['FONASA','BANMEDICA','COLMENA','CONSALUD','CRUZ BLANCA','ESENCIAL','NUEVA MASVIDA','VIDA TRES','ISALUD','FUNDACION','CRUZ DEL NORTE'],1)}
+      ${sel('f_afp','AFP',f.afp,opsCat(C.afp,f.afp),1)}
+      ${sel('f_salud','Salud (Fonasa / Isapre)',f.salud,opsCat(C.salud,f.salud),1)}
       ${inp('f_plan_isapre_uf','Plan Isapre pactado (UF, vacío si Fonasa)',f.plan_isapre_uf,'number')}
       ${inp('f_sueldo_base','Sueldo base ($)',f.sueldo_base,'number',1)}
-      ${inp('f_banco_pago','Banco (depósito de sueldo)',f.banco_pago)}
+      ${sel('f_banco_pago','Banco (depósito de sueldo)',f.banco_pago,opsCat(C.banco,f.banco_pago))}
       ${sel('f_tipo_cuenta_pago','Tipo de cuenta',f.tipo_cuenta_pago,['CUENTA CORRIENTE','CUENTA VISTA','CUENTA RUT','CHEQUERA ELECTRONICA'])}
       ${inp('f_num_cuenta_pago','N° de cuenta',f.num_cuenta_pago)}
     </div>

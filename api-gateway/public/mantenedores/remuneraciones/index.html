@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Indicadores de Remuneraciones — AutoFácil</title>
-  <!-- v1.4 — tope APV (UF/mes) que rebaja la base del impuesto único · v1.3 — navbar migrada al componente topnav -->
+  <!-- v1.5 — catálogos Isapres (código Previred) y Bancos (código SBIF): fuente única de los selectores de la ficha, Previred y Nómina Banco. v1.4 — tope APV (UF/mes) que rebaja la base del impuesto único · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -70,6 +70,20 @@
   </div>
 
   <div class="panel">
+    <h5><i class="bi bi-heart-pulse me-1"></i>Isapres / Fonasa (código Previred, Tabla N°16)</h5>
+    <div style="font-size:.76rem;color:#64748b;margin-bottom:6px">La ficha del colaborador elige de esta lista (sin texto libre) y el Archivo Previred toma el código de aquí. Desactivar la saca del selector sin borrar el historial.</div>
+    <table><thead><tr><th>Institución</th><th>Código</th><th>Activa</th></tr></thead><tbody id="tbSalud"></tbody></table>
+    <button class="btn-ghost" style="margin-top:6px" onclick="agregarCat('tbSalud',2)"><i class="bi bi-plus-lg me-1"></i>Agregar institución</button>
+  </div>
+
+  <div class="panel">
+    <h5><i class="bi bi-bank me-1"></i>Bancos (código SBIF)</h5>
+    <div style="font-size:.76rem;color:#64748b;margin-bottom:6px">Banco de depósito de sueldo en la ficha; la Nómina Banco (transferencias en lote) toma el código SBIF de aquí.</div>
+    <table><thead><tr><th>Banco</th><th>Código</th><th>Activo</th></tr></thead><tbody id="tbBanco"></tbody></table>
+    <button class="btn-ghost" style="margin-top:6px" onclick="agregarCat('tbBanco',3)"><i class="bi bi-plus-lg me-1"></i>Agregar banco</button>
+  </div>
+
+  <div class="panel">
     <h5><i class="bi bi-graph-up me-1"></i>Impuesto Único 2ª Categoría — tramos mensuales en UTM</h5>
     <table><thead><tr><th>Desde (UTM)</th><th>Hasta (UTM, vacío = ∞)</th><th>Factor</th><th>Rebaja (UTM)</th></tr></thead><tbody id="tbTramos"></tbody></table>
     <div style="font-size:.74rem;color:#94a3b8;margin-top:6px">Impuesto = base tributable × factor − rebaja × UTM. Actualizar cuando el SII publique la tabla vigente.</div>
@@ -81,6 +95,7 @@
     <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
     <ul style="margin:6px 0 0;padding-left:18px">
       <li><b>Tasas AFP</b> → descuento AFP de cada liquidación en <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a> (según la AFP de la <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a>).</li>
+      <li><b>Isapres / Fonasa y Bancos (catálogo con código)</b> → selectores de AFP, Salud y Banco de la <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a> (no admite texto libre); el código de salud va al <b>Archivo Previred</b> y el código SBIF a la <b>Nómina Banco</b>, ambos en <a href="/recursos-humanos/remuneraciones/liquidaciones/">Liquidaciones de Sueldo</a>.</li>
       <li><b>Código Previred por AFP</b> → campo 26 del <b>Archivo Previred</b> que se descarga en <a href="/recursos-humanos/remuneraciones/liquidaciones/">Liquidaciones de Sueldo</a> para pagar las cotizaciones; un código errado hace que Previred rechace la línea.</li>
       <li><b>IMM y tope gratificación</b> → tope de la gratificación legal (25%, máx 4,75 IMM ÷ 12) en <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a>.</li>
       <li><b>Topes imponibles UF y AFC</b> → base de cotización AFP/Salud/AFC de las liquidaciones (usa la UF del mes del mantenedor <a href="/mantenedores/uf/">UF</a>).</li>
@@ -112,6 +127,12 @@ async function cargar(){
     <td style="font-weight:600">${a.afp}</td>
     <td><input type="number" step="0.01" data-afp="${a.afp}" value="${a.tasa_pct}"></td>
     <td><input maxlength="2" data-afpcod="${a.afp}" value="${a.codigo_previred||''}" placeholder="ej. 34" style="width:80px"></td></tr>`).join('');
+  const filaCat = (r, len) => `<tr><td><input class="cat-n" value="${(r.nombre||'').replace(/"/g,'&quot;')}" placeholder="NOMBRE" style="text-transform:uppercase"></td>
+    <td><input class="cat-c" maxlength="${len}" value="${r.codigo||''}" placeholder="${'0'.repeat(len)}" style="width:80px"></td>
+    <td><input type="checkbox" class="cat-a" ${r.activo==null||Number(r.activo)?'checked':''}></td></tr>`;
+  document.getElementById('tbSalud').innerHTML = (d.salud||[]).map(r=>filaCat(r,2)).join('');
+  document.getElementById('tbBanco').innerHTML = (d.bancos||[]).map(r=>filaCat(r,3)).join('');
+  window.agregarCat = (id, len) => { document.getElementById(id).insertAdjacentHTML('beforeend', filaCat({activo:1}, len)); };
   document.getElementById('tbTramos').innerHTML = (d.tramos||[]).map((t,i)=>`<tr>
     <td><input type="number" step="0.01" class="tr-d" value="${t.desde_utm}"></td>
     <td><input type="number" step="0.01" class="tr-h" value="${t.hasta_utm==null?'':t.hasta_utm}"></td>
@@ -125,6 +146,8 @@ async function guardar(){
     codigo_previred: (document.querySelector(`[data-afpcod="${el.dataset.afp}"]`)||{}).value||'' }));
   const d=[...document.querySelectorAll('.tr-d')], h=[...document.querySelectorAll('.tr-h')], f=[...document.querySelectorAll('.tr-f')], r=[...document.querySelectorAll('.tr-r')];
   body.tramos = d.map((el,i)=>({ desde_utm: el.value, hasta_utm: h[i].value, factor: f[i].value, rebaja_utm: r[i].value }));
+  const leerCat = id => [...document.querySelectorAll('#'+id+' tr')].map(tr=>({ nombre: tr.querySelector('.cat-n').value.trim().toUpperCase(), codigo: tr.querySelector('.cat-c').value.trim(), activo: tr.querySelector('.cat-a').checked ? 1 : 0 })).filter(x=>x.nombre && x.codigo);
+  body.salud = leerCat('tbSalud'); body.bancos = leerCat('tbBanco');
   const j = await (await fetch('/api/rrhh/remuneraciones/indicadores', { method:'PUT', headers:HJ, body:JSON.stringify(body) })).json();
   if (!j.success) return alert(j.error||'No se pudo guardar');
   toast('✓ Indicadores guardados'); cargar();
