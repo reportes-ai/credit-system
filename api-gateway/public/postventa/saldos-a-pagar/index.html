@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -308,7 +308,8 @@ function celdaAccion(r){
 
 function render(){
   const tb = document.getElementById('body');
-  const rows = visibles();
+  // Orden: los más atrasados primero (días respecto del SLA, descendente); empate → fondos recibidos más antiguos (Pato, 09-09-2026)
+  const rows = visibles().slice().sort((a,b) => ((b.dias_sla ?? -9999) - (a.dias_sla ?? -9999)) || String(a.fecha_fondos||'').localeCompare(String(b.fecha_fondos||'')));
   if (!rows.length){ tb.innerHTML=''; document.getElementById('vacio').style.display=''; recalc(); return; }
   document.getElementById('vacio').style.display='none';
   tb.innerHTML = rows.map(r => `
