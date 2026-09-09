@@ -108,6 +108,20 @@ require('../../../../shared/migrate').enFila('rrhh-ficha', async () => {
   } catch (e) { console.error('[rrhh-ficha migration]', e.message); }
 });
 
+/* ── Mi Firma de Correo (09-09-2026): funcionalidad bajo Recursos Humanos, para TODOS los perfiles
+   (es personal: cada uno arma su firma con los datos de su ficha). Se asigna/quita desde Perfiles y Permisos. */
+require('../../../../shared/migrate').enFila('rrhh-mi-firma', async () => {
+  try {
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_mi_firma' LIMIT 1");
+    let idf = ex && ex.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500002,'Mi Firma de Correo','rh_mi_firma','/mi-firma/','bi-pen')");
+      idf = r.insertId;
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) SELECT id_perfil, ?, 1 FROM perfiles', [idf]);
+    }
+  } catch (e) { console.error('[rrhh-mi-firma migration]', e.message); }
+});
+
 /* ── Migración: familia (cónyuge + hijos) y 2° contacto de emergencia ───────── */
 require('../../../../shared/migrate').enFila('rrhh-ficha-familia', async () => {
   try {

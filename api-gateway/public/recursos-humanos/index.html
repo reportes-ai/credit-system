@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v3.6 — card Mi Firma de Correo (para todos). v3.5 — Documentos Firmados renombrado a Carpetas Digitales. v3.4 — card Revision de Postulantes para el jefe directo (rh_postulaciones_jefe) -->
+  <!-- v3.7 — card Mi Firma por permiso rh_mi_firma. v3.6 — card Mi Firma de Correo (para todos). v3.5 — Documentos Firmados renombrado a Carpetas Digitales. v3.4 — card Revision de Postulantes para el jefe directo (rh_postulaciones_jefe) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -32,7 +32,7 @@
   <div class="page-banner"><i class="bi bi-people-fill"></i><div><h2>Recursos Humanos</h2><p>Tu ficha, documentos, vacaciones, certificados y el directorio del equipo — todo en un lugar.</p></div></div>
   <div class="section-title"><i class="bi bi-grid-3x3-gap-fill"></i> Disponibles</div>
   <div class="cards-grid">
-    <a href="/mi-firma/" class="module-card" id="cardFirma">
+    <a href="/mi-firma/" class="module-card" id="cardFirma" style="display:none">
       <div class="card-icon"><i class="bi bi-pen"></i></div>
       <h5>Mi Firma de Correo</h5>
       <p>Tu firma corporativa armada sola con los datos de tu ficha: cópiala en Gmail u Outlook o descárgala como imagen.</p>
@@ -182,6 +182,7 @@
     try { const r = await fetch('/api/auth/mis-permisos?_='+Date.now(),{cache:'no-store',headers:{Authorization:'Bearer '+token}}); const j = await r.json(); (j.funcionalidades||[]).forEach(c=>funcs.add(c)); } catch(e){}
     const tiene = (...cs)=> esAdmin || cs.some(c=>funcs.has(c));
     if (tiene('rh_ficha','rh_aprobar')) document.getElementById('cardFicha').style.display='';
+    if (tiene('rh_mi_firma')) document.getElementById('cardFirma').style.display='';
     if (tiene('rh_directorio','rh_ver','rh_aprobar')) document.getElementById('cardDir').style.display='';
     if (tiene('rh_colaboradores','rh_aprobar')) document.getElementById('cardCol').style.display='';
     if (tiene('rh_remuneraciones')) document.getElementById('cardRem').style.display='';
