@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Consulta Estado Saldos Precio — AutoFácil</title>
-  <!-- v1.7 — filtro de Parque como desplegable con los parques reales de las operaciones -->
+  <!-- v1.8 — busca también por ID Financiera. v1.7 — filtro de Parque como desplegable con los parques reales de las operaciones -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -68,7 +68,7 @@
   <div class="card-af">
     <div class="head-row"><i class="bi bi-search" style="color:var(--blue);font-size:1.2rem"></i><h5>Consulta Estado Saldos Precio</h5></div>
     <div class="filtros">
-      <div><label>Buscar (N° OP, RUT o nombre dealer, ejecutivo, parque)</label><input id="fq" placeholder="Ej: 12345, 76.xxx, Automotora, Juan Pérez…" autofocus></div>
+      <div><label>Buscar (N° OP, ID Financiera, RUT o nombre dealer, ejecutivo, parque)</label><input id="fq" placeholder="Ej: 12345, 76.xxx, Automotora, Juan Pérez…" autofocus></div>
       <div><label>Parque</label>
         <select id="fParque" onchange="buscar()"><option value="">Todos los parques</option></select>
       </div>

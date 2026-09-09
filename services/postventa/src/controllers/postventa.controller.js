@@ -2857,8 +2857,9 @@ const consultaSaldos = async (req, res) => {
       filt.push('s.ejecutivo IN (?)'); fp.push(vis.lista);
     }
     if (q) {
-      filt.push(`(s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`);
-      const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk);
+      // También por ID Financiera: la 661947 (Unidad) no aparecía porque es el ID Financiera de nuestra 26090201 (Pato, 09-09-2026)
+      filt.push(`(s.num_op LIKE ? OR cr.id_financiera LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`);
+      const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk, lk);
     }
     // El WHERE sin el filtro de parque alimenta el desplegable: si se armara con
     // el parque ya aplicado, la lista se reduciría a la opción elegida.
@@ -3031,8 +3032,9 @@ const consultaFundantes = async (req, res) => {
       filt.push('s.ejecutivo IN (?)'); fp.push(vis.lista);
     }
     if (q) {
-      filt.push(`(s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`);
-      const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk);
+      // También por ID Financiera: la 661947 (Unidad) no aparecía porque es el ID Financiera de nuestra 26090201 (Pato, 09-09-2026)
+      filt.push(`(s.num_op LIKE ? OR cr.id_financiera LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`);
+      const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk, lk);
     }
     if (parque) { filt.push(`(cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`); const lk = '%' + parque + '%'; fp.push(lk, lk); }
     // Misma regla que las dos consultas de estado: a una operación anulada no se
