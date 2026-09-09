@@ -84,7 +84,15 @@ function logoAdjunto() {
   } catch { LOGO_BUF = null; return null; }
 }
 
+/* Gmail y Outlook convierten solos en link cualquier dirección postal del texto (la de facturación
+   salía subrayada en azul en las cartolas, Pato 09-09-2026). Una dirección que ya está dentro de un <a>
+   no la vuelven a enlazar: se envuelve en un <a> sin href, con el color del texto. Motor único para
+   TODOS los correos que pasan por envolverHTML. */
+const SIN_LINK_DIRECCION = html => String(html || '').replace(
+  /((?:Av\.|Avda\.|Avenida|Calle|Pasaje|Camino|Ruta)\s[^<\n]{5,140}?)(?=<br|<\/|\n|$)(?![^<]*<\/a>)/g,
+  '<a style="color:inherit;text-decoration:none">$1</a>');
 function envolverHTML(cuerpoHtml) {
+  cuerpoHtml = SIN_LINK_DIRECCION(cuerpoHtml);
   const logo = `cid:${LOGO_CID}`;
   return `
   <div style="background:#eef2f7;padding:26px 12px;font-family:'Segoe UI',Arial,sans-serif">
