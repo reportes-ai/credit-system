@@ -83,7 +83,11 @@ exports.listar = async (req, res) => {
     const hasta = /^\d{4}-\d{2}-\d{2}$/.test(req.query.hasta || '') ? req.query.hasta : null;
 
     const [segs] = await pool.query(`
-      SELECT s.id, s.num_op, s.nombre_dealer, s.ejecutivo, s.financiera,
+      SELECT s.id, s.num_op, s.ejecutivo, s.financiera,
+             /* DEALER: la FICHA (fuente única, igual que Post Venta). s.nombre_dealer es la copia de
+                creditos.automotora del Excel de Trinidad, donde un dealer de parque llega como
+                "PARQUE AUTOMALL" (op 88882, Sandra 09-09-2026); solo sirve de último respaldo. */
+             COALESCE(NULLIF(di.nombre_indexa,''), NULLIF(di.nombre_razon,''), NULLIF(d.nombre_indexa,''), NULLIF(d.nombre_razon,''), NULLIF(c.nombre_local,''), s.nombre_dealer) AS nombre_dealer,
              s.saldo_precio,
              COALESCE(s.fecha_otorgado, c.fecha_otorgado) AS fecha_otorgado,
              /* RUT: el del seguimiento y, si quedó vacío, el del crédito o la ficha */
