@@ -77,7 +77,7 @@ require('../../../../shared/migrate').enFila('correos', async () => {
       `INSERT IGNORE INTO correos_programados (codigo, nombre, descripcion, hora, dias, destinatarios, activo)
        VALUES (?,?,?,?,?,?,0)`,
       ['alerta_penetracion_seguros', 'Alerta Penetración de Seguros (AutoFin)',
-        'Avisa cuando la penetración de algún seguro cae bajo el tramo del 40% de comisión (y cuando se recupera): estado por seguro, ejecutivos que no cumplen y cuánto se deja de ganar vs el 40%. Se evalúa a diario pero solo se envía al CAMBIAR de estado.',
+        'Avisa cuando la penetración de algún seguro cae bajo el tramo del 40% de comisión (y cuando se recupera): estado por seguro, ejecutivos que no cumplen y cuánto se deja de ganar vs el 40% y la referencia con el ingreso por seguros del mes anterior (bajar de 40% a 30% = 25% de ese ingreso). Se evalúa a diario pero solo se envía al CAMBIAR de estado.',
         '08:45', '1,2,3,4,5,6', '']);
     // Informe de Salud del Sistema (v111.2) — semanal, chequeos automaticos + recordatorio de rutina manual.
     await pool.query(
@@ -452,12 +452,16 @@ async function datosPenSeguros(mesForzado) {
   const U = { rdh: topDe('rdh'), cesantia: topDe('cesantia'), reparacion: topDe('reparacion') };
   const pctTop = Math.max(U.rdh.pct, U.cesantia.pct, U.reparacion.pct);
 
+  // Universo = CURSADAS del mes sin CORFO, el MISMO del Dashboard → Seguros (antes contaba las
+  // APROBADAS no cursadas: 590 en ago-26 contra 79 otorgadas, y la penetración daba ~10% = 0% de comisión)
   const [ops] = await pool.query(`
     SELECT ejecutivo,
            (COALESCE(seguro_rdh,0)>0) tr, (COALESCE(seguro_cesantia,0)>0) tc, (COALESCE(seguro_rep_menor,0)>0) tp,
            COALESCE(seguro_rdh,0) pr, COALESCE(seguro_cesantia,0) pc, COALESCE(seguro_rep_menor,0) pp
     FROM creditos
-    WHERE DATE_FORMAT(mes,'%Y-%m')=? AND UPPER(COALESCE(financiera,'')) LIKE '%AUTOFIN%' AND estado IN ('OTORGADO','APROBADO')`, [mesStr]);
+    WHERE DATE_FORMAT(mes,'%Y-%m')=? AND UPPER(COALESCE(financiera,'')) LIKE '%AUTOFIN%'
+        AND COALESCE(NULLIF(estado,''), estado_credito) = 'OTORGADO'
+        AND UPPER(COALESCE(producto,'')) NOT LIKE '%CORFO%'`, [mesStr]);
   const n = ops.length;
   const pct100 = (a, b) => b ? Math.round(1000 * a / b) / 10 : 0;
   const pen = {
@@ -490,8 +494,37 @@ async function datosPenSeguros(mesForzado) {
     .sort((a, b) => (a.rdh + a.cesantia + a.reparacion) - (b.rdh + b.cesantia + b.reparacion));
 
   const totalPrimas = primas.rdh + primas.cesantia + primas.reparacion;
+
+  /* Referencia con el MES ANTERIOR cerrado (Pato, 10-09-2026): cuánto significa bajar del tramo
+     top al actual medido sobre el ingreso por seguros del mes pasado — ej. 40% → 30% = 25% del
+     ingreso ($26,1 MM en ago-26 → al menos $6,5 MM). El mes en curso va a medio camino y subestima. */
+  let ref = null;
+  try {
+    const [y, m] = mesStr.split('-').map(Number);
+    const mAnt = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+    const [opsA] = await pool.query(`
+      SELECT (COALESCE(seguro_rdh,0)>0) tr, (COALESCE(seguro_cesantia,0)>0) tc, (COALESCE(seguro_rep_menor,0)>0) tp,
+             COALESCE(seguro_rdh,0)+COALESCE(seguro_cesantia,0)+COALESCE(seguro_rep_menor,0) prima
+      FROM creditos
+      WHERE DATE_FORMAT(mes,'%Y-%m')=? AND UPPER(COALESCE(financiera,'')) LIKE '%AUTOFIN%'
+        AND COALESCE(NULLIF(estado,''), estado_credito) = 'OTORGADO'
+        AND UPPER(COALESCE(producto,'')) NOT LIKE '%CORFO%'`, [mAnt]);
+    const nA = opsA.length;
+    if (nA) {
+      const penA = { rdh: pct100(opsA.filter(o => +o.tr).length, nA), cesantia: pct100(opsA.filter(o => +o.tc).length, nA), reparacion: pct100(opsA.filter(o => +o.tp).length, nA) };
+      let pctA = Math.min(getPenComision('rdh', penA.rdh, tramos), getPenComision('cesantia', penA.cesantia, tramos), getPenComision('reparacion', penA.reparacion, tramos));
+      // % informado por AutoFin para ese mes manda sobre el calculado (misma regla del dashboard)
+      try { const [[ov]] = await pool.query('SELECT pct FROM comisiones_seguro_pct_mes WHERE DATE_FORMAT(mes,"%Y-%m")=? LIMIT 1', [mAnt]); if (ov && ov.pct != null) pctA = parseFloat(ov.pct) / 100; } catch (_) {}
+      const primasA = opsA.reduce((s2, o) => s2 + +o.prima, 0);
+      const ingresoA = Math.round(primasA * pctA);
+      const caida = pctTop > 0 ? (pctTop - pctActual) / pctTop : 0;   // 40% → 30% = 25%
+      ref = { mes: mAnt, mesNom: MESES[parseInt(mAnt.slice(5, 7), 10) - 1], n: nA, pct: pctA, ingreso: ingresoA,
+              caida_pct: Math.round(caida * 1000) / 10, perdida: Math.round(ingresoA * caida) };
+    }
+  } catch (_) {}
+
   return {
-    mesStr, mesNom: MESES[parseInt(mesStr.slice(5, 7), 10) - 1], n, pen, primas, U, pctTop, pctActual,
+    mesStr, mesNom: MESES[parseInt(mesStr.slice(5, 7), 10) - 1], n, pen, primas, U, pctTop, pctActual, ref,
     bajo: n > 0 && pctActual < pctTop,
     ingActual: Math.round(totalPrimas * pctActual),
     ingTop: Math.round(totalPrimas * pctTop),
@@ -568,6 +601,12 @@ async function buildAlertaPenetracion(opts = {}) {
       </td>
     </tr></table>`;
 
+  const refHTML = (esAlerta && d.ref && d.ref.perdida > 0) ? `
+    <div style="margin:10px 0 4px;padding:12px 14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;font-size:13px;color:#7c2d12;line-height:1.55">
+      <b>Referencia con el mes pasado:</b> en <b>${esc(d.ref.mesNom)}</b> los seguros AutoFin dejaron <b>${fmt(d.ref.ingreso)}</b> (${d.ref.n} ops al ${Math.round(d.ref.pct * 100)}%).
+      Pasar del <b>${Math.round(d.pctTop * 100)}%</b> al <b>${Math.round(d.pctActual * 100)}%</b> es perder un <b>${d.ref.caida_pct}%</b> del ingreso por seguros:
+      con la producción del mes pasado son <b>al menos ${fmt(d.ref.perdida)}</b> que se dejan de ganar en el mes.
+    </div>` : '';
   const th = 'color:#fff;padding:7px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;background:#2f6fd0';
   const html = `
   <div style="background:#eef2f7;padding:24px 12px;font-family:'Segoe UI',Arial,sans-serif">
@@ -582,6 +621,7 @@ async function buildAlertaPenetracion(opts = {}) {
       <div style="padding:20px 28px">
         <p style="font-size:13.5px;color:#1e293b;line-height:1.6;margin:0 0 8px">${intro}</p>
         ${cuadro}
+        ${refHTML}
         <div style="font-weight:800;color:#0f172a;font-size:13px;margin:14px 0 8px;border-left:4px solid #0141A2;padding-left:10px">Penetración del mes por seguro</div>
         <table style="width:100%;border-collapse:collapse;font-size:12.5px">
           <thead><tr><th style="${th};text-align:left">Seguro</th><th style="${th};text-align:center">Penetración</th><th style="${th};text-align:center">Meta 40%</th><th style="${th};text-align:right">Primas del mes</th></tr></thead>
@@ -605,7 +645,7 @@ async function buildAlertaPenetracion(opts = {}) {
   </div>`;
 
   const asunto = esAlerta
-    ? `⚠️ Seguros AutoFin bajo el 40% — dejamos de ganar ${fmt(d.perdida)} en ${d.mesNom}`
+    ? `⚠️ Seguros AutoFin bajo el 40% — ${d.ref && d.ref.perdida > 0 ? 'al menos ' + fmt(d.ref.perdida) + ' menos al mes (ref. ' + d.ref.mesNom + ')' : 'dejamos de ganar ' + fmt(d.perdida) + ' en ' + d.mesNom}`
     : `✅ Seguros AutoFin de vuelta al 40% — ${d.mesNom} al máximo tramo`;
   return { asunto, html };
 }
@@ -1082,4 +1122,4 @@ const preview = async (req, res) => {
   } catch (e) { console.error('[correos preview]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, actualizar, enviarAhora, preview, _buildSalud: buildSalud, _saludChecks: saludChecks, _buildFundantesPendientes: buildFundantesPendientes };
+module.exports = { listar, actualizar, enviarAhora, preview, _buildSalud: buildSalud, _saludChecks: saludChecks, _buildFundantesPendientes: buildFundantesPendientes, _datosPenSeguros: datosPenSeguros };
