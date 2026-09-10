@@ -679,6 +679,23 @@ const cartolaAprobar = async (req, res) => {
 const MESES_LARGO = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const mesLargo = m => (MESES_LARGO[parseInt(String(m).slice(5), 10) - 1] || '') + ' ' + String(m).slice(0, 4);
 
+/* Ejecutivos de las ops de la cartola del parque (por nombre, sin tildes) + Jefes Comerciales + comisiones@ */
+async function ccCartolaParque(parque, mes) {
+  const norm = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const calc = await calcularMes(mes);
+  const fila = calc.find(r => r.parque === parque);
+  const nombres = new Set((fila && fila.detalle ? fila.detalle : []).map(o => norm(o.ejecutivo)).filter(Boolean));
+  const [us] = await pool.query(`SELECT u.nombre, u.apellido, u.email, p.nombre AS perfil FROM usuarios u LEFT JOIN perfiles p ON p.id_perfil=u.id_perfil
+                                  WHERE u.estado='activo' AND u.email IS NOT NULL AND u.email<>''`);
+  const cc = new Set();
+  for (const u of us) {
+    const full = norm(u.nombre + ' ' + (u.apellido || '')), corto = norm(String(u.nombre || '').split(/\s+/)[0] + ' ' + (u.apellido || ''));
+    if (nombres.has(full) || nombres.has(corto) || u.perfil === 'Jefe Comercial') cc.add(String(u.email).trim().toLowerCase());
+  }
+  try { const m = /<([^>]+)>/.exec(require('../../../../shared/mailer').remitenteComisiones()); cc.add((m ? m[1] : 'comisiones@autofacilchile.cl').trim().toLowerCase()); } catch (_) { cc.add('comisiones@autofacilchile.cl'); }
+  return [...cc];
+}
+
 const cartolaEnviar = async (req, res) => {
   try {
     const mes = mesParam(req), parque = String(req.body.parque || '').trim();
@@ -701,8 +718,12 @@ const cartolaEnviar = async (req, res) => {
         : undefined;
       const [[row]] = await pool.query(
         "SELECT ops FROM parques_pagos_mes WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]).catch(() => [[null]]);
+      /* CC dinámico (Pato, 10-09-2026, espejo de la cartola dealer): los ejecutivos que colocaron
+         las operaciones de ESTA cartola, los Jefes Comerciales activos y comisiones@ (la casilla
+         desde la que sale). Los correos salen de la ficha de Usuarios, nunca se copian. */
+      const ccDin = await ccCartolaParque(parque, mes).catch(() => []);
       envio = await require('../../../../shared/plantillas-correo').enviar({
-        codigo: 'parque_cartola_envio', to: [mail], adjuntos: adj,
+        codigo: 'parque_cartola_envio', to: [mail], adjuntos: adj, cc: ccDin,
         datos: { PARQUE: parque, PERIODO: mes, PERIODO_LARGO: mesLargo(mes),
                  ARRIENDO: CLP(arriendo), COMISION: CLP(comision), TOTAL: CLP(totalC),
                  OPS: row?.ops ?? (req.body.ops || ''), QUIEN: quien },
@@ -825,6 +846,6 @@ const revertirPago = async (req, res) => {
   } catch (e) { console.error('[parques revertir-pago]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, detalle, aprobar, emitir, pagar,
+module.exports = { _ccCartolaParque: ccCartolaParque, listar, detalle, aprobar, emitir, pagar,
   facturaRegistrar, cartolaEstado, cartolaEmitir, cartolaAprobar, cartolaEnviar, cartolasEnviadas, cartolaReversarEnvio,
   anularODP, revertirPago };
