@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Cartolas Parque — AutoFácil</title>
-  <!-- v2.1 — navbar migrada al componente topnav · v1.9 — logo oficial embebido en el PDF · v1.8 — el PDF se DIBUJA (shared/pdf-simple.js), validado con pdftotext y PyMuPDF · v1.7 — el PDF se DIBUJA con jsPDF (no captura de pantalla): no puede salir en blanco, texto seleccionable · v1.6 — PDF: se captura con la pagina al tope (determinista) en vez de corregir el desfase de scroll · v1.5 — el PDF salia en blanco con la pagina scrolleada (fix scrollY + validacion de tamaño) · boton Ver PDF · la cartola ya no dice IVA incluido · v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
+  <!-- v2.2 — sin la línea Arriendo mensual (el arriendo se paga por su propia ODP) y título CARTOLA COMISIONES. v2.1 — navbar migrada al componente topnav · v1.9 — logo oficial embebido en el PDF · v1.8 — el PDF se DIBUJA (shared/pdf-simple.js), validado con pdftotext y PyMuPDF · v1.7 — el PDF se DIBUJA con jsPDF (no captura de pantalla): no puede salir en blanco, texto seleccionable · v1.6 — PDF: se captura con la pagina al tope (determinista) en vez de corregir el desfase de scroll · v1.5 — el PDF salia en blanco con la pagina scrolleada (fix scrollY + validacion de tamaño) · boton Ver PDF · la cartola ya no dice IVA incluido · v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -157,7 +157,7 @@ function cartolaHTML(r, i){
       <div id="bloque${i}">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
           <div>
-            <div style="font-weight:800;color:#012d70;font-size:.95rem">CARTOLA COMISIONES Y ARRIENDO — ${escH(r.parque)}</div>
+            <div style="font-weight:800;color:#012d70;font-size:.95rem">CARTOLA COMISIONES — ${escH(r.parque)}</div>
             <div class="ct-datos">
               <span>${escH(f.razon_social||'(razón social pendiente en la ficha)')}</span>
               ${f.rut?`<span>RUT ${escH(f.rut)}</span>`:''}
@@ -170,7 +170,6 @@ function cartolaHTML(r, i){
           <tr><th>N° OP</th><th>Otorgado</th><th>Dealer</th><th>Ejecutivo</th><th class="r">Saldo Precio</th><th class="r">Comisión</th></tr>
           ${filas || '<tr><td colspan="6" style="color:#94a3b8">Sin operaciones en el período</td></tr>'}
           <tr class="linea"><td colspan="5">Comisión por créditos (${r.ops} operación${r.ops===1?'':'es'})</td><td class="r">${fmtCLP(r.comision_creditos)}</td></tr>
-          <tr class="linea"><td colspan="5">Arriendo mensual</td><td class="r">${fmtCLP(r.arriendo)}</td></tr>
           <tr class="total"><td colspan="5">TOTAL</td><td class="r">${fmtCLP(r.total)}</td></tr>
         </table>
         <div style="font-size:.66rem;color:#94a3b8;margin-top:6px">Documento generado por AutoFácil Business Suite · favor emitir la(s) factura(s) a AUTOFACIL SPA — RUT 76.545.638-K, según el régimen tributario del parque.</div>
@@ -213,7 +212,7 @@ function pdfCartola(i){
   const M = 14, FIN = doc.hoja.ancho - M;
   let y = 20;
 
-  doc.texto(M, y, 'CARTOLA COMISIONES Y ARRIENDO', { size:13, bold:true, color:NAVY });
+  doc.texto(M, y, 'CARTOLA COMISIONES', { size:13, bold:true, color:NAVY });
   doc.texto(M, y + 6.5, String(r.parque || '').toUpperCase(), { size:11, bold:true, color:NAVY });
   const ficha = [f.razon_social || '', f.rut ? 'RUT ' + f.rut : ''].filter(Boolean).join('  -  ');
   if (ficha) doc.texto(M, y + 12, ficha, { size:8, color:GRIS });
@@ -260,7 +259,6 @@ function pdfCartola(i){
     y += 7.5;
   };
   linea(`Comision por creditos (${r.ops} operacion${r.ops===1?'':'es'})`, r.comision_creditos, false);
-  linea('Arriendo mensual', r.arriendo, false);
   linea('TOTAL', r.total, true);
 
   y += 9;

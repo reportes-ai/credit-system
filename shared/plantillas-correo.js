@@ -30,7 +30,6 @@ const SEMILLAS = [
 
 Adjunto encontrarán la Orden de Pago N° {ODP} de la comisión del parque {PARQUE}, período {PERIODO}.
 
-Arriendo mensual: {ARRIENDO}
 Comisión por créditos ({OPS} operaciones): {COMISION}
 TOTAL A PAGAR: {TOTAL}
 
@@ -222,10 +221,9 @@ Auto Fácil Business Suite`,
     asunto: 'CARTOLA COMISIONES {PERIODO_LARGO} — {PARQUE}',
     cuerpo: `Estimados {PARQUE}:
 
-Junto con saludar, adjuntamos la cartola de comisiones y arriendo correspondiente a {PERIODO_LARGO}, con el detalle de las operaciones del período.
+Junto con saludar, adjuntamos la cartola de comisiones correspondiente a {PERIODO_LARGO}, con el detalle de las operaciones del período.
 
 Comisión por créditos ({OPS} operaciones): {COMISION}
-Arriendo mensual: {ARRIENDO}
 
 Favor emitir la(s) factura(s) a:
 AUTOFACIL SPA — RUT 76.545.638-K
@@ -247,12 +245,11 @@ AutoFácil Crédito Automotriz`,
     ambito: 'Post Venta — Parques',
     nombre: 'Pago realizado → aviso al PARQUE',
     descripcion: 'Se manda al CONFIRMAR el pago de la comisión de un parque. Va al correo de la ficha del parque (contacto financiero, o el correo de confirmación).',
-    asunto: 'AutoFácil — Pago de comisión y arriendo {PERIODO} ({TOTAL})',
+    asunto: 'AutoFácil — Pago de comisión {PERIODO} ({TOTAL})',
     cuerpo: `Estimados {PARQUE}:
 
 Les informamos que se realizó el pago correspondiente al período {PERIODO}, según el siguiente detalle:
 
-Arriendo mensual: {ARRIENDO}
 Comisión por créditos ({OPS} operaciones): {COMISION}
 TOTAL PAGADO: {TOTAL}
 
@@ -273,9 +270,8 @@ AutoFácil Crédito Automotriz`,
     nombre: 'Pago realizado → aviso interno (Jefe Comercial)',
     descripcion: 'Se manda al CONFIRMAR el pago de la comisión de un parque, al equipo comercial, para que sepan que el parque ya recibió su pago.',
     asunto: 'Comisión pagada — {PARQUE} {PERIODO} ({TOTAL})',
-    cuerpo: `Se confirmó el pago de la comisión y arriendo del parque {PARQUE}, período {PERIODO}.
+    cuerpo: `Se confirmó el pago de la comisión del parque {PARQUE}, período {PERIODO}.
 
-Arriendo mensual: {ARRIENDO}
 Comisión por créditos ({OPS} operaciones): {COMISION}
 TOTAL PAGADO: {TOTAL}
 
