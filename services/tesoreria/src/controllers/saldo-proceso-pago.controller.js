@@ -138,21 +138,20 @@ exports.listar = async (req, res) => {
       for (let i = FLUJO.length - 1; i >= 0; i--) if (et[FLUJO[i]]) { estadoActual = FLUJO[i]; break; }
 
       const recep = et['FUNDANTES RECIBIDOS'] || null;
-      // AM/PM según la hora de corte paramétrica (después del corte, el plazo corre desde el día hábil siguiente)
-      const ampm  = recep ? (new Date(recep).getHours() < slaCfg.corte ? 'AM' : 'PM') : null;
+      // AM/PM, hora y vencimiento: TODO sale del motor único (hora de pared Chile, no la del servidor)
       const v     = SLA.vencimiento(recep, s.categoria_asignada, slaCfg);
-      const venc  = v ? ymd(v.fecha) : null;
+      const ampm  = v ? v.ampm : null;
+      const venc  = v ? v.iso : null;
       const horas = v ? v.horas : null;
 
       const pagado = et['SALDO PRECIO PAGADO'] || null;
-      const dRec = recep ? new Date(recep) : null;
       return {
         num_op: s.num_op,
         id_financiera: s.id_financiera || null,
         f_otorgado: ymd(s.fecha_otorgado),
         dealer: s.nombre_dealer, rut_dealer: s.rut_dealer,
         ejecutivo: s.ejecutivo, financiera: s.financiera,
-        hora_recepcion: dRec ? String(dRec.getHours()).padStart(2, '0') + ':' + String(dRec.getMinutes()).padStart(2, '0') : null,
+        hora_recepcion: v ? v.hora : null,
         tipo_dealer: (s.parque && s.parque !== 'NO APLICA') ? 'PARQUE' : 'CALLE',
         clasificacion: s.categoria_asignada || null,
         /* Desglose del pago: saldo precio + fijos AutoFin (Limitación y Transferencia,
@@ -168,11 +167,13 @@ exports.listar = async (req, res) => {
             + (esAutoFin(s.financiera)
               ? (Number(s.sin_limitacion) === 1 ? 0 : (fijos.autofin_limitacion || 0)) + (fijos.autofin_inscripcion || 0) : 0),
         monto_preliminar: s.odp_monto == null,             // sin ODP aún: total calculado, no congelado
+        historico: !!pagado && s.odp_monto == null,        // pagada antes del módulo ODP: no hay monto pagado registrado
         odp: s.odp_numero || null,
         estado: estadoActual,
         pagado: !!pagado,
         f_recepcion: ymd(recep), ampm,
         f_venc_sla: venc, sla_horas: recep ? horas : null,
+        sla_base: v ? v.base : null,                       // día desde el que corre el plazo (día hábil siguiente si llegó después del corte)
         f_fund_enviados: ymd(et['FUNDANTES ENVIADOS']),
         f_liberado: ymd(et['LIBERADO A PAGO']),
         f_odp: ymd(et['ORDEN DE PAGO EMITIDA']),

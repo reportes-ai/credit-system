@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.3 — API Suite Financiera (JM): 8 endpoints de solo lectura, documentados. v2.2 — miga sigue a la API abierta (AF_TOPNAV_HOJA) -->
+<!-- v2.4 — saldo-proceso-pago: campos sla_base e historico documentados. v2.3 — API Suite Financiera (JM): 8 endpoints de solo lectura, documentados. v2.2 — miga sigue a la API abierta (AF_TOPNAV_HOJA) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -124,7 +124,7 @@ const DOCS = {
         <li><b>GET /libro-ventas?desde=2026-01&hasta=2026-08</b> — auxiliar de ventas (facturas emitidas, IVA débito), mismo formato por mes.</li>
         <li><b>GET /ordenes-pago?desde=&hasta=&estado=&origen=&q=</b> — historial de Órdenes de Pago (número, tipo, proveedor/dealer, documento, monto, estado, fecha de pago). <code>origen</code>: GENERAL, SALDO, COMISION, PARQUE.</li>
         <li><b>GET /rentabilidad?mes=2026-09</b> — detalle por operación otorgada del mes: saldo precio, monto financiado, plazo, tasa, ingreso AutoFácil, comisión dealer, comisión parque, seguros, ingreso bruto (Dashboard → Rentabilidades).</li>
-        <li><b>GET /saldo-proceso-pago?todo=1</b> — planilla de Tesorería: recepción de fundantes, SLA, ODP, banco y pago por operación. Sin <code>todo</code> solo las pendientes.</li>
+        <li><b>GET /saldo-proceso-pago?todo=1</b> — planilla de Tesorería: recepción de fundantes, SLA, ODP, banco y pago por operación. Sin <code>todo</code> solo las pendientes. Campos clave: <code>f_venc_sla</code> (vencimiento por el motor único: hora de corte 14:00 + horas hábiles de la categoría, sin feriados), <code>sla_base</code> (día desde el que corre el plazo), <code>monto_preliminar</code> (sin ODP emitida: el total puede cambiar), <code>historico</code> (pagada antes del módulo ODP: no existe monto pagado registrado, usar <code>saldo_precio</code>).</li>
       </ul>
       <h6>Ejemplo (curl)</h6>
       <pre>curl -H "X-API-Key: afk_SU_LLAVE" \\

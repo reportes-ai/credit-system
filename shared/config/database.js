@@ -105,4 +105,9 @@ function vigilarCambioHora() {
 }
 require('../scheduler').programar('vigia-cambio-hora', vigilarCambioHora, 60 * 1000, { infra: true, enStaging: true, arranqueMs: 60 * 1000 });
 
+/* Offset con el que mysql2 interpreta los DATETIME de esta corrida (el mismo del SET time_zone).
+   Quien necesite la HORA DE PARED de un DATETIME (hora de corte, AM/PM) la reconstruye con esto,
+   nunca con getHours() del servidor: en Render/Cloud Run el reloj del proceso no es el de Chile. */
+pool.offsetBD = () => _tzOverride || MYSQL2_TZ;
+
 module.exports = pool;
