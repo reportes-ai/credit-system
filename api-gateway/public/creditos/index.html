@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v210.5 — Exportar Excel incluye Producto y columna Corfo SI/NO (pedido Sandra) · v210.4 — ficha: Etapa (antes "Estado") · v210.3 — Exportar Excel incluye Saldo Precio -->
+<!-- v210.6 — seguros REALES de la operación (RDH+E, cesantía, reparación menor) en el simulador y en la pestaña Seguros al editar un crédito; el teórico solo si no hay seguros informados. v210.5 — Exportar Excel incluye Producto y columna Corfo SI/NO (pedido Sandra) · v210.4 — ficha: Etapa (antes "Estado") · v210.3 — Exportar Excel incluye Saldo Precio -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -439,9 +439,9 @@
             <div class="rc-item"><span>+ Gastos Operacionales</span><span id="rCCGastos">—</span></div>
             <div class="rc-sep"></div>
             <div class="rc-item rc-subtotal"><span>Sub Total Sin Seguros</span><span id="rCCSubSin">—</span></div>
-            <div class="rc-item rc-seg"><span>+ Seguro Desgravamen</span><span id="rCCSegD">—</span></div>
-            <div class="rc-item rc-seg"><span>+ Seguro RDH</span><span id="rCCSegR">—</span></div>
-            <div class="rc-item rc-seg"><span>+ Seguro Cesantía</span><span id="rCCSegC">—</span></div>
+            <div class="rc-item rc-seg"><span id="rCCSegDl">+ Seguro Desgravamen</span><span id="rCCSegD">—</span></div>
+            <div class="rc-item rc-seg"><span id="rCCSegRl">+ Seguro RDH</span><span id="rCCSegR">—</span></div>
+            <div class="rc-item rc-seg"><span id="rCCSegCl">+ Seguro Cesantía</span><span id="rCCSegC">—</span></div>
             <div class="rc-sep"></div>
             <div class="rc-item rc-subtotal"><span>Sub Total Con Seguros</span><span id="rCCSubCon">—</span></div>
             <div class="rc-item rc-bono"><span>- Bono Financiamiento</span><span id="rCCBono">—</span></div>
@@ -469,6 +469,7 @@
 
       <!-- Tab: Seguros -->
       <div id="credTab-seguros" style="display:none">
+        <div id="ciSegReal" style="display:none;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:12px"></div>
         <div class="table-responsive mb-3">
           <table class="table table-bordered table-sm mb-0" style="font-size:.81rem">
             <thead>
@@ -480,7 +481,7 @@
             <tbody id="ciSegTableBody"></tbody>
           </table>
         </div>
-        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:16px">
+        <div id="ciSegTeorico" style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:16px">
           <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#9ca3af;margin-bottom:12px">Cálculo de Seguros para Esta Operación</div>
           <div class="row g-2">
             <div class="col-md-6">

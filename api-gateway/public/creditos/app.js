@@ -193,6 +193,7 @@ function showToast(msg, ok) {
 
 /* ─── Modo Edición ─────────────────────────────────────────────────── */
 let _modoEditar = null;   // id_credito si estamos editando, null si es ingreso nuevo
+let _credRealSeg = null;  // seguros REALES de la op en edición {rdh, ces, rep} (informados por la financiera); null = usar el cálculo teórico
 let _modoEditarNumero = null; // numero_credito para mostrar en banner
 
 /* ─── Tabs ─────────────────────────────────────────────────────────── */
@@ -1085,9 +1086,18 @@ function credRecalcular() {
   document.getElementById('rCCSaldoPrecio').textContent = f(r.saldoPrecio);
   document.getElementById('rCCGastos').textContent      = f(r.gastosOp);
   document.getElementById('rCCSubSin').textContent      = f(r.subSin);
-  document.getElementById('rCCSegD').textContent        = r.segDesg  > 0 ? f(r.segDesg)  : '—';
-  document.getElementById('rCCSegR').textContent        = r.segRdh   > 0 ? f(r.segRdh)   : '—';
-  document.getElementById('rCCSegC').textContent        = r.segCesa  > 0 ? f(r.segCesa)  : '—';
+  const lbl = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+  if (_credRealSeg) {   // seguros informados por la financiera: se muestran tal cual, no el reparto teórico
+    lbl('rCCSegDl', '+ Seguro RDH + E'); lbl('rCCSegRl', '+ Seguro Cesantía'); lbl('rCCSegCl', '+ Reparación Menor');
+    document.getElementById('rCCSegD').textContent = _credRealSeg.rdh > 0 ? f(_credRealSeg.rdh) : '—';
+    document.getElementById('rCCSegR').textContent = _credRealSeg.ces > 0 ? f(_credRealSeg.ces) : '—';
+    document.getElementById('rCCSegC').textContent = _credRealSeg.rep > 0 ? f(_credRealSeg.rep) : '—';
+  } else {
+    lbl('rCCSegDl', '+ Seguro Desgravamen'); lbl('rCCSegRl', '+ Seguro RDH'); lbl('rCCSegCl', '+ Seguro Cesantía');
+    document.getElementById('rCCSegD').textContent        = r.segDesg  > 0 ? f(r.segDesg)  : '—';
+    document.getElementById('rCCSegR').textContent        = r.segRdh   > 0 ? f(r.segRdh)   : '—';
+    document.getElementById('rCCSegC').textContent        = r.segCesa  > 0 ? f(r.segCesa)  : '—';
+  }
   document.getElementById('rCCSubCon').textContent      = f(r.subCon);
   document.getElementById('rCCBono').textContent        = p.bono > 0 ? f(p.bono) : '—';
   document.getElementById('rCCMontoFin').textContent    = f(r.montoFin);
@@ -1203,6 +1213,18 @@ function credCalcFull(p) {
 let _credLastResult = null;
 
 function credRenderSegurosTab(r, p) {
+  const bReal = document.getElementById('ciSegReal'), bTeo = document.getElementById('ciSegTeorico');
+  if (bReal && bTeo) {
+    if (_credRealSeg) {
+      const f = credFmtP, tot = _credRealSeg.rdh + _credRealSeg.ces + _credRealSeg.rep;
+      const fila = (t, v) => `<div class="cred-seg-row"><span>${t}</span><span>${v > 0 ? f(v) : '—'}</span></div>`;
+      bReal.innerHTML = `<div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:#9ca3af;margin-bottom:12px">Seguros de esta operación — informados por la financiera</div>
+        ${fila('Seguro RDH + E (robo, daño, hurto y desgravamen)', _credRealSeg.rdh)}${fila('Seguro Cesantía', _credRealSeg.ces)}${fila('Reparación Menor', _credRealSeg.rep)}
+        <div class="cred-seg-sep"></div><div class="cred-seg-row" style="font-weight:700"><span>Total Seguros</span><span>${f(tot)}</span></div>
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:8px">Valores tal como vienen en la operación de la financiera (carga masiva / Trinidad), no calculados. La tabla de tarifas de abajo es referencia de AutoFácil.</div>`;
+      bReal.style.display = ''; bTeo.style.display = 'none';
+    } else { bReal.style.display = 'none'; bTeo.style.display = ''; }
+  }
   credBuildSegTable();
   const tbody = document.getElementById('ciSegTableBody');
   if (tbody) {
@@ -1694,6 +1716,9 @@ async function cargarModoEdicion(idCredito) {
     const c = j.data;
     _modoEditar = idCredito;
     _modoEditarNumero = c.numero_credito;
+    // Seguros reales (seguro_rdh / seguro_cesantia / seguro_rep_menor): si existen, el desglose los muestra tal cual (Pato, 10-09-2026)
+    { const n = v => Math.round(parseFloat(v) || 0); const rs = { rdh: n(c.seguro_rdh), ces: n(c.seguro_cesantia), rep: n(c.seguro_rep_menor) };
+      _credRealSeg = (rs.rdh + rs.ces + rs.rep) > 0 ? rs : null; }
 
     // Cambiar a tab ingreso forzando AutoFácil (sin redirigir a otras páginas)
     document.querySelectorAll('.tab-card[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === 'ingreso'));
@@ -1791,6 +1816,7 @@ function cancelarEdicion() {
     location.href = '/creditos/revisar?id=' + _modoEditar;
   } else {
     _modoEditar = null;
+    _credRealSeg = null;
     _modoEditarNumero = null;
     document.getElementById('editModeBanner').classList.remove('visible');
     const btnG = document.getElementById('btnGuardarCredito');
