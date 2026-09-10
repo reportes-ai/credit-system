@@ -643,7 +643,7 @@ async function buildAlertaPenetracion(opts = {}) {
         <p style="font-size:11.5px;color:#94a3b8;margin:14px 0 0">El % del mes lo define el seguro más débil (tramos 20/30/40%). Detalle en Dashboard → 🛡️ Seguros.</p>
       </div>
       <div style="padding:14px 28px;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:11px">
-        Correo automático de AutoFácil · se envía solo al cambiar el estado del mes. Se suspende en Mantenedores → Correos Programados.
+        Correo automático generado por Business Suite. Se envía solo cuando existe cambio de tramo.
       </div>
     </div>
   </div>`;
