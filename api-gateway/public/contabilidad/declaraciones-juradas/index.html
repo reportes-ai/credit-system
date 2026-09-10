@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Declaraciones Juradas — AutoFácil</title>
+  <!-- v1.0 — DJ 1879 (honorarios) desde el auxiliar: retención actualizada por factor SII, marcas mensuales, resumen sección C, archivo de carga SII; factores paramétricos -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1400px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .tabs { display:flex; gap:6px; margin-bottom:16px; }
+    .tabs button { border:none; background:#fff; color:#334155; font-weight:700; font-size:.85rem; padding:8px 16px; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+    .tabs button.on { background:var(--navy); color:#fff; }
+    .tabs button:disabled { opacity:.5; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:18px; overflow:hidden; }
+    .panel h6 { background:#f8fafc; margin:0; padding:10px 18px; font-weight:800; font-size:.8rem; letter-spacing:.4px; color:var(--navy-dark); border-bottom:1px solid #e5e7eb; }
+    .scroll { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    th { background:#f1f5f9; color:#334155; font-weight:700; padding:7px 8px; white-space:nowrap; position:sticky; top:0; }
+    td { padding:6px 8px; border-bottom:1px solid #f1f5f9; }
+    .num { font-family:Consolas,monospace; text-align:right; white-space:nowrap; }
+    .calc { color:#1d4ed8; font-weight:700; }
+    .mx { text-align:center; width:24px; font-weight:800; color:var(--navy); }
+    .tot td { background:#eef6ff; font-weight:800; }
+    .aviso { padding:8px 14px; border-radius:8px; font-size:.8rem; margin-bottom:6px; }
+    .aviso.alto { background:#fef2f2; border-left:4px solid #dc2626; }
+    .aviso.medio { background:#fff7ed; border-left:4px solid #f59e0b; }
+    .aviso.info { background:#f0f9ff; border-left:4px solid #0284c7; }
+    .strip { display:grid; grid-template-columns:repeat(12,1fr); gap:6px; padding:12px 18px; }
+    .strip div { background:#f8fafc; border-radius:8px; padding:6px; text-align:center; font-size:.72rem; }
+    .strip b { display:block; font-size:.9rem; color:var(--navy-dark); }
+    .strip .cero { background:#fef2f2; }
+    .fact input { width:90px; text-align:right; font-family:Consolas,monospace; font-weight:700; color:#b91c1c; border:1.5px solid #fca5a5; border-radius:6px; padding:2px 8px; }
+    .badge-prov { background:#dc2626; color:#fff; border-radius:8px; padding:2px 10px; font-size:.72rem; font-weight:800; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:14px 18px; font-size:.8rem; margin-top:18px; }
+    @media print { .no-print{display:none!important} body{background:#fff} .main-content{padding:0;max-width:none} .panel{box-shadow:none} }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Declaraciones Juradas', icon:'bi-journal-check', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-journal-check"></i><div><h2>Declaraciones Juradas anuales</h2><p>Se arman solas desde los libros auxiliares y se descargan en el formato de carga del SII. La declaración oficial se presenta en sii.cl.</p></div></div>
+
+  <div class="tabs no-print">
+    <button class="on" data-tab="1879" onclick="tab('1879')"><i class="bi bi-person-badge me-1"></i>DJ 1879 · Honorarios</button>
+    <button data-tab="1887" disabled title="Próximamente"><i class="bi bi-people me-1"></i>DJ 1887 · Sueldos (próximamente)</button>
+    <button data-tab="factores" onclick="tab('factores')"><i class="bi bi-sliders me-1"></i>Factores de actualización</button>
+  </div>
+
+  <!-- ═══ DJ 1879 ═══ -->
+  <div id="v1879">
+    <div class="d-flex gap-2 align-items-end mb-3 no-print">
+      <div><label class="form-label small fw-semibold mb-1">Año comercial</label><select id="fAnio" class="form-select form-select-sm"></select></div>
+      <button class="btn btn-sm btn-primary" onclick="cargar1879()"><i class="bi bi-search me-1"></i>Generar</button>
+      <button class="btn btn-sm btn-success" onclick="csv1879()" id="btnCsv" disabled><i class="bi bi-filetype-csv me-1"></i>Archivo de carga SII</button>
+      <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+      <span id="lblCsv" class="small ms-2"></span>
+    </div>
+    <div id="out1879"><div class="text-center text-muted py-5">Elige el año y presiona Generar</div></div>
+    <div class="mt-2 p-3 no-print" style="background:#fff7ed;border-left:4px solid #f59e0b;border-radius:8px;font-size:.8rem">
+      <b><i class="bi bi-exclamation-triangle me-1"></i>Antes de presentar</b>
+      <ul class="mb-0 mt-1">
+        <li><b>Fecha de pago:</b> el SII considera la retención en el mes en que se <b>pagó</b> la boleta; el auxiliar va por mes contable. Si una boleta se pagó en otro mes, su marca mensual y su factor pueden diferir.</li>
+        <li><b>Archivo de carga:</b> formato del importador del SII para AT2026 (sección B, sin encabezado, RUT y DV en columnas separadas). El primer año, pruébalo en el importador de sii.cl antes de enviar: el SII publica el largo exacto de cada columna solo dentro del importador.</li>
+        <li><b>Plazos (AT2026):</b> DJ 1879 hasta el 27 de marzo; Certificado N°1 a cada profesional hasta el 14 de marzo.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ Factores ═══ -->
+  <div id="vfactores" style="display:none">
+    <div class="d-flex gap-2 align-items-end mb-3">
+      <div><label class="form-label small fw-semibold mb-1">Año comercial</label><select id="fAnioF" class="form-select form-select-sm" onchange="cargarFactores()"></select></div>
+      <button class="btn btn-sm btn-success" onclick="guardarFactores()"><i class="bi bi-save me-1"></i>Guardar factores</button>
+      <span id="lblF" class="small text-muted ms-2"></span>
+    </div>
+    <div class="panel"><h6>FACTORES DE ACTUALIZACIÓN POR MES (SII)</h6><div class="scroll"><table class="fact"><thead><tr><th>Mes</th><th class="num">Factor</th><th>Actualizado por</th></tr></thead><tbody id="tbF"></tbody></table></div></div>
+    <div class="small text-muted">Publicados por el SII en enero de cada año tributario ("Porcentajes y factores de actualización directos", sii.cl → Valores y fechas → Renta). Un mes vacío deja la declaración como <b>PROVISORIA</b> (se calcula con 1,000).</div>
+    <div class="footer-afecta">
+      <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+      <ul class="mb-0 mt-1">
+        <li><b>Factor de actualización del mes</b> → retención actualizada (C3) y total C7 de la DJ 1879 <a href="#" onclick="tab('1879');return false">ver DJ 1879</a>, y el archivo de carga al SII.</li>
+        <li>Próximamente también → montos actualizados de la DJ 1887 (sueldos) y los Certificados N°1 y N°6, que deben cuadrar al peso con sus declaraciones.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const fmt = n => Number(n||0).toLocaleString('es-CL');
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const HOJAS = { factores: 'Factores de actualización' };
+
+const anioActual = new Date().getFullYear();
+for (const sel of [fAnio, fAnioF]) {
+  for (let a = anioActual; a >= 2025; a--) sel.insertAdjacentHTML('beforeend', `<option value="${a}">${a} (AT${a+1})</option>`);
+  sel.value = String(anioActual - 1);
+}
+
+function tab(t){
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  v1879.style.display = t === '1879' ? '' : 'none';
+  vfactores.style.display = t === 'factores' ? '' : 'none';
+  if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(HOJAS[t] || null, () => tab('1879'));
+  if (t === 'factores') cargarFactores();
+}
+
+let DJ = null;
+async function cargar1879(){
+  out1879.innerHTML = '<div class="text-center text-muted py-5">Calculando…</div>';
+  const j = await fetch('/api/contabilidad/dj/1879?anio='+fAnio.value,{headers:H}).then(r=>r.json()).catch(()=>null);
+  if (!j || !j.success) { out1879.innerHTML = `<div class="aviso alto">${esc(j?.error || 'Error de conexión')}</div>`; return; }
+  DJ = j.data; btnCsv.disabled = !DJ.filas.length; lblCsv.textContent = '';
+  const R = DJ.resumen;
+  out1879.innerHTML = `
+  <div class="text-center mb-3"><b>AUTOFACIL SPA · RUT 76.545.638-K · DJ 1879 · Año Tributario ${DJ.anio_tributario} (rentas ${DJ.anio})</b>
+    ${DJ.provisoria ? ' <span class="badge-prov">PROVISORIA</span>' : ''}<div class="small text-muted">Tasa de retención del año: ${String(DJ.tasa_anio).replace('.',',')}%</div></div>
+  ${DJ.avisos.map(a => `<div class="aviso ${a.nivel} no-print">${esc(a.texto)}</div>`).join('')}
+  <div class="panel no-print"><h6>BOLETAS POR MES EN EL AUXILIAR (con retención / total) · FACTOR</h6><div class="strip">
+    ${DJ.por_mes.map(m => `<div class="${m.boletas ? '' : 'cero'}">${MESES[m.mes-1]}<b>${m.con_retencion}/${m.boletas}</b>${m.factor != null ? m.factor.toFixed(3).replace('.',',') : '<span style="color:#dc2626">sin factor</span>'}</div>`).join('')}
+  </div></div>
+  <div class="panel"><h6>SECCIÓN B — ${DJ.filas.length} INFORMADOS</h6><div class="scroll"><table>
+    <thead><tr><th>N°</th><th>RUT</th><th>Nombre</th><th class="num">Boletas</th><th class="num">Bruto</th><th class="num">Retención</th><th class="num">C3 Retención act.</th>
+      ${MESES.map(m => `<th class="mx">${m[0]}</th>`).join('')}<th class="num">Cert.</th></tr></thead>
+    <tbody>${DJ.filas.map(f => `<tr>
+      <td>${f.n}</td><td style="white-space:nowrap;${f.dv_valido ? '' : 'color:#dc2626;font-weight:800'}">${esc(f.rut)}</td><td>${esc(f.nombre)}</td>
+      <td class="num">${f.boletas}</td><td class="num">${fmt(f.bruto)}</td><td class="num">${fmt(f.retencion)}</td><td class="num calc">${fmt(f.c3)}</td>
+      ${f.meses.map(x => `<td class="mx">${x}</td>`).join('')}<td class="num">${f.c11}</td></tr>`).join('')}
+      <tr class="tot"><td colspan="4">Totales</td><td class="num">${fmt(R.c28)}</td><td class="num">${fmt(R.retencion_sin_actualizar)}</td><td class="num">${fmt(R.c7)}</td><td colspan="13"></td></tr>
+    </tbody></table></div></div>
+  <div class="panel"><h6>SECCIÓN C — CUADRO RESUMEN</h6><table>
+    <tr><td style="width:70px"><b>C7</b></td><td>Total retención honorarios art. 42 N°2 (actualizada)</td><td class="num calc">${fmt(R.c7)}</td></tr>
+    <tr><td><b>C8</b></td><td>Total retención directores art. 48, tasa 10%</td><td class="num">${fmt(R.c8)}</td></tr>
+    <tr><td><b>C9</b></td><td>Total retención directores art. 48, tasa 35%</td><td class="num">${fmt(R.c9)}</td></tr>
+    <tr><td><b>C27</b></td><td>Total servicios en Isla de Pascua</td><td class="num">${fmt(R.c27)}</td></tr>
+    <tr><td><b>C30</b></td><td>Total retención 3% préstamo tasa 0%</td><td class="num">${fmt(R.c30)}</td></tr>
+    <tr><td><b>C10</b></td><td>Total de casos informados</td><td class="num">${fmt(R.c10)}</td></tr>
+    <tr class="tot"><td><b>C28</b></td><td>Monto total honorarios (sin actualizar)</td><td class="num">${fmt(R.c28)}</td></tr>
+  </table></div>`;
+}
+
+async function csv1879(){
+  const r = await fetch('/api/contabilidad/dj/1879?formato=csv&anio='+fAnio.value,{headers:H});
+  if (!r.ok) { const j = await r.json().catch(()=>null); return alert(j?.error || 'No se pudo generar el archivo'); }
+  const blob = await r.blob(), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `DJ1879_AT${Number(fAnio.value)+1}.csv`; a.click();
+  URL.revokeObjectURL(a.href);
+  lblCsv.innerHTML = `<span style="color:#059669;font-weight:700">✓ Archivo generado (${DJ ? DJ.filas.length : ''} RUT)${DJ && DJ.provisoria ? ' — PROVISORIO' : ''}</span>`;
+}
+
+async function cargarFactores(){
+  const j = await fetch('/api/contabilidad/dj/factores?anio='+fAnioF.value,{headers:H}).then(r=>r.json()).catch(()=>null);
+  if (!j || !j.success) return alert(j?.error || 'Error de conexión');
+  const por = {}; j.data.factores.forEach(f => por[f.mes] = f);
+  tbF.innerHTML = MESES.map((m,i) => { const f = por[i+1];
+    return `<tr><td>${m}</td><td class="num"><input id="fac${i}" type="number" step="0.001" min="0.9" max="2" value="${f ? f.factor.toFixed(3) : ''}" placeholder="—"></td>
+      <td class="small text-muted">${f ? esc(f.actualizado_por || '') + (f.updated_at ? ' · ' + new Date(f.updated_at).toLocaleDateString('es-CL') : '') : 'Sin factor (provisorio)'}</td></tr>`; }).join('');
+  lblF.textContent = '';
+}
+
+async function guardarFactores(){
+  const factores = MESES.map((_,i) => { const v = document.getElementById('fac'+i).value.trim(); return v === '' ? null : Number(v); });
+  const j = await fetch('/api/contabilidad/dj/factores',{method:'PUT',headers:H,body:JSON.stringify({anio:Number(fAnioF.value),factores})}).then(r=>r.json()).catch(()=>null);
+  if (!j || !j.success) return alert(j?.error || 'Error de conexión');
+  lblF.innerHTML = '<span style="color:#059669;font-weight:700">✓ Factores guardados</span>';
+  cargarFactores();
+}
+
+cargar1879();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -1760,6 +1760,179 @@ exports.guardarF29 = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Declaraciones Juradas anuales (/contabilidad/declaraciones-juradas/) ─────
+   DJ 1879 (retenciones arts. 42 N°2 y 48 LIR — honorarios), formato SII AT2026:
+   una línea por RUT con la retención del año ACTUALIZADA mes a mes por el
+   factor del SII (C3), la marca "X" de cada mes con rentas (C12–C23) y el número
+   de certificado (C11). La sección B NO lleva el bruto por RUT: el bruto sin
+   actualizar va solo al resumen (C28).
+   Fuente única: auxiliar de honorarios, solo boletas con retención > 0 (las de
+   retención 0 las retuvo el propio emisor o son exentas: no se informan).
+   Factores de actualización: paramétricos en ctb_dj_factores (el SII los publica
+   en enero del año tributario); un mes sin factor se calcula con 1,000 y la DJ
+   queda PROVISORIA. La DJ 1887 (sueldos) y los certificados siguen este patrón. */
+const RUTCORE = require('../../../../api-gateway/public/js/rut-core');
+const DJ_FACTORES_SEMILLA = {   // SII, "Porcentajes y factores de actualización directos", AT2026
+  2025: [1.036, 1.026, 1.022, 1.016, 1.014, 1.012, 1.017, 1.008, 1.007, 1.003, 1.003, 1.000],
+};
+require('../../../../shared/migrate').enFila('contabilidad-dj', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_dj_factores (
+        anio            INT NOT NULL,
+        mes             TINYINT NOT NULL,
+        factor          DECIMAL(6,3) NOT NULL,
+        actualizado_por VARCHAR(160) NULL,
+        updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (anio, mes)
+      )`);
+    for (const [anio, fs] of Object.entries(DJ_FACTORES_SEMILLA))
+      for (let i = 0; i < 12; i++)
+        await pool.query('INSERT IGNORE INTO ctb_dj_factores (anio, mes, factor, actualizado_por) VALUES (?,?,?,?)',
+          [Number(anio), i + 1, fs[i], 'SII (semilla)']);
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_dj' LIMIT 1");
+    let idf = ex?.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003,'Declaraciones Juradas','ctb_dj','/contabilidad/declaraciones-juradas/','bi-journal-check')");
+      idf = r.insertId;
+    }
+    for (const idp of [1, 90003, 90007, 90009])
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
+    console.log('[contabilidad] declaraciones juradas listas');
+  } catch (e) { console.error('[contabilidad-dj migration]', e.message); }
+});
+
+async function factoresDJ(anio) {
+  const [rows] = await pool.query('SELECT mes, factor FROM ctb_dj_factores WHERE anio=?', [anio]);
+  const f = {}; rows.forEach(r => { f[Number(r.mes)] = Number(r.factor); });
+  return f;
+}
+
+/* MOTOR ÚNICO de la DJ 1879: lo usan la pantalla y el archivo de carga al SII
+   (y lo usará el Certificado N°1, que debe cuadrar al peso con la DJ). */
+async function calcularDJ1879(anio) {
+  const factor = await factoresDJ(anio);
+  const [bol] = await pool.query(
+    'SELECT mes, rut, nombre, bruto, tasa_retencion, retencion, origen FROM ctb_honorarios_aux WHERE mes LIKE ? ORDER BY mes',
+    [`${anio}-%`]);
+  const mesDe = b => Number(String(b.mes).slice(5, 7));
+  const conRet = bol.filter(b => Number(b.retencion) > 0);
+  const sinRet = bol.filter(b => !(Number(b.retencion) > 0));
+
+  const porRut = new Map();
+  for (const b of conRet) {
+    const rut = RUTCORE.normalizar(b.rut) || String(b.rut || '').trim();
+    if (!porRut.has(rut)) porRut.set(rut, { rut, nombre: b.nombre, boletas: 0, bruto: 0, retencion: 0,
+      ret_mes: Array(12).fill(0), bruto_mes: Array(12).fill(0), tasas: new Set() });
+    const g = porRut.get(rut), m = mesDe(b) - 1;
+    g.boletas++; g.bruto += Number(b.bruto); g.retencion += Number(b.retencion);
+    g.ret_mes[m] += Number(b.retencion); g.bruto_mes[m] += Number(b.bruto);
+    g.tasas.add(Number(b.tasa_retencion));
+  }
+
+  // Tasa del año = la más frecuente entre las boletas con retención; cualquier otra se avisa.
+  const conteo = {}; conRet.forEach(b => { const t = Number(b.tasa_retencion); conteo[t] = (conteo[t] || 0) + 1; });
+  const tasaAnio = Number(Object.entries(conteo).sort((a, b) => b[1] - a[1])[0]?.[0] || 0);
+
+  const filas = [...porRut.values()]
+    .sort((a, b) => Number(String(a.rut).split('-')[0]) - Number(String(b.rut).split('-')[0]))
+    .map((g, i) => {
+      const [cuerpo, dv] = String(g.rut).split('-');
+      const retAct = g.ret_mes.map((r, k) => Math.round(r * (factor[k + 1] || 1)));
+      return {
+        n: i + 1, rut: g.rut, cuerpo, dv: String(dv || '').toUpperCase(),
+        dv_valido: !!(cuerpo && dv && RUTCORE.calcDV(cuerpo) === String(dv).toUpperCase()),
+        nombre: g.nombre, boletas: g.boletas, bruto: g.bruto, retencion: g.retencion,
+        ret_mes: g.ret_mes, ret_act_mes: retAct,
+        c3: retAct.reduce((a, x) => a + x, 0), c4: 0, c5: 0,
+        meses: g.bruto_mes.map(x => (x > 0 ? 'X' : '')),
+        c25: 0, c29: 0, c11: i + 1,
+        tasas: [...g.tasas],
+      };
+    });
+
+  const mesesConRet = [...new Set(conRet.map(mesDe))].sort((a, b) => a - b);
+  const mesesSinFactor = mesesConRet.filter(m => !factor[m]);
+  const porMes = Array.from({ length: 12 }, (_, k) => {
+    const del = bol.filter(b => mesDe(b) === k + 1);
+    return { mes: k + 1, boletas: del.length, con_retencion: del.filter(b => Number(b.retencion) > 0).length,
+      retencion: del.reduce((a, b) => a + Number(b.retencion), 0), factor: factor[k + 1] ?? null };
+  });
+
+  const avisos = [];
+  if (mesesSinFactor.length)
+    avisos.push({ nivel: 'alto', texto: `PROVISORIA: faltan los factores de actualización de ${mesesSinFactor.length} mes(es) (${mesesSinFactor.join(', ')}); se calcularon con 1,000. Cárgalos en la pestaña Factores cuando el SII los publique.` });
+  const malDV = filas.filter(f => !f.dv_valido);
+  if (malDV.length) avisos.push({ nivel: 'alto', texto: `${malDV.length} RUT con dígito verificador inválido: ${malDV.map(f => f.rut).join(', ')}. El SII los rechaza.` });
+  const atipicas = conRet.filter(b => Number(b.tasa_retencion) !== tasaAnio);
+  if (atipicas.length) avisos.push({ nivel: 'medio', texto: `${atipicas.length} boleta(s) con tasa distinta a la del año (${tasaAnio}%): ${atipicas.map(b => `${b.rut} ${b.mes} al ${Number(b.tasa_retencion)}%`).join('; ')}. Revisar si corresponden a honorarios art. 42 N°2.` });
+  if (sinRet.length) avisos.push({ nivel: 'info', texto: `${sinRet.length} boleta(s) sin retención (el emisor retuvo o son exentas) por $${sinRet.reduce((a, b) => a + Number(b.bruto), 0).toLocaleString('es-CL')} bruto: no se informan en la 1879.` });
+  const vacios = porMes.filter(m => !m.boletas).map(m => m.mes);
+  if (vacios.length) avisos.push({ nivel: 'medio', texto: `Meses sin ninguna boleta en el auxiliar: ${vacios.join(', ')}. Confirma que no falta importar honorarios de AVSOFT.` });
+
+  return {
+    anio, anio_tributario: anio + 1, tasa_anio: tasaAnio, provisoria: mesesSinFactor.length > 0,
+    filas, por_mes: porMes, avisos,
+    resumen: {
+      c7: filas.reduce((a, f) => a + f.c3, 0), c8: 0, c9: 0, c27: 0, c30: 0,
+      c10: filas.length, c28: filas.reduce((a, f) => a + f.bruto, 0),
+      retencion_sin_actualizar: filas.reduce((a, f) => a + f.retencion, 0),
+    },
+  };
+}
+
+/* GET /dj/1879?anio=AAAA[&formato=csv] — formato=csv entrega el archivo de carga
+   masiva del SII: solo la sección B, ';', sin encabezado, RUT en dos columnas,
+   montos enteros sin separador, CRLF. Orden: RUT;DV;C3;C4;C5;C12..C23;C25;C29;C11. */
+exports.getDJ1879 = async (req, res) => {
+  try {
+    const anio = parseInt(req.query.anio, 10);
+    if (!(anio >= 2020 && anio <= 2100)) return fail(res, 'anio (AAAA) obligatorio', 400);
+    const dj = await calcularDJ1879(anio);
+    if (req.query.formato === 'csv') {
+      const lineas = dj.filas.map(f => [f.cuerpo, f.dv, f.c3, f.c4, f.c5, ...f.meses, f.c25, f.c29, f.c11].join(';'));
+      auditar({ req, accion: 'EXPORTAR', modulo: 'contabilidad', entidad: 'dj1879', entidad_id: null,
+        detalle: `DJ 1879 AT${dj.anio_tributario}: ${dj.filas.length} RUT, retención actualizada $${dj.resumen.c7}${dj.provisoria ? ' (PROVISORIA)' : ''}` });
+      res.setHeader('Content-Type', 'text/csv; charset=windows-1252');
+      res.setHeader('Content-Disposition', `attachment; filename="DJ1879_AT${dj.anio_tributario}.csv"`);
+      return res.send(Buffer.from(lineas.join('\r\n') + '\r\n', 'latin1'));
+    }
+    ok(res, dj);
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.getDJFactores = async (req, res) => {
+  try {
+    const anio = parseInt(req.query.anio, 10);
+    if (!(anio >= 2020 && anio <= 2100)) return fail(res, 'anio (AAAA) obligatorio', 400);
+    const [rows] = await pool.query('SELECT mes, factor, actualizado_por, updated_at FROM ctb_dj_factores WHERE anio=? ORDER BY mes', [anio]);
+    ok(res, { anio, factores: rows.map(r => ({ ...r, factor: Number(r.factor) })) });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* PUT /dj/factores { anio, factores: [12 valores | null] } — null borra el mes (vuelve a provisorio). */
+exports.guardarDJFactores = async (req, res) => {
+  try {
+    const anio = parseInt(req.body?.anio, 10);
+    const fs = req.body?.factores;
+    if (!(anio >= 2020 && anio <= 2100)) return fail(res, 'anio inválido', 400);
+    if (!Array.isArray(fs) || fs.length !== 12) return fail(res, 'Se esperan 12 factores (enero a diciembre)', 400);
+    for (const v of fs)
+      if (v !== null && v !== '' && !(Number(v) >= 0.9 && Number(v) <= 2)) return fail(res, `Factor fuera de rango: ${v} (debe estar entre 0,900 y 2,000)`, 400);
+    const quien = nombreDe(req.user);
+    for (let i = 0; i < 12; i++) {
+      const v = fs[i];
+      if (v === null || v === '') await pool.query('DELETE FROM ctb_dj_factores WHERE anio=? AND mes=?', [anio, i + 1]);
+      else await pool.query(
+        'INSERT INTO ctb_dj_factores (anio, mes, factor, actualizado_por) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE factor=VALUES(factor), actualizado_por=VALUES(actualizado_por)',
+        [anio, i + 1, Number(v), quien]);
+    }
+    auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'dj_factores', entidad_id: anio, detalle: `Factores de actualización ${anio}: ${fs.map(v => v ?? '—').join(' / ')}` });
+    ok(res, { guardado: true });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── LRE: Libro de Remuneraciones Electrónico (Dirección del Trabajo) ─────────
    Genera el CSV mensual oficial (Manual LRE de la DT: separador ';', nombre
    rutempleador_aaaamm.csv, montos enteros, opcionales vacíos, headers =

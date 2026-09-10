@@ -39,6 +39,7 @@
     <tr><td>Tasas</td><td>Tasa mensual menor/mayor 200 UF por período. La TMC se calibra automáticamente desde la CMF. Alimenta cotizador, cartas, bot WhatsApp y recálculos.</td></tr>
     <tr><td>Parámetros de Crédito</td><td>Gastos operacionales (prenda, inscripción, GPS, gastos admin, etc.), costo de fondo y % ejecutivo. Los usan el simulador y el cotizador de Facilito.</td></tr>
     <tr><td>Impuestos</td><td>IVA y retención de honorarios; los cálculos de facturas y boletas leen esta tabla.</td></tr>
+    <tr><td>Factores de actualización (Contabilidad → Declaraciones Juradas)</td><td>Factor del SII por mes y año (tabla <code>ctb_dj_factores</code>, pestaña Factores). Actualiza la retención de cada mes en la <b>DJ 1879</b> (columna C3 y total C7) y en su archivo de carga; a futuro, la DJ 1887 y los Certificados N°1 y N°6. El SII los publica en enero; un mes vacío deja la declaración PROVISORIA (se calcula con 1,000). Año 2025 precargado.</td></tr>
     <tr><td>Política de Crédito</td><td>Umbrales de aprobación y reglas de la política vigente.</td></tr>
     <tr><td>Fórmulas Financieras</td><td>Definiciones de las fórmulas que usan los cálculos del negocio.</td></tr>
     <tr><td>Comisiones y Factores de Seguro</td><td>Tasas de seguros por tramo y comisiones asociadas.</td></tr>
