@@ -836,6 +836,7 @@
   <h3>Documentos que exige</h3>
   <ul>
     <li><b>UNIDAD:</b> Carta Compromiso + Cotización (PDF). El servidor los lee al subirlos (parser de texto con fallback posicional para el layout en bloque; Haiku cuando el texto no deja leer las claves) y guarda lo leído en <code>extracted</code>, junto al documento.</li>
+    <li><b>El dealer NUNCA sale del PDF</b> (ni de Unidad ni de AutoFin): para la financiera el dealer es AutoFácil —le paga a AutoFácil y AutoFácil paga a los dealers y parques—, así que su documento trae "AUTOFACIL SPA (AFA)" y nuestro RUT. El ejecutivo elige el dealer a mano en la lista, y al guardar el servidor rechaza un RUT de dealer que no corresponda a la ficha del dealer elegido (10-09-2026).</li>
     <li><b>AUTOFIN:</b> Carta de Aprobación (PDF) + <b>pantallazo del sistema Autofin</b> con la solicitud puntual (buscada por su ID) mostrando su estado. El generador ofrece dos vías: botón <b>📸 Capturar pantalla</b> (elige la ventana de Autofin y el sistema toma el cuadro completo) o pegar con <b>Ctrl+V</b> (Alt+ImprPant). Haiku lee ID y Estado del print al subirlo; si es un listado o no se ve el estado, avisa al ejecutivo al tiro.</li>
   </ul>
   <h3>Qué valida</h3>

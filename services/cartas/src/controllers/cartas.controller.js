@@ -100,6 +100,22 @@ function sincronizarCreditoDesdeCarta(c, idCred) {
    PARQUE MAIPU → comisión de calle. Grave y silencioso, así que se valida acá,
    donde no hay cómo saltárselo. Sin ficha para el RUT no se puede afirmar nada
    → pasa (dealer nuevo en incorporación). Devuelve null si está OK. */
+/* El RUT del dealer de la carta debe ser el de la FICHA del dealer elegido (Pato 10-09-2026).
+   Los PDF de la financiera traen a AutoFácil como dealer ("AUTOFACIL SPA (AFA)", 76.545.638-K):
+   el autocompletado lo metió en dos cartas con el nombre de otro dealer (AUTEN 26081170,
+   PARQUE VESPUCIO NORTE 26090390) y el crédito y la cartola lo heredaron. Sin ficha para ese
+   nombre no se puede afirmar nada → pasa (dealer en incorporación). Devuelve null si está OK. */
+async function dealerVsFicha(nombreDealer, rutDealer) {
+  const nom = String(nombreDealer || '').trim().toUpperCase();
+  const rut = String(rutDealer || '').replace(/\./g, '').trim().toUpperCase();
+  if (!nom || !rut) return null;
+  const [fs] = await pool.query(
+    `SELECT rut FROM dealers WHERE UPPER(TRIM(nombre_indexa)) = ? OR UPPER(TRIM(nombre_razon)) = ?`, [nom, nom]).catch(() => [[]]);
+  const ruts = [...new Set(fs.map(f => String(f.rut || '').replace(/\./g, '').trim().toUpperCase()).filter(Boolean))];
+  if (!ruts.length || ruts.includes(rut)) return null;
+  return `El RUT del dealer (${rutDealer}) no corresponde a ${nombreDealer}: su ficha dice ${ruts.join(' / ')}. Vuelve a elegir el dealer en la lista (el RUT se completa solo). El dealer nunca se toma del PDF de la financiera.`;
+}
+
 async function tipoVsFichaDealer(tipo, rutDealer, parqueCarta) {
   const t = String(tipo || '').toUpperCase();
   const rut = String(rutDealer || '').replace(/\./g, '').trim().toUpperCase();
@@ -1221,6 +1237,12 @@ const upsert = async (req, res) => {
       const errTipo = await tipoVsFichaDealer(c.tipo, c.rutConc || c.rut_conc, c.parque);
       if (errTipo) return res.status(422).json({ success: false, data: null, error: errTipo });
     }
+    // El RUT del dealer: formato canónico y el de SU ficha (nunca el de AutoFácil que traen los PDF).
+    if (c.rutConc) c.rutConc = RUT.normalizar(c.rutConc) || c.rutConc;
+    {
+      const errDealer = await dealerVsFicha(c.concesionario, c.rutConc || c.rut_conc);
+      if (errDealer) return res.status(422).json({ success: false, data: null, error: errDealer });
+    }
     // Regla de negocio (2026-07-23): el ID de la financiera es ÚNICO por operación.
     // Si ya existe en otra carta viva o en un crédito VIVO, se detiene la digitación
     // (evita cartas gemelas KT/DI y choques con uq_id_financiera al crear el crédito).
@@ -1774,7 +1796,6 @@ function parseCartaCompromiso(t) {
     saldo:           _saldo,
     tasaCredito:     (g(/Tasa de interés Nominal:\s*([\d,]+)/) || '').replace(',', '.') || null,
     montoCreditoCLP: _monto,
-    concesionario:   g(/Dealers:\s*([^\n]+?)Sucursal/),
     vendedor:        g(/F&I:\s*([^\n]+?)Ejecutivo/),
     patente:         g(/placa patente\s+([A-Z]{4}\d{2}|[A-Z]{2}\d{4})/i),
     marca:           g(/Marca\s+([A-ZÁÉÍÓÚ]+)\s*,/),
@@ -1783,7 +1804,8 @@ function parseCartaCompromiso(t) {
     precioVenta:     _numU(g(/precio de venta[^$]*\$\s*([\d.]+)/)),
     pie:             _numU(g(/pie entregado[^$]*\$\s*([\d.]+)/)),
     partBruto:       _numU(g(/Participación\s*\$\s*([\d.]+)\s*IVA/)),
-    rutConc:         (g(/RUT\s+([\d,]+-[\dkK])/) || '').replace(/,/g, '.').toUpperCase() || null,
+    /* Sin dealer (concesionario/rutConc): para Unidad el dealer es AutoFácil ("AUTOFACIL SPA (AFA)",
+       RUT 76.545.638-K). El dealer real lo elige el ejecutivo a mano (Pato 10-09-2026). */
     acreedor:        /Unidad Cr[eé]ditos/i.test(t) ? 'UNIDAD DE CREDITO' : null,
   };
 }
@@ -1913,7 +1935,7 @@ async function ocrCartaIA(tipoDoc, b64) {
   const ia = require('../../../../shared/ia');
   if (!(await ia.iaActiva('cartas_pdf_ia'))) return null;
   const CAMPOS = {
-    COMPROMISO_UNIDAD: 'numero de operacion (opOrigen), fecha del documento (fecha, formato YYYY-MM-DD), rut del cliente (rutCliente, formato 12345678-9), nombres del cliente (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca del vehiculo (marca), modelo (modelo), año (anio), patente/placa COMPLETA de 6 caracteres, formato chileno AAAA00 o AA0000 — suele venir en el parrafo como "placa patente XXXX00"; si no se lee completa usa null (patente), precio de venta (precioVenta), pie (pie), saldo de precio (saldo), plazo en cuotas (plazo), tasa mensual en % (tasaCredito), monto del credito = el MONTO BRUTO en pesos (montoCreditoCLP) — nunca el costo total (que incluye intereses) ni la cuota, participacion/comision del dealer en pesos IVA incluido (partBruto), nombre del concesionario/dealer (concesionario), rut del concesionario (rutConc), nombre del vendedor (vendedor)',
+    COMPROMISO_UNIDAD: 'numero de operacion (opOrigen), fecha del documento (fecha, formato YYYY-MM-DD), rut del cliente (rutCliente, formato 12345678-9), nombres del cliente (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca del vehiculo (marca), modelo (modelo), año (anio), patente/placa COMPLETA de 6 caracteres, formato chileno AAAA00 o AA0000 — suele venir en el parrafo como "placa patente XXXX00"; si no se lee completa usa null (patente), precio de venta (precioVenta), pie (pie), saldo de precio (saldo), plazo en cuotas (plazo), tasa mensual en % (tasaCredito), monto del credito = el MONTO BRUTO en pesos (montoCreditoCLP) — nunca el costo total (que incluye intereses) ni la cuota, participacion/comision del dealer en pesos IVA incluido (partBruto), nombre del vendedor (vendedor)',
     COTIZACION_UNIDAD: 'numero de operacion o cotizacion (opOrigen), MONTO BRUTO del credito en pesos (montoCreditoCLP) — no el liquido ni el costo total, monto liquido del credito (saldo), costo total del credito (costoTotal), plazo en meses (plazo), valor de la cuota (cuota)',
     CARTA_AUTOFIN: 'numero de credito o solicitud (opOrigen), fecha (fecha, YYYY-MM-DD), rut del cliente (rutCliente), nombres (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca (marca), modelo (modelo), año (anio), patente/placa COMPLETA de 6 caracteres, formato chileno AAAA00 o AA0000; si no se lee completa usa null (patente), precio de venta (precioVenta), pie (pie), saldo (saldo), plazo en cuotas (plazo), tasa mensual % (tasaCredito), monto del credito = el TOTAL PAGARE en pesos (montoCreditoCLP) — NUNCA el total de recargos ni el valor de una cuota, nombre del ejecutivo (ejecutivo), prima seguro desgravamen (segDesgravamen), prima cesantia (segCesantia), prima RDH/robo-hurto (segRdh), prima reparaciones menores (segRep), gps (gps), gastos = suma de inscripcion + mantenciones prepagadas + garantia mecanica + seguro perdida total (gastos)',
   };
@@ -1937,7 +1959,7 @@ async function ocrCartaIA(tipoDoc, b64) {
     if ('anio' in datos) datos.anio = _iaNum(datos.anio);
     if ('tasaCredito' in datos) datos.tasaCredito = _iaTasa(datos.tasaCredito);
     if (datos.rutCliente) datos.rutCliente = RUT.normalizar(datos.rutCliente) || datos.rutCliente;
-    if (datos.rutConc) datos.rutConc = RUT.normalizar(datos.rutConc) || datos.rutConc;
+    delete datos.concesionario; delete datos.rutConc;   // el dealer nunca sale del PDF (lo elige el ejecutivo)
     return datos;
   } catch (e) { console.error('[ocrCartaIA]', e.code || e.message); return null; }
 }
