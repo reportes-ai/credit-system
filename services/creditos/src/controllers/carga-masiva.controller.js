@@ -598,6 +598,25 @@ const importar = async (req, res) => {
             WHERE d.nombre_indexa IS NOT NULL AND d.nombre_indexa <> ''
               AND UPPER(TRIM(c.automotora)) <> UPPER(TRIM(d.nombre_indexa))
               AND UPPER(TRIM(c.automotora)) LIKE CONCAT('%', UPPER(TRIM(d.nombre_indexa)), '%')`);
+        /* RED DE SEGURIDAD DEL PARQUE (Pato, 10-09-2026): el Excel de la financiera trae "NO APLICA"
+           cuando no informa parque, y la comisión de parque se calcula sobre creditos.parque → salía
+           $0 (op 26080595 Alco Autos, 26080590 González Linares, 26080720 Vera). Para las ops SIN parque
+           real, la fuente es 1) la carta de aprobación ligada (la carta manda) y, si no hay carta,
+           2) la ficha del dealer cuando es dealer de parque con parque real. Nunca pisa un parque real. */
+        const PH = "('','NO APLICA','S/I','PARQUE','CALLE','PARTICULAR')";
+        const [pc] = await pool.query(
+          `UPDATE creditos c JOIN cartas_aprobacion ca ON ca.id_credito_creado = c.id
+              SET c.parque = ca.parque, c.tipo_ubicacion = 'PARQUE'
+            WHERE (c.parque IS NULL OR UPPER(TRIM(c.parque)) IN ${PH})
+              AND ca.parque IS NOT NULL AND UPPER(TRIM(ca.parque)) NOT IN ${PH}`);
+        const [pf] = await pool.query(
+          `UPDATE creditos c JOIN dealers d ON d.id_dealer = c.id_dealer
+              SET c.parque = d.ccs_parque, c.tipo_ubicacion = 'PARQUE'
+            WHERE (c.parque IS NULL OR UPPER(TRIM(c.parque)) IN ${PH})
+              AND UPPER(COALESCE(d.tipo_ficha,'')) = 'PARQUE'
+              AND d.ccs_parque IS NOT NULL AND UPPER(TRIM(d.ccs_parque)) NOT IN ${PH}
+              AND NOT EXISTS (SELECT 1 FROM cartas_aprobacion ca WHERE ca.id_credito_creado = c.id AND ca.parque IS NOT NULL AND UPPER(TRIM(ca.parque)) NOT IN ${PH})`);
+        if ((pc.affectedRows || 0) + (pf.affectedRows || 0)) console.log(`[carga-masiva parque] ${pc.affectedRows} op(s) tomaron el parque de la carta y ${pf.affectedRows} de la ficha del dealer`);
         // Parque/Calle: si la columna parque trae un nombre real de parque → PARQUE
         await pool.query(
           `UPDATE creditos SET tipo_ubicacion='PARQUE'
