@@ -86,7 +86,8 @@ async function adminCatalogo(req, res) {
     const [apis] = await pool.query('SELECT codigo, nombre, descripcion, icono, endpoint, activo, orden FROM apis_catalogo WHERE activo = 1 ORDER BY orden, nombre');
     const [stats] = await pool.query('SELECT api, COUNT(*) llaves, SUM(activo) activas, SUM(llamadas) llamadas FROM api_clientes GROUP BY api');
     const m = {}; stats.forEach(s => { m[s.api] = s; });
-    res.json({ success: true, data: apis.map(a => ({ ...a, stats: m[a.codigo] || { llaves: 0, activas: 0, llamadas: 0 } })), error: null });
+    const pend = await require('./api-mensajes.controller').pendientesPorApi();
+    res.json({ success: true, data: apis.map(a => ({ ...a, stats: m[a.codigo] || { llaves: 0, activas: 0, llamadas: 0 }, buzon_pendientes: pend[a.codigo] || 0 })), error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 }
 

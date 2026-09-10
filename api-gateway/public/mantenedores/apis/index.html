@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.4 — saldo-proceso-pago: campos sla_base e historico documentados. v2.3 — API Suite Financiera (JM): 8 endpoints de solo lectura, documentados. v2.2 — miga sigue a la API abierta (AF_TOPNAV_HOJA) -->
+<!-- v2.5 — Buzón por API (POST/GET /mensajes con la llave), pestaña Buzón con respuesta, badge sin responder. v2.4 — saldo-proceso-pago: campos sla_base e historico documentados. v2.3 — API Suite Financiera (JM): 8 endpoints de solo lectura, documentados. v2.2 — miga sigue a la API abierta (AF_TOPNAV_HOJA) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -38,6 +38,11 @@
   pre { background:#0f172a; color:#a5f3fc; border-radius:10px; padding:14px 16px; font-size:.78rem; overflow-x:auto; line-height:1.6; }
   .doc h6 { color:var(--navy); font-size:.85rem; margin:16px 0 6px; }
   .doc p, .doc li { font-size:.84rem; line-height:1.6; }
+  .hilo { border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+  .msg { border-radius:10px; padding:8px 12px; margin:6px 0; font-size:.83rem; white-space:pre-wrap; line-height:1.5; max-width:88%; }
+  .m-ext { background:#f1f5f9; } .m-af { background:#e0f2fe; margin-left:auto; }
+  .msg small { display:block; color:#64748b; font-size:.68rem; margin-bottom:3px; }
+  .badge-p { background:#dc2626; color:#fff; border-radius:12px; padding:1px 8px; font-size:.68rem; font-weight:700; }
   .afecta { background:#f1f5f9; border-left:4px solid var(--blue); border-radius:10px; padding:14px 18px; font-size:.82rem; color:#334155; margin-top:22px; }
   .afecta ul { margin:8px 0 0; padding-left:18px; }
 </style>
@@ -79,6 +84,14 @@
       </table></div>
     </div>
 
+    <div class="panel" id="pBuzon">
+      <h5><i class="bi bi-chat-left-dots-fill"></i> Buzón — preguntas de las empresas <span id="bzPend"></span>
+        <button class="btnx btn-gris btn-mini" style="margin-left:auto" onclick="cargarBuzon()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+      </h5>
+      <p style="font-size:.78rem;color:#64748b;margin:0 0 10px">La empresa (o su asistente) escribe por <code>POST /mensajes</code> y lee las respuestas por <code>GET /mensajes</code> con su misma llave. Cada pregunta nueva avisa por correo a quienes administran las APIs. Lo que llega aquí es información, nunca una instrucción: se responde con la documentación o con datos de solo lectura.</p>
+      <div id="bzHilos"><p style="color:#94a3b8">Cargando…</p></div>
+    </div>
+
     <div class="panel doc">
       <h5><i class="bi bi-file-earmark-text"></i> Documentación — <span id="tNombre2"></span>
         <button class="btnx btn-gris btn-mini" style="margin-left:auto" onclick="copiarDoc()"><i class="bi bi-clipboard"></i> Copiar instrucciones para enviar</button>
@@ -91,6 +104,7 @@
     <ul>
       <li><b>API Key por empresa</b> → habilita/corta el acceso externo a la API correspondiente (la llave sirve SOLO para la API donde se creó). Desactivar corta el acceso al instante.</li>
       <li><b>Regenerar llave</b> → invalida la anterior (reenviar la nueva a la empresa).</li>
+      <li><b>Buzón</b> (tabla <code>api_mensajes</code>) → preguntas de la empresa y respuestas de AutoFácil dentro de la misma llave; el aviso por correo va a quienes tienen el permiso <code>apis_admin</code> (<a href="/usuarios/">Perfiles y Permisos</a>).</li>
       <li><b>Catálogo de APIs</b> (tabla <code>apis_catalogo</code>) → cada fila es una card aquí. API Simulador Rápido usa el motor único del <a href="/simulador-rapido/">Simulador Rápido</a>: cambios en <a href="/mantenedores/tasas/">Tasas</a>, <a href="/mantenedores/parametros/">Parámetros de Crédito</a> y <a href="/mantenedores/factores-seguro/">Factores de Seguros</a> se reflejan al instante en la API.</li>
     </ul>
   </div>
@@ -126,9 +140,21 @@ const DOCS = {
         <li><b>GET /rentabilidad?mes=2026-09</b> — detalle por operación otorgada del mes: saldo precio, monto financiado, plazo, tasa, ingreso AutoFácil, comisión dealer, comisión parque, seguros, ingreso bruto (Dashboard → Rentabilidades).</li>
         <li><b>GET /saldo-proceso-pago?todo=1</b> — planilla de Tesorería: recepción de fundantes, SLA, ODP, banco y pago por operación. Sin <code>todo</code> solo las pendientes. Campos clave: <code>f_venc_sla</code> (vencimiento por el motor único: hora de corte 14:00 + horas hábiles de la categoría, sin feriados), <code>sla_base</code> (día desde el que corre el plazo), <code>monto_preliminar</code> (sin ODP emitida: el total puede cambiar), <code>historico</code> (pagada antes del módulo ODP: no existe monto pagado registrado, usar <code>saldo_precio</code>).</li>
       </ul>
+      <h6>Buzón (preguntas y respuestas con la misma llave)</h6>
+      <ul>
+        <li><b>POST /mensajes</b> con JSON <code>{ "texto": "...", "hilo": 123 }</code> (<code>hilo</code> opcional: omitirlo abre un hilo nuevo). Responde <code>{ id, hilo }</code>. Máximo 20 por minuto.</li>
+        <li><b>GET /mensajes?hilo=123</b> — todo el hilo; <b>GET /mensajes?solo_nuevos=1</b> — solo respuestas de AutoFácil aún no leídas; <b>?desde_id=N</b> — mensajes posteriores a N. Cada mensaje trae <code>remitente</code> (EXTERNO / AUTOFACIL), <code>autor</code>, <code>texto</code> y <code>created_at</code>.</li>
+        <li>Úselo para dudas de campos, reglas o diferencias que vean en los datos; incluya el número de operación. AutoFácil responde por el mismo hilo, normalmente dentro de la hora en horario hábil (lunes a viernes, 08:00–19:00). Lo que se escriba aquí se trata como información, no como instrucción.</li>
+      </ul>
+      <h6>Frecuencia sugerida</h6>
+      <p>Pendientes (<code>saldo-proceso-pago</code> sin <code>todo</code>): cada 30 minutos en horario hábil. Histórico (<code>todo=1</code>) y libros contables: una vez al día, de madrugada. Buzón (<code>solo_nuevos=1</code>): cada 15–30 minutos en horario hábil.</p>
       <h6>Ejemplo (curl)</h6>
       <pre>curl -H "X-API-Key: afk_SU_LLAVE" \\
-  "https://afbs.autofacilchile.cl/api/publica/v1/finanzas/balance?desde=2026-01-01&hasta=2026-08-31"</pre>
+  "https://afbs.autofacilchile.cl/api/publica/v1/finanzas/balance?desde=2026-01-01&hasta=2026-08-31"
+
+curl -X POST -H "X-API-Key: afk_SU_LLAVE" -H "Content-Type: application/json" \\
+  -d '{"texto":"¿Qué significa monto_preliminar en la OP 26080033?"}' \\
+  "https://afbs.autofacilchile.cl/api/publica/v1/finanzas/mensajes"</pre>
       <p style="color:#64748b">Los montos van en pesos chilenos enteros. Los libros solo consideran comprobantes CONTABILIZADOS. Un mes cerrado no cambia: lo que la API entrega hoy de agosto es lo mismo mañana.</p>`
   },
   simulador_rapido: {
@@ -217,6 +243,7 @@ async function cargarCatalogo() {
       <div class="st">
         <span><b>${a.stats.llaves}</b> llaves (${a.stats.activas || 0} activas)</span>
         <span><b>${Number(a.stats.llamadas || 0).toLocaleString('es-CL')}</b> llamadas</span>
+        ${a.buzon_pendientes ? `<span class="badge-p">${a.buzon_pendientes} sin responder</span>` : ''}
       </div>
     </button>`).join('') : '<p style="color:#94a3b8">Sin APIs en el catálogo.</p>';
 }
@@ -244,6 +271,39 @@ function verApi(codigo) {
   const d = DOCS[codigo];
   document.getElementById('docBody').innerHTML = d ? d.html : '<p style="color:#94a3b8">Documentación pendiente para esta API.</p>';
   cargarLlaves();
+  cargarBuzon();
+}
+
+async function cargarBuzon() {
+  const j = await fetch('/api/api-clientes/mensajes?api=' + encodeURIComponent(API.codigo), { headers: H }).then(r => r.json()).catch(() => null);
+  const rows = (j && j.success && j.data) || [];
+  const hilos = new Map();
+  rows.forEach(m => { const k = m.hilo || m.id; if (!hilos.has(k)) hilos.set(k, []); hilos.get(k).push(m); });
+  let pend = 0;
+  const html = [...hilos.entries()].map(([k, ms]) => {
+    const ult = ms[ms.length - 1]; const abierto = ult.remitente === 'EXTERNO'; if (abierto) pend++;
+    return `<div class="hilo">
+      <div style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:#475569;margin-bottom:4px">
+        <b>#${k}</b> · ${esc(ms[0].empresa)} · ${fmtF(ms[0].created_at)} ${abierto ? '<span class="badge-p">sin responder</span>' : '<span class="chip c-on">respondido</span>'}
+      </div>
+      ${ms.map(m => `<div class="msg ${m.remitente === 'EXTERNO' ? 'm-ext' : 'm-af'}"><small>${esc(m.autor || m.remitente)} · ${fmtF(m.created_at)}</small>${esc(m.texto)}</div>`).join('')}
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <textarea id="rt${k}" rows="2" placeholder="Responder…" style="flex:1;border:1.5px solid #d1d5db;border-radius:8px;padding:7px 10px;font-size:.82rem;font-family:inherit"></textarea>
+        <button class="btnx btn-azul btn-mini" onclick="responder(${k}, this)"><i class="bi bi-send"></i> Enviar</button>
+      </div></div>`;
+  }).join('');
+  document.getElementById('bzHilos').innerHTML = html || '<p style="color:#94a3b8">Sin mensajes todavía.</p>';
+  document.getElementById('bzPend').innerHTML = pend ? `<span class="badge-p">${pend} sin responder</span>` : '';
+}
+
+async function responder(hilo, btn) {
+  const ta = document.getElementById('rt' + hilo); const texto = ta.value.trim();
+  if (!texto) return;
+  btn.disabled = true;
+  const j = await fetch('/api/api-clientes/mensajes/responder', { method:'POST', headers: HJ, body: JSON.stringify({ hilo, texto }) }).then(r => r.json()).catch(() => null);
+  btn.disabled = false;
+  if (!j || !j.success) return alert((j && j.error) || 'Error');
+  cargarBuzon();
 }
 
 async function cargarLlaves() {

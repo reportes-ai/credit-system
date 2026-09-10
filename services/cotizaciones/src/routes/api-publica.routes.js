@@ -25,6 +25,11 @@ publica.get('/v1/finanzas/libro-ventas',         rlFin, kFin, fin.libroVentas);
 publica.get('/v1/finanzas/ordenes-pago',         rlFin, kFin, fin.ordenesPago);
 publica.get('/v1/finanzas/rentabilidad',         rlFin, kFin, fin.rentabilidad);
 publica.get('/v1/finanzas/saldo-proceso-pago',   rlFin, kFin, fin.saldoProcesoPago);
+/* Buzón: la empresa (o su asistente) pregunta y lee respuestas con la misma llave */
+const msj = require('../controllers/api-mensajes.controller');
+const rlMsj = rateLimit({ ventanaMs: 60000, max: 20, mensaje: 'Límite de 20 mensajes por minuto excedido' });
+publica.post('/v1/finanzas/mensajes', express.json({ limit: '64kb' }), rlMsj, kFin, msj.publicar);
+publica.get('/v1/finanzas/mensajes',  rlFin, kFin, msj.leer);
 
 /* Admin: mantenedor APIs */
 const admin = express.Router();
@@ -33,6 +38,8 @@ admin.get('/catalogo', c.adminCatalogo);
 admin.get('/', c.adminListar);
 admin.post('/', c.adminCrear);
 admin.put('/:id/activo', c.adminActivo);
+admin.get('/mensajes', msj.adminListar);
+admin.post('/mensajes/responder', msj.adminResponder);
 admin.post('/:id/regenerar', c.adminRegenerar);
 
 module.exports = { publica, admin };
