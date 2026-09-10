@@ -580,7 +580,7 @@ async function buildAlertaPenetracion(opts = {}) {
     : '<tr><td colspan="5" style="padding:10px 12px;color:#94a3b8;text-align:center">Todos los ejecutivos cumplen el umbral del 40%</td></tr>';
 
   const headBg = esAlerta ? 'linear-gradient(135deg,#7f1d1d,#b91c1c)' : 'linear-gradient(135deg,#14532d,#16a34a)';
-  const tituloMail = esAlerta ? '⚠️ Penetración de seguros bajo el 40%' : '✅ Penetración de seguros recuperada — volvimos al 40%';
+  const tituloMail = esAlerta ? `⚠️ Penetración de seguros bajó al ${Math.round(d.pctActual * 100)}%` : '✅ Penetración de seguros recuperada — volvimos al 40%';
   const intro = esAlerta
     ? `La penetración de seguros AutoFin de <b>${d.mesNom}</b> cayó del tramo máximo: este mes AutoFin nos está pagando el <b>${Math.round(d.pctActual * 100)}%</b> de las primas en vez del <b>${Math.round(d.pctTop * 100)}%</b>. Cada operación que salga sin seguros nos cuesta comisión de TODO el mes.`
     : `Buenas noticias: la penetración de seguros AutoFin de <b>${d.mesNom}</b> volvió al tramo máximo — AutoFin nos paga el <b>${Math.round(d.pctTop * 100)}%</b> de las primas. A mantenerlo hasta el cierre.`;
@@ -645,7 +645,7 @@ async function buildAlertaPenetracion(opts = {}) {
   </div>`;
 
   const asunto = esAlerta
-    ? `ALERTA ⚠️ Seguros AutoFin bajo el 40% — ${d.ref && d.ref.perdida > 0 ? 'al menos ' + fmt(d.ref.perdida) + ' menos al mes (ref. ' + d.ref.mesNom + ')' : 'dejamos de ganar ' + fmt(d.perdida) + ' en ' + d.mesNom}`
+    ? `ALERTA ⚠️ Seguros AutoFin bajó al ${Math.round(d.pctActual * 100)}% — ${d.ref && d.ref.perdida > 0 ? 'al menos ' + fmt(d.ref.perdida) + ' menos al mes (ref. ' + d.ref.mesNom + ')' : 'dejamos de ganar ' + fmt(d.perdida) + ' en ' + d.mesNom}`
     : `✅ Seguros AutoFin de vuelta al 40% — ${d.mesNom} al máximo tramo`;
   return { asunto, html };
 }
