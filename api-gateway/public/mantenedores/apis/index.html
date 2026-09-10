@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.2 — miga sigue a la API abierta (AF_TOPNAV_HOJA) -->
+<!-- v2.3 — API Suite Financiera (JM): 8 endpoints de solo lectura, documentados. v2.2 — miga sigue a la API abierta (AF_TOPNAV_HOJA) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -109,6 +109,28 @@ let CATALOGO = [], API = null;
 /* Documentación por API (texto de presentación — mapa local, no dato de negocio).
    Al publicar una API nueva: agregar su entrada aquí con html + correo. */
 const DOCS = {
+  suite_financiera: {
+    html: `
+      <h6>Base</h6>
+      <pre>https://afbs.autofacilchile.cl/api/publica/v1/finanzas</pre>
+      <h6>Autenticación</h6>
+      <p>Header <b>X-API-Key</b> con la llave de esta API. Solo lectura. Límite 120 consultas por minuto. Fechas en formato <b>AAAA-MM-DD</b>; todo responde <code>{ success, data, error }</code> con los mismos datos que las pantallas de la Suite.</p>
+      <h6>Endpoints</h6>
+      <ul>
+        <li><b>GET /libro-mayor?cuenta=1101001&desde=2026-01-01&hasta=2026-08-31</b> — mayor de una cuenta: saldo inicial y movimientos (Contabilidad → Libro Mayor).</li>
+        <li><b>GET /libro-mayor-completo?desde=&hasta=</b> — todas las cuentas del período.</li>
+        <li><b>GET /balance?desde=&hasta=</b> — Balance de 8 columnas (débitos, créditos, deudor, acreedor, activo, pasivo, pérdida, ganancia) por cuenta.</li>
+        <li><b>GET /libro-compras?desde=2026-01&hasta=2026-08</b> — auxiliar de compras (facturas recibidas, IVA crédito). Aquí <code>desde</code>/<code>hasta</code> van por <b>mes AAAA-MM</b>; opcional <code>q</code> (proveedor/folio) y <code>cuenta</code>. Devuelve hasta 1.000 documentos (<code>truncado</code> avisa si hay más: acote el rango) y el resumen por mes.</li>
+        <li><b>GET /libro-ventas?desde=2026-01&hasta=2026-08</b> — auxiliar de ventas (facturas emitidas, IVA débito), mismo formato por mes.</li>
+        <li><b>GET /ordenes-pago?desde=&hasta=&estado=&origen=&q=</b> — historial de Órdenes de Pago (número, tipo, proveedor/dealer, documento, monto, estado, fecha de pago). <code>origen</code>: GENERAL, SALDO, COMISION, PARQUE.</li>
+        <li><b>GET /rentabilidad?mes=2026-09</b> — detalle por operación otorgada del mes: saldo precio, monto financiado, plazo, tasa, ingreso AutoFácil, comisión dealer, comisión parque, seguros, ingreso bruto (Dashboard → Rentabilidades).</li>
+        <li><b>GET /saldo-proceso-pago?todo=1</b> — planilla de Tesorería: recepción de fundantes, SLA, ODP, banco y pago por operación. Sin <code>todo</code> solo las pendientes.</li>
+      </ul>
+      <h6>Ejemplo (curl)</h6>
+      <pre>curl -H "X-API-Key: afk_SU_LLAVE" \\
+  "https://afbs.autofacilchile.cl/api/publica/v1/finanzas/balance?desde=2026-01-01&hasta=2026-08-31"</pre>
+      <p style="color:#64748b">Los montos van en pesos chilenos enteros. Los libros solo consideran comprobantes CONTABILIZADOS. Un mes cerrado no cambia: lo que la API entrega hoy de agosto es lo mismo mañana.</p>`
+  },
   simulador_rapido: {
     html: `
       <h6>Endpoint</h6>

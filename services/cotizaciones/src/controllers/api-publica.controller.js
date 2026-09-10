@@ -40,6 +40,9 @@ enFila('api_publica', async () => {
   )`);
   await pool.query(`INSERT IGNORE INTO apis_catalogo (codigo, nombre, descripcion, icono, endpoint, orden) VALUES
     ('simulador_rapido', 'API Simulador Rápido', 'Un monto → cuotas a 12/24/36/48 meses con CAE, tasa y monto financiado. Motor único del Simulador Rápido.', 'bi-calculator-fill', '/api/publica/v1/simulador-rapido?monto=MONTO', 10)`);
+  // Suite Financiera (JM, 10-09-2026): lectura de contabilidad, ODP, rentabilidad y saldos para su app de finanzas
+  await pool.query(`INSERT IGNORE INTO apis_catalogo (codigo, nombre, descripcion, icono, endpoint, orden) VALUES
+    ('suite_financiera', 'API Suite Financiera', 'Solo lectura: Libro Mayor, Balance 8 columnas, Libros de Compras y Ventas, Órdenes de Pago, Rentabilidad por operación y Saldo Precio en Proceso de Pago. Mismos motores que las pantallas de la Suite.', 'bi-bank2', '/api/publica/v1/finanzas/*', 20)`);
 });
 
 const nuevaLlave = () => 'afk_' + crypto.randomBytes(24).toString('hex');
