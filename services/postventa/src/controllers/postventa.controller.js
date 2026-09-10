@@ -1919,12 +1919,15 @@ async function datosSaldosAPagar() {
     const slaCfg = await SLAM.config();
     const isoD = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     const hoyCL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+    // "Vence mañana" = vence el PRÓXIMO DÍA HÁBIL (un viernes, el lunes; antes de un feriado, el día hábil siguiente)
+    const mananaHabil = require('../../../../shared/feriados').proximosDiasHabiles(isoD(hoyCL), 1)[0];
     rows.forEach(r => {
       r.monto_pagar = montoSaldoOrden(r.financiera, r.saldo_precio, fijos, Number(r.sin_limitacion) === 1);
       const v = SLAM.vencimiento(r.fecha_fundantes, r.categoria, slaCfg);
       r.fecha_pago_sla = v ? isoD(v.fecha) : null;
       // Días respecto del SLA: negativo = falta, 0 = vence hoy, positivo = vencido
       r.dias_sla = v ? Math.round((new Date(isoD(hoyCL)) - new Date(isoD(v.fecha))) / 86400000) : null;
+      r.vence_manana = !!(r.fecha_pago_sla && r.fecha_pago_sla === mananaHabil);
     });
     return { rows, fijos };
 }

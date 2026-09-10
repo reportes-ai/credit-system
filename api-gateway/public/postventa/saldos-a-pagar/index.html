@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v5.2 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v5.3 — cuadro Pendientes de pago: líneas "Vencen hoy" y "Vencen mañana" (ops X monto, según SLA). v5.2 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -130,6 +130,8 @@
     <div class="stat pend">
       <div class="lbl">Pendientes de pago</div>
       <div class="val"><span id="cntPend">0</span> ops X <span id="montoPend">$0</span></div>
+      <div class="sub" style="margin-top:4px">Vencen hoy: <b><span id="hoyN">0</span> ops X <span id="hoyM">$0</span></b></div>
+      <div class="sub">Vencen mañana: <b><span id="manN">0</span> ops X <span id="manM">$0</span></b></div>
     </div>
     <div class="stat pag">
       <div class="lbl">Pagados hoy</div>
@@ -370,6 +372,13 @@ function recalc(){
   const pend = DATA.filter(r => !r.pagado), pag = DATA.filter(r => r.pagado);
   document.getElementById('cntPend').textContent   = pend.length;
   document.getElementById('montoPend').textContent = fmt(sum(pend));
+  /* Pendientes que vencen hoy / mañana según el SLA: hoy = dias_sla 0 (la misma columna Días);
+     mañana = el PRÓXIMO DÍA HÁBIL (vence_manana del servidor: un viernes cuenta lo del lunes). */
+  const vHoy = pend.filter(r => r.dias_sla === 0), vMan = pend.filter(r => r.vence_manana);
+  document.getElementById('hoyN').textContent = vHoy.length;
+  document.getElementById('hoyM').textContent = fmt(sum(vHoy));
+  document.getElementById('manN').textContent = vMan.length;
+  document.getElementById('manM').textContent = fmt(sum(vMan));
   document.getElementById('cntPag').textContent    = pag.length;
   document.getElementById('montoPag').textContent  = fmt(sum(pag));
   // Barra de acción
