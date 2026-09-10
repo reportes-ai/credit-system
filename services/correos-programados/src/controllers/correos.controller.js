@@ -77,7 +77,7 @@ require('../../../../shared/migrate').enFila('correos', async () => {
       `INSERT IGNORE INTO correos_programados (codigo, nombre, descripcion, hora, dias, destinatarios, activo)
        VALUES (?,?,?,?,?,?,0)`,
       ['alerta_penetracion_seguros', 'Alerta Penetración de Seguros (AutoFin)',
-        'Avisa cuando la penetración de algún seguro cae bajo el tramo del 40% de comisión (y cuando se recupera): estado por seguro, ejecutivos que no cumplen y cuánto se deja de ganar vs el 40% y la referencia con el ingreso por seguros del mes anterior (bajar de 40% a 30% = 25% de ese ingreso). Se evalúa a diario pero solo se envía al CAMBIAR de estado.',
+        'Avisa cuando la penetración de algún seguro cae bajo el tramo del 40% de comisión (y cuando se recupera): estado por seguro, ejecutivos que no cumplen y cuánto se deja de ganar vs el 40% y la referencia con el ingreso por seguros del mes anterior (bajar de 40% a 30% = 25% de ese ingreso). Se evalúa a diario pero solo se envía al CAMBIAR de tramo (40→30, 30→20, y las subidas).',
         '08:45', '1,2,3,4,5,6', '']);
     // Informe de Salud del Sistema (v111.2) — semanal, chequeos automaticos + recordatorio de rutina manual.
     await pool.query(
@@ -434,8 +434,9 @@ async function buildResumenEjecutivo() {
 
 /* ── Reporte: Alerta Penetración de Seguros AutoFin ──────────────────────────
    Se evalúa a diario, pero SOLO se envía al cambiar de estado en el mes:
-   OK→BAJO (algún seguro bajo el tramo 40%) manda la ALERTA; BAJO→OK manda la
-   RECUPERACIÓN. El estado vive en dashboard_config (seg_pen_alerta_estado). */
+   cada cambio de TRAMO manda correo: bajar (40→30, 30→20) manda la ALERTA con la
+   pérdida del tramo vigente (25% / 50% del ingreso de referencia); volver al 40%
+   manda la RECUPERACIÓN. El estado (tramo) vive en dashboard_config (seg_pen_alerta_estado). */
 async function datosPenSeguros(mesForzado) {
   const ch = chileParts();
   const mesStr = mesForzado || `${ch.year}-${String(ch.month).padStart(2, '0')}`;
@@ -542,18 +543,21 @@ async function buildAlertaPenetracion(opts = {}) {
     if (row) prev = JSON.parse(row.config_value);
   } catch (_) {}
   const estadoActual = d.bajo ? 'BAJO' : 'OK';
+  const pctHoy = Math.round(d.pctActual * 100);   // el TRAMO manda (Pato, 10-09-2026): 40→30 avisa, 30→20 avisa de nuevo, 20→30 y 30→40 también
   const guardar = () => pool.query(
     `INSERT INTO dashboard_config (config_key, config_value) VALUES (?,?)
      ON DUPLICATE KEY UPDATE config_value=VALUES(config_value), updated_at=NOW()`,
-    [KEY, JSON.stringify({ estado: estadoActual, mes: d.mesStr })]).catch(() => {});
+    [KEY, JSON.stringify({ estado: estadoActual, pct: pctHoy, mes: d.mesStr })]).catch(() => {});
 
   let variante = opts.variante; // 'ALERTA' | 'RECUPERACION' (preview/ejemplos)
   if (!variante) {
     const mismoMes = prev && prev.mes === d.mesStr;
+    const pctPrev = mismoMes && prev.pct != null ? prev.pct : (mismoMes ? (prev.estado === 'BAJO' ? null : Math.round(d.pctTop * 100)) : Math.round(d.pctTop * 100));
     if (!opts.forzar) {
-      if (mismoMes && prev.estado === estadoActual) return { skip: true, estado: 'Sin cambios (' + estadoActual + ')' };
+      if (mismoMes && pctPrev === pctHoy) return { skip: true, estado: 'Sin cambios (' + estadoActual + ' ' + pctHoy + '%)' };
       if (!mismoMes && estadoActual === 'OK') { await guardar(); return { skip: true, estado: 'Mes parte en OK — sin aviso' }; }
     }
+    // Volver al tramo máximo = RECUPERACIÓN; cualquier otro tramo (bajó o subió sin llegar al máximo) = ALERTA con la pérdida vigente
     variante = estadoActual === 'BAJO' ? 'ALERTA' : 'RECUPERACION';
     await guardar();
   }
