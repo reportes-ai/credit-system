@@ -412,8 +412,43 @@ const listarOrdenes = async (req, res) => {
     if (hasta) { where.push('DATE(oc.created_at) <= ?'); args.push(hasta); }
     const q = norm(req.query.q);
     if (q) {
-      where.push('(oc.numero LIKE ? OR oc.concepto LIKE ? OR op.proveedor_nombre LIKE ? OR spv.nombre_dealer LIKE ? OR cpv.nombre_dealer LIKE ?)');
-      args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+      /* Buscador (Pato 10-09-2026): además de N° de orden, concepto, proveedor y dealer,
+         busca por ID financiera, N° de operación, RUT (con o sin puntos/guion), cliente,
+         ejecutivo, N° de documento y factura. Lo de la operación se resuelve contra el
+         CRÉDITO (fuente única) y se cruza por el seguimiento o por el "OP n" del concepto
+         (las órdenes migradas no tienen seguimiento vivo). */
+      // La base es case-sensitive (utf8mb4_bin): todo texto se compara en MAYÚSCULAS.
+      const like = `%${q.toUpperCase()}%`;
+      const U = col => `UPPER(${col}) LIKE ?`;
+      const rutN = q.replace(/[.\-\s]/g, '').toUpperCase();
+      /* RUT con DV → exacto: escrito con guion/puntos, o 9 caracteres, o terminado en K
+         (un N° de operación tiene 8 dígitos y un ID financiera menos). 7-8 dígitos sin DV → por el cuerpo. */
+      const rutCompleto = /^\d{7,8}[\dK]$/.test(rutN) && (/[.\-]/.test(q) || rutN.length === 9 || rutN.endsWith('K')) ? rutN : null;
+      const rutCuerpo = !rutCompleto && /^\d{7,8}$/.test(rutN) ? rutN : null;
+      const rutSql = col => `REPLACE(REPLACE(REPLACE(UPPER(${col}),'.',''),'-',''),' ','')`;
+      const condRut = col => rutCompleto ? `${rutSql(col)} = ?` : `${rutSql(col)} LIKE ?`;
+      const valRut = rutCompleto || (rutCuerpo ? `${rutCuerpo}_` : null);
+      const [crs] = await pool.query(
+        `SELECT c.id, c.num_op FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+          WHERE c.id_financiera = ? OR CAST(c.num_op AS CHAR) = ? OR ${U('c.ejecutivo')} OR ${U('c.automotora')}
+             OR ${U('cl.nombre_completo')} OR ${U("CONCAT_WS(' ', cl.nombres, cl.apellido_paterno, cl.apellido_materno)")}
+             ${valRut ? `OR ${condRut('c.rut_dealer')} OR ${condRut('cl.rut')}` : ''}
+          LIMIT 300`,
+        [q, q, like, like, like, like, ...(valRut ? [valRut, valRut] : [])]).catch(() => [[]]);
+      const ids = crs.map(c => c.id);
+      const ops = [...new Set(crs.map(c => String(c.num_op || '')).filter(x => /^\d+$/.test(x)))].slice(0, 150);
+      const conds = [U('oc.numero'), U('oc.concepto'), U('op.proveedor_nombre'), U('spv.nombre_dealer'), U('cpv.nombre_dealer'),
+        U('op.numero_documento'), U('pfc.numero_factura'), U('spv.ejecutivo'), U('cpv.ejecutivo'),
+        'CAST(spv.num_op AS CHAR) = ?', 'CAST(cpv.num_op AS CHAR) = ?'];
+      const cargs = [like, like, like, like, like, like, like, like, like, q, q];
+      if (valRut) {
+        conds.push(condRut('op.proveedor_rut'), condRut('spv.rut_dealer'), condRut('cpv.rut_dealer'));
+        cargs.push(valRut, valRut, valRut);
+      }
+      if (ids.length) { conds.push('spv.id_credito IN (?)', 'cpv.id_credito IN (?)'); cargs.push(ids, ids); }
+      if (ops.length) { conds.push('oc.concepto REGEXP ?'); cargs.push(`OP (${ops.join('|')})([^0-9]|$)`); }
+      where.push(`(${conds.join(' OR ')})`);
+      args.push(...cargs);
     }
     const [rows] = await pool.query(`
       SELECT oc.id, oc.numero, oc.origen, oc.origen_id, oc.concepto, oc.monto, oc.created_at AS fecha_emision,

@@ -2506,13 +2506,14 @@ async function propagarDealerCredito(idCredito, nom, rut) {
   const [[d]] = await pool.query(
     "SELECT id_dealer FROM dealers WHERE REPLACE(rut,'.','') = REPLACE(?,'.','') LIMIT 1", [rut]);
   out.id_dealer = d ? d.id_dealer : null;
-  // Se escriben JUNTOS rut, cuerpo/dv e id_dealer (homologación): dejar uno de los
-  // tres apuntando al dealer viejo es lo que mandó la comisión de la 88986 a otra cuenta.
-  const rutCuerpo = parseInt(String(rut).replace(/[^\dkK]/gi, '').slice(0, -1), 10) || null;
-  const rutDv = String(rut).replace(/[^\dkK]/gi, '').slice(-1).toUpperCase() || null;
+  // Se escriben JUNTOS rut e id_dealer (homologación): dejar uno apuntando al dealer viejo
+  // es lo que mandó la comisión de la 88986 a otra cuenta. rut_dealer_cuerpo / rut_dealer_dv
+  // son columnas GENERADAS desde rut_dealer (split v77.23): escribirlas hace fallar el UPDATE
+  // ("value specified for generated column … is not allowed") y la corrección quedaba a medias
+  // — carta y cartola corregidas, crédito no (detectado 10-09-2026 al corregir AUTEN 26081170).
   const [rc] = await pool.query(
-    'UPDATE creditos SET automotora=?, rut_dealer=?, rut_dealer_cuerpo=?, rut_dealer_dv=?, id_dealer=COALESCE(?, id_dealer), updated_at=NOW() WHERE id=?',
-    [nom, rut, rutCuerpo, rutDv, out.id_dealer, cr.id]);
+    'UPDATE creditos SET automotora=?, rut_dealer=?, id_dealer=COALESCE(?, id_dealer), updated_at=NOW() WHERE id=?',
+    [nom, rut, out.id_dealer, cr.id]);
   out.credito = rc.affectedRows;
   const [rs] = await pool.query(
     'UPDATE postventa_seguimiento SET nombre_dealer=?, rut_dealer=? WHERE id_credito=?', [nom, rut, cr.id]);
