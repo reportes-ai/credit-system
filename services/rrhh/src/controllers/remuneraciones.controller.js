@@ -24,6 +24,7 @@ const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
 const nombreDe = u => `${u?.nombre || ''} ${u?.apellido || ''}`.trim() || u?.email || null;
 const R = v => Math.round(Number(v) || 0);
+const { baseTributable } = require('../../../../shared/base-tributable');   // motor único de la base del impuesto único (lo comparte la DJ 1887)
 
 /* ── Migración ─────────────────────────────────────────────────────────────── */
 require('../../../../shared/migrate').enFila('rrhh-remuneraciones', async () => {
@@ -709,11 +710,11 @@ function calcLiquidacion(inp, ind) {
      del 7% del tope imponible — art. 42 N°1 LIR / art. 18 DL 3.500. Antes solo se rebajaba
      el 7% legal: a Sandra Ayala (plan 4 UF) le salía impuesto $10.608 y AVSOFT $8.243
      (08-09-2026). Con sueldo sobre el tope no cambia nada: el 7% ya es el máximo. */
-  const topeSalud = R(topeImp * ind.rem_salud_pct / 100);
-  const saludDeducible = Math.min(descSalud + descSaludAdicional, topeSalud);
-  // APV régimen B rebaja la base tributable, tope rem_apv_tope_uf UF (art. 42 bis LIR)
-  const apvDeducible = Math.min(R(inp.apv), R((ind.rem_apv_tope_uf || 0) * ind.uf));
-  const baseTrib = Math.max(0, imponible - descAfp - saludDeducible - descAfc - apvDeducible);
+  // APV régimen B rebaja la base tributable, tope rem_apv_tope_uf UF (art. 42 bis LIR).
+  // La fórmula vive en shared/base-tributable.js (misma que usa la DJ 1887).
+  const { base: baseTrib, apvDeducible } = baseTributable({
+    remuneracion: imponible, afp: descAfp, afc: descAfc, salud: descSalud + descSaludAdicional, apv: inp.apv,
+    topeImponible: topeImp, saludPct: ind.rem_salud_pct, apvTope: (ind.rem_apv_tope_uf || 0) * ind.uf });
   const baseUtm = ind.utm > 0 ? baseTrib / ind.utm : 0;
   let impuesto = 0;
   for (const t of ind.tramos) {

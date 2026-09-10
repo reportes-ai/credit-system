@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Declaraciones Juradas — AutoFácil</title>
-  <!-- v1.0 — DJ 1879 (honorarios) desde el auxiliar: retención actualizada por factor SII, marcas mensuales, resumen sección C, archivo de carga SII; factores paramétricos -->
+  <!-- v1.1 — DJ 1887 (sueldos): renta neta por el motor único de la base tributable, siglas mensuales, horas, resumen y archivo SII. v1.0 — DJ 1879 (honorarios) desde el auxiliar: retención actualizada por factor SII, marcas mensuales, resumen sección C, archivo de carga SII; factores paramétricos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -51,7 +51,7 @@
 
   <div class="tabs no-print">
     <button class="on" data-tab="1879" onclick="tab('1879')"><i class="bi bi-person-badge me-1"></i>DJ 1879 · Honorarios</button>
-    <button data-tab="1887" disabled title="Próximamente"><i class="bi bi-people me-1"></i>DJ 1887 · Sueldos (próximamente)</button>
+    <button data-tab="1887" onclick="tab('1887')"><i class="bi bi-people me-1"></i>DJ 1887 · Sueldos</button>
     <button data-tab="factores" onclick="tab('factores')"><i class="bi bi-sliders me-1"></i>Factores de actualización</button>
   </div>
 
@@ -75,6 +75,27 @@
     </div>
   </div>
 
+  <!-- ═══ DJ 1887 ═══ -->
+  <div id="v1887" style="display:none">
+    <div class="d-flex gap-2 align-items-end mb-3 no-print">
+      <div><label class="form-label small fw-semibold mb-1">Año comercial</label><select id="fAnio7" class="form-select form-select-sm"></select></div>
+      <button class="btn btn-sm btn-primary" onclick="cargar1887()"><i class="bi bi-search me-1"></i>Generar</button>
+      <button class="btn btn-sm btn-success" onclick="csv1887()" id="btnCsv7" disabled><i class="bi bi-filetype-csv me-1"></i>Archivo de carga SII</button>
+      <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+      <span id="lblCsv7" class="small ms-2"></span>
+    </div>
+    <div id="out1887"><div class="text-center text-muted py-5">Elige el año y presiona Generar</div></div>
+    <div class="mt-2 p-3 no-print" style="background:#fff7ed;border-left:4px solid #f59e0b;border-radius:8px;font-size:.8rem">
+      <b><i class="bi bi-exclamation-triangle me-1"></i>Antes de presentar</b>
+      <ul class="mb-0 mt-1">
+        <li><b>Renta neta:</b> es la base del impuesto único de cada mes (total ganado − AFP − cesantía − salud deducible − APV), calculada con el mismo motor de las liquidaciones de la Suite. Contra el libro de AVSOFT 2026 reproduce el impuesto retenido al peso en las 216 liquidaciones de enero a agosto.</li>
+        <li><b>Sección A:</b> el año en que la empresa se acoge a las 40 horas (C65) y los datos del informante se completan en el importador de sii.cl.</li>
+        <li><b>Accesorias pagadas entre enero y abril del año siguiente</b> (C32) y rebaja por zonas extremas no se generan: no aplican hoy.</li>
+        <li><b>Plazos (AT2026):</b> DJ 1887 hasta el 27 de marzo; Certificado N°6 a cada trabajador hasta el 14 de marzo. Probar el archivo en el importador antes del primer envío.</li>
+      </ul>
+    </div>
+  </div>
+
   <!-- ═══ Factores ═══ -->
   <div id="vfactores" style="display:none">
     <div class="d-flex gap-2 align-items-end mb-3">
@@ -88,7 +109,8 @@
       <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
       <ul class="mb-0 mt-1">
         <li><b>Factor de actualización del mes</b> → retención actualizada (C3) y total C7 de la DJ 1879 <a href="#" onclick="tab('1879');return false">ver DJ 1879</a>, y el archivo de carga al SII.</li>
-        <li>Próximamente también → montos actualizados de la DJ 1887 (sueldos) y los Certificados N°1 y N°6, que deben cuadrar al peso con sus declaraciones.</li>
+        <li><b>Factor de actualización del mes</b> → renta neta (C3), impuesto único (C4), renta no gravada (C8) y remuneración imponible actualizada (C12) de la DJ 1887 <a href="#" onclick="tab('1887');return false">ver DJ 1887</a>, y su archivo de carga.</li>
+        <li>Próximamente → Certificados N°1 y N°6, que deben cuadrar al peso con sus declaraciones.</li>
       </ul>
     </div>
   </div>
@@ -101,10 +123,10 @@ const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
 const fmt = n => Number(n||0).toLocaleString('es-CL');
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const HOJAS = { factores: 'Factores de actualización' };
+const HOJAS = { '1887': 'DJ 1887 · Sueldos', factores: 'Factores de actualización' };
 
 const anioActual = new Date().getFullYear();
-for (const sel of [fAnio, fAnioF]) {
+for (const sel of [fAnio, fAnio7, fAnioF]) {
   for (let a = anioActual; a >= 2025; a--) sel.insertAdjacentHTML('beforeend', `<option value="${a}">${a} (AT${a+1})</option>`);
   sel.value = String(anioActual - 1);
 }
@@ -112,9 +134,11 @@ for (const sel of [fAnio, fAnioF]) {
 function tab(t){
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   v1879.style.display = t === '1879' ? '' : 'none';
+  v1887.style.display = t === '1887' ? '' : 'none';
   vfactores.style.display = t === 'factores' ? '' : 'none';
   if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(HOJAS[t] || null, () => tab('1879'));
   if (t === 'factores') cargarFactores();
+  if (t === '1887' && !DJ7) cargar1887();
 }
 
 let DJ = null;
@@ -158,6 +182,65 @@ async function csv1879(){
   a.href = URL.createObjectURL(blob); a.download = `DJ1879_AT${Number(fAnio.value)+1}.csv`; a.click();
   URL.revokeObjectURL(a.href);
   lblCsv.innerHTML = `<span style="color:#059669;font-weight:700">✓ Archivo generado (${DJ ? DJ.filas.length : ''} RUT)${DJ && DJ.provisoria ? ' — PROVISORIO' : ''}</span>`;
+}
+
+let DJ7 = null;
+async function cargar1887(){
+  out1887.innerHTML = '<div class="text-center text-muted py-5">Calculando…</div>';
+  const j = await fetch('/api/contabilidad/dj/1887?anio='+fAnio7.value,{headers:H}).then(r=>r.json()).catch(()=>null);
+  if (!j || !j.success) { out1887.innerHTML = `<div class="aviso alto">${esc(j?.error || 'Error de conexión')}</div>`; return; }
+  DJ7 = j.data; btnCsv7.disabled = !DJ7.filas.length; lblCsv7.textContent = '';
+  const R = DJ7.resumen;
+  out1887.innerHTML = `
+  <div class="text-center mb-3"><b>AUTOFACIL SPA · RUT 76.545.638-K · DJ 1887 · Año Tributario ${DJ7.anio_tributario} (rentas ${DJ7.anio})</b>
+    ${DJ7.provisoria ? ' <span class="badge-prov">PROVISORIA</span>' : ''}</div>
+  ${DJ7.avisos.map(a => `<div class="aviso ${a.nivel} no-print">${esc(a.texto)}</div>`).join('')}
+  <div class="panel no-print"><h6>TRABAJADORES POR MES · RENTA NETA DEL MES (SIN ACTUALIZAR) · FACTOR</h6><div class="strip">
+    ${DJ7.por_mes.map(m => `<div class="${m.trabajadores ? '' : 'cero'}">${MESES[m.mes-1]}<b>${m.trabajadores}</b>${m.trabajadores ? '$'+fmt(Math.round(m.ingreso/1000))+' mil<br>' : ''}${m.factor != null ? m.factor.toFixed(3).replace('.',',') : '<span style="color:#dc2626">sin factor</span>'}</div>`).join('')}
+  </div></div>
+  <div class="panel"><h6>SECCIÓN B — ${DJ7.filas.length} INFORMADOS (montos actualizados)</h6><div class="scroll"><table>
+    <thead><tr><th>N°</th><th>RUT</th><th>Nombre</th><th class="num">C3 Renta neta</th><th class="num">C4 Impuesto único</th><th class="num">C5 Mayor ret.</th><th class="num">C8 No gravada</th>
+      ${MESES.map(m => `<th class="mx">${m[0]}</th>`).join('')}<th class="num">Horas</th><th class="num">Cert.</th></tr></thead>
+    <tbody>${DJ7.filas.map(f => `<tr>
+      <td>${f.n}</td><td style="white-space:nowrap;${f.dv_valido ? '' : 'color:#dc2626;font-weight:800'}">${esc(f.rut)}</td>
+      <td>${esc(f.nombre)}${f.sin_ficha ? ' <span class="small text-muted">(sin ficha)</span>' : ''}</td>
+      <td class="num calc">${fmt(f.c3)}</td><td class="num calc">${fmt(f.c4)}</td><td class="num">${fmt(f.c5)}</td><td class="num">${fmt(f.c8)}</td>
+      ${f.siglas.map(x => `<td class="mx" style="${x === 'F' ? 'color:#dc2626' : ''}">${x}</td>`).join('')}
+      <td class="num" style="${f.c64 == null ? 'color:#dc2626' : ''}">${f.c64 ?? '—'}</td><td class="num">${f.c31}</td></tr>`).join('')}
+      <tr class="tot"><td colspan="3">Totales</td><td class="num">${fmt(R.c13)}</td><td class="num">${fmt(R.c14)}</td><td class="num">${fmt(R.c15)}</td><td class="num">${fmt(R.c16)}</td><td colspan="14"></td></tr>
+    </tbody></table></div></div>
+  <div class="row g-3">
+    <div class="col-md-6"><div class="panel"><h6>SECCIÓN C — CUADRO RESUMEN (actualizado)</h6><table>
+      <tr><td style="width:60px"><b>C13</b></td><td>Renta total neta pagada</td><td class="num calc">${fmt(R.c13)}</td></tr>
+      <tr><td><b>C14</b></td><td>Impuesto único retenido</td><td class="num calc">${fmt(R.c14)}</td></tr>
+      <tr><td><b>C15</b></td><td>Mayor retención solicitada</td><td class="num">${fmt(R.c15)}</td></tr>
+      <tr><td><b>C16</b></td><td>Renta total no gravada</td><td class="num">${fmt(R.c16)}</td></tr>
+      <tr><td><b>C35</b></td><td>Renta total exenta</td><td class="num">${fmt(R.c35)}</td></tr>
+      <tr><td><b>C17</b></td><td>Rebaja por zonas extremas</td><td class="num">${fmt(R.c17)}</td></tr>
+      <tr><td><b>C63</b></td><td>3% préstamo tasa 0%</td><td class="num">${fmt(R.c63)}</td></tr>
+      <tr class="tot"><td><b>C18</b></td><td>Total de casos informados</td><td class="num">${fmt(R.c18)}</td></tr>
+    </table></div></div>
+    <div class="col-md-6"><div class="panel"><h6>TOTAL MONTOS ANUALES SIN ACTUALIZAR</h6><table>
+      <tr><td style="width:60px"><b>C6</b></td><td>Renta neta</td><td class="num">${fmt(R.c6)}</td></tr>
+      <tr><td><b>C7</b></td><td>Impuesto único (rentas del año)</td><td class="num">${fmt(R.c7)}</td></tr>
+      <tr><td><b>C32</b></td><td>Impuesto único por accesorias ene–abr año siguiente</td><td class="num">${fmt(R.c32)}</td></tr>
+      <tr><td><b>C10</b></td><td>Renta no gravada</td><td class="num">${fmt(R.c10)}</td></tr>
+      <tr><td><b>C34</b></td><td>Renta exenta</td><td class="num">${fmt(R.c34)}</td></tr>
+      <tr><td><b>C11</b></td><td>Zonas extremas</td><td class="num">${fmt(R.c11)}</td></tr>
+      <tr><td><b>C36</b></td><td>Leyes sociales</td><td class="num">${fmt(R.c36)}</td></tr>
+      <tr><td><b>C62</b></td><td>3% préstamo</td><td class="num">${fmt(R.c62)}</td></tr>
+      <tr class="tot"><td><b>C12</b></td><td>Remuneración imponible previsional (actualizada)</td><td class="num">${fmt(R.c12)}</td></tr>
+    </table></div></div>
+  </div>`;
+}
+
+async function csv1887(){
+  const r = await fetch('/api/contabilidad/dj/1887?formato=csv&anio='+fAnio7.value,{headers:H});
+  if (!r.ok) { const j = await r.json().catch(()=>null); return alert(j?.error || 'No se pudo generar el archivo'); }
+  const blob = await r.blob(), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `DJ1887_AT${Number(fAnio7.value)+1}.csv`; a.click();
+  URL.revokeObjectURL(a.href);
+  lblCsv7.innerHTML = `<span style="color:#059669;font-weight:700">✓ Archivo generado (${DJ7 ? DJ7.filas.length : ''} trabajadores)${DJ7 && DJ7.provisoria ? ' — PROVISORIO' : ''}</span>`;
 }
 
 async function cargarFactores(){

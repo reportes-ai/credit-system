@@ -104,6 +104,7 @@ router.get('/lre',   verifyToken, requireFunc('ctb_lre', 'ctb_libros_aux'), ctrl
 router.get('/f29',   verifyToken, requireFunc('ctb_f29', 'ctb_libros_aux'), ctrl.getF29);
 router.post('/f29',  verifyToken, requireFunc('ctb_f29', 'ctb_libros_aux'), ctrl.guardarF29);
 router.get('/dj/1879',     verifyToken, requireFunc('ctb_dj'), ctrl.getDJ1879);
+router.get('/dj/1887',     verifyToken, requireFunc('ctb_dj'), ctrl.getDJ1887);
 router.get('/dj/factores', verifyToken, requireFunc('ctb_dj'), ctrl.getDJFactores);
 router.put('/dj/factores', verifyToken, requireFunc('ctb_dj'), ctrl.guardarDJFactores);
 router.put('/directorio/hechos',     verifyToken, requireFunc('ctb_directorio'), ctrl.guardarHechoDirectorio);
