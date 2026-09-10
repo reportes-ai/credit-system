@@ -645,7 +645,7 @@ async function buildAlertaPenetracion(opts = {}) {
   </div>`;
 
   const asunto = esAlerta
-    ? `⚠️ Seguros AutoFin bajo el 40% — ${d.ref && d.ref.perdida > 0 ? 'al menos ' + fmt(d.ref.perdida) + ' menos al mes (ref. ' + d.ref.mesNom + ')' : 'dejamos de ganar ' + fmt(d.perdida) + ' en ' + d.mesNom}`
+    ? `ALERTA ⚠️ Seguros AutoFin bajo el 40% — ${d.ref && d.ref.perdida > 0 ? 'al menos ' + fmt(d.ref.perdida) + ' menos al mes (ref. ' + d.ref.mesNom + ')' : 'dejamos de ganar ' + fmt(d.perdida) + ' en ' + d.mesNom}`
     : `✅ Seguros AutoFin de vuelta al 40% — ${d.mesNom} al máximo tramo`;
   return { asunto, html };
 }
