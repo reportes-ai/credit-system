@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Dealer a Pagar — AutoFácil</title>
-  <!-- v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v1.7 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -263,8 +263,9 @@ function colorearDias(){
 }
 
 function visibles(){
-  const q = (document.getElementById('buscar').value||'').toLowerCase();
-  return DATA.filter(r => !q || [r.num_op,r.nombre_dealer,r.rut_dealer,r.financiera,r.id_financiera,r.numero_factura].some(v => String(v||'').toLowerCase().includes(q)));
+  const q = document.getElementById('buscar').value||'';
+  // Motor único de búsqueda (busqueda-core): + ejecutivo; mayúsculas y RUT sin puntos/guion
+  return DATA.filter(r => AF_BUSCA.coincide([r.num_op,r.nombre_dealer,r.rut_dealer,r.financiera,r.id_financiera,r.numero_factura,r.ejecutivo], q));
 }
 
 function celdaAccion(r){
@@ -567,6 +568,7 @@ function descargarCSV(){
   toast(`CSV de ${m.length} pago(s) descargado`);
 }
 </script>
+<script src="/js/busqueda-core.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>

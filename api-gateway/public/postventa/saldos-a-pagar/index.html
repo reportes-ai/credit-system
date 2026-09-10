@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v5.2 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -284,8 +284,9 @@ function colorearDias(){
 }
 
 function visibles(){
-  const q = (document.getElementById('buscar').value||'').toLowerCase();
-  return DATA.filter(r => !q || [r.num_op,r.nombre_dealer,r.rut_dealer,r.financiera,r.id_financiera].some(v => String(v||'').toLowerCase().includes(q)));
+  const q = document.getElementById('buscar').value||'';
+  // Motor único de búsqueda (busqueda-core): + ejecutivo; mayúsculas y RUT sin puntos/guion
+  return DATA.filter(r => AF_BUSCA.coincide([r.num_op,r.nombre_dealer,r.rut_dealer,r.financiera,r.id_financiera,r.ejecutivo], q));
 }
 
 function celdaAccion(r){
@@ -672,6 +673,7 @@ async function verODP(ordenId){
   </div>
 </dialog>
 <script src="/js/timbre-pagado.js"></script>
+<script src="/js/busqueda-core.js"></script>
 <script src="/js/odp-documento.js?v=222.66"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>

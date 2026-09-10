@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v4.14 — solo lectura parametrico: sin postventa_seguimiento se ve todo pero no se marca nada (checkboxes bloqueados, sin Emitir/Revertir/editar factura) · v4.13 — N° de ODP visible bajo ORDEN DE PAGO EMITIDA (saldo y comision; en replicas muestra la orden de la titular) · v4.12 — popup Emitir ODP con la narrativa desde el neto (+IVA / −retencion / emisor retiene) · v4.11 — boleta con "el emisor retiene": retencion 0, se deposita el bruto completo · v4.10 — casilla delegable pv_marcar_cartola_enviada · v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v4.15 — buscador por el motor único busqueda-core: + ODP de saldo y comisión y N° de factura; RUT sin puntos/guion. v4.14 — solo lectura parametrico: sin postventa_seguimiento se ve todo pero no se marca nada (checkboxes bloqueados, sin Emitir/Revertir/editar factura) · v4.13 — N° de ODP visible bajo ORDEN DE PAGO EMITIDA (saldo y comision; en replicas muestra la orden de la titular) · v4.12 — popup Emitir ODP con la narrativa desde el neto (+IVA / −retencion / emisor retiene) · v4.11 — boleta con "el emisor retiene": retencion 0, se deposita el bruto completo · v4.10 — casilla delegable pv_marcar_cartola_enviada · v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -201,15 +201,16 @@ function renderFiltros(){
 
 /* skip = dimensión a ignorar (para calcular los totales de sus propios toggles) */
 function filtrar(skip){
-  const q = (document.getElementById('fBuscar').value||'').toLowerCase();
+  const q = (document.getElementById('fBuscar').value||'').trim();
   return DATA.filter(r => {
     if (filtroPagado && skip!=='pagado' && esPagado(r)) return false;
     if (skip!=='mes' && selMes.size && !selMes.has(mesDe(r.fecha_otorgado))) return false;
     if (skip!=='fin' && selFin.size && !selFin.has(String(r.financiera||'').toUpperCase())) return false;
     if (skip!=='saldo' && selSaldo.size && !selSaldo.has(etapaActual(r,'SALDO'))) return false;
     if (skip!=='com' && selCom.size && !selCom.has(etapaActual(r,'COMISION'))) return false;
-    if (q && ![r.num_op, r.id_financiera, r.nombre_dealer, r.rut_dealer, r.ejecutivo, r.financiera,
-               String(r.saldo_precio), String(r.comision)].some(v=>String(v||'').toLowerCase().includes(q))) return false;
+    // Motor único de búsqueda (busqueda-core): + ODP de saldo y de comisión y N° de factura; RUT sin puntos/guion
+    if (q && !AF_BUSCA.coincide([r.num_op, r.id_financiera, r.nombre_dealer, r.rut_dealer, r.ejecutivo, r.financiera,
+               r.odp_saldo, r.odp_comision, r.fac_numero, String(r.saldo_precio), String(r.comision)], q)) return false;
     return true;
   });
 }
@@ -895,6 +896,7 @@ async function confirmarEmitirODP(){
   </div>
 </dialog>
 <script src="/js/odp-preemision.js"></script>
+<script src="/js/busqueda-core.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>

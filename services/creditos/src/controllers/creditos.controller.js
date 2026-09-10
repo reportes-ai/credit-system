@@ -393,21 +393,21 @@ const getAll = async (req, res) => {
     const paramsBase = [];
 
     if (q && q.trim()) {
-      const qNorm = q.trim().toUpperCase().replace(/\./g, '');
-      const like  = `%${qNorm}%`;
       /* Los DOS números buscan, cada uno por su lado. Con COALESCE, una operación
          con numero_credito (ej. 2608005) dejaba de encontrarse por su N° OP real
          (26080005), porque el fallback a num_op solo aplica cuando el otro es NULL
          — 54 operaciones estaban así de invisibles. Buscar es distinto de mostrar:
          para mostrar manda el N° OP; para buscar, cualquiera de los dos sirve. */
-      whereBase += ` AND (
-        UPPER(REPLACE(COALESCE(cl.rut, ''),'.',''))                        LIKE ? OR
-        UPPER(COALESCE(cl.nombre_completo, ''))                            LIKE ? OR
-        UPPER(COALESCE(ob.numero_credito, ''))                             LIKE ? OR
-        CAST(ob.num_op AS CHAR)                                            LIKE ? OR
-        CAST(COALESCE(ob.id_financiera, '') AS CHAR)                       LIKE ?
-      )`;
-      paramsBase.push(like, like, like, like, like);
+      /* Motor único de búsqueda (busqueda-core, 10-09-2026): además de RUT, cliente y los dos
+         números, busca por dealer, ejecutivo, RUT del dealer y N° de carta; el RUT se compara
+         sin puntos NI guion en ambos lados ("123456789" encuentra "12.345.678-9"). */
+      const BUSCA = require('../../../../api-gateway/public/js/busqueda-core');
+      const bq = BUSCA.sql(q, {
+        texto: ['cl.nombre_completo', 'ob.numero_credito', 'ob.num_op', 'ob.id_financiera', 'ob.automotora', 'ob.ejecutivo'],
+        rut: ['cl.rut', 'ob.rut_dealer', 'ob.num_op', 'ob.id_financiera', 'ob.numero_credito'],
+        subTexto: ['EXISTS (SELECT 1 FROM cartas_aprobacion ca WHERE ca.id_credito_creado = ob.id AND UPPER(ca.op_carta) LIKE ?)'],
+      });
+      if (bq) { whereBase += ` AND ${bq.sql}`; paramsBase.push(...bq.args); }
     }
 
     if (financiera && financiera !== 'TODAS') {

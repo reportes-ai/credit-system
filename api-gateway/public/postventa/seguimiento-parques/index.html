@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Comisión Parques — AutoFácil</title>
-  <!-- v1.2 — navbar migrada al componente topnav · v1.0 — track PARQUE por operación: mismas etapas y condiciones que la comisión dealer -->
+  <!-- v1.3 — buscador por el motor único busqueda-core (mayúsculas/tildes, RUT sin puntos/guion). v1.2 — navbar migrada al componente topnav · v1.0 — track PARQUE por operación: mismas etapas y condiciones que la comisión dealer -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -162,14 +162,15 @@ function renderFiltros(){
 }
 
 function filtrar(skip){
-  const q = (document.getElementById('fBuscar').value||'').toLowerCase();
+  const q = (document.getElementById('fBuscar').value||'').trim();
   return DATA.filter(r => {
     if (filtroPagado && skip!=='pagado' && esPagado(r)) return false;
     if (skip!=='mes' && selMes.size && !selMes.has(mesDe(r.fecha_otorgado))) return false;
     if (skip!=='pq' && selParque.size && !selParque.has(r.parque)) return false;
     if (skip!=='et' && selEtapa.size && !selEtapa.has(etapaActual(r))) return false;
-    if (q && ![r.num_op, r.id_financiera, r.nombre_dealer, r.rut_dealer, r.parque, r.ejecutivo,
-               String(r.com_parque)].some(v=>String(v||'').toLowerCase().includes(q))) return false;
+    // Motor único de búsqueda (busqueda-core): mayúsculas/tildes y RUT sin puntos/guion
+    if (q && !AF_BUSCA.coincide([r.num_op, r.id_financiera, r.nombre_dealer, r.rut_dealer, r.parque, r.ejecutivo,
+               String(r.com_parque)], q)) return false;
     return true;
   });
 }
@@ -307,6 +308,7 @@ async function toggleEtapa(id, etapa, chk){
   finally { chk.disabled = false; }
 }
 </script>
+<script src="/js/busqueda-core.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>

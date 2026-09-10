@@ -43,11 +43,12 @@ const list = async (req, res) => {
     let where = `1=1`;
     const params = [];
 
-    if (q) {
-      const like = `%${q.trim().toUpperCase()}%`;
-      where += ` AND (UPPER(ct.rut_cliente) LIKE ? OR UPPER(ct.nombre_cliente) LIKE ? OR UPPER(c.numero_credito) LIKE ? OR CAST(c.num_op AS CHAR) LIKE ?)`;
-      params.push(like, like, like, like);
-    }
+    // Motor único de búsqueda (busqueda-core): + ID financiera, dealer y ejecutivo; RUT sin puntos/guion.
+    const bq = require('../../../../api-gateway/public/js/busqueda-core').sql(q, {
+      texto: ['ct.nombre_cliente', 'c.numero_credito', 'c.num_op', 'c.id_financiera', 'c.automotora', 'c.ejecutivo'],
+      rut: ['ct.rut_cliente', 'c.rut_dealer', 'c.num_op', 'c.id_financiera'],
+    });
+    if (bq) { where += ` AND ${bq.sql}`; params.push(...bq.args); }
 
     const [rows] = await pool.query(`
       SELECT

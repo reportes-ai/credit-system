@@ -2858,8 +2858,15 @@ const consultaSaldos = async (req, res) => {
     }
     if (q) {
       // También por ID Financiera: la 661947 (Unidad) no aparecía porque es el ID Financiera de nuestra 26090201 (Pato, 09-09-2026)
-      filt.push(`(s.num_op LIKE ? OR cr.id_financiera LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`);
-      const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk, lk);
+      // Motor único de búsqueda (busqueda-core): mayúsculas, RUT sin puntos/guion, y ODP de saldo.
+      const bq = require('../../../../api-gateway/public/js/busqueda-core').sql(q, {
+        texto: ['s.num_op', 'cr.id_financiera', 's.nombre_dealer', 'cr.automotora', 's.ejecutivo', 'cr.parque', 'cr.nombre_parque_mgmt'],
+        rut: ['s.rut_dealer', 'cr.rut_dealer', 's.num_op', 'cr.id_financiera'],
+        subTexto: ['EXISTS (SELECT 1 FROM postventa_ordenes pob WHERE pob.id_seguimiento = s.id AND UPPER(pob.num_orden) LIKE ?)',
+                   "EXISTS (SELECT 1 FROM clientes clb WHERE clb.id_cliente = cr.id_cliente AND UPPER(CONCAT_WS(' ', clb.nombre_completo, clb.nombres, clb.apellido_paterno, clb.apellido_materno)) LIKE ?)"],
+        subRut: ["EXISTS (SELECT 1 FROM clientes clb WHERE clb.id_cliente = cr.id_cliente AND REPLACE(REPLACE(REPLACE(UPPER(clb.rut),'.',''),'-',''),' ','') LIKE ?)"],
+      });
+      if (bq) { filt.push(bq.sql); fp.push(...bq.args); }
     }
     // El WHERE sin el filtro de parque alimenta el desplegable: si se armara con
     // el parque ya aplicado, la lista se reduciría a la opción elegida.
@@ -2950,8 +2957,14 @@ const consultaFacturas = async (req, res) => {
       filt.push('s.ejecutivo IN (?)'); fp.push(vis.lista);
     }
     if (q) {
-      filt.push(`(s.num_op LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR f.numero_factura LIKE ?)`);
-      const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk);
+      // Motor único de búsqueda (busqueda-core): + ID financiera, mayúsculas y RUT sin puntos/guion.
+      const bq = require('../../../../api-gateway/public/js/busqueda-core').sql(q, {
+        texto: ['s.num_op', 'cr.id_financiera', 's.nombre_dealer', 'cr.automotora', 's.ejecutivo', 'f.numero_factura'],
+        rut: ['s.rut_dealer', 'cr.rut_dealer', 's.num_op', 'cr.id_financiera'],
+        subTexto: ["EXISTS (SELECT 1 FROM clientes clb WHERE clb.id_cliente = cr.id_cliente AND UPPER(CONCAT_WS(' ', clb.nombre_completo, clb.nombres, clb.apellido_paterno, clb.apellido_materno)) LIKE ?)"],
+        subRut: ["EXISTS (SELECT 1 FROM clientes clb WHERE clb.id_cliente = cr.id_cliente AND REPLACE(REPLACE(REPLACE(UPPER(clb.rut),'.',''),'-',''),' ','') LIKE ?)"],
+      });
+      if (bq) { filt.push(bq.sql); fp.push(...bq.args); }
     }
     if (mes)     { filt.push(`DATE_FORMAT(f.fecha_factura,'%Y-%m') = ?`); fp.push(mes); }
     if (factura) { filt.push(`f.numero_factura LIKE ?`); fp.push('%' + factura + '%'); }
@@ -3033,8 +3046,15 @@ const consultaFundantes = async (req, res) => {
     }
     if (q) {
       // También por ID Financiera: la 661947 (Unidad) no aparecía porque es el ID Financiera de nuestra 26090201 (Pato, 09-09-2026)
-      filt.push(`(s.num_op LIKE ? OR cr.id_financiera LIKE ? OR s.rut_dealer LIKE ? OR s.nombre_dealer LIKE ? OR s.ejecutivo LIKE ? OR cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`);
-      const lk = '%' + q + '%'; fp.push(lk, lk, lk, lk, lk, lk, lk);
+      // Motor único de búsqueda (busqueda-core): mayúsculas, RUT sin puntos/guion, y ODP de saldo.
+      const bq = require('../../../../api-gateway/public/js/busqueda-core').sql(q, {
+        texto: ['s.num_op', 'cr.id_financiera', 's.nombre_dealer', 'cr.automotora', 's.ejecutivo', 'cr.parque', 'cr.nombre_parque_mgmt'],
+        rut: ['s.rut_dealer', 'cr.rut_dealer', 's.num_op', 'cr.id_financiera'],
+        subTexto: ['EXISTS (SELECT 1 FROM postventa_ordenes pob WHERE pob.id_seguimiento = s.id AND UPPER(pob.num_orden) LIKE ?)',
+                   "EXISTS (SELECT 1 FROM clientes clb WHERE clb.id_cliente = cr.id_cliente AND UPPER(CONCAT_WS(' ', clb.nombre_completo, clb.nombres, clb.apellido_paterno, clb.apellido_materno)) LIKE ?)"],
+        subRut: ["EXISTS (SELECT 1 FROM clientes clb WHERE clb.id_cliente = cr.id_cliente AND REPLACE(REPLACE(REPLACE(UPPER(clb.rut),'.',''),'-',''),' ','') LIKE ?)"],
+      });
+      if (bq) { filt.push(bq.sql); fp.push(...bq.args); }
     }
     if (parque) { filt.push(`(cr.parque LIKE ? OR cr.nombre_parque_mgmt LIKE ?)`); const lk = '%' + parque + '%'; fp.push(lk, lk); }
     // Misma regla que las dos consultas de estado: a una operación anulada no se

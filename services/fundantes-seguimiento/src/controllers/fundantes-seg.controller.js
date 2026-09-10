@@ -290,12 +290,16 @@ const listar = async (req, res) => {
     if (fEstado && ESTADOS.includes(fEstado)) { whereData += " AND COALESCE(fs.estado,'PENDIENTE') = ?"; fpData.push(fEstado); }
     else if (fEstadoOp && OP_MAP[fEstadoOp]) { whereData += ' AND ' + OP_MAP[fEstadoOp]; }
     else if (!incluirCerrados) whereData += " AND COALESCE(fs.estado,'PENDIENTE') <> 'CERRADO'";
-    // Búsqueda por N° OP o ID Financiera (server-side: encuentra aunque esté fuera de las primeras 500).
+    // Búsqueda server-side (encuentra aunque esté fuera de las primeras 500), por el motor único
+    // busqueda-core: N° OP, ID financiera, dealer, ejecutivo, cliente y RUT (cliente/dealer) sin puntos/guion.
     const q = String(req.query.q || '').trim();
-    if (q) {
-      whereData += " AND (REPLACE(c.num_op,'.','') LIKE ? OR c.id_financiera LIKE ?)";
-      fpData.push('%' + q.replace(/\./g, '') + '%', '%' + q + '%');
-    }
+    const bq = require('../../../../api-gateway/public/js/busqueda-core').sql(q, {
+      texto: ['c.num_op', 'c.id_financiera', 'c.automotora', 'c.ejecutivo'],
+      rut: ['c.num_op', 'c.id_financiera', 'c.rut_dealer'],
+      subTexto: ["EXISTS (SELECT 1 FROM clientes clb WHERE clb.id_cliente = c.id_cliente AND UPPER(CONCAT_WS(' ', clb.nombre_completo, clb.nombres, clb.apellido_paterno, clb.apellido_materno)) LIKE ?)"],
+      subRut: ["EXISTS (SELECT 1 FROM clientes clb WHERE clb.id_cliente = c.id_cliente AND REPLACE(REPLACE(REPLACE(UPPER(clb.rut),'.',''),'-',''),' ','') LIKE ?)"],
+    });
+    if (bq) { whereData += ` AND ${bq.sql}`; fpData.push(...bq.args); }
     const [ops] = await pool.query(`
       SELECT c.id AS id_credito, c.num_op, c.financiera, c.id_financiera, c.ejecutivo,
              c.fecha_otorgado, c.gps, c.limitacion, c.saldo_precio,
