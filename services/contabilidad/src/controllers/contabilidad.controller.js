@@ -316,7 +316,7 @@ exports.libroMayor = async (req, res) => {
          FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
         WHERE c.estado='CONTABILIZADO' AND m.cuenta=? AND c.fecha < ?`, [cuenta, r.desde]);
     const [rows] = await pool.query(
-      `SELECT c.id, c.tipo, c.anio, c.numero, c.fecha, c.glosa comp_glosa, m.glosa, m.debe, m.haber, m.num_op, m.rut
+      `SELECT c.id, c.tipo, c.anio, c.numero, c.fecha, c.glosa comp_glosa, c.origen, m.glosa, m.debe, m.haber, m.num_op, m.rut
          FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
         WHERE c.estado='CONTABILIZADO' AND m.cuenta=? AND c.fecha BETWEEN ? AND ?
         ORDER BY c.fecha, c.id LIMIT 5000`, [cuenta, r.desde, r.hasta]);
@@ -345,7 +345,7 @@ exports.libroMayorCompleto = async (req, res) => {
     const inicial = new Map(iniRows.map(x => [x.cuenta, Number(x.d) - Number(x.h)]));
 
     const [movs] = await pool.query(
-      `SELECT m.cuenta, c.id, c.tipo, c.anio, c.numero, c.fecha, c.glosa comp_glosa,
+      `SELECT m.cuenta, c.id, c.tipo, c.anio, c.numero, c.fecha, c.glosa comp_glosa, c.origen,
               m.glosa, m.debe, m.haber, m.num_op, m.rut
          FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
         WHERE c.estado='CONTABILIZADO' AND c.fecha BETWEEN ? AND ?

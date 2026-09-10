@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.5 — Buzón por API (POST/GET /mensajes con la llave), pestaña Buzón con respuesta, badge sin responder. v2.4 — saldo-proceso-pago: campos sla_base e historico documentados. v2.3 — API Suite Financiera (JM): 8 endpoints de solo lectura, documentados. v2.2 — miga sigue a la API abierta (AF_TOPNAV_HOJA) -->
+<!-- v2.6 — libro-mayor y libro-mayor-completo: campo origen del comprobante documentado. v2.5 — Buzón por API (POST/GET /mensajes con la llave), pestaña Buzón con respuesta, badge sin responder. v2.4 — saldo-proceso-pago: campos sla_base e historico documentados. v2.3 — API Suite Financiera (JM): 8 endpoints de solo lectura, documentados. v2.2 — miga sigue a la API abierta (AF_TOPNAV_HOJA) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -133,6 +133,7 @@ const DOCS = {
       <ul>
         <li><b>GET /libro-mayor?cuenta=1101001&desde=2026-01-01&hasta=2026-08-31</b> — mayor de una cuenta: saldo inicial y movimientos (Contabilidad → Libro Mayor).</li>
         <li><b>GET /libro-mayor-completo?desde=&hasta=</b> — todas las cuentas del período.</li>
+        <li>En ambos mayores cada movimiento trae <code>tipo</code> (INGRESO / EGRESO / TRASPASO), <code>num</code>, <code>comp_glosa</code> y <code>origen</code>: qué generó el comprobante — <code>MANUAL</code> (digitado: ajustes y reclasificaciones), <code>AVSOFT</code> (importado del sistema anterior), <code>CIERRE_EJERCICIO</code>, o el asiento automático de la operación (<code>SALDO_FONDOS_RECIBIDOS</code>, <code>SALDO_PRECIO_PAGADO</code>, <code>COMISION_*</code>, <code>PROVISION_*</code>, <code>PAGO_CAJA</code>, <code>ODP_PAGADA</code>, <code>COMPRA_RCV</code>, etc.).</li>
         <li><b>GET /balance?desde=&hasta=</b> — Balance de 8 columnas (débitos, créditos, deudor, acreedor, activo, pasivo, pérdida, ganancia) por cuenta.</li>
         <li><b>GET /libro-compras?desde=2026-01&hasta=2026-08</b> — auxiliar de compras (facturas recibidas, IVA crédito). Aquí <code>desde</code>/<code>hasta</code> van por <b>mes AAAA-MM</b>; opcional <code>q</code> (proveedor/folio) y <code>cuenta</code>. Devuelve hasta 1.000 documentos (<code>truncado</code> avisa si hay más: acote el rango) y el resumen por mes.</li>
         <li><b>GET /libro-ventas?desde=2026-01&hasta=2026-08</b> — auxiliar de ventas (facturas emitidas, IVA débito), mismo formato por mes.</li>
