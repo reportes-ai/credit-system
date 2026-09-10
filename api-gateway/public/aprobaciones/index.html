@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.71 — corte de cartola paramétrico: lo marcado A PAGAR en el mes en curso sale en la cartola del mes siguiente (aviso con las diferidas). v4.70 (Revisión Cartolas: botón Adicional / Descuento por dealer — popup con tipo, monto, glosa (cartola + ODP) y comentario interno; queda POR APROBAR hasta que lo apruebe el supervisor del digitador, con campanita; suma en la cartola solo aprobado) — v4.69 (PDF de cartola: las que no eran la primera salian cortadas o en blanco — html2canvas solo captura dentro del viewport; se captura un clon en flujo al inicio del body con scroll 0) — v4.68 (abrir documento: muestra la causa real del servidor, p.ej. host sin acceso al almacén) — v4.67 (Rentabilidad de la carta aplica el corte por plazo del Modelo 2 UAC: op >= 36 cuotas = % fijo, no el tier del mes) — v4.66 (hora con segundos de creación en Revisión de Cartas Pendientes) — v4.65 — ?carta=ID abre directo una carta (puerta de entrada desde la ficha del crédito) · v4.64 — excepciones: lo que cuadra con pizarra se resume en "✓ Tasa OK · Comisión OK"; solo lo distinto se detalla · v4.63 — vigencia desde fecha carta O digitacion (lo mas tarde), igual que el servidor · v4.62 — participacion sugerida desde la TABLA PACTADA del local (motor /api/comision-dealer/tabla); la excepcion compara contra lo pactado · v4.61 — cartola con SECCIONES por local (subtotal por parque/calle) cuando el dealer curso en mas de una ubicacion · v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.72 — cartola: el nombre de quien digitó el adicional/descuento ya no sale en el PDF al dealer (sigue en pantalla para el supervisor); con un ajuste POR APROBAR la cartola no se puede enviar (botón bloqueado + validación en el servidor). v4.71 — corte de cartola paramétrico: lo marcado A PAGAR en el mes en curso sale en la cartola del mes siguiente (aviso con las diferidas). v4.70 (Revisión Cartolas: botón Adicional / Descuento por dealer — popup con tipo, monto, glosa (cartola + ODP) y comentario interno; queda POR APROBAR hasta que lo apruebe el supervisor del digitador, con campanita; suma en la cartola solo aprobado) — v4.69 (PDF de cartola: las que no eran la primera salian cortadas o en blanco — html2canvas solo captura dentro del viewport; se captura un clon en flujo al inicio del body con scroll 0) — v4.68 (abrir documento: muestra la causa real del servidor, p.ej. host sin acceso al almacén) — v4.67 (Rentabilidad de la carta aplica el corte por plazo del Modelo 2 UAC: op >= 36 cuotas = % fijo, no el tier del mes) — v4.66 (hora con segundos de creación en Revisión de Cartas Pendientes) — v4.65 — ?carta=ID abre directo una carta (puerta de entrada desde la ficha del crédito) · v4.64 — excepciones: lo que cuadra con pizarra se resume en "✓ Tasa OK · Comisión OK"; solo lo distinto se detalla · v4.63 — vigencia desde fecha carta O digitacion (lo mas tarde), igual que el servidor · v4.62 — participacion sugerida desde la TABLA PACTADA del local (motor /api/comision-dealer/tabla); la excepcion compara contra lo pactado · v4.61 — cartola con SECCIONES por local (subtotal por parque/calle) cuando el dealer curso en mas de una ubicacion · v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3865,6 +3865,7 @@ async function resolverAjuste(id, accion){
 }
 
 let REV_IDS = {};   // gi → [ids de movimientos del bloque] para el envío
+let REV_PEND = {};  // gi → n° de adicionales/descuentos POR APROBAR (bloquean el envío)
 function renderRevCartolas(){
   const cont = document.getElementById('bloquesCartolas');
   if (!cont) return;
@@ -3913,6 +3914,8 @@ function renderRevCartolas(){
     const movs = grupos[key];
     const conc = NOMBRE[key];
     REV_IDS[gi] = movs.filter(m=>m.estado_comision!=='POR APROBAR').map(m=>m.id);
+    // Pato 10-09-2026: con un adicional/descuento POR APROBAR la cartola NO se envía (el dealer no debe ver un monto no confirmado)
+    const ajPend = REV_PEND[gi] = movs.filter(m=>esAjuste(m) && m.estado_comision==='POR APROBAR').length;
     const rutC = movs.find(m=>m.rut_conc)?.rut_conc || '';
     const mailBD = movs.find(m=>m.mail)?.mail || DEALERS.find(d=>rutN(d.rut)===rutN(rutC))?.mail || '';
     const comisiones = movs.filter(m=>m.movimiento==='COMISION' && m.estado_comision==='A PAGAR').reduce((s,m)=>s+(+m.comision||0),0);
@@ -3929,7 +3932,7 @@ function renderRevCartolas(){
       const puedoAprobar = pend && puede('cartola_ajuste_aprobar') && Number(m.id_creado_por)!==Number(YO.id_usuario) && (ES_ADMIN || !m.id_aprobador || Number(m.id_aprobador)===Number(YO.id_usuario));
       const esAd = m.movimiento==='ADICIONAL';
       return `<tr style="background:${pend?'#fffbeb':'#f8fafc'}">
-      <td colspan="2" style="font-size:.74rem;color:#64748b">${pend?'<i class="bi bi-hourglass-split"></i> ':''}${escH(m.creado_por||'')}</td>
+      <td colspan="2" style="font-size:.74rem;color:#64748b"><span data-html2canvas-ignore>${pend?'<i class="bi bi-hourglass-split"></i> ':''}${escH(m.creado_por||'')}</span></td>
       <td style="font-size:.74rem"><span class="est-mini" style="background:${esAd?'#dcfce7':'#fee2e2'};color:${esAd?'#15803d':'#b91c1c'}">${escH(m.movimiento)}</span></td>
       <td colspan="4" style="font-size:.8rem"><b>${escH(m.glosa||'')}</b>${m.comentario?`<div style="font-size:.7rem;color:#64748b" data-html2canvas-ignore><i class="bi bi-chat-left-text"></i> ${escH(m.comentario)}</div>`:''}${m.aprob_comentario?`<div style="font-size:.7rem;color:#b45309" data-html2canvas-ignore>Supervisor: ${escH(m.aprob_comentario)}</div>`:''}</td>
       <td style="text-align:right"><b>${esAd?'+':'−'}${fmtCLP(m.comision)}</b></td>
@@ -3977,7 +3980,9 @@ function renderRevCartolas(){
           <input id="mailCta${gi}" value="${escH(mailBD)}" placeholder="correo@concesionario.cl" style="border:none;border-radius:7px;padding:6px 10px;font-size:.78rem;min-width:220px">
           <button class="btn-mini" style="padding:8px 12px;font-size:.8rem;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35)" title="Ver el PDF tal como se adjuntará" onclick="previewCartolaPDF(${gi},this.dataset.conc)" data-conc="${escH(conc)}"><i class="bi bi-file-earmark-pdf"></i> Ver PDF</button>
           <button class="btn-mini" style="padding:8px 12px;font-size:.8rem;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35)" title="Ver el correo tal como llegará al dealer" onclick="previewCorreoCartola(${gi},this.dataset.conc,${subTotal})" data-conc="${escH(conc)}"><i class="bi bi-envelope-open"></i> Ver correo</button>
-          <button class="btn-mini bm-ok" style="padding:8px 14px;font-size:.82rem" onclick="enviarCartola(${gi},this.dataset.conc,this.dataset.rut,${subTotal})" data-conc="${escH(conc)}" data-rut="${escH(rutC)}"><i class="bi bi-envelope"></i> Enviar Cartola</button>
+          ${ajPend
+            ? `<button class="btn-mini" disabled style="padding:8px 14px;font-size:.82rem;background:#fef3c7;color:#92400e;cursor:not-allowed" title="Tiene ${ajPend} adicional(es)/descuento(s) por aprobar: el supervisor debe aprobarlo(s) o rechazarlo(s) antes de enviar la cartola"><i class="bi bi-hourglass-split"></i> ${ajPend} ajuste(s) por aprobar</button>`
+            : `<button class="btn-mini bm-ok" style="padding:8px 14px;font-size:.82rem" onclick="enviarCartola(${gi},this.dataset.conc,this.dataset.rut,${subTotal})" data-conc="${escH(conc)}" data-rut="${escH(rutC)}"><i class="bi bi-envelope"></i> Enviar Cartola</button>`}
         </div>
         <!-- logo BLANCO real (logo-blanco.png): html2canvas ignora el filter CSS,
              así que el truco del topnav salía a color en el PDF. Los botones llevan
@@ -4108,6 +4113,7 @@ async function previewCorreoCartola(gi, conc, total){
 }
 
 async function enviarCartola(gi, conc, rutC, total){
+  if (REV_PEND[gi]) return alert(`La cartola de ${conc} tiene ${REV_PEND[gi]} adicional(es)/descuento(s) por aprobar. El supervisor debe resolverlos antes de enviarla.`);
   const mes = mesActual();   // la cartola se emite en el mes actual (mes de envío)
   const mail = document.getElementById('mailCta'+gi).value.trim();
   const bloque = document.getElementById('bloqueCta'+gi);
@@ -4133,8 +4139,10 @@ async function enviarCartola(gi, conc, rutC, total){
   } catch(e) { alert('Error generando PDF: '+e.message); return; }
   // 2) Registrar el envío: estampa el mes de cartola en los movimientos y marca Post Venta
   try {
-    await fetch('/api/cartolas/enviadas', { method:'POST', headers: hdr(),
+    const rReg = await fetch('/api/cartolas/enviadas', { method:'POST', headers: hdr(),
       body: JSON.stringify({ mes, rut_conc: rutC, concesionario: conc, mail, total_bruto: total, ids: (REV_IDS[gi]||[]) }) });
+    // 409 = alguien agregó un ajuste después de cargar la página: no se registra ni se manda el correo
+    if (rReg.status === 409) { const jr = await rReg.json().catch(()=>({})); cargarMovimientos(); return alert(jr.error || 'La cartola tiene ajustes por aprobar.'); }
   } catch(e) {}
   // Refresca para que las operaciones enviadas salgan de pendientes y muestren su Mes Cartola
   cargarMovimientos();
@@ -4151,7 +4159,7 @@ async function enviarCartola(gi, conc, rutC, total){
       r.onerror = rej; r.readAsDataURL(pdfBlob);
     });
     const rj = await (await fetch('/api/cartolas/correo', { method:'POST', headers: hdr(),
-      body: JSON.stringify({ mes_nombre: nombreMes(mes), dealer: conc, mail, total: fmtCLP(total),
+      body: JSON.stringify({ mes_nombre: nombreMes(mes), dealer: conc, rut_conc: rutC, mail, total: fmtCLP(total),
                              pdf_base64: b64, filename, ejec_cc: ejecMails }) })).json();
     if (rj.success && rj.data && rj.data.enviado)
       alert('📧 Cartola enviada por correo a ' + mail + (rj.data.cc ? '\nCC: ' + rj.data.cc : '')

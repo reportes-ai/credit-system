@@ -455,11 +455,26 @@ async function segsDeMovs(filtroSql, vals) {
   return segs;
 }
 
+/* Adicionales/descuentos POR APROBAR de un dealer que aún no salieron en una cartola.
+   Mientras exista uno, la cartola NO se envía (Pato 10-09-2026): el dealer no debe
+   recibir un monto que el supervisor todavía no confirma. */
+async function ajustesPendientes(rut, nombre) {
+  if (!rut && !nombre) return 0;
+  const [[r]] = await pool.query(
+    `SELECT COUNT(*) n FROM cartolas_movimientos
+      WHERE movimiento IN ('ADICIONAL','DESCUENTO') AND aprobacion='PENDIENTE' AND mes_cartola IS NULL
+        AND ${rut ? 'rut_dealer = ?' : 'nombre_dealer = ?'}`, [rut || nombre]);
+  return Number(r.n) || 0;
+}
+const msgPendientes = n => `La cartola tiene ${n} adicional(es)/descuento(s) por aprobar. El supervisor debe aprobarlos o rechazarlos antes de enviarla.`;
+
 const registrarEnvio = async (req, res) => {
   try {
     const { mes, rut_conc, concesionario, mail, total_bruto, ids } = req.body;
     if (!mes || !concesionario)
       return res.status(400).json({ success: false, data: null, error: 'mes y concesionario requeridos' });
+    const pend = await ajustesPendientes(rut_conc, concesionario);
+    if (pend) return res.status(409).json({ success: false, data: null, error: msgPendientes(pend) });
     const enviadoPor = nombreUsuario(req.usuario);
     const movIds = Array.isArray(ids) ? ids.map(Number).filter(Boolean) : [];
     const [r] = await pool.query(
@@ -558,8 +573,10 @@ const reversarEnvio = async (req, res) => {
    El PDF lo genera el navegador (html2pdf) y llega en base64. ── */
 const enviarCorreoCartola = async (req, res) => {
   try {
-    const { mes_nombre, dealer, mail, total, pdf_base64, filename, ejec_cc } = req.body || {};
+    const { mes_nombre, dealer, rut_conc, mail, total, pdf_base64, filename, ejec_cc } = req.body || {};
     if (!dealer || !mail) return res.status(400).json({ success: false, data: null, error: 'dealer y mail requeridos' });
+    const pend = await ajustesPendientes(rut_conc, dealer);
+    if (pend) return res.status(409).json({ success: false, data: null, error: msgPendientes(pend) });
     // La plantilla vive en el mantenedor único Correos del Sistema (antes en postventa_config)
     const tpl = await require('../../../../shared/plantillas-correo').comoTpl('dealer_cartola_envio', 'correo_cartola_dealer');
     if (tpl.activo === false)
