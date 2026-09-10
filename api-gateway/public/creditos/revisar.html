@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v3.2 — barra de acciones en UNA sola línea (sin wrap, botones más compactos, "Ver Carta") · v3.1 — boton "Ver Carta de Aprobación" junto a Editar Crédito: abre la carta que creó la operación con sus documentos adjuntos (/aprobaciones/?carta=ID) · v3.0 — boton Rechazar (con motivo obligatorio) en toda operacion propia en curso, junto al boton de la etapa · v2.9 — rotulos: Etapa del Crédito (antes "Estado") · v2.8 — navbar migrada al componente topnav (avatar, campanita y Salir) · v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
+<!-- v3.3 — Desglose Seguros con los seguros REALES de la operación (RDH+E, cesantía, reparación menor); el cálculo teórico solo si no hay seguros informados. v3.2 — barra de acciones en UNA sola línea (sin wrap, botones más compactos, "Ver Carta") · v3.1 — boton "Ver Carta de Aprobación" junto a Editar Crédito: abre la carta que creó la operación con sus documentos adjuntos (/aprobaciones/?carta=ID) · v3.0 — boton Rechazar (con motivo obligatorio) en toda operacion propia en curso, junto al boton de la etapa · v2.9 — rotulos: Etapa del Crédito (antes "Estado") · v2.8 — navbar migrada al componente topnav (avatar, campanita y Salir) · v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -1317,6 +1317,29 @@ function renderDetalleGastos(panel) {
 
 function renderDetalleSeguros(panel) {
   const c  = _credito;
+  /* Seguros REALES de la operación (columnas seguro_rdh / seguro_cesantia / seguro_rep_menor, informadas
+     por la financiera en la carga): si existen, el desglose los muestra tal cual. El cálculo teórico
+     con la tarifa por tramo de plazo es solo para créditos AutoFácil propios sin seguros informados
+     (Pato, 10-09-2026: el desglose teórico "no tenía nada que ver con la realidad", solo el total). */
+  const sR = Math.round(parseFloat(c.seguro_rdh) || 0), sC = Math.round(parseFloat(c.seguro_cesantia) || 0), sM = Math.round(parseFloat(c.seguro_rep_menor) || 0);
+  if (sR + sC + sM > 0) {
+    const fp = v => v > 0 ? fmtP(v) : '<span style="color:#cbd5e1">—</span>';
+    const badge = ok => ok
+      ? '<span style="font-size:.68rem;background:#f0fdf4;border:1px solid #86efac;border-radius:4px;padding:1px 6px;color:#15803d">Incluido</span>'
+      : '<span style="font-size:.68rem;background:#f1f5f9;border-radius:4px;padding:1px 5px;color:#94a3b8">No incluido</span>';
+    const totalReal = sR + sC + sM, totalOp = Math.round(parseFloat(c.seguros) || 0);
+    panel.innerHTML = `
+      <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--navy);margin-bottom:8px">
+        <i class="bi bi-shield-check me-1"></i>Desglose Seguros — informados por la financiera
+      </div>
+      <div class="det-row"><span class="det-row-label">Seguro RDH + E (robo, daño, hurto y desgravamen) ${badge(sR>0)}</span><span class="det-row-val ${sR?'':'zero'}">${fp(sR)}</span></div>
+      <div class="det-row"><span class="det-row-label">Seguro Cesantía ${badge(sC>0)}</span><span class="det-row-val ${sC?'':'zero'}">${fp(sC)}</span></div>
+      <div class="det-row"><span class="det-row-label">Reparación Menor ${badge(sM>0)}</span><span class="det-row-val ${sM?'':'zero'}">${fp(sM)}</span></div>
+      <div class="det-total"><span>Total Seguros</span><span>${fmtP(totalReal)}</span></div>
+      ${totalOp && totalOp !== totalReal ? `<div style="font-size:.68rem;color:#b45309;margin-top:6px">El total de seguros de la operación (${fmtP(totalOp)}) no coincide con la suma del desglose: revisar la carga.</div>` : ''}
+      <div style="font-size:.68rem;color:#94a3b8;margin-top:6px">Valores tal como vienen en la operación de la financiera (carga masiva / Trinidad), no calculados.</div>`;
+    return;
+  }
   const dj = parseDJ();
   const chkD = dj.seguros?.desgravamen ?? true;
   const chkR = dj.seguros?.rdh         ?? true;
