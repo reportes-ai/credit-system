@@ -210,7 +210,7 @@ async function buildInformeVentas() {
   <div style="background:#eef2f7;padding:24px 12px;font-family:'Segoe UI',Arial,sans-serif">
     <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 8px 28px rgba(2,32,82,.08)">
       <div style="padding:18px 28px 12px;background:#fff">
-        <img src="${APP_URL}/img/logo.png" alt="AutoFácil" height="34" style="height:34px;width:auto;display:block">
+        <img src="${APP_URL}/img/logo-bs-mail.png" alt="AutoFácil Business Suite" height="44" style="height:44px;width:auto;display:block">
       </div>
       <div style="background:#0a1c3e;color:#fff;padding:18px 28px">
         <div style="font-size:18px;font-weight:800;letter-spacing:.2px">Informe Diario de Ventas</div>
@@ -382,7 +382,7 @@ async function buildResumenEjecutivo() {
   <div style="background:#eef2f7;padding:24px 12px;font-family:'Segoe UI',Arial,sans-serif">
     <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 8px 28px rgba(2,32,82,.08)">
       <div style="padding:18px 28px 12px;background:#fff">
-        <img src="${APP_URL}/img/logo.png" alt="AutoFácil" height="34" style="height:34px;width:auto;display:block">
+        <img src="${APP_URL}/img/logo-bs-mail.png" alt="AutoFácil Business Suite" height="44" style="height:44px;width:auto;display:block">
       </div>
       <div style="background:#012d70;background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE);color:#fff;padding:18px 28px">
         <div style="font-size:18px;font-weight:800;letter-spacing:.2px">Resumen Ejecutivo Diario</div>
@@ -616,7 +616,7 @@ async function buildAlertaPenetracion(opts = {}) {
   <div style="background:#eef2f7;padding:24px 12px;font-family:'Segoe UI',Arial,sans-serif">
     <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 8px 28px rgba(2,32,82,.08)">
       <div style="padding:18px 28px 12px;background:#fff">
-        <img src="${APP_URL}/img/logo.png" alt="AutoFácil" height="34" style="height:34px;width:auto;display:block">
+        <img src="${APP_URL}/img/logo-bs-mail.png" alt="AutoFácil Business Suite" height="44" style="height:44px;width:auto;display:block">
       </div>
       <div style="background:${headBg};color:#fff;padding:18px 28px">
         <div style="font-size:18px;font-weight:800;letter-spacing:.2px">${tituloMail}</div>
@@ -957,7 +957,7 @@ async function buildFundantesPendientes() {
   <div style="background:#eef2f7;padding:24px 12px;font-family:'Segoe UI',Arial,sans-serif">
     <div style="max-width:760px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 8px 28px rgba(2,32,82,.08)">
       <div style="padding:18px 28px 12px;background:#fff">
-        <img src="${APP_URL}/img/logo.png" alt="AutoFácil" height="34" style="height:34px;width:auto;display:block">
+        <img src="${APP_URL}/img/logo-bs-mail.png" alt="AutoFácil Business Suite" height="44" style="height:44px;width:auto;display:block">
       </div>
       <div style="background:${nCrit ? 'linear-gradient(135deg,#7f1d1d,#b91c1c)' : 'linear-gradient(135deg,#012d70,#0141A2)'};color:#fff;padding:18px 28px">
         <div style="font-size:18px;font-weight:800;letter-spacing:.2px">📁 Fundantes Pendientes</div>
