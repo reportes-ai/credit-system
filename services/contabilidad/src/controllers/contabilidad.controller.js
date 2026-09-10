@@ -1610,7 +1610,10 @@ require('../../../../shared/migrate').enFila('contabilidad-remun-aux', async () 
        las cotizaciones que rebajan la base del impuesto único, el APV, la mayor
        retención solicitada, el 3% del préstamo solidario y la indemnización por años
        de servicio (renta no gravada / mes del finiquito). */
-    for (const c of ['seg_ces_trab', 'salud_legal', 'salud_adicional', 'total_imposicion', 'apv', 'mayor_retencion', 'prestamo_3pct', 'ias', 'total_ganado'])
+    /* finiquito_otros = vacaciones proporcionales + mes de aviso + indemnización voluntaria (marca "F" de la DJ 1887);
+       aportes_emp_otros = ley de accidentes + aportes de la reforma previsional + trabajo pesado del empleador (leyes sociales C36). */
+    for (const c of ['seg_ces_trab', 'salud_legal', 'salud_adicional', 'total_imposicion', 'apv', 'mayor_retencion', 'prestamo_3pct', 'ias', 'total_ganado',
+                     'finiquito_otros', 'aportes_emp_otros'])
       await pool.query(`ALTER TABLE ctb_remun_aux ADD COLUMN ${c} DECIMAL(14,0) NOT NULL DEFAULT 0`).catch(() => {});
   } catch (e) { console.error('[contabilidad-remun-aux migration]', e.message); }
 });
@@ -1640,6 +1643,9 @@ exports.importarRemunAux = async (req, res) => {
       liquido: 'SUELDO LIQUIDO', segCes: 'SEG.CES. EMP.', sis: 'SIS EMP.',
       segCesT: 'SEG.CES. TRAB.', salud7: '7 % SALUD', saludAd: 'ADICIONAL SALUD', imposicion: 'TOTAL IMPOSICION',
       apv: 'AHORRO PREV.', mayorRet: 'MAYOR RETEN.SOLIC.', prest3: 'RETENCION 3% PRESTAMO SOLIDARIO',
+      vacProp: 'VACACIONES PROPORCIONALES', mesAviso: 'INDEMINIZACION MES DE AVISO', indVol: 'INDEMNIZACION VOLUNTARIA',
+      ley16744: 'LEY 17.644 (ACT.)', capInd: 'APORTE CAP.INDIVIDUAL', expVida: 'APORTE EXPECTATIVA DE VIDA',
+      rentProt: 'APORTE RENTABILIDAD PROTEGIDA', pesadoEmp: 'MONTO TRAB.PESADO',
     })) { const i = col(nom); off[k] = i < 0 ? -1 : head.length - i; }
     // La Ñ de "AÑOS" llega mal codificada según el export: se busca por patrón.
     { const i = head.findIndex(h => /^INDEMNIZACION A.OS DE SERVICIO$/.test(h)); off.ias = i < 0 ? -1 : head.length - i; }
@@ -1660,7 +1666,9 @@ exports.importarRemunAux = async (req, res) => {
         (fin('salud') || '').trim().slice(0, 40) || null, n(fin('saludM')),
         n(fin('impUnico')), n(fin('desc')), n(fin('liquido')), n(fin('segCes')), n(fin('sis')),
         n(fin('segCesT')), n(fin('salud7')), n(fin('saludAd')), n(fin('imposicion')), n(fin('apv')),
-        n(fin('mayorRet')), n(fin('prest3')), n(fin('ias')), n(fin('ganado'))]);
+        n(fin('mayorRet')), n(fin('prest3')), n(fin('ias')), n(fin('ganado')),
+        n(fin('vacProp')) + n(fin('mesAviso')) + n(fin('indVol')),
+        n(fin('ley16744')) + n(fin('capInd')) + n(fin('expVida')) + n(fin('rentProt')) + n(fin('pesadoEmp'))]);
     }
     if (!filas.length) return fail(res, 'No se pudo interpretar ninguna fila', 400);
     const meses = [...new Set(filas.map(f => f[0]))];
@@ -1669,7 +1677,8 @@ exports.importarRemunAux = async (req, res) => {
       await pool.query(
         `INSERT INTO ctb_remun_aux (mes, rut, nombre, cargo, centro_costo, dias, sueldo_base, imponible, haberes,
           afp_nombre, afp_monto, salud_nombre, salud_monto, impuesto_unico, descuentos, liquido, seg_ces_emp, sis_emp,
-          seg_ces_trab, salud_legal, salud_adicional, total_imposicion, apv, mayor_retencion, prestamo_3pct, ias, total_ganado) VALUES ?`,
+          seg_ces_trab, salud_legal, salud_adicional, total_imposicion, apv, mayor_retencion, prestamo_3pct, ias, total_ganado,
+          finiquito_otros, aportes_emp_otros) VALUES ?`,
         [filas.slice(i, i + 300)]);
     auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'remun_aux', entidad_id: null, detalle: `Import remuneraciones AVSOFT: ${filas.length} liquidaciones, meses ${meses.join(', ')}` });
     ok(res, { liquidaciones: filas.length, meses });
@@ -1964,7 +1973,8 @@ async function calcularDJ1887(anio) {
   const factor = await factoresDJ(anio);
   const [liq] = await pool.query(
     `SELECT mes, rut, nombre, imponible, total_ganado, haberes, afp_monto, salud_monto, seg_ces_trab, apv,
-            impuesto_unico, mayor_retencion, prestamo_3pct, ias, total_imposicion
+            impuesto_unico, mayor_retencion, prestamo_3pct, ias, total_imposicion, finiquito_otros,
+            seg_ces_emp, sis_emp, aportes_emp_otros
        FROM ctb_remun_aux WHERE mes LIKE ? ORDER BY mes`, [`${anio}-%`]);
   const mesDe = r => Number(String(r.mes).slice(5, 7));
   const [cfg] = await pool.query("SELECT clave, valor FROM rh_config WHERE clave IN ('rem_tope_imponible_uf','rem_apv_tope_uf','rem_salud_pct')");
@@ -2000,7 +2010,7 @@ async function calcularDJ1887(anio) {
       topeImponible: tope[m], saludPct: C.rem_salud_pct || 7,
       apvTope: C.rem_apv_tope_uf && ufMes[m] ? C.rem_apv_tope_uf * ufMes[m] : Infinity });
     if (!porRut.has(rut)) porRut.set(rut, { rut, nombre: r.nombre, renta: vacio12(), imp: vacio12(), mayor: vacio12(),
-      nograv: vacio12(), p3: vacio12(), imponible: vacio12(), leyes: vacio12(), ias: vacio12(), con: Array(12).fill(false) });
+      nograv: vacio12(), p3: vacio12(), imponible: vacio12(), leyes: vacio12(), ias: vacio12(), fin: vacio12(), con: Array(12).fill(false) });
     const g = porRut.get(rut);
     g.con[k] = true;
     g.renta[k] += base;
@@ -2009,27 +2019,38 @@ async function calcularDJ1887(anio) {
     g.nograv[k] += Math.max(0, (Number(r.haberes) || 0) - ganado);
     g.p3[k] += Number(r.prestamo_3pct) || 0;
     g.imponible[k] += Number(r.imponible) || 0;
-    g.leyes[k] += Number(r.total_imposicion) || ((Number(r.afp_monto) || 0) + (Number(r.salud_monto) || 0) + (Number(r.seg_ces_trab) || 0));
+    /* Leyes sociales (C36) = cotizaciones que REBAJARON la renta neta (ganado − renta neta:
+       AFP + cesantía + salud deducible + APV deducible) + las de cargo del empleador (cesantía
+       y SIS del empleador, ley de accidentes y aportes de la reforma). Así lo arma AVSOFT:
+       validado fila a fila contra su "Formato archivo plano F1887" AT2026 (281 de 322 filas con
+       la fórmula anterior; las 41 restantes eran salud adicional no deducible y APV). */
+    g.leyes[k] += Math.max(0, ganado - base) + (Number(r.seg_ces_emp) || 0) + (Number(r.sis_emp) || 0) + (Number(r.aportes_emp_otros) || 0);
     g.ias[k] += Number(r.ias) || 0;
+    g.fin[k] += Number(r.finiquito_otros) || 0;
   }
 
   const act = (arr) => arr.map((v, k) => Math.round(v * (factor[k + 1] || 1)));
   const suma = (arr) => arr.reduce((a, x) => a + x, 0);
   const finInferido = [];
+  // Sin renta, impuesto, no gravada ni retenciones en todo el año → no se informa (así lo hace AVSOFT).
+  const enCero = [...porRut.values()].filter(g => ![g.renta, g.imp, g.mayor, g.nograv, g.p3].some(a => a.some(v => v)));
   const filas = [...porRut.values()]
+    .filter(g => !enCero.includes(g))
     .sort((a, b) => Number(String(a.rut).split('-')[0]) - Number(String(b.rut).split('-')[0]))
     .map((g, i) => {
       const [cuerpo, dv] = String(g.rut).split('-');
       const u = usuarioDe.get(g.rut);
       const ultimo = g.con.lastIndexOf(true) + 1;
       const baja = u && u.fecha_baja && new Date(u.fecha_baja).getFullYear() === anio ? new Date(u.fecha_baja).getMonth() + 1 : null;
-      const inferida = !u && ultimo < ultimoMes;   // ex trabajador sin ficha: dejó de aparecer antes del último mes del libro
-      if (inferida) finInferido.push(g.rut);
+      /* "F" solo con evidencia (fecha de baja, indemnización, vacaciones proporcionales o mes de aviso
+         pagados en el mes). Deducirlo del último mes con liquidación no calzó con la 1887 que presentó
+         AVSOFT en AT2026 (14 diferencias): quien deja de aparecer sin finiquito en el libro va con "C". */
+      if (!u && ultimo < ultimoMes && !g.fin.some(x => x > 0) && !g.ias.some(x => x > 0)) finInferido.push(g.rut);
       const parcial = u && Number(u.jornada_especial_hrs) > 0 && Number(u.jornada_especial_hrs) <= 30;
       const siglas = g.con.map((c, k) => {
         if (!c) return '';
         const m = k + 1;
-        if (m === baja || g.ias[k] > 0 || (inferida && m === ultimo)) return 'F';
+        if (m === baja || g.ias[k] > 0 || g.fin[k] > 0) return 'F';
         return parcial ? 'P' : 'C';
       });
       const horas = !u ? null : (u.jornada_art22 ? 99 : (Number(u.jornada_especial_hrs) > 0 ? Number(u.jornada_especial_hrs) : (u.jornada_40h ? 40 : null)));
@@ -2056,7 +2077,8 @@ async function calcularDJ1887(anio) {
   if (malDV.length) avisos.push({ nivel: 'alto', texto: `${malDV.length} RUT con dígito verificador inválido: ${malDV.map(f => f.rut).join(', ')}.` });
   const sinHoras = filas.filter(f => f.c64 == null);
   if (sinHoras.length) avisos.push({ nivel: 'medio', texto: `${sinHoras.length} trabajador(es) sin horas semanales pactadas (C64): ${sinHoras.map(f => f.rut).join(', ')}. Completa la jornada en la ficha de RRHH (art. 22 = 99) o ingrésalas en el importador del SII.` });
-  if (finInferido.length) avisos.push({ nivel: 'info', texto: `${finInferido.length} ex trabajador(es) sin ficha en Usuarios: se marcó "F" en su último mes con liquidación (${finInferido.join(', ')}). Confirma los meses de finiquito.` });
+  if (finInferido.length) avisos.push({ nivel: 'info', texto: `${finInferido.length} ex trabajador(es) sin ficha dejan de aparecer antes de fin de año sin pagos de finiquito en el libro; se informan con "C" (${finInferido.join(', ')}). Si alguno fue finiquitado, corresponde "F" en su último mes.` });
+  if (enCero.length) avisos.push({ nivel: 'info', texto: `${enCero.length} RUT con liquidaciones en $0 todo el año no se informan: ${enCero.map(g => g.rut).join(', ')}.` });
   const faltan = [];
   for (let m = 1; m <= ultimoMes; m++) if (!mesesConDatos.includes(m)) faltan.push(m);
   if (faltan.length) avisos.push({ nivel: 'medio', texto: `Meses sin liquidaciones en el libro: ${faltan.join(', ')}.` });
