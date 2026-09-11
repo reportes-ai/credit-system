@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v3.4 — Momento en que la comisión pasa A PAGAR (cierre de mes / inmediato). v3.3 — Corte de la cartola (mes anterior / inmediato). v3.2 — "Sale desde": remitente parametrico por plantilla (cuentas habilitadas del mailer); cartolas dealer/parque nacen desde comisiones@ · v3.1 — campo CCO (copia oculta) editable en cada plantilla de correo · v3.0 — correo ODP a Contabilidad: campo Con copia (CC) parametrico junto al destinatario · v2.9 — navbar migrada al componente topnav · v2.7 — los montos seguidos salen como tabla en el correo · v2.6 — el cuerpo se envia con parrafos de verdad (bug: la prueba lo mandaba todo pegado) · v2.5 — cuerpos en texto plano legible (el motor los pasa a HTML) + cada correo dice a quien va dirigido · v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
+  <!-- v3.5 — parámetros TEF Banco Internacional (gratis al mes, monto máximo). v3.4 — Momento en que la comisión pasa A PAGAR (cierre de mes / inmediato). v3.3 — Corte de la cartola (mes anterior / inmediato). v3.2 — "Sale desde": remitente parametrico por plantilla (cuentas habilitadas del mailer); cartolas dealer/parque nacen desde comisiones@ · v3.1 — campo CCO (copia oculta) editable en cada plantilla de correo · v3.0 — correo ODP a Contabilidad: campo Con copia (CC) parametrico junto al destinatario · v2.9 — navbar migrada al componente topnav · v2.7 — los montos seguidos salen como tabla en el correo · v2.6 — el cuerpo se envia con parrafos de verdad (bug: la prueba lo mandaba todo pegado) · v2.5 — cuerpos en texto plano legible (el motor los pasa a HTML) + cada correo dice a quien va dirigido · v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -128,6 +128,11 @@
           <option value="CIERRE_MES">El último día del mes (todo lo que recibió fondos en el mes)</option>
           <option value="INMEDIATO">Inmediato (al marcar FONDOS RECIBIDOS)</option>
         </select><span id="msgMomento" style="font-size:.78rem;color:#16a34a"></span>
+        <div style="flex-basis:100%;height:0"></div>
+        <div><b style="color:#0141A2"><i class="bi bi-bank me-1"></i>TEF masiva Banco Internacional</b><div style="font-size:.76rem;color:#64748b">Botón «TEF B.Internacional» en Saldos Precios, Comisiones y Comisiones Parques a Pagar. Cargos gratis por mes (las tres pantallas suman) y monto máximo por transferencia que acepta el banco.</div></div>
+        <label style="font-size:.8rem;color:#334155">Gratis al mes <input id="tefGratis" type="number" min="1" class="form-control form-control-sm" style="width:90px;display:inline-block" onchange="guardarTEF('tef_gratis_mes', this.value)"></label>
+        <label style="font-size:.8rem;color:#334155">Monto máximo $ <input id="tefMax" type="number" min="1" step="1000" class="form-control form-control-sm" style="width:130px;display:inline-block" onchange="guardarTEF('tef_monto_max', this.value)"></label>
+        <span id="msgTEF" style="font-size:.78rem;color:#16a34a"></span>
       </div>
       <h6 style="font-weight:800;color:#0141A2;margin:0 0 4px"><i class="bi bi-envelope-at me-1"></i>Correos de Cartolas, Comisiones y Parques</h6>
       <div class="ph" style="margin:0 0 12px">Texto, destinatarios por perfil, copia (CC) e interruptor de cada correo automático. El cuerpo se escribe en <b>texto normal</b> y el sistema le da el formato al enviarlo: una línea en blanco separa párrafos, y <b>dos o más líneas seguidas del tipo «Concepto: $monto» salen como tabla</b> (si la etiqueta empieza con TOTAL, la fila va destacada). Cada correo indica <b>a quién va dirigido</b>; los perfiles y el CC son copias que se suman. Cada uno se guarda por separado y queda auditado; <b>Prueba</b> lo manda con datos de ejemplo solo a la casilla que indiques.</div>
@@ -169,6 +174,7 @@
       <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este recuadro</b><br>
       • <b>Destinatario (Para) y Con copia (CC)</b> → a quién va y quién queda copiado en el correo de la orden de pago (<a href="/postventa/orden-pago/">Emisión Orden de Pago Saldo Precio</a>, <a href="/postventa/orden-pago-comision/">Emisión Orden de Pago Comisión</a> y el envío manual desde <a href="/ordenes-pago/historial/">Órdenes de Pago → Historial</a>). El usuario que envía siempre se suma al CC.<br>
       • <b>Asunto / Cuerpo / Firma</b> → el texto del correo que arma cada página al pulsar «Enviar Correo». El cuadro de la orden se inserta automáticamente entre el cuerpo y la firma.<br>
+      • <b>TEF masiva Banco Internacional</b> → botón «TEF B.Internacional» y la leyenda «te quedan N/150 gratis» en <a href="/postventa/saldos-a-pagar/">Saldos Precios a Pagar</a>, <a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a> y <a href="/postventa/comisiones-parques/">Comisiones Parques a Pagar</a>; los cargos se cuentan en las tres. Los datos bancarios salen de la ficha del dealer / del parque y el código de banco del catálogo de <a href="/mantenedores/remuneraciones/">Indicadores de Remuneraciones</a> (Bancos).<br>
       • <b>Cartola al dealer</b> → el correo automático (comisiones@, HTML + PDF adjunto, CC ejecutivos y Jefe Comercial) al pulsar «Enviar Cartola» en <a href="/aprobaciones/">Emisión de Cartolas</a> (pestaña Revisión Cartolas). El interruptor lo activa/desactiva.<br>
       • <b>Cartola al parque</b> → el correo con la cartola en PDF (detalle de operaciones + arriendo) al pulsar «Enviar cartola» en <a href="/postventa/cartolas-parque/">Emisión de Cartolas Parque</a>.<br>
       • <b>Orden de Pago de parque → Contabilidad</b> → aviso al emitir la ODP en <a href="/postventa/comisiones-parques/">Comisiones Parques a Pagar</a>.<br>
@@ -220,6 +226,8 @@ function pintaCorreos(){
   const CTAS = CFG._cuentas_remitente || [{clave:'sistema',label:'Sistema (afbs@)'}];
   const sc = document.getElementById('corteCartola'); if (sc) sc.value = CFG.cartola_corte_marcado === 'INMEDIATO' ? 'INMEDIATO' : 'MES_ANTERIOR';
   const sm = document.getElementById('momentoAPagar'); if (sm) sm.value = CFG.comision_a_pagar_momento === 'INMEDIATO' ? 'INMEDIATO' : 'CIERRE_MES';
+  const tg = document.getElementById('tefGratis'); if (tg) tg.value = Number(CFG.tef_gratis_mes) > 0 ? Number(CFG.tef_gratis_mes) : 150;
+  const tm = document.getElementById('tefMax'); if (tm) tm.value = Number(CFG.tef_monto_max) > 0 ? Number(CFG.tef_monto_max) : 7000000;
   const opts = CTAS.map(x=>`<option value="${x.clave}">${x.label}</option>`).join('');
   document.getElementById('sRemitente').innerHTML = opts;
   document.getElementById('cRemitente').innerHTML = opts;
@@ -236,6 +244,12 @@ function pintaCorreos(){
   document.getElementById('psAsunto').value = ps.asunto; document.getElementById('psCuerpo').value = ps.cuerpo; document.getElementById('psFirma').value = ps.firma || '';
 }
 
+async function guardarTEF(clave, v){
+  const m = document.getElementById('msgTEF'); const n = Number(v);
+  if (!(n > 0)) { m.textContent = '✗ Debe ser mayor que 0'; return; }
+  const j = await fetch('/api/postventa/config/' + clave, { method:'PUT', headers:H, body: JSON.stringify({ valor: n }) }).then(r=>r.json()).catch(()=>null);
+  m.textContent = j && j.success ? '✓ Guardado' : '✗ No se pudo guardar'; setTimeout(()=>m.textContent='', 3000);
+}
 async function guardarMomento(){
   const v = document.getElementById('momentoAPagar').value, m = document.getElementById('msgMomento');
   const j = await fetch('/api/postventa/config/comision_a_pagar_momento', { method:'PUT', headers:H, body: JSON.stringify({ valor: v }) }).then(r=>r.json()).catch(()=>null);

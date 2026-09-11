@@ -386,6 +386,7 @@ app.use('/api/castigos',                require('../../services/creditos/src/rou
 
 // Tesorería
 app.use('/api/cajas',                require('../../services/tesoreria/src/routes/cajas.routes'));
+app.use('/api/tef',                  require('../../services/tesoreria/src/routes/tef.routes'));   // TEF masiva Banco Internacional
 app.use('/api/cierre-caja',          require('../../services/tesoreria/src/routes/cierre-caja.routes'));
 app.use('/api/cuentas-transitorias', require('../../services/tesoreria/src/routes/cuentas-transitorias.routes'));
 app.use('/api/brokerage',            require('../../services/tesoreria/src/routes/brokerage.routes'));

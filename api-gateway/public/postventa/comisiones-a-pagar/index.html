@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Dealer a Pagar — AutoFácil</title>
-  <!-- v1.7 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v1.8 — botón TEF B.Internacional con el cupo gratis del mes. v1.7 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -110,6 +110,10 @@
       <span class="sep"></span>
       <button class="btn-sec" id="btnNomina" onclick="copiarNomina()" disabled><i class="bi bi-clipboard me-1"></i>Nómina</button>
       <button class="btn-sec" id="btnCSV" onclick="descargarCSV()" disabled><i class="bi bi-download me-1"></i>CSV</button>
+      <span style="display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle">
+        <button class="btn-sec" id="btnTEF" onclick="descargarTEF()" disabled title="Archivo de transferencias masivas para el Internet Banking del Banco Internacional"><i class="bi bi-bank me-1"></i>TEF B.Internacional</button>
+        <span id="tefCupo" style="font-size:.68rem;color:#64748b;margin-top:2px;white-space:nowrap"></span>
+      </span>
       <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarPago()" disabled><i class="bi bi-check2-all me-1"></i>Confirmar pago</button>
     </div>
   </div>
@@ -360,6 +364,7 @@ function recalc(){
   bc.disabled = env.length===0 || !CAN.pagar;
   bn.disabled = env.length===0 || !CAN.nomina;
   bv.disabled = env.length===0 || !CAN.nomina;
+  const bt = document.getElementById('btnTEF'); if (bt) bt.disabled = env.length===0 || !CAN.nomina;
   bc.title = CAN.pagar ? '' : quienTxt('pagar');
   bn.title = bv.title = CAN.nomina ? '' : quienTxt('nomina');
   document.getElementById('accionBar').style.display = DATA.some(r => !r.pagado) ? 'flex' : 'none';
@@ -567,6 +572,40 @@ function descargarCSV(){
   a.click(); URL.revokeObjectURL(a.href);
   toast(`CSV de ${m.length} pago(s) descargado`);
 }
+
+/* ── TEF masiva Banco Internacional (motor único shared/tef-internacional.js) ── */
+const TEF_PLATAFORMA = 'COMISIONES';
+async function cargarCupoTEF(){
+  try {
+    const j = await fetch('/api/tef/cupo', { headers:H }).then(r=>r.json());
+    const el = document.getElementById('tefCupo'); if (!el || !j.success) return;
+    const c = j.data; el.textContent = `te quedan ${c.restantes}/${c.gratis} gratis este mes`;
+    el.style.color = c.restantes <= 10 ? '#b91c1c' : '#64748b';
+    el.title = `Cargos enviados en ${c.mes}: ` + Object.entries(c.por_plataforma||{}).map(([k,v])=>`${k} ${v}`).join(' · ');
+  } catch(e){}
+}
+function filasTEF(){ return nominaRows().map(r => ({ ref:'OP '+(r.num_op||''), rut:r.rut_dealer, nombre:r.nombre_dealer, banco:r.banco, tipo_cuenta:r.tipo_cuenta||'', num_cuenta:r.num_cuenta, correo:r.correo||'', monto:Math.round(Number(r.comision)||0), motivo:`Comision OP ${r.num_op||''}` })); }
+async function descargarTEF(){
+  const filas = filasTEF(); if (!filas.length) return;
+  const btn = document.getElementById('btnTEF'); btn.disabled = true;
+  try {
+    const j = await fetch('/api/tef/internacional', { method:'POST', headers:H, body: JSON.stringify({ plataforma: TEF_PLATAFORMA, filas }) }).then(r=>r.json());
+    if (!j.success) return toast(j.error || 'No se pudo generar el archivo', true);
+    const d = j.data;
+    if (d.cargos) {
+      const bin = atob(d.archivo_base64), arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([arr], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      a.download = d.nombre_archivo; a.click(); URL.revokeObjectURL(a.href);
+    }
+    toast(`TEF: ${d.cargos} transferencia(s) por $${Number(d.monto_total).toLocaleString('es-CL')}` + (d.excluidas.length ? ` · ${d.excluidas.length} fuera del archivo` : ''), !d.cargos);
+    if (d.excluidas.length) alert('Quedaron FUERA del archivo (pagar por transferencia individual o corregir la ficha):\n' + d.excluidas.map(x => `• ${x.ref} ${x.nombre}: ${x.motivo}`).join('\n'));
+    cargarCupoTEF();
+  } catch(e){ toast('Error de red', true); }
+  finally { btn.disabled = false; }
+}
+cargarCupoTEF();
 </script>
 <script src="/js/busqueda-core.js"></script>
 <script src="/js/topnav.js"></script>
