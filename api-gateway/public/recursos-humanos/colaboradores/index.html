@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
+  <!-- v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -137,6 +137,7 @@ async function abrir(id){
       ${sel('f_tipo_contrato','Tipo de contrato',f.tipo_contrato,['INDEFINIDO','PLAZO FIJO','HONORARIOS','PRACTICA'],1)}
       ${sel('f_jornada','Jornada',f.jornada,['COMPLETA','PARCIAL'],1)}
       ${sel('f_tipo_renta','Tipo de renta (comisiones)',f.tipo_renta||'VARIABLE',['VARIABLE','FIJA'],1)}
+      ${sel('f_pensionado','Pensionado (sin AFP, AFC ni SIS)',Number(f.pensionado)===1?'SI':'NO',['NO','SI'],1)}
       ${inp('f_telefono','Teléfono corporativo',u.telefono)}
     </div>
     <div class="sec">Datos personales</div>
@@ -248,7 +249,7 @@ async function guardarFicha(){
   const body = {
     cargo:g('f_cargo'), fecha_ingreso:g('f_fecha_ingreso'), centro_costo:g('f_centro_costo'),
     fecha_nacimiento:g('f_fecha_nacimiento'), sexo:g('f_sexo'), telefono:g('f_telefono'),
-    tipo_contrato:g('f_tipo_contrato'), jornada:g('f_jornada'), tipo_renta:g('f_tipo_renta')||'VARIABLE',
+    tipo_contrato:g('f_tipo_contrato'), jornada:g('f_jornada'), tipo_renta:g('f_tipo_renta')||'VARIABLE', pensionado:g('f_pensionado')==='SI'?1:0,
     estado_civil:g('f_estado_civil'), nacionalidad:g('f_nacionalidad'),
     direccion:g('f_direccion'), comuna:g('f_comuna'), ciudad:g('f_ciudad'),
     email_personal:g('f_email_personal'), telefono_personal:g('f_telefono_personal'),

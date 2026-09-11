@@ -11,6 +11,8 @@
      ausencia, ingreso o baja en el mes, el tope de gratificación y los topes imponibles
      (AFP/salud/SIS y AFC) valen tope × días/30 — norma Previred/DT; antes se aplicaban enteros.
    UF de la liquidación: la del ÚLTIMO día del mes (antes, día 28).
+   PENSIONADO (rh_fichas.pensionado=1, 11-09-2026): sin AFP, sin AFC (trabajador y empleador) y sin SIS;
+     salud e impuesto igual que todos. Caso Cristina Peña (AVSOFT: AFP 0, cesantía 0).
    Descuentos legales (sobre imponible topado a rem_tope_imponible_uf × UF):
      · AFP: tasa por administradora (rh_afp_tasas, paramétrica).
      · Salud: 7% legal (rem_salud_pct) — plan Isapre pactado en UF pendiente.
@@ -706,13 +708,15 @@ function calcLiquidacion(inp, ind) {
   const topeImp = R(ind.rem_tope_imponible_uf * ind.uf * prorrateo);
   const baseCotiz = Math.min(imponible, topeImp);
 
-  const afpPct = parseFloat((ind.afps.find(a => a.afp === String(inp.afp || '').toUpperCase()) || {}).tasa_pct) || 0;
-  const descAfp = inp.afp ? R(baseCotiz * afpPct / 100) : 0;
+  // Pensionado: ya jubiló → no cotiza AFP ni cesantía, y el empleador no paga SIS (Previred, Tabla N°7 tipo de trabajador)
+  const pensionado = Number(inp.pensionado) === 1;
+  const afpPct = pensionado ? 0 : parseFloat((ind.afps.find(a => a.afp === String(inp.afp || '').toUpperCase()) || {}).tasa_pct) || 0;
+  const descAfp = (inp.afp && !pensionado) ? R(baseCotiz * afpPct / 100) : 0;
   const descSalud = R(baseCotiz * ind.rem_salud_pct / 100);
   // Plan Isapre pactado en UF: lo que exceda el 7% legal es "adicional isapre" (descuento al líquido).
   const planUF = Number(inp.plan_isapre_uf) || 0;
   const descSaludAdicional = planUF > 0 ? Math.max(0, R(planUF * ind.uf) - descSalud) : 0;
-  const esIndef = String(inp.tipo_contrato || '').toUpperCase() === 'INDEFINIDO';
+  const esIndef = String(inp.tipo_contrato || '').toUpperCase() === 'INDEFINIDO' && !pensionado;
   const baseAfc = Math.min(imponible, R(ind.rem_tope_afc_uf * ind.uf * prorrateo));
   const descAfc = esIndef ? R(baseAfc * ind.rem_afc_trabajador_pct / 100) : 0;
 
@@ -737,8 +741,8 @@ function calcLiquidacion(inp, ind) {
   const totalHaberes = imponible + colacion + movilizacion + otrosNoImp;
   const totalDescuentos = descAfp + descSalud + descSaludAdicional + descAfc + impuesto + otrosDesc;
   // Aportes del EMPLEADOR (no afectan el líquido; alimentan costo empresa/Previred)
-  const aporteSis = R(baseCotiz * (ind.rem_sis_pct || 0) / 100);
-  const aporteAfcEmp = R(baseAfc * ((esIndef ? ind.rem_afc_emp_pct : ind.rem_afc_emp_pfijo_pct) || 0) / 100);
+  const aporteSis = pensionado ? 0 : R(baseCotiz * (ind.rem_sis_pct || 0) / 100);
+  const aporteAfcEmp = pensionado ? 0 : R(baseAfc * ((esIndef ? ind.rem_afc_emp_pct : ind.rem_afc_emp_pfijo_pct) || 0) / 100);
   const aporteMutual = R(baseCotiz * (ind.rem_mutual_pct || 0) / 100);
   return {
     dias, sueldo_base: sueldo, comisiones, feriado_variable: feriadoVar, feriado_var_dias: inp.feriado_var_dias || 0, otros_imponibles: otrosImp, gratificacion,
@@ -756,7 +760,7 @@ function calcLiquidacion(inp, ind) {
     liquido: totalHaberes - totalDescuentos,
     aporte_sis: aporteSis, aporte_afc_emp: aporteAfcEmp, aporte_mutual: aporteMutual,
     costo_empresa: totalHaberes + aporteSis + aporteAfcEmp + aporteMutual,
-    tipo_contrato: inp.tipo_contrato || null,
+    tipo_contrato: inp.tipo_contrato || null, pensionado,
   };
 }
 
@@ -883,7 +887,7 @@ const getMes = async (req, res) => {
     const [emps] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) AS nombre,
               CONCAT(UPPER(COALESCE(u.nombre,'')), ' ', UPPER(COALESCE(u.apellido,''))) AS nombre_corto,
-              u.rut, u.cargo, u.fecha_ingreso, u.fecha_baja, f.sueldo_base, f.afp, f.salud, f.tipo_contrato, f.colacion, f.movilizacion, f.plan_isapre_uf,
+              u.rut, u.cargo, u.fecha_ingreso, u.fecha_baja, f.sueldo_base, f.afp, f.salud, f.tipo_contrato, f.pensionado, f.colacion, f.movilizacion, f.plan_isapre_uf,
               f.banco_pago, f.tipo_cuenta_pago, f.num_cuenta_pago
          FROM usuarios u JOIN rh_fichas f ON f.id_usuario = u.id_usuario
         WHERE (u.estado='activo' OR DATE_FORMAT(u.fecha_baja,'%Y-%m') >= ?)
@@ -909,7 +913,7 @@ const getMes = async (req, res) => {
                  banco_pago: e.banco_pago, tipo_cuenta_pago: e.tipo_cuenta_pago, num_cuenta_pago: e.num_cuenta_pago, ...det };
       }
       const inp = {
-        sueldo_base: e.sueldo_base, afp: e.afp, salud: e.salud, tipo_contrato: e.tipo_contrato,
+        sueldo_base: e.sueldo_base, afp: e.afp, salud: e.salud, tipo_contrato: e.tipo_contrato, pensionado: e.pensionado,
         plan_isapre_uf: e.plan_isapre_uf,
         dias: diasTrabajadosMes(mes, e.fecha_ingreso, lics[e.id_usuario], e.fecha_baja),
         colacion: e.colacion, movilizacion: e.movilizacion,
@@ -955,13 +959,13 @@ const guardar = async (req, res) => {
         `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) AS nombre,
                 CONCAT(UPPER(COALESCE(u.nombre,'')), ' ', UPPER(COALESCE(u.apellido,''))) AS nombre_corto,
                 u.rut, u.cargo, u.fecha_ingreso, u.fecha_baja,
-                fi.sueldo_base, fi.afp, fi.salud, fi.tipo_contrato, fi.colacion, fi.movilizacion, fi.plan_isapre_uf
+                fi.sueldo_base, fi.afp, fi.salud, fi.tipo_contrato, fi.pensionado, fi.colacion, fi.movilizacion, fi.plan_isapre_uf
            FROM usuarios u JOIN rh_fichas fi ON fi.id_usuario = u.id_usuario WHERE u.id_usuario = ?`, [f.id_usuario]);
       if (!emp) continue;
       const [[ya]] = await pool.query('SELECT id, estado FROM rh_liquidaciones WHERE id_usuario=? AND mes=?', [f.id_usuario, mes]);
       if (ya && ya.estado === 'EMITIDA') continue;   // congelada
       const inp = {
-        sueldo_base: emp.sueldo_base, afp: emp.afp, salud: emp.salud, tipo_contrato: emp.tipo_contrato,
+        sueldo_base: emp.sueldo_base, afp: emp.afp, salud: emp.salud, tipo_contrato: emp.tipo_contrato, pensionado: emp.pensionado,
         plan_isapre_uf: emp.plan_isapre_uf,
         dias: diasTrabajadosMes(mes, emp.fecha_ingreso, lics[emp.id_usuario], emp.fecha_baja),
         colacion: emp.colacion, movilizacion: emp.movilizacion,
@@ -1320,7 +1324,7 @@ function liqAlcance(sueldoBase, ficha, ind) {
     sueldo_base: sueldoBase, dias: 30,
     comisiones: 0, otros_imponibles: 0, otros_no_imponibles: 0, otros_descuentos: 0,
     colacion: ficha.colacion || 0, movilizacion: ficha.movilizacion || 0,
-    afp: ficha.afp || null, salud: ficha.salud || null,
+    afp: ficha.afp || null, salud: ficha.salud || null, pensionado: ficha.pensionado,
     plan_isapre_uf: 0,                    // adicional isapre EXCLUIDO del alcance
     tipo_contrato: ficha.tipo_contrato || 'INDEFINIDO',
   }, ind);
@@ -1367,7 +1371,7 @@ const aumentoRenta = async (req, res) => {
              TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) nombre_completo,
              u.rut, u.cargo, DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso,
              f.direccion, f.comuna, f.nacionalidad, f.estado_civil,
-             f.sueldo_base, f.colacion, f.movilizacion, f.afp, f.salud, f.plan_isapre_uf, f.tipo_contrato
+             f.sueldo_base, f.colacion, f.movilizacion, f.afp, f.salud, f.plan_isapre_uf, f.tipo_contrato, f.pensionado
       FROM usuarios u JOIN rh_fichas f ON f.id_usuario = u.id_usuario
       WHERE u.id_usuario=? LIMIT 1`, [idU]);
     if (!p) return fail(res, 'Colaborador sin ficha RRHH', 404);

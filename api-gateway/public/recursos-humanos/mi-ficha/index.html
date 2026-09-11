@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Ficha — AutoFácil</title>
-  <!-- v1.9 — Previsión y Pago: plan Isapre en UF y pesos del día. v1.8 — foto real de Credenciales en el avatar del hero -->
+  <!-- v1.10 — pensionado: AFP 'Pensionado (no cotiza)'. v1.9 — Previsión y Pago: plan Isapre en UF y pesos del día. v1.8 — foto real de Credenciales en el avatar del hero -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -143,7 +143,7 @@ function render(){
     fld('Fecha de ingreso', fD(u.fecha_ingreso)) + fld('Tipo de contrato', f.tipo_contrato) + fld('Jornada', f.jornada) +
     fld('Centro de costo', u.centro_costo) + fld('Fecha de nacimiento', fD(u.fecha_nacimiento)) + fld('Teléfono corporativo', u.telefono);
   document.getElementById('gPrev').innerHTML =
-    fld('AFP', f.afp) + fld('Salud', f.salud) + fld('Sueldo base', fP(f.sueldo_base)) +
+    fld('AFP', Number(f.pensionado) === 1 ? 'Pensionado (no cotiza)' : f.afp) + fld('Salud', f.salud) + fld('Sueldo base', fP(f.sueldo_base)) +
     // Plan Isapre pactado en UF (y en pesos con la UF del día); Fonasa no tiene plan
     (Number(f.plan_isapre_uf) > 0 ? fld('Plan Isapre', Number(f.plan_isapre_uf).toLocaleString('es-CL', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' UF' + (DATA.uf ? ' ≈ ' + fP(Math.round(f.plan_isapre_uf * DATA.uf)) + '/mes' : '')) : '') +
     fld('Banco de pago', f.banco_pago) + fld('Tipo de cuenta', f.tipo_cuenta_pago) + fld('N° de cuenta', f.num_cuenta_pago);

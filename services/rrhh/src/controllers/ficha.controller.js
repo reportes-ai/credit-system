@@ -169,6 +169,9 @@ require('../../../../shared/migrate').enFila('rrhh-ficha-previred', async () => 
       // especial sin variable (caso Karen Méndez): el motor la marca "no comisiona", la nómina la excluye
       // y la liquidación no le carga comisiones ni la bloquea por "sin aprobar".
       "tipo_renta VARCHAR(10) NOT NULL DEFAULT 'VARIABLE'",
+      // Pensionado (Pato, 11-09-2026, caso Cristina Peña): ya jubiló y sigue trabajando → no cotiza AFP ni
+      // seguro de cesantía (trabajador ni empleador) y el empleador no paga SIS. Salud sí (7% / plan).
+      "pensionado TINYINT NOT NULL DEFAULT 0",
     ]) await pool.query(`ALTER TABLE rh_fichas ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
     console.log('[rrhh-ficha-previred] listo');
   } catch (e) { console.error('[rrhh-ficha-previred migration]', e.message); }
@@ -179,7 +182,7 @@ const CAMPOS_CONTACTO = ['direccion', 'comuna', 'ciudad', 'email_personal', 'tel
   'emergencia_nombre', 'emergencia_fono', 'emergencia2_nombre', 'emergencia2_fono',
   'estado_civil', 'nacionalidad',
   'conyuge_nombre', 'conyuge_rut', 'conyuge_telefono', 'conyuge_direccion', 'conyuge_misma_dir'];
-const CAMPOS_LABORAL = ['tipo_contrato', 'tipo_renta', 'jornada', 'afp', 'salud', 'plan_isapre_uf', 'sueldo_base',
+const CAMPOS_LABORAL = ['tipo_contrato', 'tipo_renta', 'pensionado', 'jornada', 'afp', 'salud', 'plan_isapre_uf', 'sueldo_base',
   'banco_pago', 'tipo_cuenta_pago', 'num_cuenta_pago', 'observaciones',
   'tramo_asignacion', 'cargas_otras', 'cargas_maternales', 'cargas_invalidas', 'anos_trabajados_previos'];
 // Identidad en usuarios que RRHH puede actualizar desde la ficha

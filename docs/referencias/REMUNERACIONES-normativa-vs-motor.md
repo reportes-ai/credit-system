@@ -23,7 +23,7 @@ saber qué ya está, qué se decidió distinto (y por qué) y qué falta.
 | 7 | Impuesto único: base = imponible − AFP − salud (solo 7%) − AFC; tramos UTM (factor − rebaja) | `shared/base-tributable.js` (compartido con la DJ 1887): la salud deducible es la **pactada completa** (7% + adicional Isapre) con tope del 7% del tope imponible (art. 42 N°1 LIR / art. 18 DL 3.500) y APV régimen B rebaja hasta `rem_apv_tope_uf`. Validado contra AVSOFT (Sandra Ayala, 08-09-2026: $8.243). **El documento está simplificado en este punto; manda la ley y AVSOFT.** Tramos `rh_impuesto_tramos`, impuesto nunca negativo. | ✅ decidido |
 | 8 | Vacaciones con renta variable: promedio 3 meses de variables sumado al sueldo por los días de vacaciones | Haber "feriado variable" (art. 71 CT): promedio de comisiones de los últimos 3 meses enteros trabajados × días de vacaciones / 30. | ✅ |
 | 8b | Kardex de vacaciones, 1,25 días por mes; finiquito = saldo × sueldo/30 | Cuenta corriente `rh_vac_movimientos` (devengo 15 días por aniversario + progresivo art. 68 + tomados + ajustes), `saldoCuenta(id, fecha)`; el finiquito paga el saldo con la base de `services/rrhh/src/base-remuneracion.js`. | ✅ |
-| 9 | Aportes patronales: mutual (0,90% + siniestralidad), Ley Sanna 0,03%, SIS 1,54% (no si pensionado), AFC empleador 2,4% / 3,0% | `rem_mutual_pct` (una sola tasa, hoy 0,93%), `rem_sis_pct`, `rem_afc_emp_pct` / `rem_afc_emp_pfijo_pct`. Falta la **Ley Sanna** como aporte separado y la exclusión del SIS para **pensionados**. | ⚠️ pendiente 4.12 |
+| 9 | Aportes patronales: mutual (0,90% + siniestralidad), Ley Sanna 0,03%, SIS 1,54% (no si pensionado), AFC empleador 2,4% / 3,0% | `rem_mutual_pct` (una sola tasa, hoy 0,93%), `rem_sis_pct`, `rem_afc_emp_pct` / `rem_afc_emp_pfijo_pct`. Pensionados: `rh_fichas.pensionado` = sin AFP, AFC ni SIS (v231.12). Falta la **Ley Sanna** como aporte separado. | ⚠️ pendiente 4.12 (Sanna) |
 | 10 | Orden de cálculo (pipeline) | `calcLiquidacion()` sigue el mismo orden: días → proporcionales → variables → gratificación → imponible → bases topadas → descuentos legales → base tributable → impuesto → no imponibles → otros descuentos → líquido → aportes patronales. | ✅ |
 
 ## Pendiente 4.12 (PENDIENTES.md)
@@ -31,7 +31,7 @@ Brechas del motor contra la normativa, para decidir con Pato antes de tocar el c
 liquidaciones ya validadas al peso contra AVSOFT):
 1. ✅ Prorrateo por días pagados de topes (v231.9, paramétrico `rem_prorratea_topes`).
 2. **Ley Sanna** (0,03% cargo empleador) como aporte separado en costo empresa y archivo Previred.
-3. **SIS no se paga por pensionados**: bandera en la ficha + exclusión.
+3. ✅ Pensionado: bandera en la ficha, sin AFP/AFC/SIS (v231.12).
 4. ✅ UF del último día del mes (v231.9).
 
 Las decisiones tomadas distinto al documento (mes de ingreso en 30avos, semana corrida mensual,
