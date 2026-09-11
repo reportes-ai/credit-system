@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.1 — un panel por producto con reglas propias del mantenedor Productos por Financiera (AUTOFIN PREFERENTE): tasa, dealer por tramo, parque y ejecutivo propios, comisiones editables · v3.0 — comisiones Dealer, Parque y Ejecutivo editables EN CADA PANEL (AutoFin y UAC por separado, ↺ vuelve a la tabla); sale el input global de comisión dealer · v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
+<!-- v3.2 — costo de fondo propio por producto (tasa − spread ≤/> 200 UF) y página full width para ver los paneles uno al lado del otro · v3.1 — un panel por producto con reglas propias del mantenedor Productos por Financiera (AUTOFIN PREFERENTE): tasa, dealer por tramo, parque y ejecutivo propios, comisiones editables · v3.0 — comisiones Dealer, Parque y Ejecutivo editables EN CADA PANEL (AutoFin y UAC por separado, ↺ vuelve a la tabla); sale el input global de comisión dealer · v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -16,8 +16,8 @@
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
 
     /* Layout */
-    .page-content { padding:24px 32px; max-width:1300px; margin:0 auto; }
-    .sim-layout { display:grid; grid-template-columns:380px 1fr; gap:24px; align-items:start; }
+    .page-content { padding:24px 32px; max-width:none; margin:0 auto; }   /* full width: los paneles caben uno al lado del otro */
+    .sim-layout { display:grid; grid-template-columns:340px 1fr; gap:24px; align-items:start; }
     @media(max-width:900px){ .sim-layout { grid-template-columns:1fr; } }
 
     /* Cards */
@@ -52,7 +52,7 @@
     .uf-badge strong { color:#78350f; }
 
     /* Results — columnas paralelas */
-    .res-cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; }
+    .res-cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; }
     @media(max-width:900px){ .res-cols { grid-template-columns:1fr; } }
     .res-panel { display:block; }
     .badge-mejor { background:#f59e0b; color:#fff; font-size:.7rem; font-weight:700; border-radius:12px; padding:2px 8px; margin-left:8px; }
@@ -642,9 +642,12 @@ function simular() {
   for (const pr of PRODS) {
     const key = 'p' + pr.id;
     const tasaP = (esMayor ? Number(pr.tasa_mayor_pct) : Number(pr.tasa_menor_pct)) / 100;
+    // Costo de fondo del producto = tasa − spread propio (misma fórmula que AutoFin: CF = tasa − spread); sin spread propio usa el de AutoFin
+    const spreadP = esMayor ? pr.spread_mayor_pct : pr.spread_menor_pct;
+    const costoFondoP = spreadP != null && !isNaN(spreadP) ? tasaP - Number(spreadP) / 100 : costoFondo;
     const ing_tasa_p = window.AF_RENT_CORE
-      ? AF_RENT_CORE.ingresoColocacionAutoFin({ montoCap: monto_fin, plazo, tasaCli: tasaP, costoFondo })
-      : (tasaP > 0 && costoFondo > 0 ? Math.round(monto_fin * tasaP * Math.pow(1+tasaP,plazo)/(Math.pow(1+tasaP,plazo)-1) * (1-Math.pow(1+costoFondo,-plazo))/costoFondo - monto_fin) : 0);
+      ? AF_RENT_CORE.ingresoColocacionAutoFin({ montoCap: monto_fin, plazo, tasaCli: tasaP, costoFondo: costoFondoP })
+      : (tasaP > 0 && costoFondoP > 0 ? Math.round(monto_fin * tasaP * Math.pow(1+tasaP,plazo)/(Math.pow(1+tasaP,plazo)-1) * (1-Math.pow(1+costoFondoP,-plazo))/costoFondoP - monto_fin) : 0);
     const TAB_P = { dealer: Math.round(saldo * pctTramo(pr.dealer_tramos, plazo)), parque: esPatio ? Math.round(saldo * (Number(pr.parque_pct) || 0) / 100) : 0, ej: Math.round(monto_fin * (Number(pr.ejecutivo_pct) || 0) / 100) };
     const O = ovrDe(key);
     const C_P = { dealer: O.dealer != null ? O.dealer : TAB_P.dealer, parque: esPatio ? (O.parque != null ? O.parque : TAB_P.parque) : 0, ej: O.ej != null ? O.ej : TAB_P.ej };
@@ -657,7 +660,7 @@ function simular() {
       com_dealer: C_P.dealer, com_patio: C_P.parque, com_ej: C_P.ej,
       rentab: rentab_p, pct: monto_fin ? rentab_p / monto_fin * 100 : 0,
       cuota: cuota_p, esPatio, esCorfo: false,
-      tier_note: `Tasa cliente <b>${(tasaP * 100).toFixed(2).replace('.', ',')}%</b> (${esMayor ? '> 200 UF' : '≤ 200 UF'}) · dealer ${(pctTramo(pr.dealer_tramos, plazo) * 100).toFixed(1).replace('.', ',')}% del saldo a ${plazo} meses · parque ${Number(pr.parque_pct) || 0}% · ejecutivo ${Number(pr.ejecutivo_pct) || 0}% del monto financiado${pr.descripcion ? '<br>' + pr.descripcion : ''}`,
+      tier_note: `Tasa cliente <b>${(tasaP * 100).toFixed(2).replace('.', ',')}%</b> (${esMayor ? '> 200 UF' : '≤ 200 UF'}) · spread ${spreadP != null ? Number(spreadP).toFixed(2).replace('.', ',') + '%' : 'AutoFin'} → costo de fondo ${(costoFondoP * 100).toFixed(2).replace('.', ',')}% · dealer ${(pctTramo(pr.dealer_tramos, plazo) * 100).toFixed(1).replace('.', ',')}% del saldo a ${plazo} meses · parque ${Number(pr.parque_pct) || 0}% · ejecutivo ${Number(pr.ejecutivo_pct) || 0}% del monto financiado${pr.descripcion ? '<br>' + pr.descripcion : ''}`,
     });
     paneles.push({ hdr: 'hdrP' + pr.id, nombre: pr.producto, icono: 'bi-star-fill', rentab: rentab_p });
   }

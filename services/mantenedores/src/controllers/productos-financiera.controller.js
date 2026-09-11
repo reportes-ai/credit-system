@@ -48,15 +48,19 @@ require('../../../../shared/migrate').enFila('productos-financiera', async () =>
       'reglas_propias TINYINT(1) NOT NULL DEFAULT 0',
       'tasa_menor_pct DECIMAL(6,3) NULL',      // % mensual cliente, créditos ≤ 200 UF
       'tasa_mayor_pct DECIMAL(6,3) NULL',      // % mensual cliente, créditos > 200 UF
+      'spread_menor_pct DECIMAL(6,3) NULL',    // spread mensual ≤ 200 UF: costo de fondo = tasa − spread (como AutoFin)
+      'spread_mayor_pct DECIMAL(6,3) NULL',    // spread mensual > 200 UF
       'dealer_tramos TEXT NULL',               // JSON [{hasta:35,pct:0},{hasta:47,pct:2.5},{hasta:999,pct:5}] sobre saldo precio
       'parque_pct DECIMAL(6,3) NULL',          // % del saldo precio (solo dealer de parque)
       'ejecutivo_pct DECIMAL(6,3) NULL',       // % del monto financiado
       'descripcion VARCHAR(300) NULL',
     ]) await pool.query(`ALTER TABLE productos_financiera ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
     await pool.query(
-      `INSERT IGNORE INTO productos_financiera (financiera, producto, activo, orden, reglas_propias, tasa_menor_pct, tasa_mayor_pct, dealer_tramos, parque_pct, ejecutivo_pct, descripcion)
-       VALUES ('AUTOFIN', 'AUTOFIN PREFERENTE', 1, 13, 1, 2.39, 2.09, ?, 2.5, 1.0, 'Producto AutoFin con tasa preferente: comisión dealer 0% hasta 35 meses, 2,5% de 36 a 47 y 5% desde 48; parque 2,5%; ejecutivo 1% del monto financiado')`,
+      `INSERT IGNORE INTO productos_financiera (financiera, producto, activo, orden, reglas_propias, tasa_menor_pct, tasa_mayor_pct, spread_menor_pct, spread_mayor_pct, dealer_tramos, parque_pct, ejecutivo_pct, descripcion)
+       VALUES ('AUTOFIN', 'AUTOFIN PREFERENTE', 1, 13, 1, 2.39, 2.09, 0.55, 0.45, ?, 2.5, 1.0, 'Producto AutoFin con tasa preferente: comisión dealer 0% hasta 35 meses, 2,5% de 36 a 47 y 5% desde 48; parque 2,5%; ejecutivo 1% del monto financiado')`,
       [JSON.stringify([{ hasta: 35, pct: 0 }, { hasta: 47, pct: 2.5 }, { hasta: 999, pct: 5 }])]);
+    // Spreads de PREFERENTE (Pato, 11-09-2026): 0,55% ≤ 200 UF y 0,45% > 200 UF — solo si la fila aún no los tiene
+    await pool.query("UPDATE productos_financiera SET spread_menor_pct=0.55, spread_mayor_pct=0.45 WHERE producto='AUTOFIN PREFERENTE' AND spread_menor_pct IS NULL").catch(() => {});
   } catch (e) {
     console.error('[productos-financiera migration]', e.message);
   }
@@ -92,6 +96,7 @@ function reglasDe(b) {
     if (!tramos.length) tramos = null;
   }
   return { reglas_propias: b.reglas_propias ? 1 : 0, tasa_menor_pct: num(b.tasa_menor_pct), tasa_mayor_pct: num(b.tasa_mayor_pct),
+    spread_menor_pct: num(b.spread_menor_pct), spread_mayor_pct: num(b.spread_mayor_pct),
     dealer_tramos: tramos ? JSON.stringify(tramos) : null, parque_pct: num(b.parque_pct), ejecutivo_pct: num(b.ejecutivo_pct),
     descripcion: b.descripcion ? String(b.descripcion).trim().slice(0, 300) : null };
 }
@@ -102,8 +107,8 @@ const create = async (req, res) => {
     if (!financiera || !producto) return res.status(400).json({ success: false, data: null, error: 'financiera y producto son requeridos' });
     const R = reglasDe(req.body);
     const [r] = await pool.query(
-      'INSERT INTO productos_financiera (financiera, producto, activo, orden, reglas_propias, tasa_menor_pct, tasa_mayor_pct, dealer_tramos, parque_pct, ejecutivo_pct, descripcion) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-      [financiera.trim(), producto.trim(), activo ? 1 : 0, parseInt(orden) || 0, R.reglas_propias, R.tasa_menor_pct, R.tasa_mayor_pct, R.dealer_tramos, R.parque_pct, R.ejecutivo_pct, R.descripcion]
+      'INSERT INTO productos_financiera (financiera, producto, activo, orden, reglas_propias, tasa_menor_pct, tasa_mayor_pct, spread_menor_pct, spread_mayor_pct, dealer_tramos, parque_pct, ejecutivo_pct, descripcion) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [financiera.trim(), producto.trim(), activo ? 1 : 0, parseInt(orden) || 0, R.reglas_propias, R.tasa_menor_pct, R.tasa_mayor_pct, R.spread_menor_pct, R.spread_mayor_pct, R.dealer_tramos, R.parque_pct, R.ejecutivo_pct, R.descripcion]
     );
     auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'producto_financiera', entidad_id: r.insertId, detalle: `Creó producto "${producto.trim()}" (${financiera.trim()})`, meta: req.body });
     res.json({ success: true, data: { id: r.insertId }, error: null });
@@ -125,7 +130,7 @@ const update = async (req, res) => {
     if (orden     !== undefined) { sets.push('orden=?');      params.push(parseInt(orden) || 0); }
     if (req.body.reglas_propias !== undefined || req.body.dealer_tramos !== undefined || req.body.tasa_menor_pct !== undefined) {
       const R = reglasDe(req.body);
-      for (const k of ['reglas_propias', 'tasa_menor_pct', 'tasa_mayor_pct', 'dealer_tramos', 'parque_pct', 'ejecutivo_pct', 'descripcion']) { sets.push(k + '=?'); params.push(R[k]); }
+      for (const k of ['reglas_propias', 'tasa_menor_pct', 'tasa_mayor_pct', 'spread_menor_pct', 'spread_mayor_pct', 'dealer_tramos', 'parque_pct', 'ejecutivo_pct', 'descripcion']) { sets.push(k + '=?'); params.push(R[k]); }
     }
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Nada que actualizar' });
     params.push(id);
