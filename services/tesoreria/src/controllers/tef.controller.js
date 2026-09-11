@@ -23,7 +23,7 @@ async function filasParques(items) {
     const [[odp]] = await pool.query('SELECT monto FROM op_correlativos WHERE numero = ? AND anulada = 0 LIMIT 1', [it.odp_numero || '']);
     out.push({ ref: it.parque, rut: p?.rut_cuenta || p?.rut, nombre: p?.razon_social || p?.nombre_cuenta || it.parque, banco: p?.banco,
       tipo_cuenta: p?.cuenta_tipo, num_cuenta: p?.num_cuenta, correo: p?.correo_confirmacion, monto: odp?.monto || 0,
-      motivo: `Pago comision parque ${it.odp_numero || ''}` });
+      motivo: `Pago com parque ${it.odp_numero || ''}` });   // cabe en los 30 del banco
   }
   return out;
 }

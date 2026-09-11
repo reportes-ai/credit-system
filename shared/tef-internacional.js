@@ -67,7 +67,7 @@ const glosa = (s, largo) => sinAcentos(s).replace(/[^A-Za-z0-9 .\/]/g, ' ').repl
    abrevia el motivo ("saldo precio" → "SP", "comision" → "com") y, si aún no cabe, se corta. */
 function glosaParte(motivo, k, n) {
   const suf = ` Transf. ${k}/${n}`;
-  let m = glosa(motivo, 30);
+  let m = glosa(motivo, 120);   // abreviar ANTES de cortar, para no perder el número de la operación
   if ((m + suf).length > 30) m = m.replace(/saldo precio/i, 'SP').replace(/comision/i, 'com').replace(/parque/i, 'pq');
   if ((m + suf).length > 30) m = m.replace(/^Pago /i, '');   // antes de cortar el número, sacrificar el "Pago"
   return glosa(m.slice(0, 30 - suf.length) + suf, 30);
