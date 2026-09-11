@@ -340,7 +340,9 @@ const listar = async (req, res) => {
     if (!mes) return res.status(400).json({ success: false, data: null, error: 'Parámetro mes (YYYY-MM) requerido' });
     const calc = await calcularMes(mes);
     const [estados] = await pool.query(
-      "SELECT id, parque, etapa, odp_numero, arriendo, comision_creditos, ops, aprobada_por, fecha_aprobada, emitida_por, fecha_emitida, pagada_por, fecha_pagada FROM parques_pagos_mes WHERE DATE_FORMAT(mes,'%Y-%m')=?", [mes]);
+      `SELECT id, parque, etapa, odp_id, odp_numero, arriendo, comision_creditos, ops, aprobada_por, fecha_aprobada, emitida_por, fecha_emitida, pagada_por, fecha_pagada,
+              (SELECT fd.id FROM postventa_factura_docs fd WHERE fd.origen='PARQUE' AND fd.ref_id=parques_pagos_mes.id ORDER BY fd.id LIMIT 1) AS factura_doc_id
+         FROM parques_pagos_mes WHERE DATE_FORMAT(mes,'%Y-%m')=?`, [mes]);
     const estByParque = new Map(estados.map(e => [e.parque, e]));
     const rows = calc.map(r => {
       const e = estByParque.get(r.parque);
@@ -355,6 +357,8 @@ const listar = async (req, res) => {
         total: frozen ? Math.round(Number(e.arriendo)) + Math.round(Number(e.comision_creditos)) : r.total,
         etapa: e?.etapa || 'EN_APROBACION',
         odp_numero: e?.odp_numero || null,
+        odp_id: e?.odp_id || null,               // op_correlativos.id → popup de la orden (motor odp-documento.js)
+        factura_doc_id: e?.factura_doc_id || null,   // factura adjunta del parque (click abre el PDF)
         pago_id: e?.id || null,   // ref para las facturas adjuntas (postventa_factura_docs PARQUE)
         hitos: e ? {
           aprobada: e.fecha_aprobada ? { por: e.aprobada_por, fecha: e.fecha_aprobada } : null,

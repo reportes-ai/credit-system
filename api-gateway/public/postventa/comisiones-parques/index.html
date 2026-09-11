@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Parques a Pagar — AutoFácil</title>
-  <!-- v1.8 — TEF: generar el archivo registra el pago (y sus correos). v1.7 — botón TEF B.Internacional (parques con ODP emitida) con el cupo gratis del mes. v1.6 — login conserva el destino (?next=). v1.5 — full width + fecha de emision bajo la Orden de Pago · v1.4 — popup de revisión pre-emisión (factura adjunta + totales) · v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
+  <!-- v1.9 — ODP con popup de la orden (motor odp-documento.js), factura adjunta con click, operaciones como link. v1.8 — TEF: generar el archivo registra el pago (y sus correos). v1.7 — botón TEF B.Internacional (parques con ODP emitida) con el cupo gratis del mes. v1.6 — login conserva el destino (?next=). v1.5 — full width + fecha de emision bajo la Orden de Pago · v1.4 — popup de revisión pre-emisión (factura adjunta + totales) · v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -45,6 +45,11 @@
     .b-emitir  { background:#c2410c; }
     .b-pagar   { background:#16a34a; }
     .odp-tag { font-weight:800; color:#c2410c; font-size:.8rem; }
+    .odp-link { font-weight:800; color:#0141A2; font-size:.8rem; text-decoration:none; }
+    .fac-link { font-weight:700; color:#0141A2; font-size:.78rem; text-decoration:none; }
+    .ops-link { cursor:pointer; color:#0141A2; font-weight:800; text-decoration:underline dotted; }
+    #dlgODP::backdrop { background:rgba(15,23,42,.55); }
+    .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
     .hito { display:block; font-size:.68rem; color:#94a3b8; }
     .det-row td { background:#f8fafc; padding:0 12px 14px; }
     .det-box { background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-top:8px; overflow:hidden; }
@@ -86,7 +91,7 @@
   <div class="card-af">
     <table>
       <thead><tr>
-        <th></th><th>Parque</th><th class="num">Ops</th><th class="num">Arriendo</th><th class="num">Comisión créditos</th><th class="num">Total</th><th>Etapa</th><th>Orden de Pago</th><th style="text-align:center">Acciones</th>
+        <th></th><th>Parque</th><th class="num">Ops</th><th class="num">Arriendo</th><th class="num">Comisión créditos</th><th class="num">Total</th><th>Etapa</th><th>Orden de Pago / Factura</th><th style="text-align:center">Acciones</th>
       </tr></thead>
       <tbody id="tb"><tr><td colspan="9" class="vacio">Selecciona un mes…</td></tr></tbody>
       <tfoot id="tf" style="display:none"><tr>
@@ -170,12 +175,12 @@ function pintar(){
     return `<tr class="rowp" onclick="toggleDet(${i})">
       <td><i class="bi bi-chevron-right" id="chev${i}"></i></td>
       <td style="font-weight:700;color:var(--navy)">${esc(r.parque)}</td>
-      <td class="num">${r.ops.toLocaleString('es-CL')}</td>
+      <td class="num"><span class="ops-link" title="Ver las operaciones del parque">${r.ops.toLocaleString('es-CL')} OP</span></td>
       <td class="num">${CLP(r.arriendo)}</td>
       <td class="num">${CLP(r.comision_creditos)}</td>
       <td class="num" style="font-weight:800">${CLP(r.total)}</td>
       <td><span class="etapa ${etCls}">${etTxt}</span>${hitos}</td>
-      <td>${r.odp_numero? '<span class="odp-tag">'+esc(r.odp_numero)+'</span>'+(r.hitos&&r.hitos.emitida&&r.hitos.emitida.fecha?'<div style="font-size:.72rem;color:#94a3b8">'+new Date(r.hitos.emitida.fecha).toLocaleDateString('es-CL')+'</div>':''):'—'}</td>
+      <td onclick="event.stopPropagation()">${r.odp_numero? (r.odp_id ? '<a href="javascript:void 0" class="odp-link" onclick="verODP('+r.odp_id+')" title="Ver la Orden de Pago"><i class="bi bi-file-earmark-text me-1"></i>'+esc(r.odp_numero)+'</a>' : '<span class="odp-tag">'+esc(r.odp_numero)+'</span>')+(r.factura_doc_id ? '<div><a href="javascript:void 0" class="fac-link" onclick="verFactura('+r.factura_doc_id+')" title="Ver la factura adjunta del parque"><i class="bi bi-paperclip me-1"></i>Factura adjunta</a></div>' : '')+(r.hitos&&r.hitos.emitida&&r.hitos.emitida.fecha?'<div style="font-size:.72rem;color:#94a3b8">'+new Date(r.hitos.emitida.fecha).toLocaleDateString('es-CL')+'</div>':''):'—'}</td>
       <td style="text-align:center" onclick="event.stopPropagation()">${btn||'—'}</td>
     </tr>
     <tr class="det-row" id="det${i}" style="display:none"><td colspan="9"><div class="det-box" id="detbox${i}">Cargando…</div></td></tr>`;
@@ -306,6 +311,42 @@ async function ejecutarAccion(acc, parque){
 })();
 </script>
 <script src="/js/odp-preemision.js"></script>
+<script>
+/* Ver la Orden de Pago sin salir de la pantalla — motor único /js/odp-documento.js (igual que Saldos y Comisiones a Pagar) */
+async function verODP(ordenId){
+  const dlg = document.getElementById('dlgODP');
+  document.getElementById('odpTitulo').textContent = 'Orden de Pago';
+  document.getElementById('odpBody').innerHTML = '<p style="color:#94a3b8;padding:20px 0;text-align:center">Cargando…</p>';
+  dlg.showModal();
+  try {
+    const r = await fetch('/api/ordenes-pago/ordenes/'+ordenId+'/documento', { headers:H });
+    const j = await r.json();
+    if (!j.success || !j.data) throw new Error(j.error||'No se pudo cargar la orden');
+    document.getElementById('odpTitulo').textContent = j.data.numero || 'Orden de Pago';
+    document.getElementById('odpBody').innerHTML = AF_ODP_DOC.html(j.data);
+  } catch(e){ document.getElementById('odpBody').innerHTML = '<p style="color:#b91c1c;padding:20px 0;text-align:center">'+esc(e.message)+'</p>'; }
+}
+async function verFactura(docId){
+  try {
+    const r = await fetch('/api/postventa/factura-doc/'+docId, { headers:H });
+    if (!r.ok) throw new Error('No se pudo abrir la factura');
+    const url = URL.createObjectURL(await r.blob()); window.open(url, '_blank'); setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  } catch(e){ toast(e.message, true); }
+}
+</script>
+<dialog id="dlgODP" style="border:none;border-radius:16px;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3);max-width:880px;width:96%">
+  <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:15px 20px;font-weight:700;display:flex;justify-content:space-between">
+    <span id="odpTitulo">Orden de Pago</span>
+    <i class="bi bi-x-lg" style="cursor:pointer" onclick="document.getElementById('dlgODP').close()"></i>
+  </div>
+  <div style="padding:18px 20px;font-size:.86rem;color:#334155" id="odpBody"></div>
+  <div style="padding:13px 20px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
+    <button class="btn-ghost" onclick="document.getElementById('dlgODP').close()">Cerrar</button>
+    <a class="btn-ghost" style="text-decoration:none;color:#334155" href="/ordenes-pago/historial/?origen=PARQUE" target="_blank"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir en Órdenes de Pago</a>
+  </div>
+</dialog>
+<script src="/js/timbre-pagado.js"></script>
+<script src="/js/odp-documento.js?v=232.5"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js">
 /* ── TEF masiva Banco Internacional (motor único shared/tef-internacional.js) ── */
