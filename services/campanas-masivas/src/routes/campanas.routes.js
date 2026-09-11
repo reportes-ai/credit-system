@@ -10,6 +10,7 @@ const puede = requireFunc('campanas_masivas');
 // Píxel de lectura de los mails: PÚBLICO (lo carga el correo del cliente) y
 // declarado ANTES de /:id para no chocar con esa ruta. Solo marca LEIDO con firma válida.
 router.get('/pixel/:token',          c.pixel);
+router.get('/imagen/:token',         c.imagen);      // imagen del correo (pública, con firma)
 
 router.get('/catalogo',              verifyToken, puede, c.catalogo);
 router.get('/plantillas-wsp',        verifyToken, puede, c.plantillasWsp);
@@ -19,6 +20,8 @@ router.get('/:id',                   verifyToken, puede, c.obtener);
 router.put('/:id',                   verifyToken, puede, c.actualizar);
 router.delete('/:id',                verifyToken, puede, c.eliminar);
 router.post('/:id/destinatarios',    verifyToken, puede, c.cargarDestinatarios);
+router.post('/:id/imagen',           verifyToken, puede, c.subirImagen);
+router.delete('/:id/imagen',         verifyToken, puede, c.quitarImagen);
 router.post('/:id/generar-desde-bd', verifyToken, puede, c.generarDesdeBD);
 router.get('/:id/preview',           verifyToken, puede, c.preview);
 router.post('/:id/enviar',           verifyToken, puede, c.enviar);

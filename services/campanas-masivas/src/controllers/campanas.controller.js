@@ -103,6 +103,13 @@ require('../../../../shared/migrate').enFila('campanas', async () => {
     for (const col of ["plantilla_wsp VARCHAR(150) NULL", "plantilla_wsp_idioma VARCHAR(10) NULL",
                        "plantilla_wsp_body TEXT NULL", "plantilla_wsp_map JSON NULL"]) {
       await pool.query(`ALTER TABLE campanas_masivas ADD COLUMN IF NOT EXISTS ${col}`);
+    /* Imagen del correo (flyer) con link y botón (Pato, 11-09-2026: subasta Auten para dealers).
+       La imagen va al bucket (shared/almacen-docs) y se sirve pública con firma para el correo. */
+    for (const col of ['imagen_nombre VARCHAR(200) NULL', 'imagen_mime VARCHAR(80) NULL', 'imagen_blob LONGBLOB NULL',
+                       'link_url VARCHAR(500) NULL', 'boton_texto VARCHAR(80) NULL'])
+      await pool.query(`ALTER TABLE campanas_masivas ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
+    for (const ddl of require('../../../../shared/almacen-docs').sqlColumnas('campanas_masivas'))
+      await pool.query(ddl).catch(() => {});
     }
     for (const col of ["renta DECIMAL(15,2) NULL", "renta_estimada TINYINT(1) NOT NULL DEFAULT 0",
                        "politica VARCHAR(12) NULL", "contactos_dn JSON NULL", "telefonos_alt JSON NULL"]) {
@@ -314,11 +321,13 @@ exports.obtener = async (req, res) => {
         SUM(estado='NO_RECIBIDO') no_recibidos,
         SUM(convertido=1) conversiones
       FROM campanas_destinatarios WHERE id_campana=?`, [c.id]);
+    delete c.imagen_blob;
+    c.imagen_url = c.imagen_nombre ? `${APP_URL}/api/campanas-masivas/imagen/${c.id}-${firmaPixel('img' + c.id)}` : null;
     ok(res, { ...c, stats: st });
   } catch (e) { fail(res, e.message); }
 };
 
-const EDITABLES = ['descripcion', 'origen_data', 'campos', 'texto', 'asunto', 'remitente', 'plantilla', 'titulo', 'color_titulo', 'parametros', 'deciles_control', 'excluir_regiones', 'analizar_ia', 'plantilla_wsp', 'plantilla_wsp_idioma', 'plantilla_wsp_body', 'plantilla_wsp_map'];
+const EDITABLES = ['descripcion', 'origen_data', 'campos', 'texto', 'asunto', 'remitente', 'plantilla', 'titulo', 'color_titulo', 'link_url', 'boton_texto', 'parametros', 'deciles_control', 'excluir_regiones', 'analizar_ia', 'plantilla_wsp', 'plantilla_wsp_idioma', 'plantilla_wsp_body', 'plantilla_wsp_map'];
 exports.actualizar = async (req, res) => {
   try {
     const [[c]] = await pool.query('SELECT estado FROM campanas_masivas WHERE id=?', [req.params.id]);
@@ -393,7 +402,22 @@ exports.generarDesdeBD = async (req, res) => {
     const exRegSQL = exReg.length ? `AND (cl.id_region IS NULL OR cl.id_region NOT IN (${exReg.map(() => '?').join(',')}))` : '';
 
     let rows = [];
-    if (c.objetivo === 'COBRANZA') {
+    if (p.audiencia === 'DEALERS') {
+      /* Audiencia DEALERS (Pato, 11-09-2026): la red de dealers activos, con filtro por categoría
+         (SOCIO / PARTNER / SUPER_PARTNER). Correo = el de la ficha (correo, si no cf_email / rl_email).
+         El RUT es el del dealer (sirve para deciles de control y para no repetir). */
+      const cats = Array.isArray(p.categorias) ? p.categorias.map(x => String(x).toUpperCase()).filter(Boolean) : [];
+      const [r] = await pool.query(`
+        SELECT d.rut, COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon) nombre, '' ap_paterno, '' ap_materno,
+               'Estimados' saludo, COALESCE(NULLIF(d.correo,''), NULLIF(d.cf_email,''), NULLIF(d.rl_email,'')) email,
+               COALESCE(d.categoria_asignada, 'SOCIO') categoria, d.nombre_razon
+          FROM dealers d
+         WHERE d.activo = 1 ${cats.length ? 'AND COALESCE(d.categoria_asignada,\'SOCIO\') IN (' + cats.map(() => '?').join(',') + ')' : ''}
+         ORDER BY nombre`, cats);
+      const vistos = new Set();
+      rows = r.filter(x => { const k = String(x.email || '').toLowerCase().trim() || String(x.rut); if (vistos.has(k)) return false; vistos.add(k); return true; })
+        .map(x => ({ ...x, esp1: x.categoria, esp2: x.nombre_razon || '' }));
+    } else if (c.objetivo === 'COBRANZA') {
       const [r] = await pool.query(`
         SELECT cl.rut, cl.nombres nombre, cl.apellido_paterno ap_paterno, cl.apellido_materno ap_materno,
                cl.sexo genero, IF(cl.sexo='FEMENINO','Estimada','Estimado') saludo,
@@ -540,12 +564,60 @@ function htmlMail(c, dest, opts = {}) {
   } else if (c.plantilla === 'titulo') {
     head = `<div style="padding:34px 30px 10px"><div style="color:${c.color_titulo || azul};font-size:32px;line-height:1.15;font-weight:800;font-family:Segoe UI,Arial">${merge(c.titulo || '', dest)}</div></div>`;
   }
+  // Imagen (flyer) clicable y botón con link — se sirven desde la Suite con firma (no requieren login)
+  const link = String(c.link_url || '').trim();
+  const img = c.imagen_nombre
+    ? `<a href="${link || '#'}" style="display:block"><img src="${APP_URL}/api/campanas-masivas/imagen/${c.id}-${firmaPixel('img' + c.id)}" alt="${(c.descripcion || '').replace(/"/g, '')}" style="display:block;width:100%;height:auto;border:0"></a>`
+    : '';
+  const boton = link
+    ? `<div style="text-align:center;padding:6px 30px 28px"><a href="${link}" style="display:inline-block;background:${azul};color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:14px 34px;border-radius:12px;font-family:Segoe UI,Arial">${c.boton_texto || 'Ver más'}</a></div>`
+    : '';
   return `<div style="max-width:620px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;font-family:Segoe UI,Arial,sans-serif">
-    ${head}
-    <div style="padding:26px 30px;color:#1e293b;font-size:15px;line-height:1.65">${cuerpo}</div>
+    ${head}${img}
+    ${cuerpo ? `<div style="padding:26px 30px;color:#1e293b;font-size:15px;line-height:1.65">${cuerpo}</div>` : ''}${boton}
     <div style="background:#f8fafc;padding:14px 30px;color:#94a3b8;font-size:11px">AutoFácil Crédito Automotriz · autofacilchile.cl · +56 9 3246 9071</div>
   </div>${pixel}`;
 }
+
+/* ── Imagen del correo: subir (base64), servir (pública con firma) y quitar ── */
+exports.subirImagen = async (req, res) => {
+  try {
+    const [[c]] = await pool.query('SELECT id, estado, doc_ruta FROM campanas_masivas WHERE id=?', [req.params.id]);
+    if (!c) return fail(res, 'Campaña no existe', 404);
+    if (c.estado !== 'BORRADOR') return fail(res, 'Solo se edita una campaña en BORRADOR', 400);
+    const { nombre, mime, base64 } = req.body || {};
+    if (!base64 || !/^image\/(png|jpe?g|gif|webp)$/i.test(String(mime || ''))) return fail(res, 'Sube una imagen PNG, JPG, GIF o WEBP', 400);
+    const buffer = Buffer.from(String(base64), 'base64');
+    if (buffer.length > 3 * 1024 * 1024) return fail(res, 'La imagen no puede superar 3 MB', 400);
+    const almacen = require('../../../../shared/almacen-docs');
+    const rutaVieja = c.doc_ruta;
+    const d = await almacen.colocar({ ambito: 'campanas', clave: c.id, buffer, mime, nombre: nombre || 'imagen' });
+    await pool.query('UPDATE campanas_masivas SET imagen_nombre=?, imagen_mime=?, imagen_blob=?, doc_storage=?, doc_ruta=?, doc_bytes=? WHERE id=?',
+      [nombre || 'imagen', mime, d.blob, d.storage, d.ruta, d.bytes, c.id]);
+    if (rutaVieja && rutaVieja !== d.ruta) almacen.borrar(rutaVieja).catch(() => {});
+    ok(res, { imagen_url: `${APP_URL}/api/campanas-masivas/imagen/${c.id}-${firmaPixel('img' + c.id)}` });
+  } catch (e) { fail(res, e.message); }
+};
+exports.imagen = async (req, res) => {
+  try {
+    const m = /^(\d+)-([0-9a-f]{12})/.exec(String(req.params.token || ''));
+    if (!m || firmaPixel('img' + m[1]) !== m[2]) return res.status(404).end();
+    const [[c]] = await pool.query('SELECT imagen_nombre, imagen_mime, imagen_blob, doc_ruta FROM campanas_masivas WHERE id=?', [m[1]]);
+    if (!c || !c.imagen_nombre) return res.status(404).end();
+    res.set('Cache-Control', 'public, max-age=86400');
+    await require('../../../../shared/almacen-docs').servir(res, { ruta: c.doc_ruta, blob: c.imagen_blob, nombre: c.imagen_nombre, mime: c.imagen_mime });
+  } catch (e) { res.status(500).end(); }
+};
+exports.quitarImagen = async (req, res) => {
+  try {
+    const [[c]] = await pool.query('SELECT id, estado, doc_ruta FROM campanas_masivas WHERE id=?', [req.params.id]);
+    if (!c) return fail(res, 'Campaña no existe', 404);
+    if (c.estado !== 'BORRADOR') return fail(res, 'Solo se edita una campaña en BORRADOR', 400);
+    await pool.query('UPDATE campanas_masivas SET imagen_nombre=NULL, imagen_mime=NULL, imagen_blob=NULL, doc_storage=NULL, doc_ruta=NULL, doc_bytes=NULL WHERE id=?', [c.id]);
+    if (c.doc_ruta) require('../../../../shared/almacen-docs').borrar(c.doc_ruta).catch(() => {});
+    ok(res, { quitada: true });
+  } catch (e) { fail(res, e.message); }
+};
 
 /* ── Vista previa mail-merge (recorre registros) ────────────────────────── */
 exports.preview = async (req, res) => {

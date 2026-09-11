@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.7 -->
+<!-- v1.8 — imagen del correo (flyer) con link y botón; audiencia Dealers activos por categoría. v1.7 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -100,6 +100,17 @@
         <div class="nota">La plantilla incluye <b>email</b> y <b>telefono</b> (obligatorio según el canal) más los campos variables elegidos. Separador <b>;</b> — se acepta el CSV que genera Excel.</div>
       </div>
       <div id="zonaParam" style="display:none">
+        <label class="f">Audiencia</label>
+        <div class="pills" style="margin-bottom:10px">
+          <span class="pill on" id="audCLIENTES" onclick="setAud('CLIENTES')">👤 Clientes (según el objetivo)</span>
+          <span class="pill" id="audDEALERS" onclick="setAud('DEALERS')">🏢 Dealers activos (red comercial)</span>
+        </div>
+        <div class="row" id="paramDealers" style="display:none">
+          <div style="grid-column:span 3"><label class="f">Categorías (vacío = todas)</label>
+            <div class="pills"><span class="pill catd on" data-c="SOCIO" onclick="this.classList.toggle('on')">Socio</span><span class="pill catd on" data-c="PARTNER" onclick="this.classList.toggle('on')">Partner</span><span class="pill catd on" data-c="SUPER_PARTNER" onclick="this.classList.toggle('on')">Super Partner</span></div>
+            <div class="nota">Correo = el de la ficha del dealer (o el del contacto financiero / representante legal). Variables útiles: <b>{{nombre}}</b> (dealer), <b>{{esp1}}</b> (categoría), <b>{{esp2}}</b> (razón social).</div>
+          </div>
+        </div>
         <div class="row" id="paramCob">
           <div><label class="f">Días de mora — desde</label><input class="f" type="number" id="pMoraMin" value="1"></div>
           <div><label class="f">Días de mora — hasta</label><input class="f" type="number" id="pMoraMax" value="90"></div>
@@ -180,6 +191,19 @@
         <div class="row" id="rowTitulo" style="margin-top:10px;display:none">
           <div style="grid-column:span 2"><label class="f">Título (acepta variables)</label><input class="f" id="mTitulo" oninput="marcarSucio()"></div>
           <div><label class="f">Color del título</label><input class="f" type="color" id="mColor" value="#0141A2" style="height:40px" oninput="marcarSucio()"></div>
+        </div>
+        <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-top:10px">
+          <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:8px"><i class="bi bi-image me-1"></i>Imagen del correo (flyer) + link — opcional</div>
+          <div class="row">
+            <div><label class="f">Imagen (PNG/JPG, máx. 3 MB)</label>
+              <label class="btn btn-gris" style="display:inline-block"><i class="bi bi-upload me-1"></i>Subir imagen<input type="file" accept="image/*" style="display:none" onchange="subirImagen(this)"></label>
+              <button class="btn btn-rojo" type="button" id="btnQuitarImg" style="display:none" onclick="quitarImagen()"><i class="bi bi-x-lg me-1"></i>Quitar</button>
+              <span id="msgImg" class="okmsg"></span></div>
+            <div><label class="f">Link del botón (y de la imagen)</label><input class="f" id="mLink" placeholder="https://…" oninput="marcarSucio()"></div>
+            <div><label class="f">Texto del botón</label><input class="f" id="mBoton" placeholder="¡Inscríbete ahora!" oninput="marcarSucio()"></div>
+          </div>
+          <img id="imgPrev" style="display:none;max-width:260px;border-radius:8px;border:1px solid #e2e8f0;margin-top:8px">
+          <div class="nota">La imagen va arriba del texto y es clicable; el botón va al final. Si dejas el texto vacío, el correo lleva solo la imagen y el botón.</div>
         </div>
         <div class="row" style="margin-top:8px">
           <div style="grid-column:span 2">
@@ -318,6 +342,10 @@ async function cargarCampana(){
   document.getElementById('mAsunto').value = CAMP.asunto || '';
   document.getElementById('mTitulo').value = CAMP.titulo || '';
   document.getElementById('mColor').value = CAMP.color_titulo || '#0141A2';
+  document.getElementById('mLink').value = CAMP.link_url || '';
+  document.getElementById('mBoton').value = CAMP.boton_texto || '';
+  pintarImagen(CAMP.imagen_url);
+  try { const pr = safe(CAMP.parametros) || {}; setAud(pr.audiencia === 'DEALERS' ? 'DEALERS' : 'CLIENTES', true); if (Array.isArray(pr.categorias) && pr.categorias.length) document.querySelectorAll('.pill.catd').forEach(x => x.classList.toggle('on', pr.categorias.includes(x.dataset.c))); } catch(_) {}
   if (CAMP.remitente) document.getElementById('mRemitente').value = CAMP.remitente;
   setTpl(CAMP.plantilla || 'banner', true);
   setOrigen(CAMP.origen_data || 'MANUAL', true);
@@ -361,6 +389,40 @@ function setTpl(t, soloUI){
   if (!soloUI) marcarSucio();
   window._tpl = t;
 }
+let AUD = 'CLIENTES';
+function setAud(a, soloUI){
+  AUD = a;
+  document.getElementById('audCLIENTES').classList.toggle('on', a==='CLIENTES');
+  document.getElementById('audDEALERS').classList.toggle('on', a==='DEALERS');
+  document.getElementById('paramDealers').style.display = a==='DEALERS' ? '' : 'none';
+  const ob = CAMP ? CAMP.objetivo : 'VENTA';
+  document.getElementById('paramCob').style.display = (a==='CLIENTES' && ob==='COBRANZA') ? '' : 'none';
+  document.getElementById('paramVta').style.display = (a==='CLIENTES' && ob==='VENTA') ? '' : 'none';
+  if (!soloUI) marcarSucio();
+}
+function pintarImagen(url){
+  const im = document.getElementById('imgPrev'), bq = document.getElementById('btnQuitarImg');
+  if (url) { im.src = url + '?t=' + Date.now(); im.style.display = ''; bq.style.display = ''; } else { im.style.display = 'none'; bq.style.display = 'none'; }
+}
+function subirImagen(inp){
+  const f = inp.files[0]; if (!f) return;
+  if (f.size > 3*1024*1024) { alert('Máximo 3 MB'); inp.value=''; return; }
+  const rd = new FileReader();
+  rd.onload = async () => {
+    const b64 = String(rd.result).split(',')[1];
+    const r = await fetch(`/api/campanas-masivas/${ID}/imagen`, { method:'POST', headers: hdrs(1), body: JSON.stringify({ nombre: f.name, mime: f.type, base64: b64 }) });
+    const j = await r.json();
+    document.getElementById('msgImg').textContent = j.success ? '✔ Imagen cargada' : ('Error: ' + j.error);
+    if (j.success) { pintarImagen(j.data.imagen_url); cargarPreview(); }
+  };
+  rd.readAsDataURL(f); inp.value = '';
+}
+async function quitarImagen(){
+  if (!confirm('¿Quitar la imagen del correo?')) return;
+  const r = await fetch(`/api/campanas-masivas/${ID}/imagen`, { method:'DELETE', headers: hdrs(1) });
+  const j = await r.json();
+  if (j.success) { pintarImagen(null); document.getElementById('msgImg').textContent = 'Imagen quitada'; cargarPreview(); }
+}
 function setOrigen(o, soloUI){
   window._origen = o;
   document.getElementById('odMANUAL').classList.toggle('on', o==='MANUAL');
@@ -388,6 +450,7 @@ async function guardar(){
     asunto: document.getElementById('mAsunto').value, remitente: document.getElementById('mRemitente').value,
     plantilla: window._tpl || 'banner', titulo: document.getElementById('mTitulo').value,
     color_titulo: document.getElementById('mColor').value,
+    link_url: document.getElementById('mLink').value.trim(), boton_texto: document.getElementById('mBoton').value.trim(),
     deciles_control: deciles, excluir_regiones: regionesEx,
     analizar_ia: document.getElementById('chkIA').checked,
   };
@@ -455,7 +518,9 @@ function subirCSV(inp){
 async function generarBD(){
   if (sucio) await guardar();
   const o = CAMP.objetivo;
-  const p = o==='COBRANZA'
+  const p = AUD==='DEALERS'
+    ? { audiencia:'DEALERS', categorias:[...document.querySelectorAll('.pill.catd.on')].map(x => x.dataset.c) }
+    : o==='COBRANZA'
     ? { mora_min:+pMoraMin.value||1, mora_max:+pMoraMax.value||90, capital_min:numCLP(pCapMin.value) }
     : { termino_min:+pTerMin.value||0, termino_max:+pTerMax.value||6, renta_min:numCLP(pRentaMin.value), monto_min:numCLP(pMontoMin.value), renta_est_pct:+pRentaEst.value||0 };
   const r = await fetch(`/api/campanas-masivas/${ID}/generar-desde-bd`, { method:'POST', headers: hdrs(1), body: JSON.stringify(p) });
