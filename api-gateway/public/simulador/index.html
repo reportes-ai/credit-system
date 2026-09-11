@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.5 — barra negra con el total del monto financiado; el detalle (saldo, gastos, primas) abajo a la izquierda · v3.4 — las notas explicativas (tier UAC, reglas del producto) van al pie de cada panel · v3.3 — productos con seguros obligatorios (PREFERENTE): monto financiado, primas, ingreso por seguros y cuota propios, aunque se desmarquen los seguros · v3.2 — costo de fondo propio por producto (tasa − spread ≤/> 200 UF) y página full width para ver los paneles uno al lado del otro · v3.1 — un panel por producto con reglas propias del mantenedor Productos por Financiera (AUTOFIN PREFERENTE): tasa, dealer por tramo, parque y ejecutivo propios, comisiones editables · v3.0 — comisiones Dealer, Parque y Ejecutivo editables EN CADA PANEL (AutoFin y UAC por separado, ↺ vuelve a la tabla); sale el input global de comisión dealer · v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
+<!-- v3.6 — sale la nota sobre comisiones editables del panel de datos · v3.5 — barra negra con el total del monto financiado; el detalle (saldo, gastos, primas) abajo a la izquierda · v3.4 — las notas explicativas (tier UAC, reglas del producto) van al pie de cada panel · v3.3 — productos con seguros obligatorios (PREFERENTE): monto financiado, primas, ingreso por seguros y cuota propios, aunque se desmarquen los seguros · v3.2 — costo de fondo propio por producto (tasa − spread ≤/> 200 UF) y página full width para ver los paneles uno al lado del otro · v3.1 — un panel por producto con reglas propias del mantenedor Productos por Financiera (AUTOFIN PREFERENTE): tasa, dealer por tramo, parque y ejecutivo propios, comisiones editables · v3.0 — comisiones Dealer, Parque y Ejecutivo editables EN CADA PANEL (AutoFin y UAC por separado, ↺ vuelve a la tabla); sale el input global de comisión dealer · v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -162,11 +162,7 @@
             </div>
           </div>
 
-          <!-- Las comisiones (dealer, parque, ejecutivo) parten de la tabla y se editan
-               EN CADA PANEL de resultados (AutoFin y UAC por separado), con ↺ para volver. -->
-          <div class="f-group" style="font-size:.78rem;color:#64748b;background:#f8fafc;border-radius:8px;padding:8px 10px">
-            <i class="bi bi-pencil-square me-1" style="color:#0369a1"></i>Las comisiones <b>Dealer, Parque y Ejecutivo</b> se editan directamente en cada panel (AutoFin y Unidad de Crédito por separado). En naranjo = modificada; ↺ vuelve a la tabla.
-          </div>
+          <!-- Las comisiones (dealer, parque, ejecutivo) se editan EN CADA PANEL de resultados (naranjo = modificada, ↺ vuelve a la tabla). -->
 
           <hr class="divider">
 
