@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.8 — imagen del correo (flyer) con link y botón; audiencia Dealers activos por categoría. v1.7 -->
+<!-- v1.9 — correo de prueba, correos por minuto y cupo diario (continúa otro día), universo y estimación de días. v1.8 — imagen del correo (flyer) con link y botón; audiencia Dealers activos por categoría. v1.7 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -250,9 +250,10 @@
         <button onclick="mergeNav(1)"><i class="bi bi-chevron-right"></i></button>
         <span id="mergeQuien" style="font-size:.8rem;color:#6b7280"></span>
         <button class="btn btn-gris" style="margin-left:auto" onclick="cargarPreview()"><i class="bi bi-arrow-repeat me-1"></i>Actualizar</button>
+        <button class="btn btn-azul" id="btnPrueba" onclick="enviarPrueba(this)"><i class="bi bi-envelope-paper me-1"></i>Enviarme un correo de prueba</button>
       </div>
       <div id="prevAsunto" style="font-weight:700;margin-bottom:8px;display:none"></div>
-      <div class="preview-box" id="prevBox"><span style="color:#9ca3af;font-size:.82rem">Guarda el contenido y carga destinatarios para previsualizar.</span></div>
+      <div class="preview-box" id="prevBox"><span style="color:#9ca3af;font-size:.82rem">Guarda el contenido y <b>genera o carga los destinatarios en el paso 3</b> para previsualizar. El correo de prueba se puede mandar igual (usa un dealer de ejemplo).</span></div>
     </div>
 
     <!-- PASO 7: enviar -->
@@ -260,6 +261,12 @@
       <h5><span class="num">7</span>Envío</h5>
       <div class="nota" id="notaWsp" style="display:none"><b>WhatsApp:</b> con <b>plantilla aprobada</b> (paso 5) la campaña llega a <b>todos</b> los contactos. El modo texto libre queda solo para conversaciones activas.</div>
       <div class="nota">Al enviar, cada contacto queda registrado como <b>gestión en el CRM</b> (Campaña Venta / Campaña Cobranza) y el grupo de CONTROL se deja fuera automáticamente.</div>
+      <div class="row" id="rowRitmo" style="margin-bottom:10px">
+        <div><label class="f">Correos por minuto (máx. 60)</label><input class="f" type="number" id="mPorMinuto" value="30" min="1" max="60" oninput="marcarSucio();pintarUniverso()"></div>
+        <div><label class="f">Cupo diario de esta campaña</label><input class="f" type="number" id="mCupoDiario" value="250" min="1" oninput="marcarSucio();pintarUniverso()"></div>
+        <div style="align-self:end;font-size:.78rem;color:#64748b" id="lblCupoSistema"></div>
+      </div>
+      <div id="universo" style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:.85rem;color:#334155"></div>
       <button class="btn btn-verde" id="btnEnviar" onclick="enviar()"><i class="bi bi-send-fill me-1"></i>Enviar campaña</button>
       <span id="msgEnvio" style="font-size:.85rem;font-weight:700;margin-left:8px"></span>
     </div>
@@ -343,6 +350,9 @@ async function cargarCampana(){
   document.getElementById('mTitulo').value = CAMP.titulo || '';
   document.getElementById('mColor').value = CAMP.color_titulo || '#0141A2';
   document.getElementById('mLink').value = CAMP.link_url || '';
+  document.getElementById('mPorMinuto').value = CAMP.por_minuto || 30;
+  document.getElementById('mCupoDiario').value = CAMP.cupo_diario || 250;
+  pintarUniverso();
   document.getElementById('mBoton').value = CAMP.boton_texto || '';
   pintarImagen(CAMP.imagen_url);
   try { const pr = safe(CAMP.parametros) || {}; setAud(pr.audiencia === 'DEALERS' ? 'DEALERS' : 'CLIENTES', true); if (Array.isArray(pr.categorias) && pr.categorias.length) document.querySelectorAll('.pill.catd').forEach(x => x.classList.toggle('on', pr.categorias.includes(x.dataset.c))); } catch(_) {}
@@ -359,8 +369,40 @@ async function cargarCampana(){
 }
 function bloquear(){
   document.querySelectorAll('input,select,textarea,.pill').forEach(e => e.disabled = true);
+  const pend = Number(CAMP.stats && CAMP.stats.pendientes) || 0;
+  if (pend > 0) {   // enviada por partes (cupo diario): se puede continuar
+    document.getElementById('btnEnviar').innerHTML = `<i class="bi bi-send-fill me-1"></i>Continuar envío (quedan ${pend})`;
+    return;
+  }
   document.getElementById('btnEnviar').textContent = 'Campaña ya enviada — ver resultados en la bandeja';
   document.getElementById('btnEnviar').onclick = () => location='/campanas-masivas/';
+}
+/* Universo, cupo y estimación de días — con los datos que trae la campaña (stats) */
+function pintarUniverso(){
+  if (!CAMP || !CAMP.stats) return;
+  const st = CAMP.stats;
+  const total = Number(st.total)||0, control = Number(st.control)||0, sinCorreo = Number(st.sin_correo)||0;
+  const universo = total - control;
+  const cupo = +document.getElementById('mCupoDiario').value || 250, pm = +document.getElementById('mPorMinuto').value || 30;
+  const pend = Number(st.pendientes)||0;
+  const dias = cupo > 0 ? Math.ceil(Math.max(0, pend) / cupo) : 0;
+  const mins = pm > 0 ? Math.ceil(Math.min(pend, cupo) / pm) : 0;
+  document.getElementById('universo').innerHTML = total
+    ? `<b>Universo:</b> ${universo.toLocaleString('es-CL')} destinatarios a contactar (${total.toLocaleString('es-CL')} cargados, ${control} en grupo control${sinCorreo ? `, <span style="color:#b45309">${sinCorreo} sin correo</span>` : ''}). ` +
+      `<b>Pendientes:</b> ${pend.toLocaleString('es-CL')} · <b>Hoy enviados por esta campaña:</b> ${st.hoy_enviados||0} de ${cupo}. ` +
+      `<b>Estimado:</b> ${dias} día(s) a ${cupo} por día, unos ${mins} min por día a ${pm} por minuto.`
+    : '<span style="color:#b45309">Sin destinatarios todavía: genera o carga la audiencia en el paso 3.</span>';
+  document.getElementById('lblCupoSistema').innerHTML = `El sistema completo lleva <b>${st.sistema_hoy||0}</b> correos hoy; el límite del proveedor es <b>${st.mail_cupo_diario||300}</b> al día (todo el sistema).`;
+}
+async function enviarPrueba(btn){
+  if (sucio) await guardar();
+  const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando…';
+  try {
+    const r = await fetch(`/api/campanas-masivas/${ID}/prueba`, { method:'POST', headers: hdrs(1), body: '{}' });
+    const j = await r.json();
+    btn.innerHTML = j.success ? `<i class="bi bi-check2 me-1"></i>Enviado a ${j.data.enviado_a}` : `<i class="bi bi-x-lg me-1"></i>${j.error}`;
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 6000);
+  } catch(e){ btn.innerHTML = orig; btn.disabled = false; alert('Error de red'); }
 }
 
 /* campos variables */
@@ -451,6 +493,7 @@ async function guardar(){
     plantilla: window._tpl || 'banner', titulo: document.getElementById('mTitulo').value,
     color_titulo: document.getElementById('mColor').value,
     link_url: document.getElementById('mLink').value.trim(), boton_texto: document.getElementById('mBoton').value.trim(),
+    por_minuto: +document.getElementById('mPorMinuto').value || 30, cupo_diario: +document.getElementById('mCupoDiario').value || 250,
     deciles_control: deciles, excluir_regiones: regionesEx,
     analizar_ia: document.getElementById('chkIA').checked,
   };
@@ -553,20 +596,28 @@ function mergeNav(dir){ mergeI = Math.max(0, Math.min(mergeTotal-1, mergeI+dir))
 
 /* ── Envío por lotes ── */
 async function enviar(){
-  if (sucio) await guardar();
-  if (!confirm('¿Enviar la campaña ahora a todos los destinatarios del grupo CAMPAÑA?')) return;
+  if (sucio && CAMP.estado === 'BORRADOR') await guardar();
+  const pm = +document.getElementById('mPorMinuto').value || 30, cupo = +document.getElementById('mCupoDiario').value || 250;
+  if (!confirm(`¿Enviar la campaña a los destinatarios del grupo CAMPAÑA?\nRitmo: ${pm} por minuto, máximo ${cupo} hoy. Deja esta pestaña abierta mientras envía.`)) return;
   const msg = document.getElementById('msgEnvio');
   document.getElementById('btnEnviar').disabled = true;
   let tot = 0, err = 0;
+  const espera = seg => new Promise(res => { let t = seg; const iv = setInterval(() => { t--; msg.textContent = msg.textContent.replace(/· próximo lote en \d+ s|$/, `· próximo lote en ${t} s`); if (t <= 0) { clearInterval(iv); res(); } }, 1000); });
   try {
     while (true) {
       const r = await fetch(`/api/campanas-masivas/${ID}/enviar`, { method:'POST', headers: hdrs() });
       const j = await r.json();
       if (!j.success) { msg.textContent = 'Error: '+j.error; msg.style.color='#dc2626'; return; }
       tot += j.data.enviados; err += (j.data.errores||0);
-      msg.textContent = `Enviando… ${tot} ok, ${err} con error, quedan ${j.data.pendientes}`;
       msg.style.color = '#0141A2';
+      if (j.data.cupo_agotado) {
+        msg.textContent = `⏸ Cupo diario alcanzado (${j.data.hoy_enviados} de ${j.data.cupo_diario}). Hoy: ${tot} ok, ${err} con error. Quedan ${j.data.pendientes}: mañana vuelve a esta campaña y pulsa «Continuar envío».`;
+        msg.style.color = '#b45309';
+        return;
+      }
+      msg.textContent = `Enviando… ${tot} ok, ${err} con error, quedan ${j.data.pendientes} (hoy ${j.data.hoy_enviados}/${j.data.cupo_diario})`;
       if (j.data.fin) break;
+      await espera(j.data.esperar_seg || 60);
     }
     msg.textContent = `✔ Campaña enviada: ${tot} mensajes (${err} con error). Revisa los resultados en la bandeja.`;
     msg.style.color = '#16a34a';

@@ -25,6 +25,7 @@ router.delete('/:id/imagen',         verifyToken, puede, c.quitarImagen);
 router.post('/:id/generar-desde-bd', verifyToken, puede, c.generarDesdeBD);
 router.get('/:id/preview',           verifyToken, puede, c.preview);
 router.post('/:id/enviar',           verifyToken, puede, c.enviar);
+router.post('/:id/prueba',           verifyToken, puede, c.prueba);      // correo de prueba a quien arma la campaña
 router.post('/:id/recalcular',       verifyToken, puede, c.recalcularConversion);
 router.get('/:id/resultados',        verifyToken, puede, c.resultados);
 router.get('/:id/destinatarios',     verifyToken, puede, c.destinatarios);

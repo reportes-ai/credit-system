@@ -106,10 +106,14 @@ require('../../../../shared/migrate').enFila('campanas', async () => {
     /* Imagen del correo (flyer) con link y botón (Pato, 11-09-2026: subasta Auten para dealers).
        La imagen va al bucket (shared/almacen-docs) y se sirve pública con firma para el correo. */
     for (const col of ['imagen_nombre VARCHAR(200) NULL', 'imagen_mime VARCHAR(80) NULL', 'imagen_blob LONGBLOB NULL',
-                       'link_url VARCHAR(500) NULL', 'boton_texto VARCHAR(80) NULL'])
+                       'link_url VARCHAR(500) NULL', 'boton_texto VARCHAR(80) NULL',
+                       /* Velocidad y cupo (Pato, 11-09-2026): correos por minuto y máximo por día de ESTA campaña.
+                          El límite del proveedor (Brevo) es global y vive en dashboard_config.mail_cupo_diario. */
+                       'por_minuto INT NOT NULL DEFAULT 30', 'cupo_diario INT NOT NULL DEFAULT 250'])
       await pool.query(`ALTER TABLE campanas_masivas ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
     for (const ddl of require('../../../../shared/almacen-docs').sqlColumnas('campanas_masivas'))
       await pool.query(ddl).catch(() => {});
+    await pool.query("INSERT IGNORE INTO dashboard_config (config_key, config_value) VALUES ('mail_cupo_diario', '300')").catch(() => {});
     }
     for (const col of ["renta DECIMAL(15,2) NULL", "renta_estimada TINYINT(1) NOT NULL DEFAULT 0",
                        "politica VARCHAR(12) NULL", "contactos_dn JSON NULL", "telefonos_alt JSON NULL"]) {
@@ -323,11 +327,12 @@ exports.obtener = async (req, res) => {
       FROM campanas_destinatarios WHERE id_campana=?`, [c.id]);
     delete c.imagen_blob;
     c.imagen_url = c.imagen_nombre ? `${APP_URL}/api/campanas-masivas/imagen/${c.id}-${firmaPixel('img' + c.id)}` : null;
+    Object.assign(st, await cupos(c));
     ok(res, { ...c, stats: st });
   } catch (e) { fail(res, e.message); }
 };
 
-const EDITABLES = ['descripcion', 'origen_data', 'campos', 'texto', 'asunto', 'remitente', 'plantilla', 'titulo', 'color_titulo', 'link_url', 'boton_texto', 'parametros', 'deciles_control', 'excluir_regiones', 'analizar_ia', 'plantilla_wsp', 'plantilla_wsp_idioma', 'plantilla_wsp_body', 'plantilla_wsp_map'];
+const EDITABLES = ['descripcion', 'origen_data', 'campos', 'texto', 'asunto', 'remitente', 'plantilla', 'titulo', 'color_titulo', 'link_url', 'boton_texto', 'por_minuto', 'cupo_diario', 'parametros', 'deciles_control', 'excluir_regiones', 'analizar_ia', 'plantilla_wsp', 'plantilla_wsp_idioma', 'plantilla_wsp_body', 'plantilla_wsp_map'];
 exports.actualizar = async (req, res) => {
   try {
     const [[c]] = await pool.query('SELECT estado FROM campanas_masivas WHERE id=?', [req.params.id]);
@@ -342,6 +347,8 @@ exports.actualizar = async (req, res) => {
         v = JSON.stringify(v);
       } else if (['parametros', 'deciles_control', 'excluir_regiones', 'plantilla_wsp_map'].includes(k)) v = JSON.stringify(v ?? null);
       else if (k === 'analizar_ia') v = v ? 1 : 0;
+      else if (k === 'por_minuto') v = Math.min(60, Math.max(1, parseInt(v, 10) || 30));
+      else if (k === 'cupo_diario') v = Math.max(1, parseInt(v, 10) || 250);
       sets.push(`${k}=?`); vals.push(v);
     }
     if (!sets.length) return fail(res, 'Nada que actualizar', 400);
@@ -579,6 +586,34 @@ function htmlMail(c, dest, opts = {}) {
   </div>${pixel}`;
 }
 
+/* ── Cupos: lo enviado HOY por esta campaña, lo que lleva el sistema completo hoy y el límite del proveedor ── */
+async function cupos(c) {
+  const [[a]] = await pool.query("SELECT COUNT(*) n FROM campanas_destinatarios WHERE id_campana=? AND estado IN ('ENVIADO','LEIDO') AND DATE(enviado_at)=CURDATE()", [c.id]);
+  const [[b]] = await pool.query("SELECT COUNT(*) n FROM correos_log WHERE DATE(fecha)=CURDATE() AND ok=1").catch(() => [[{ n: 0 }]]);
+  const [[m]] = await pool.query("SELECT config_value v FROM dashboard_config WHERE config_key='mail_cupo_diario'").catch(() => [[null]]);
+  const [[sc]] = await pool.query("SELECT SUM(grupo='CAMPANA' AND (email IS NULL OR email NOT LIKE '%@%')) sin_correo FROM campanas_destinatarios WHERE id_campana=?", [c.id]);
+  return { hoy_enviados: Number(a.n), sistema_hoy: Number(b.n), mail_cupo_diario: parseInt(m && m.v, 10) || 300,
+           por_minuto: c.por_minuto || 30, cupo_diario: c.cupo_diario || 250, sin_correo: Number(sc.sin_correo || 0) };
+}
+
+/* ── Correo de PRUEBA: el mismo HTML de la campaña al correo de quien la arma ── */
+exports.prueba = async (req, res) => {
+  try {
+    const [[c]] = await pool.query('SELECT * FROM campanas_masivas WHERE id=?', [req.params.id]);
+    if (!c) return fail(res, 'Campaña no existe', 404);
+    if (c.canal !== 'MAIL') return fail(res, 'La prueba es solo para campañas de Mail', 400);
+    const to = String((req.body && req.body.email) || req.usuario.email || '').trim();
+    if (!to.includes('@')) return fail(res, 'Tu usuario no tiene correo; indica uno', 400);
+    let [[d]] = await pool.query("SELECT * FROM campanas_destinatarios WHERE id_campana=? AND grupo='CAMPANA' ORDER BY id LIMIT 1", [c.id]);
+    if (!d) d = { id: 0, rut: '76.000.000-0', nombre: 'DEALER DE PRUEBA', ap_paterno: '', saludo: 'Estimados', email: to, esp1: 'PARTNER', esp2: 'Razón social de prueba' };
+    const { enviarCorreo, remitentePorClave } = require('../../../../shared/mailer');
+    const from = c.remitente ? (remitentePorClave ? remitentePorClave(c.remitente) : undefined) : undefined;
+    const r = await enviarCorreo({ to, subject: '[PRUEBA] ' + merge(c.asunto || c.descripcion, d), html: htmlMail(c, d), from });
+    if (!r.ok) return fail(res, r.error || 'No se pudo enviar', 500);
+    ok(res, { enviado_a: to, con_datos_de: d.nombre });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── Imagen del correo: subir (base64), servir (pública con firma) y quitar ── */
 exports.subirImagen = async (req, res) => {
   try {
@@ -644,8 +679,16 @@ exports.enviar = async (req, res) => {
     const [[c]] = await pool.query('SELECT * FROM campanas_masivas WHERE id=?', [req.params.id]);
     if (!c) return fail(res, 'Campaña no existe', 404);
     if (c.es_test) return fail(res, 'La campaña TEST es solo demostrativa', 400);
+    /* Velocidad y cupo: cada llamada manda UN lote de `por_minuto` (el frontend espera 60 s entre lotes)
+       y nunca más de `cupo_diario` en el día por esta campaña. Lo que sobra queda PENDIENTE y se
+       continúa otro día con el mismo botón. */
+    const cp = await cupos(c);
+    const disponibleHoy = Math.max(0, cp.cupo_diario - cp.hoy_enviados);
+    const [[{ pend0 }]] = await pool.query("SELECT COUNT(*) pend0 FROM campanas_destinatarios WHERE id_campana=? AND grupo='CAMPANA' AND estado='PENDIENTE'", [c.id]);
+    if (pend0 > 0 && disponibleHoy <= 0) return ok(res, { enviados: 0, errores: 0, pendientes: pend0, fin: false, cupo_agotado: true, ...cp });
+    const lote = Math.min(60, cp.por_minuto, disponibleHoy || 60);
     const [dests] = await pool.query(
-      "SELECT * FROM campanas_destinatarios WHERE id_campana=? AND grupo='CAMPANA' AND estado='PENDIENTE' ORDER BY id LIMIT 60", [c.id]);
+      "SELECT * FROM campanas_destinatarios WHERE id_campana=? AND grupo='CAMPANA' AND estado='PENDIENTE' ORDER BY id LIMIT ?", [c.id, lote]);
     if (!dests.length) {
       await pool.query("UPDATE campanas_masivas SET estado='ENVIADA', enviada_at=COALESCE(enviada_at, NOW()) WHERE id=?", [c.id]);
       return ok(res, { enviados: 0, pendientes: 0, fin: true });
@@ -717,7 +760,8 @@ exports.enviar = async (req, res) => {
       } catch (e) { console.error('[campanas crm]', e.message); }
     }
     const [[{ p }]] = await pool.query("SELECT COUNT(*) p FROM campanas_destinatarios WHERE id_campana=? AND grupo='CAMPANA' AND estado='PENDIENTE'", [c.id]);
-    ok(res, { enviados: okN, errores: errN, pendientes: p, fin: p === 0 });
+    const cp2 = await cupos(c);
+    ok(res, { enviados: okN, errores: errN, pendientes: p, fin: p === 0, cupo_agotado: p > 0 && cp2.hoy_enviados >= cp2.cupo_diario, esperar_seg: p > 0 ? 60 : 0, ...cp2 });
   } catch (e) { fail(res, e.message); }
 };
 
