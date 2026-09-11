@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.2 — costo de fondo propio por producto (tasa − spread ≤/> 200 UF) y página full width para ver los paneles uno al lado del otro · v3.1 — un panel por producto con reglas propias del mantenedor Productos por Financiera (AUTOFIN PREFERENTE): tasa, dealer por tramo, parque y ejecutivo propios, comisiones editables · v3.0 — comisiones Dealer, Parque y Ejecutivo editables EN CADA PANEL (AutoFin y UAC por separado, ↺ vuelve a la tabla); sale el input global de comisión dealer · v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
+<!-- v3.3 — productos con seguros obligatorios (PREFERENTE): monto financiado, primas, ingreso por seguros y cuota propios, aunque se desmarquen los seguros · v3.2 — costo de fondo propio por producto (tasa − spread ≤/> 200 UF) y página full width para ver los paneles uno al lado del otro · v3.1 — un panel por producto con reglas propias del mantenedor Productos por Financiera (AUTOFIN PREFERENTE): tasa, dealer por tramo, parque y ejecutivo propios, comisiones editables · v3.0 — comisiones Dealer, Parque y Ejecutivo editables EN CADA PANEL (AutoFin y UAC por separado, ↺ vuelve a la tabla); sale el input global de comisión dealer · v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -641,26 +641,41 @@ function simular() {
   ];
   for (const pr of PRODS) {
     const key = 'p' + pr.id;
-    const tasaP = (esMayor ? Number(pr.tasa_mayor_pct) : Number(pr.tasa_menor_pct)) / 100;
+    /* Seguros OBLIGATORIOS (p.ej. PREFERENTE): el producto lleva siempre desgravamen, RDH, cesantía y
+       reparaciones menores, se marquen o no en el panel de datos → monto financiado, primas, ingreso por
+       seguros y cuota propios del producto. */
+    const oblig = Number(pr.seguros_obligatorios) === 1;
+    let monto_fin_p = monto_fin, ing_seg_p = ing_seg_af, primas_p = totalPrimas;
+    if (oblig) {
+      const gastosP = gastos + (incRep ? 0 : (P.reparaciones_menores || 0));
+      const subP = saldo + gastosP;
+      const rateP = getSegRate('d', plazo) + getSegRate('r', plazo) + getSegRate('c', plazo);
+      const capP = Math.round(subP * (rateP > 0 ? 1 / (1 - rateP) : 1));
+      primas_p = Math.round(capP * getSegRate('d', plazo)) + Math.round(capP * getSegRate('r', plazo)) + Math.round(capP * getSegRate('c', plazo));
+      monto_fin_p = subP + primas_p;
+      ing_seg_p = Math.round((primas_p + (P.reparaciones_menores || 0)) * pctTraspaso);
+    }
+    const esMayorP = limite200 ? monto_fin_p > limite200 : false;
+    const tasaP = (esMayorP ? Number(pr.tasa_mayor_pct) : Number(pr.tasa_menor_pct)) / 100;
     // Costo de fondo del producto = tasa − spread propio (misma fórmula que AutoFin: CF = tasa − spread); sin spread propio usa el de AutoFin
-    const spreadP = esMayor ? pr.spread_mayor_pct : pr.spread_menor_pct;
+    const spreadP = esMayorP ? pr.spread_mayor_pct : pr.spread_menor_pct;
     const costoFondoP = spreadP != null && !isNaN(spreadP) ? tasaP - Number(spreadP) / 100 : costoFondo;
     const ing_tasa_p = window.AF_RENT_CORE
-      ? AF_RENT_CORE.ingresoColocacionAutoFin({ montoCap: monto_fin, plazo, tasaCli: tasaP, costoFondo: costoFondoP })
-      : (tasaP > 0 && costoFondoP > 0 ? Math.round(monto_fin * tasaP * Math.pow(1+tasaP,plazo)/(Math.pow(1+tasaP,plazo)-1) * (1-Math.pow(1+costoFondoP,-plazo))/costoFondoP - monto_fin) : 0);
-    const TAB_P = { dealer: Math.round(saldo * pctTramo(pr.dealer_tramos, plazo)), parque: esPatio ? Math.round(saldo * (Number(pr.parque_pct) || 0) / 100) : 0, ej: Math.round(monto_fin * (Number(pr.ejecutivo_pct) || 0) / 100) };
+      ? AF_RENT_CORE.ingresoColocacionAutoFin({ montoCap: monto_fin_p, plazo, tasaCli: tasaP, costoFondo: costoFondoP })
+      : (tasaP > 0 && costoFondoP > 0 ? Math.round(monto_fin_p * tasaP * Math.pow(1+tasaP,plazo)/(Math.pow(1+tasaP,plazo)-1) * (1-Math.pow(1+costoFondoP,-plazo))/costoFondoP - monto_fin_p) : 0);
+    const TAB_P = { dealer: Math.round(saldo * pctTramo(pr.dealer_tramos, plazo)), parque: esPatio ? Math.round(saldo * (Number(pr.parque_pct) || 0) / 100) : 0, ej: Math.round(monto_fin_p * (Number(pr.ejecutivo_pct) || 0) / 100) };
     const O = ovrDe(key);
     const C_P = { dealer: O.dealer != null ? O.dealer : TAB_P.dealer, parque: esPatio ? (O.parque != null ? O.parque : TAB_P.parque) : 0, ej: O.ej != null ? O.ej : TAB_P.ej };
-    const rentab_p = ing_tasa_p + ing_seg_af - (C_P.dealer + C_P.parque + C_P.ej);
-    const cuota_p = tasaP > 0 ? Math.round(window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(monto_fin, tasaP, plazo) : monto_fin * tasaP * Math.pow(1+tasaP,plazo) / (Math.pow(1+tasaP,plazo)-1)) : Math.round(monto_fin/plazo);
+    const rentab_p = ing_tasa_p + ing_seg_p - (C_P.dealer + C_P.parque + C_P.ej);
+    const cuota_p = tasaP > 0 ? Math.round(window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(monto_fin_p, tasaP, plazo) : monto_fin_p * tasaP * Math.pow(1+tasaP,plazo) / (Math.pow(1+tasaP,plazo)-1)) : Math.round(monto_fin_p/plazo);
     const el = document.getElementById('resP' + pr.id);
     if (el) el.innerHTML = renderResultados({
       panel: key, tabla: TAB_P,
-      ing_tasa: ing_tasa_p, ing_seg: ing_seg_af, com_corfo: 0,
+      ing_tasa: ing_tasa_p, ing_seg: ing_seg_p, com_corfo: 0,
       com_dealer: C_P.dealer, com_patio: C_P.parque, com_ej: C_P.ej,
-      rentab: rentab_p, pct: monto_fin ? rentab_p / monto_fin * 100 : 0,
+      rentab: rentab_p, pct: monto_fin_p ? rentab_p / monto_fin_p * 100 : 0,
       cuota: cuota_p, esPatio, esCorfo: false,
-      tier_note: `Tasa cliente <b>${(tasaP * 100).toFixed(2).replace('.', ',')}%</b> (${esMayor ? '> 200 UF' : '≤ 200 UF'}) · spread ${spreadP != null ? Number(spreadP).toFixed(2).replace('.', ',') + '%' : 'AutoFin'} → costo de fondo ${(costoFondoP * 100).toFixed(2).replace('.', ',')}% · dealer ${(pctTramo(pr.dealer_tramos, plazo) * 100).toFixed(1).replace('.', ',')}% del saldo a ${plazo} meses · parque ${Number(pr.parque_pct) || 0}% · ejecutivo ${Number(pr.ejecutivo_pct) || 0}% del monto financiado${pr.descripcion ? '<br>' + pr.descripcion : ''}`,
+      tier_note: `${oblig ? '<b>Seguros obligatorios</b>: monto financiado propio ' + fN(monto_fin_p) + ' (primas ' + fN(primas_p) + ')<br>' : ''}Tasa cliente <b>${(tasaP * 100).toFixed(2).replace('.', ',')}%</b> (${esMayorP ? '> 200 UF' : '≤ 200 UF'}) · spread ${spreadP != null ? Number(spreadP).toFixed(2).replace('.', ',') + '%' : 'AutoFin'} → costo de fondo ${(costoFondoP * 100).toFixed(2).replace('.', ',')}% · dealer ${(pctTramo(pr.dealer_tramos, plazo) * 100).toFixed(1).replace('.', ',')}% del saldo a ${plazo} meses · parque ${Number(pr.parque_pct) || 0}% · ejecutivo ${Number(pr.ejecutivo_pct) || 0}% del monto financiado${pr.descripcion ? '<br>' + pr.descripcion : ''}`,
     });
     paneles.push({ hdr: 'hdrP' + pr.id, nombre: pr.producto, icono: 'bi-star-fill', rentab: rentab_p });
   }

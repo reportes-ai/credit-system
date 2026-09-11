@@ -7,7 +7,7 @@
   <title>Productos por Financiera — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v2.1 — spreads propios (costo de fondo = tasa − spread). v2.0 — productos con REGLAS PROPIAS (tasa cliente, comisión dealer por tramo de plazo, parque y ejecutivo): nace AUTOFIN PREFERENTE; footer Qué afecta. v1.2 -->
+  <!-- v2.2 — seguros obligatorios por producto. v2.1 — spreads propios (costo de fondo = tasa − spread). v2.0 — productos con REGLAS PROPIAS (tasa cliente, comisión dealer por tramo de plazo, parque y ejecutivo): nace AUTOFIN PREFERENTE; footer Qué afecta. v1.2 -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -152,6 +152,7 @@
     </div>
     <div class="reglas-box" id="reglasBox" style="display:none">
       <div class="form-group"><label>Descripción</label><input type="text" id="mDesc" placeholder="Qué tiene de especial este producto"></div>
+      <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="mSegOblig" style="width:auto"> Seguros obligatorios (desgravamen, RDH, cesantía y rep. menores siempre incluidos)</label></div>
       <div class="reglas-grid">
         <div class="form-group"><label>Tasa cliente ≤ 200 UF (% mensual)</label><input type="number" step="0.001" id="mTasaMenor" placeholder="2.39"></div>
         <div class="form-group"><label>Tasa cliente &gt; 200 UF (% mensual)</label><input type="number" step="0.001" id="mTasaMayor" placeholder="2.09"></div>
@@ -247,7 +248,7 @@
 
   function resumenReglas(r) {
     const t = (r.dealer_tramos || []).map(x => `≤${x.hasta === 999 ? '∞' : x.hasta}m ${x.pct}%`).join(' · ');
-    return `Tasa ${r.tasa_menor_pct ?? '—'}% / ${r.tasa_mayor_pct ?? '—'}% · Spread ${r.spread_menor_pct ?? '—'}% / ${r.spread_mayor_pct ?? '—'}% · Dealer ${t || '—'} · Parque ${r.parque_pct ?? '—'}% · Ejec. ${r.ejecutivo_pct ?? '—'}%`;
+    return `Tasa ${r.tasa_menor_pct ?? '—'}% / ${r.tasa_mayor_pct ?? '—'}% · Spread ${r.spread_menor_pct ?? '—'}% / ${r.spread_mayor_pct ?? '—'}% · Dealer ${t || '—'} · Parque ${r.parque_pct ?? '—'}% · Ejec. ${r.ejecutivo_pct ?? '—'}%${Number(r.seguros_obligatorios) === 1 ? ' · seguros obligatorios' : ''}`;
   }
   function pintarTramos(tramos) {
     const box = document.getElementById('tramos');
@@ -270,6 +271,7 @@
     document.getElementById('mDesc').value = item?.descripcion || '';
     document.getElementById('mTasaMenor').value = item?.tasa_menor_pct ?? '';
     document.getElementById('mTasaMayor').value = item?.tasa_mayor_pct ?? '';
+    document.getElementById('mSegOblig').checked = !!(item && Number(item.seguros_obligatorios) === 1);
     document.getElementById('mSpreadMenor').value = item?.spread_menor_pct ?? '';
     document.getElementById('mSpreadMayor').value = item?.spread_mayor_pct ?? '';
     document.getElementById('mParque').value = item?.parque_pct ?? '';
@@ -316,6 +318,7 @@
       reglas_propias: document.getElementById('mReglas').checked ? 1 : 0,
       descripcion: document.getElementById('mDesc').value.trim(),
       tasa_menor_pct: document.getElementById('mTasaMenor').value, tasa_mayor_pct: document.getElementById('mTasaMayor').value,
+      seguros_obligatorios: document.getElementById('mSegOblig').checked ? 1 : 0,
       spread_menor_pct: document.getElementById('mSpreadMenor').value, spread_mayor_pct: document.getElementById('mSpreadMayor').value,
       parque_pct: document.getElementById('mParque').value, ejecutivo_pct: document.getElementById('mEjec').value,
       dealer_tramos: leerTramos(),
