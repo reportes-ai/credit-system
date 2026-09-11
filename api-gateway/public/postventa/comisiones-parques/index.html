@@ -335,6 +335,7 @@ async function descargarTEF(){
       a.download = d.nombre_archivo; a.click(); URL.revokeObjectURL(a.href);
     }
     toast(`TEF: ${d.cargos} transferencia(s) por $${Number(d.monto_total).toLocaleString('es-CL')}` + (d.excluidas.length ? ` · ${d.excluidas.length} fuera del archivo` : ''), !d.cargos);
+    if ((d.divididas||[]).length) toast(`${d.divididas.length} pago(s) sobre el máximo del banco se dividieron en partes: ` + d.divididas.map(x => `${x.ref} en ${x.partes}`).join(', '));
     if (d.excluidas.length) alert('Quedaron FUERA del archivo (pagar por transferencia individual o corregir la ficha):\n' + d.excluidas.map(x => `• ${x.ref} ${x.nombre}: ${x.motivo}`).join('\n'));
     cargarCupoTEF();
   } catch(e){ toast('Error de red', true); }

@@ -39,20 +39,21 @@ require('./migrate').enFila('tef-internacional', async () => {
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY ix_mes (mes)
   )`);
-  await pool.query("INSERT IGNORE INTO postventa_config (clave, valor) VALUES ('tef_gratis_mes', '150'), ('tef_monto_max', '7000000')").catch(() => {});
+  await pool.query("INSERT IGNORE INTO postventa_config (clave, valor) VALUES ('tef_gratis_mes', '150'), ('tef_monto_max', '7000000'), ('tef_dividir', '1')").catch(() => {});
 });
 
 const R = v => Math.round(Number(v) || 0);
 const mesChile = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }).slice(0, 7);
 
 async function parametros() {
-  const out = { gratis: 150, montoMax: 7000000 };
+  const out = { gratis: 150, montoMax: 7000000, dividir: true };
   try {
-    const [rows] = await pool.query("SELECT clave, valor FROM postventa_config WHERE clave IN ('tef_gratis_mes','tef_monto_max')");
+    const [rows] = await pool.query("SELECT clave, valor FROM postventa_config WHERE clave IN ('tef_gratis_mes','tef_monto_max','tef_dividir')");
     for (const r of rows) {
       let v = r.valor; try { v = JSON.parse(v); } catch (_) {}
       if (r.clave === 'tef_gratis_mes' && Number(v) > 0) out.gratis = Number(v);
       if (r.clave === 'tef_monto_max' && Number(v) > 0) out.montoMax = Number(v);
+      if (r.clave === 'tef_dividir') out.dividir = Number(v) === 1;
     }
   } catch (_) {}
   return out;
@@ -104,7 +105,7 @@ async function codigoBanco(nombre) {
    Devuelve { buffer, nombre_archivo, cargos, monto_total, excluidas:[{ref, motivo}], cupo } */
 async function construirTEF({ plataforma, filas, usuario }) {
   const P = await parametros();
-  const ok = [], excluidas = [];
+  const ok = [], excluidas = [], divididas = [];
   for (const f of filas || []) {
     const ref = f.ref || f.motivo || '';
     const rut = rutBanco(f.rut), cuenta = cuentaBanco(f.num_cuenta), monto = R(f.monto);
@@ -116,10 +117,22 @@ async function construirTEF({ plataforma, filas, usuario }) {
     if (!cuenta) porque.push('sin número de cuenta');
     if (!banco) porque.push('banco no reconocido' + (f.banco ? ` (${f.banco})` : ''));
     if (monto <= 0) porque.push('monto en cero');
-    if (monto > P.montoMax) porque.push(`monto sobre el máximo del banco ($${P.montoMax.toLocaleString('es-CL')} por transferencia)`);
+    if (monto > P.montoMax && !P.dividir) porque.push(`monto sobre el máximo del banco ($${P.montoMax.toLocaleString('es-CL')} por transferencia)`);
     if (!motivo) porque.push('sin motivo');
     if (porque.length) { excluidas.push({ ref, nombre: f.nombre || '', monto, motivo: porque.join(', ') }); continue; }
-    ok.push([rut, nombre, cuenta, monto, tipoCuenta(f.tipo_cuenta), banco, alfanum(f.correo, 45).toLowerCase().replace(/ /g, '') || '', motivo]);
+    const correo = alfanum(f.correo, 45).toLowerCase().replace(/ /g, '') || '';
+    /* Monto sobre el máximo del banco: se DIVIDE en N transferencias iguales a la misma cuenta
+       (tef_dividir=1, Pato 11-09-2026), cada una con su parte en el motivo ("… 1/2"). Cada parte
+       es un cargo para el cupo del mes. */
+    const partes = monto > P.montoMax ? Math.ceil(monto / P.montoMax) : 1;
+    let resto = monto;
+    for (let k = 1; k <= partes; k++) {
+      const m = k === partes ? resto : Math.floor(monto / partes);
+      resto -= m;
+      const mot = partes > 1 ? alfanum(motivo, 30 - (` ${k}/${partes}`).length) + ` ${k}/${partes}` : motivo;
+      ok.push([rut, nombre, cuenta, m, tipoCuenta(f.tipo_cuenta), banco, correo, mot]);
+    }
+    if (partes > 1) divididas.push({ ref, nombre: f.nombre || '', monto, partes });
   }
   const header = ['rut_destinatario', 'nombre_destinatario', 'cuenta_destinatario', 'monto', 'tipo_cuenta', 'codigo_banco', 'correo_destinatario', 'motivo'];
   const ws = XLSX.utils.aoa_to_sheet([header, ...ok]);
@@ -140,7 +153,7 @@ async function construirTEF({ plataforma, filas, usuario }) {
        JSON.stringify(ok.map(r => ({ rut: r[0], nombre: r[1], monto: r[3], motivo: r[7] })))]);
   }
   const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
-  return { buffer, nombre_archivo: `TEF-BInternacional-${plataforma.toLowerCase()}-${hoy}.xlsx`, cargos: ok.length, monto_total, excluidas, cupo: await cupoMes() };
+  return { buffer, nombre_archivo: `TEF-BInternacional-${plataforma.toLowerCase()}-${hoy}.xlsx`, cargos: ok.length, monto_total, excluidas, divididas, cupo: await cupoMes() };
 }
 
 /* Cupo del mes: cargos ya enviados en las tres plataformas vs el tope gratis. */

@@ -38,7 +38,7 @@ async function generar(req, res) {
     if (plataforma === 'PARQUES') filas = await filasParques(filas);
     const r = await tef.construirTEF({ plataforma, filas, usuario: req.usuario });
     res.json({ success: true, data: { archivo_base64: r.buffer.toString('base64'), nombre_archivo: r.nombre_archivo, cargos: r.cargos,
-      monto_total: r.monto_total, excluidas: r.excluidas, cupo: r.cupo }, error: null });
+      monto_total: r.monto_total, excluidas: r.excluidas, divididas: r.divididas, cupo: r.cupo }, error: null });
   } catch (e) {
     console.error('[tef generar]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
