@@ -423,7 +423,7 @@ exports.generarDesdeBD = async (req, res) => {
          ORDER BY nombre`, cats);
       const vistos = new Set();
       rows = r.filter(x => { const k = String(x.email || '').toLowerCase().trim() || String(x.rut); if (vistos.has(k)) return false; vistos.add(k); return true; })
-        .map(x => ({ ...x, esp1: x.categoria, esp2: x.nombre_razon || '' }));
+        .map(x => ({ ...x, esp1: x.categoria, esp2: x.nombre_razon || '', renta: null, renta_estimada: 0 }));   // renta_estimada es NOT NULL
     } else if (c.objetivo === 'COBRANZA') {
       const [r] = await pool.query(`
         SELECT cl.rut, cl.nombres nombre, cl.apellido_paterno ap_paterno, cl.apellido_materno ap_materno,
