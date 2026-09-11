@@ -584,7 +584,7 @@ async function cargarCupoTEF(){
     el.title = `Cargos enviados en ${c.mes}: ` + Object.entries(c.por_plataforma||{}).map(([k,v])=>`${k} ${v}`).join(' · ');
   } catch(e){}
 }
-function filasTEF(){ return nominaRows().map(r => ({ ref:'OP '+(r.num_op||''), rut:r.rut_dealer, nombre:r.nombre_dealer, banco:r.banco, tipo_cuenta:r.tipo_cuenta||'', num_cuenta:r.num_cuenta, correo:r.correo||'', monto:Math.round(Number(r.comision)||0), motivo:`Comision OP ${r.num_op||''}` })); }
+function filasTEF(){ return nominaRows().map(r => ({ ref:'OP '+(r.num_op||''), rut:r.rut_dealer, nombre:r.nombre_dealer, banco:r.banco, tipo_cuenta:r.tipo_cuenta||'', num_cuenta:r.num_cuenta, correo:r.correo||'', monto:Math.round(Number(r.comision)||0), motivo:`Pago comision OP${r.num_op||''}` })); }
 async function descargarTEF(){
   const filas = filasTEF(); if (!filas.length) return;
   const btn = document.getElementById('btnTEF'); btn.disabled = true;

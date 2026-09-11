@@ -62,6 +62,16 @@ async function parametros() {
 /* ── Normalizaciones según la estructura del banco ── */
 const sinAcentos = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
 const alfanum = (s, largo) => sinAcentos(s).toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, largo);
+const glosa = (s, largo) => sinAcentos(s).replace(/[^A-Za-z0-9 .\/]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, largo);
+/* Glosa de una parte: "<motivo> Transf. k/n" (Pato, 11-09-2026). Si no cabe en los 30 del banco se
+   abrevia el motivo ("saldo precio" → "SP", "comision" → "com") y, si aún no cabe, se corta. */
+function glosaParte(motivo, k, n) {
+  const suf = ` Transf. ${k}/${n}`;
+  let m = glosa(motivo, 30);
+  if ((m + suf).length > 30) m = m.replace(/saldo precio/i, 'SP').replace(/comision/i, 'com').replace(/parque/i, 'pq');
+  if ((m + suf).length > 30) m = m.replace(/^Pago /i, '');   // antes de cortar el número, sacrificar el "Pago"
+  return glosa(m.slice(0, 30 - suf.length) + suf, 30);
+}
 const rutBanco = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase().slice(0, 15);   // con DV, sin puntos ni guión
 const cuentaBanco = c => String(c || '').replace(/\D/g, '').slice(0, 19);
 
@@ -110,7 +120,7 @@ async function construirTEF({ plataforma, filas, usuario }) {
     const ref = f.ref || f.motivo || '';
     const rut = rutBanco(f.rut), cuenta = cuentaBanco(f.num_cuenta), monto = R(f.monto);
     const banco = await codigoBanco(f.banco);
-    const nombre = alfanum(f.nombre, 45), motivo = alfanum(f.motivo, 30);
+    const nombre = alfanum(f.nombre, 45), motivo = glosa(f.motivo, 30);
     const porque = [];
     if (rut.length < 7) porque.push('sin RUT');
     if (!nombre) porque.push('sin nombre');
@@ -121,16 +131,15 @@ async function construirTEF({ plataforma, filas, usuario }) {
     if (!motivo) porque.push('sin motivo');
     if (porque.length) { excluidas.push({ ref, nombre: f.nombre || '', monto, motivo: porque.join(', ') }); continue; }
     const correo = alfanum(f.correo, 45).toLowerCase().replace(/ /g, '') || '';
-    /* Monto sobre el máximo del banco: se DIVIDE en N transferencias iguales a la misma cuenta
-       (tef_dividir=1, Pato 11-09-2026), cada una con su parte en el motivo ("… 1/2"). Cada parte
-       es un cargo para el cupo del mes. */
+    /* Monto sobre el máximo del banco: se DIVIDE en transferencias a la misma cuenta, cada una por
+       el MÁXIMO y la última por la diferencia (Pato, 11-09-2026); glosa "<motivo> Transf. k/n".
+       Cada parte es un cargo para el cupo del mes. */
     const partes = monto > P.montoMax ? Math.ceil(monto / P.montoMax) : 1;
     let resto = monto;
     for (let k = 1; k <= partes; k++) {
-      const m = k === partes ? resto : Math.floor(monto / partes);
+      const m = k === partes ? resto : P.montoMax;
       resto -= m;
-      const mot = partes > 1 ? alfanum(motivo, 30 - (` ${k}/${partes}`).length) + ` ${k}/${partes}` : motivo;
-      ok.push([rut, nombre, cuenta, m, tipoCuenta(f.tipo_cuenta), banco, correo, mot]);
+      ok.push([rut, nombre, cuenta, m, tipoCuenta(f.tipo_cuenta), banco, correo, partes > 1 ? glosaParte(motivo, k, partes) : motivo]);
     }
     if (partes > 1) divididas.push({ ref, nombre: f.nombre || '', monto, partes });
   }
