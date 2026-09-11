@@ -7,6 +7,10 @@
      · Imponibles: sueldo base + comisiones (auto desde el motor de comisiones,
        editable) + otros imponibles + gratificación legal (25% con tope 4,75 IMM/12).
      · No imponibles: colación + movilización + otros.
+   Topes PRORRATEADOS por días pagados (rem_prorratea_topes=1, 11-09-2026): con licencia,
+     ausencia, ingreso o baja en el mes, el tope de gratificación y los topes imponibles
+     (AFP/salud/SIS y AFC) valen tope × días/30 — norma Previred/DT; antes se aplicaban enteros.
+   UF de la liquidación: la del ÚLTIMO día del mes (antes, día 28).
    Descuentos legales (sobre imponible topado a rem_tope_imponible_uf × UF):
      · AFP: tasa por administradora (rh_afp_tasas, paramétrica).
      · Salud: 7% legal (rem_salud_pct) — plan Isapre pactado en UF pendiente.
@@ -78,7 +82,8 @@ require('../../../../shared/migrate').enFila('rrhh-remuneraciones', async () => 
       ('rem_salud_pct', '7'),
       ('rem_imm', '529000'),
       ('rem_grat_tope_imm', '4.75'),
-      ('rem_apv_tope_uf', '50')`);
+      ('rem_apv_tope_uf', '50'),
+      ('rem_prorratea_topes', '1')`);
     // Haberes no imponibles fijos en la ficha
     await pool.query('ALTER TABLE rh_fichas ADD COLUMN colacion DECIMAL(10,0) NULL').catch(() => {});
     await pool.query('ALTER TABLE rh_fichas ADD COLUMN movilizacion DECIMAL(10,0) NULL').catch(() => {});
@@ -661,7 +666,9 @@ async function descuentosDelMes(mes) {
 async function indicadores(mes) {
   const [cfgRows] = await pool.query("SELECT clave, valor FROM rh_config WHERE clave LIKE 'rem_%'");
   const cfg = {}; cfgRows.forEach(r => cfg[r.clave] = parseFloat(r.valor) || 0);
-  const finMes = mes + '-28';
+  // UF del ÚLTIMO día del mes (norma Previred/DT); si el mes aún no termina, getUF entrega la última cargada.
+  const [y, m] = mes.split('-').map(Number);
+  const finMes = mes + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0');
   const uf = (await getUF(finMes)) || (await getUF(new Date().toISOString().slice(0, 10))) || 0;
   const [[utmRow]] = await pool.query('SELECT valor FROM utm WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [finMes + ' 23:59:59']);
   const utm = parseFloat(utmRow?.valor) || 0;
@@ -687,12 +694,16 @@ function calcLiquidacion(inp, ind) {
   const otrosDesc = R(inp.otros_descuentos);
 
   const baseGrat = sueldo + comisiones + feriadoVar + otrosImp;
+  /* Topes proporcionales a los días pagados (licencia, ausencia, ingreso o baja en el mes):
+     tope × días/30 para la gratificación y para los topes imponibles AFP/salud/SIS y AFC.
+     Paramétrico rem_prorratea_topes (1 = norma Previred/DT; 0 = topes enteros, como hasta el 10-09-2026). */
+  const prorrateo = (ind.rem_prorratea_topes == null || Number(ind.rem_prorratea_topes) === 1) ? dias / 30 : 1;
   // Gratificación legal art. 50: 25% mensual con tope (4,75 IMM)/12
-  const topeGrat = R(ind.rem_grat_tope_imm * ind.rem_imm / 12);
+  const topeGrat = R(ind.rem_grat_tope_imm * ind.rem_imm / 12 * prorrateo);
   const gratificacion = Math.min(R(baseGrat * 0.25), topeGrat);
 
   const imponible = baseGrat + gratificacion;
-  const topeImp = R(ind.rem_tope_imponible_uf * ind.uf);
+  const topeImp = R(ind.rem_tope_imponible_uf * ind.uf * prorrateo);
   const baseCotiz = Math.min(imponible, topeImp);
 
   const afpPct = parseFloat((ind.afps.find(a => a.afp === String(inp.afp || '').toUpperCase()) || {}).tasa_pct) || 0;
@@ -702,7 +713,7 @@ function calcLiquidacion(inp, ind) {
   const planUF = Number(inp.plan_isapre_uf) || 0;
   const descSaludAdicional = planUF > 0 ? Math.max(0, R(planUF * ind.uf) - descSalud) : 0;
   const esIndef = String(inp.tipo_contrato || '').toUpperCase() === 'INDEFINIDO';
-  const baseAfc = Math.min(imponible, R(ind.rem_tope_afc_uf * ind.uf));
+  const baseAfc = Math.min(imponible, R(ind.rem_tope_afc_uf * ind.uf * prorrateo));
   const descAfc = esIndef ? R(baseAfc * ind.rem_afc_trabajador_pct / 100) : 0;
 
   /* Impuesto único 2ª categoría sobre la base tributable (imponible − previsión), tramos en UTM.
@@ -732,6 +743,7 @@ function calcLiquidacion(inp, ind) {
   return {
     dias, sueldo_base: sueldo, comisiones, feriado_variable: feriadoVar, feriado_var_dias: inp.feriado_var_dias || 0, otros_imponibles: otrosImp, gratificacion,
     total_imponible: imponible, base_cotizacion: baseCotiz,
+    tope_gratificacion: topeGrat, tope_imponible: topeImp, topes_prorrateados: prorrateo < 1,   // trazabilidad del prorrateo
     colacion, movilizacion, otros_no_imponibles: otrosNoImp,
     adicionales: Array.isArray(inp.adicionales) ? inp.adicionales : [],   // detalle por ítem (nombre, monto, imponible)
     total_haberes: totalHaberes,
