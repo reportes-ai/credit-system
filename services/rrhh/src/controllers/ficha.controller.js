@@ -207,7 +207,9 @@ async function armarFicha(idUsuario, conSueldo, soloVisibles) {
       ORDER BY created_at DESC`, [idUsuario]);
   const [hijos] = await pool.query(
     "SELECT id, nombre, rut, DATE_FORMAT(fecha_nacimiento,'%Y-%m-%d') fecha_nacimiento, es_carga FROM rh_hijos WHERE id_usuario=? ORDER BY fecha_nacimiento, id", [idUsuario]);
-  return { usuario: u, ficha, documentos: docs, hijos };
+  // UF del día para mostrar el plan Isapre (pactado en UF) también en pesos
+  let uf = null; try { uf = await require('../../../../shared/uf').getUF(new Date()); } catch (_) {}
+  return { usuario: u, ficha, documentos: docs, hijos, uf };
 }
 
 /* GET /api/rrhh/ficha        → la mía
