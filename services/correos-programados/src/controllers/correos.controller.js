@@ -552,7 +552,11 @@ async function buildAlertaPenetracion(opts = {}) {
   let variante = opts.variante; // 'ALERTA' | 'RECUPERACION' (preview/ejemplos)
   if (!variante) {
     const mismoMes = prev && prev.mes === d.mesStr;
-    const pctPrev = mismoMes && prev.pct != null ? prev.pct : (mismoMes ? (prev.estado === 'BAJO' ? null : Math.round(d.pctTop * 100)) : Math.round(d.pctTop * 100));
+    /* Estado guardado sin tramo (formato anterior al 10-09-2026): si el estado (OK/BAJO) no cambió,
+       no es un cambio de tramo — se asume el tramo de hoy y se guarda. Sin esto, el 11-09 se repitió
+       la alerta del 10-09 (el estado de la víspera venía sin pct y se leyó como "cambió"). */
+    const pctPrev = mismoMes && prev.pct != null ? prev.pct
+      : (mismoMes ? (prev.estado === estadoActual ? pctHoy : Math.round(d.pctTop * 100)) : Math.round(d.pctTop * 100));
     if (!opts.forzar) {
       if (mismoMes && pctPrev === pctHoy) return { skip: true, estado: 'Sin cambios (' + estadoActual + ' ' + pctHoy + '%)' };
       if (!mismoMes && estadoActual === 'OK') { await guardar(); return { skip: true, estado: 'Mes parte en OK — sin aviso' }; }
