@@ -237,14 +237,21 @@ async function notificarComisionRev(evento, { ejecutivo, mes } = {}) {
          WHERE p.nombre IN (?) AND (u.estado IS NULL OR u.estado<>'inactivo')`, [perfiles]);
       us.forEach(u=>ids.add(u.id_usuario));
     }
-    if (cfg.incluir_ejecutivo && ejecutivo) {
-      try { const [us] = await pool.query('SELECT id_usuario FROM usuario_ejecutivos WHERE ejecutivo=?', [ejecutivo]); us.forEach(u=>ids.add(u.id_usuario)); } catch(_){}
+    // Quiénes son "el ejecutivo" (para hablarle de "tus comisiones"); a los demás se les dice de quién son
+    const idsEjecutivo = new Set();
+    if (ejecutivo) {
+      try { const [us] = await pool.query('SELECT id_usuario FROM usuario_ejecutivos WHERE ejecutivo=?', [ejecutivo]); us.forEach(u=>idsEjecutivo.add(u.id_usuario)); } catch(_){}
     }
+    if (cfg.incluir_ejecutivo) idsEjecutivo.forEach(id=>ids.add(id));
     String(cfg.usuarios_extra||'').split(',').map(s=>parseInt(s.trim())).filter(Boolean).forEach(id=>ids.add(id));
     if (!ids.size) return;
     let dest = [...ids];
     try { dest = await require('../../../../shared/backups').expandirAlerta(dest); } catch(_){}
-    const mensaje = def.mensaje.replace('{mesPago}', mesPagoNombre(mes)).replace('{mesProd}', mesNombre(mes)).replace('{ejecutivo}', ejecutivo||'');
+    const plantilla = t => t.replace('{mesPago}', mesPagoNombre(mes)).replace('{mesProd}', mesNombre(mes)).replace('{ejecutivo}', ejecutivo||'');
+    const mensaje = plantilla(def.mensaje);
+    // Para terceros (jefes, Operaciones, Admin): "Tus comisiones" → "Las comisiones de <ejecutivo>", y el nombre en el título (Pato, 11-09-2026)
+    const mensajeTercero = plantilla(def.mensaje.replace(/^Tus comisiones/, `Las comisiones de ${ejecutivo||''}`).replace(' esperan tu aprobación', ' esperan la aprobación del ejecutivo').replace('Si no respondes', 'Si no responde'));
+    const tituloTercero = ejecutivo && !/\{ejecutivo\}|de [A-ZÁÉÍÓÚÑ]/.test(def.titulo) ? def.titulo.replace(/^Comisiones/, `Comisiones de ${ejecutivo}`) : def.titulo;
     const clave = `comrev:${evento}:${ejecutivo||''}:${mes}`;
     const sonTipo = SONIDOS.includes(cfg.sonido_tipo) ? cfg.sonido_tipo : 'campana';
     for (const uid of dest) {
@@ -253,7 +260,7 @@ async function notificarComisionRev(evento, { ejecutivo, mes } = {}) {
       await pool.query(
         `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar, son_cada, son_max, son_tipo)
          VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-        [uid,'alerta',def.titulo,mensaje,def.href,clave,cfg.prioridad||'normal',cfg.sonido?1:0,cfg.sonido_cada_seg||30,cfg.sonido_max_min||5,sonTipo]);
+        [uid,'alerta',idsEjecutivo.has(uid) ? def.titulo : tituloTercero, idsEjecutivo.has(uid) ? mensaje : mensajeTercero,def.href,clave,cfg.prioridad||'normal',cfg.sonido?1:0,cfg.sonido_cada_seg||30,cfg.sonido_max_min||5,sonTipo]);
     }
   } catch (e) { console.error('[notificarComisionRev]', evento, e.message); }
 }
