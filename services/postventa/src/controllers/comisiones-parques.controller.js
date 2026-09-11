@@ -423,19 +423,19 @@ async function notificarUsuarios(ids, { titulo, mensaje, href, clave }) {
 const CLP = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
 
 /* ── POST /api/comisiones-parques/aprobar {mes, parque} ──────────────────── */
-const aprobar = async (req, res) => {
-  try {
-    const mes = mesParam(req);
-    const parque = String(req.body.parque || '').trim();
-    if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
-    const calc = await calcularMes(mes);
-    const row = calc.find(r => r.parque === parque);
-    if (!row) return res.status(404).json({ success: false, data: null, error: 'Parque no encontrado' });
-    const quien = `${req.user?.nombre || ''} ${req.user?.apellido || ''}`.trim() || 'sistema';
-    // La FOTO de operaciones queda escrita ANTES de congelar (después ya no se toca)
-    await fotografiarOps(parque, mes);
-    // Snapshot: los montos quedan congelados al aprobar
-    await pool.query(`
+/* Aprobación del PAGO del parque (snapshot + devengo). La usan el botón "Aprobar" de Comisiones
+   Parques a Pagar y, desde el 11-09-2026, la aprobación/envío de la CARTOLA: aprobar la cartola YA es
+   aprobar el pago (Pato: "¿por qué me pides aprobar si ya fueron aprobadas y enviadas?"). Idempotente:
+   si el pago ya pasó de EN_APROBACION no toca nada. */
+async function aprobarPagoParque(parque, mes, quien, req) {
+  const calc = await calcularMes(mes);
+  const row = calc.find(r => r.parque === parque);
+  if (!row) return null;
+  const [[ya]] = await pool.query("SELECT etapa FROM parques_pagos_mes WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]);
+  if (ya && ya.etapa !== 'EN_APROBACION') return ya.etapa;
+  // La FOTO de operaciones queda escrita ANTES de congelar (después ya no se toca)
+  await fotografiarOps(parque, mes);
+  await pool.query(`
       INSERT INTO parques_pagos_mes (parque, mes, arriendo, comision_creditos, ops, etapa, aprobada_por, fecha_aprobada)
       VALUES (?, ?, ?, ?, ?, 'APROBADA', ?, NOW())
       ON DUPLICATE KEY UPDATE
@@ -445,16 +445,27 @@ const aprobar = async (req, res) => {
         etapa=IF(etapa='EN_APROBACION', 'APROBADA', etapa),
         aprobada_por=IF(fecha_aprobada IS NULL, VALUES(aprobada_por), aprobada_por),
         fecha_aprobada=IF(fecha_aprobada IS NULL, NOW(), fecha_aprobada)`,
-      [parque, mes + '-01', row.arriendo, row.comision_creditos, row.ops, quien]);
-    // Máxima 4: devengo del gasto al aprobar (regla COMISION_PARQUES, idempotente por ref)
-    require('../../../contabilidad/src/motor-asientos').contabilizar({
-      evento: 'COMISION_PARQUES',
-      glosa: `Comisión/arriendo parque ${parque} — ${mes}`,
-      ref: `PARQUE-${parque}-${mes}`,
-      montos: { arriendo: Math.round(Number(row.arriendo) || 0), comision: Math.round(Number(row.comision_creditos) || 0) },
-    }).catch(e => console.error('[parques ctb devengo]', e.message));
-    auditar({ req, accion: 'EDITAR', modulo: 'postventa', entidad: 'parque_pago', detalle: `Aprobó comisión parque ${parque} ${mes}: arriendo ${CLP(row.arriendo)} + comisión ${CLP(row.comision_creditos)} (${row.ops} ops)` });
-    res.json({ success: true, data: { etapa: 'APROBADA' }, error: null });
+    [parque, mes + '-01', row.arriendo, row.comision_creditos, row.ops, quien]);
+  // Máxima 4: devengo del gasto al aprobar (regla COMISION_PARQUES, idempotente por ref)
+  require('../../../contabilidad/src/motor-asientos').contabilizar({
+    evento: 'COMISION_PARQUES',
+    glosa: `Comisión/arriendo parque ${parque} — ${mes}`,
+    ref: `PARQUE-${parque}-${mes}`,
+    montos: { arriendo: Math.round(Number(row.arriendo) || 0), comision: Math.round(Number(row.comision_creditos) || 0) },
+  }).catch(e => console.error('[parques ctb devengo]', e.message));
+  if (req) auditar({ req, accion: 'EDITAR', modulo: 'postventa', entidad: 'parque_pago', detalle: `Aprobó comisión parque ${parque} ${mes}: arriendo ${CLP(row.arriendo)} + comisión ${CLP(row.comision_creditos)} (${row.ops} ops)` });
+  return 'APROBADA';
+}
+
+const aprobar = async (req, res) => {
+  try {
+    const mes = mesParam(req);
+    const parque = String(req.body.parque || '').trim();
+    if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
+    const quien = `${req.user?.nombre || ''} ${req.user?.apellido || ''}`.trim() || 'sistema';
+    const etapa = await aprobarPagoParque(parque, mes, quien, req);
+    if (!etapa) return res.status(404).json({ success: false, data: null, error: 'Parque no encontrado' });
+    return res.json({ success: true, data: { etapa }, error: null });
   } catch (e) { console.error('[comisiones-parques aprobar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
@@ -673,6 +684,8 @@ const cartolaAprobar = async (req, res) => {
     if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
     await fotografiarOps(parque, mes);
     await marcarEtapaParqueOps(parque, mes, ['CARTOLA EMITIDA', 'CARTOLA APROBADA'], quienDe(req));
+    // Aprobar la cartola = aprobar el pago: Comisiones Parques a Pagar queda directo en "Emitir Orden de Pago"
+    await aprobarPagoParque(parque, mes, quienDe(req), req);
     auditar({ req, accion: 'APROBAR', modulo: 'postventa', entidad: 'cartola_parque', detalle: `Aprobó cartola parque ${parque} (${mes})` });
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { console.error('[cartola aprobar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -740,6 +753,7 @@ const cartolaEnviar = async (req, res) => {
       [mes, parque, mail || null, arriendo, comision, totalC, quien]);
     await fotografiarOps(parque, mes);   // por si el envío llega sin pasar por emitir
     await marcarEtapaParqueOps(parque, mes, ['COMISION A PAGAR', 'CARTOLA EMITIDA', 'CARTOLA APROBADA', 'CARTOLA ENVIADA'], quien);
+    await aprobarPagoParque(parque, mes, quien, req);   // enviada ⇒ aprobada para el pago
     auditar({ req, accion: 'ENVIAR_CARTOLA', modulo: 'postventa', entidad: 'cartola_parque', entidad_id: r.insertId,
       detalle: `Envió cartola parque ${parque} (${mes}) por ${CLP(totalC)} a ${mail || '(sin correo)'}` +
                (envio.enviado ? ` — correo enviado${envio.cc?.length ? ' (CC ' + envio.cc.join(', ') + ')' : ''}` : ` — SIN correo: ${envio.motivo}`) });
@@ -850,6 +864,6 @@ const revertirPago = async (req, res) => {
   } catch (e) { console.error('[parques revertir-pago]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { _ccCartolaParque: ccCartolaParque, listar, detalle, aprobar, emitir, pagar,
+module.exports = { _ccCartolaParque: ccCartolaParque, _aprobarPagoParque: aprobarPagoParque, listar, detalle, aprobar, emitir, pagar,
   facturaRegistrar, cartolaEstado, cartolaEmitir, cartolaAprobar, cartolaEnviar, cartolasEnviadas, cartolaReversarEnvio,
   anularODP, revertirPago };
