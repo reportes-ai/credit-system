@@ -554,6 +554,15 @@ function paramsHSM(c, dest) {
   return map.map(campo => ({ type: 'text', text: (campo ? merge('{{' + campo + '}}', dest) : '') || '-' }));
 }
 
+/* Datos de la empresa para el pie del correo — fuente única: Credenciales Corporativas (credenciales_empresa).
+   Se cachean 5 min; preview/enviar/prueba los cargan antes de armar el HTML. */
+let EMPRESA = { organizacion: 'AutoFácil Crédito Automotriz', web: 'https://www.autofacilchile.cl', email: 'contacto@autofacilchile.cl' }, EMPRESA_EXP = 0;
+async function cargarEmpresa() {
+  if (EMPRESA_EXP > Date.now()) return EMPRESA;
+  try { const [[e]] = await pool.query('SELECT organizacion, web, email FROM credenciales_empresa WHERE id=1'); if (e) EMPRESA = { ...EMPRESA, ...Object.fromEntries(Object.entries(e).filter(([, v]) => v)) }; } catch (_) {}
+  EMPRESA_EXP = Date.now() + 5 * 60 * 1000;
+  return EMPRESA;
+}
 function htmlMail(c, dest, opts = {}) {
   const cuerpo = merge(c.texto, dest).replace(/\n/g, '<br>');
   const pixel = (opts.pixel && dest.id)
@@ -562,12 +571,12 @@ function htmlMail(c, dest, opts = {}) {
   const azul = '#0141A2', navy = '#012d70';
   let head = '';
   if (c.plantilla === 'banner') {
-    head = `<div style="background:linear-gradient(135deg,${navy},${azul});padding:26px 30px;border-radius:12px 12px 0 0">
-      <div style="color:#fff;font-size:26px;font-weight:800;font-family:Segoe UI,Arial">Auto<span style="color:#7cc4ff">Fácil</span></div>
-      <div style="color:#bfdbfe;font-size:12px;letter-spacing:2px">CRÉDITO AUTOMOTRIZ</div></div>`;
+    // Logo real de AutoFácil (versión blanca) sobre el banner — img/logo-blanco-mail.png
+    head = `<div style="background:linear-gradient(135deg,${navy},${azul});padding:22px 30px;border-radius:12px 12px 0 0">
+      <img src="${APP_URL}/img/logo-blanco-mail.png" alt="AutoFácil Crédito Automotriz" width="210" style="display:block;width:210px;height:auto;border:0"></div>`;
   } else if (c.plantilla === 'logo') {
-    head = `<div style="padding:22px 30px;border-bottom:3px solid ${azul}">
-      <span style="color:${navy};font-size:24px;font-weight:800;font-family:Segoe UI,Arial">Auto<span style="color:${azul}">Fácil</span></span></div>`;
+    head = `<div style="padding:18px 30px;border-bottom:3px solid ${azul}">
+      <img src="${APP_URL}/img/logo-autofacil-mail.png" alt="AutoFácil Crédito Automotriz" width="200" style="display:block;width:200px;height:auto;border:0"></div>`;
   } else if (c.plantilla === 'titulo') {
     head = `<div style="padding:34px 30px 10px"><div style="color:${c.color_titulo || azul};font-size:32px;line-height:1.15;font-weight:800;font-family:Segoe UI,Arial">${merge(c.titulo || '', dest)}</div></div>`;
   }
@@ -582,7 +591,7 @@ function htmlMail(c, dest, opts = {}) {
   return `<div style="max-width:620px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;font-family:Segoe UI,Arial,sans-serif">
     ${head}${img}
     ${cuerpo ? `<div style="padding:26px 30px;color:#1e293b;font-size:15px;line-height:1.65">${cuerpo}</div>` : ''}${boton}
-    <div style="background:#f8fafc;padding:14px 30px;color:#94a3b8;font-size:11px">AutoFácil Crédito Automotriz · autofacilchile.cl · +56 9 3246 9071</div>
+    <div style="background:#f8fafc;padding:14px 30px;color:#94a3b8;font-size:11px">${EMPRESA.organizacion} · ${String(EMPRESA.web || '').replace(/^https?:\/\//, '')}${EMPRESA.email ? ' · ' + EMPRESA.email : ''}</div>
   </div>${pixel}`;
 }
 
@@ -602,6 +611,7 @@ exports.prueba = async (req, res) => {
     const [[c]] = await pool.query('SELECT * FROM campanas_masivas WHERE id=?', [req.params.id]);
     if (!c) return fail(res, 'Campaña no existe', 404);
     if (c.canal !== 'MAIL') return fail(res, 'La prueba es solo para campañas de Mail', 400);
+    await cargarEmpresa();
     const to = String((req.body && req.body.email) || req.usuario.email || '').trim();
     if (!to.includes('@')) return fail(res, 'Tu usuario no tiene correo; indica uno', 400);
     let [[d]] = await pool.query("SELECT * FROM campanas_destinatarios WHERE id_campana=? AND grupo='CAMPANA' ORDER BY id LIMIT 1", [c.id]);
@@ -659,6 +669,7 @@ exports.preview = async (req, res) => {
   try {
     const [[c]] = await pool.query('SELECT * FROM campanas_masivas WHERE id=?', [req.params.id]);
     if (!c) return fail(res, 'Campaña no existe', 404);
+    await cargarEmpresa();
     const idx = Math.max(0, Number(req.query.i) || 0);
     const [[{ n }]] = await pool.query("SELECT COUNT(*) n FROM campanas_destinatarios WHERE id_campana=? AND grupo='CAMPANA'", [c.id]);
     if (!n) return ok(res, { total: 0 });
@@ -679,6 +690,7 @@ exports.enviar = async (req, res) => {
     const [[c]] = await pool.query('SELECT * FROM campanas_masivas WHERE id=?', [req.params.id]);
     if (!c) return fail(res, 'Campaña no existe', 404);
     if (c.es_test) return fail(res, 'La campaña TEST es solo demostrativa', 400);
+    await cargarEmpresa();
     /* Velocidad y cupo: cada llamada manda UN lote de `por_minuto` (el frontend espera 60 s entre lotes)
        y nunca más de `cupo_diario` en el día por esta campaña. Lo que sobra queda PENDIENTE y se
        continúa otro día con el mismo botón. */
