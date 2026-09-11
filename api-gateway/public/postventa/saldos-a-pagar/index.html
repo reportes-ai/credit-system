@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v5.6 — TEF: generar el archivo registra el pago (y sus correos). v5.5 — botón TEF B.Internacional (archivo de transferencias masivas) con el cupo gratis del mes. v5.4 — "Vencen hoy/mañana" con letra chica (clase venc, como "Nada enviado a pago todavía"). v5.3 — cuadro Pendientes de pago: líneas "Vencen hoy" y "Vencen mañana" (ops X monto, según SLA). v5.2 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v5.7 — fix: el bloque TEF quedó dentro de <script src=timbre-pagado.js> y el navegador lo ignoraba (descargarTEF is not defined). v5.6 — TEF: generar el archivo registra el pago (y sus correos). v5.5 — botón TEF B.Internacional (archivo de transferencias masivas) con el cupo gratis del mes. v5.4 — "Vencen hoy/mañana" con letra chica (clase venc, como "Nada enviado a pago todavía"). v5.3 — cuadro Pendientes de pago: líneas "Vencen hoy" y "Vencen mañana" (ops X monto, según SLA). v5.2 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -687,7 +687,8 @@ async function verODP(ordenId){
     <a class="btn-ghost" style="text-decoration:none;color:#334155" href="/ordenes-pago/historial/?origen=SALDO" target="_blank"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir en Órdenes de Pago</a>
   </div>
 </dialog>
-<script src="/js/timbre-pagado.js">
+<script src="/js/timbre-pagado.js"></script>
+<script>
 /* ── TEF masiva Banco Internacional (motor único shared/tef-internacional.js) ── */
 const TEF_PLATAFORMA = 'SALDOS';
 async function cargarCupoTEF(){
