@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v231.15';
+const APP_VERSION = 'v231.16';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -843,7 +843,8 @@ document.addEventListener('DOMContentLoaded', () => {
       list.querySelectorAll('.af-notif-x').forEach(b => {
         b.addEventListener('click', async (e) => {
           e.stopPropagation();
-          try { await fetch('/api/notif/' + b.dataset.del, { method: 'DELETE', headers: H }); } catch (e) {}
+          // Si el servidor rechaza (modo "Ver como" o perfil de solo lectura), se muestra el motivo en vez de fallar en silencio
+          try { const r = await fetch('/api/notif/' + b.dataset.del, { method: 'DELETE', headers: H }).then(x => x.json()); if (r && !r.success && r.error) alert(r.error); } catch (e) {}
           cargar();
         });
       });
@@ -852,7 +853,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('afBtnBorrarTodas').addEventListener('click', async (e) => {
     e.stopPropagation();
-    try { await fetch('/api/notif/todas', { method: 'DELETE', headers: H }); } catch (e) {}
+    try { const r = await fetch('/api/notif/todas', { method: 'DELETE', headers: H }).then(x => x.json()); if (r && !r.success && r.error) { alert(r.error); return; } } catch (e) {}
     unread = 0;
     document.getElementById('afBellCount').style.display = 'none';
     cargar();
