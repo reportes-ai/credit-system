@@ -2197,7 +2197,9 @@ exports.getLRE = async (req, res) => {
         const rut = nRut(l.rut || l.urut);
         const cotiz = (d.desc_afp || 0) + (d.desc_salud || 0) + (d.desc_salud_adicional || 0) + (d.desc_afc || 0);
         const noImp = (d.colacion || 0) + (d.movilizacion || 0) + (d.otros_no_imponibles || 0);
-        const aportes = (d.aporte_afc_emp || 0) + (d.aporte_mutual || 0) + (d.aporte_sis || 0);
+        // 4152 del LRE = mutual (Ley 16.744) + Ley SANNA (la DT las declara juntas)
+        const mutualSanna = (d.aporte_mutual || 0) + (d.aporte_sanna || 0);
+        const aportes = (d.aporte_afc_emp || 0) + mutualSanna + (d.aporte_sis || 0);
         return {
           '1101': rut, '1102': lreFecha(l.fecha_ingreso), '1105': 13, '1106': 13114, '1170': 1, '1146': 0, '1107': 101,
           '1108': 0, '1109': 0, '1141': afpCod(d.afp || l.fafp), '1142': 0, '1143': salCod(d.salud || l.fsalud),
@@ -2207,7 +2209,7 @@ exports.getLRE = async (req, res) => {
           '2301': d.colacion || '', '2302': d.movilizacion || '', '2306': d.otros_no_imponibles || '',
           '3141': d.desc_afp || 0, '3143': d.desc_salud || 0, '3144': d.desc_salud_adicional || '',
           '3151': d.desc_afc || '', '3161': d.impuesto || 0, '3183': d.otros_descuentos || '',
-          '4151': d.aporte_afc_emp || '', '4152': d.aporte_mutual || 0, '4155': d.aporte_sis || 0,
+          '4151': d.aporte_afc_emp || '', '4152': mutualSanna, '4155': d.aporte_sis || 0,
           '5201': d.total_haberes || 0, '5210': d.total_imponible || 0, '5220': 0, '5230': noImp, '5240': 0,
           '5301': d.total_descuentos || 0, '5361': d.impuesto || 0, '5341': cotiz,
           '5302': Math.max(0, (d.total_descuentos || 0) - (d.impuesto || 0) - cotiz),

@@ -11,6 +11,7 @@
      ausencia, ingreso o baja en el mes, el tope de gratificación y los topes imponibles
      (AFP/salud/SIS y AFC) valen tope × días/30 — norma Previred/DT; antes se aplicaban enteros.
    UF de la liquidación: la del ÚLTIMO día del mes (antes, día 28).
+   LEY SANNA (rem_sanna_pct, 11-09-2026): 0,03% cargo empleador sobre la base topada → aporte_sanna y costo_empresa.
    PENSIONADO (rh_fichas.pensionado=1, 11-09-2026): sin AFP, sin AFC (trabajador y empleador) y sin SIS;
      salud e impuesto igual que todos. Caso Cristina Peña (AVSOFT: AFP 0, cesantía 0).
    Descuentos legales (sobre imponible topado a rem_tope_imponible_uf × UF):
@@ -126,7 +127,8 @@ require('../../../../shared/migrate').enFila('rrhh-remuneraciones-v2', async () 
       ('rem_sis_pct', '1.88'),
       ('rem_afc_emp_pct', '2.4'),
       ('rem_afc_emp_pfijo_pct', '3'),
-      ('rem_mutual_pct', '0.93')`);
+      ('rem_mutual_pct', '0.93'),
+      ('rem_sanna_pct', '0.03')`);
     console.log('[rrhh-remuneraciones-v2] listo');
   } catch (e) { console.error('[rrhh-remuneraciones-v2 migration]', e.message); }
 });
@@ -744,6 +746,8 @@ function calcLiquidacion(inp, ind) {
   const aporteSis = pensionado ? 0 : R(baseCotiz * (ind.rem_sis_pct || 0) / 100);
   const aporteAfcEmp = pensionado ? 0 : R(baseAfc * ((esIndef ? ind.rem_afc_emp_pct : ind.rem_afc_emp_pfijo_pct) || 0) / 100);
   const aporteMutual = R(baseCotiz * (ind.rem_mutual_pct || 0) / 100);
+  // Ley SANNA (21.063): 0,03% de cargo del empleador sobre la renta imponible topada; se paga junto a la mutual
+  const aporteSanna = R(baseCotiz * (ind.rem_sanna_pct || 0) / 100);
   return {
     dias, sueldo_base: sueldo, comisiones, feriado_variable: feriadoVar, feriado_var_dias: inp.feriado_var_dias || 0, otros_imponibles: otrosImp, gratificacion,
     total_imponible: imponible, base_cotizacion: baseCotiz,
@@ -758,8 +762,8 @@ function calcLiquidacion(inp, ind) {
     base_tributable: baseTrib, apv_deducible: apvDeducible, impuesto,
     otros_descuentos: otrosDesc, total_descuentos: totalDescuentos,
     liquido: totalHaberes - totalDescuentos,
-    aporte_sis: aporteSis, aporte_afc_emp: aporteAfcEmp, aporte_mutual: aporteMutual,
-    costo_empresa: totalHaberes + aporteSis + aporteAfcEmp + aporteMutual,
+    aporte_sis: aporteSis, aporte_afc_emp: aporteAfcEmp, aporte_mutual: aporteMutual, aporte_sanna: aporteSanna,
+    costo_empresa: totalHaberes + aporteSis + aporteAfcEmp + aporteMutual + aporteSanna,
     tipo_contrato: inp.tipo_contrato || null, pensionado,
   };
 }
