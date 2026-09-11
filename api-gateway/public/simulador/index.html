@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
+<!-- v3.0 — comisiones Dealer, Parque y Ejecutivo editables EN CADA PANEL (AutoFin y UAC por separado, ↺ vuelve a la tabla); sale el input global de comisión dealer · v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -67,6 +67,11 @@
     .res-row.costo { background:#fef2f2; }
     .res-row.costo .val { color:#dc2626; }
     .res-row.neutral { background:#f8fafc; }
+    /* Comisiones editables EN CADA PANEL (AutoFin / UAC): azul = según tabla, naranjo = modificada */
+    .cost-in { width:128px; text-align:right; font-weight:700; color:#dc2626; border:1px solid #fecaca; border-radius:6px; background:#fff; padding:3px 8px; font-size:.85rem; }
+    .cost-in.ov { background:#fff7ed; color:#9a3412; border-color:#fdba74; }
+    .ov-reset { border:1px solid #d1d5db; background:#fff; border-radius:6px; padding:2px 7px; cursor:pointer; color:#475569; font-size:.8rem; }
+    .res-row .lbl small { font-weight:600; }
 
     /* Distribución del ingreso total (quién se queda con cada peso que entra) */
     .dist-box { border:1.5px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-top:10px; background:#fff; }
@@ -157,18 +162,10 @@
             </div>
           </div>
 
-          <!-- Comisión dealer: parte con la de la tabla y se puede sobrescribir
-               para simular una negociación puntual (campo calculado vs forzado). -->
-          <div class="f-group">
-            <label>Comisión Dealer $ <small id="lblComDealer" style="color:#0369a1;font-weight:600">(según tabla)</small></label>
-            <div style="display:flex;gap:8px;align-items:center">
-              <input type="text" id="iComDealer" class="auto" inputmode="numeric" style="flex:1"
-                oninput="comDealerManual=true;fmtMiles(this);simular()" placeholder="$0">
-              <button type="button" id="btnComAuto" onclick="resetComDealer()" title="Volver a la comisión de la tabla"
-                style="display:none;border:1.5px solid #d1d5db;background:#fff;border-radius:8px;padding:7px 10px;cursor:pointer;color:#475569">
-                <i class="bi bi-arrow-counterclockwise"></i>
-              </button>
-            </div>
+          <!-- Las comisiones (dealer, parque, ejecutivo) parten de la tabla y se editan
+               EN CADA PANEL de resultados (AutoFin y UAC por separado), con ↺ para volver. -->
+          <div class="f-group" style="font-size:.78rem;color:#64748b;background:#f8fafc;border-radius:8px;padding:8px 10px">
+            <i class="bi bi-pencil-square me-1" style="color:#0369a1"></i>Las comisiones <b>Dealer, Parque y Ejecutivo</b> se editan directamente en cada panel (AutoFin y Unidad de Crédito por separado). En naranjo = modificada; ↺ vuelve a la tabla.
           </div>
 
           <hr class="divider">
@@ -309,8 +306,22 @@ function tierUACn(ops) {
 }
 
 /* ── Helpers formato ──────────────────────────────────────────────── */
-let comDealerManual = false;   // ¿la comisión del dealer fue digitada a mano?
-function resetComDealer() { comDealerManual = false; simular(); }
+/* Comisiones modificadas a mano, POR PANEL (Pato, 11-09-2026): null = según tabla.
+   Se editan dentro del panel de resultados; al recalcular se conserva el foco del input. */
+const OVR = { af: { dealer: null, parque: null, ej: null }, uac: { dealer: null, parque: null, ej: null } };
+let FOCO = null;
+function setOvr(panel, key, inp) {
+  const v = parseMiles(inp.value);
+  OVR[panel][key] = v;
+  FOCO = inp.id;
+  simular();
+}
+function resetOvr(panel, key) { OVR[panel][key] = null; FOCO = null; simular(); }
+function restaurarFoco() {
+  if (!FOCO) return;
+  const el = document.getElementById(FOCO); if (!el) return;
+  el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (_) {}
+}
 
 function fmtMiles(inp) {
   // Guardar posición del cursor relativa al final para no perderla al reformatear
@@ -552,44 +563,28 @@ function simular() {
     com_dealer = Math.round(saldo * callePct);
     com_patio  = 0;
   }
-  /* La comisión del dealer se puede sobrescribir para simular una negociación:
-     mientras nadie la toque sigue a la tabla (azul, "según tabla"); si se digita,
-     manda lo escrito (naranjo, "modificada") y el botón ↺ vuelve al cálculo. */
-  const comDealerTabla = com_dealer;
-  const elCom = document.getElementById('iComDealer');
-  if (comDealerManual) {
-    const v = parseMiles(elCom.value);
-    if (v > 0) com_dealer = v;
-  } else if (elCom) {
-    elCom.value = fN(comDealerTabla);
-  }
-  if (elCom) {
-    elCom.classList.toggle('auto', !comDealerManual);
-    elCom.style.background = comDealerManual ? '#fff7ed' : '';
-    elCom.style.color      = comDealerManual ? '#9a3412' : '';
-    elCom.style.fontWeight = comDealerManual ? '700' : '';
-    const lbl = document.getElementById('lblComDealer');
-    if (lbl) {
-      lbl.textContent = comDealerManual ? '(modificada)' : '(según tabla)';
-      lbl.style.color = comDealerManual ? '#b45309' : '#0369a1';
-    }
-    const btn = document.getElementById('btnComAuto');
-    if (btn) btn.style.display = comDealerManual ? '' : 'none';
-  }
-
   // ── Comisión ejecutivo ─────────────────────────────────────────────
   const pctEj  = (P.pct_ejecutivo_fin || 2.12) / 100;
   const com_ej = Math.round(monto_fin * pctEj);
+
+  /* Valores de TABLA (azul). Cada panel (AutoFin / UAC) puede sobrescribir cualquiera de las
+     tres comisiones para simular una negociación distinta en cada financiera (naranjo). */
+  const TABLA = { dealer: com_dealer, parque: esPatio ? com_patio : 0, ej: com_ej };
+  const costos = panel => ({
+    dealer: OVR[panel].dealer != null ? OVR[panel].dealer : TABLA.dealer,
+    parque: esPatio ? (OVR[panel].parque != null ? OVR[panel].parque : TABLA.parque) : 0,
+    ej:     OVR[panel].ej     != null ? OVR[panel].ej     : TABLA.ej,
+  });
+  const C_AF = costos('af'), C_UAC = costos('uac');
 
   // ── Cuota mensual ──────────────────────────────────────────────────
   const cuota_af  = tasaCli > 0 ? Math.round(window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(monto_fin, tasaCli, plazo) : monto_fin * tasaCli * Math.pow(1+tasaCli,plazo) / (Math.pow(1+tasaCli,plazo)-1)) : Math.round(monto_fin/plazo);
   const tasaUAC   = esMayor ? tmcMayor : tmcMenor;
   const cuota_uac = tasaUAC > 0 ? Math.round(window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(monto_fin, tasaUAC, plazo) : monto_fin * tasaUAC * Math.pow(1+tasaUAC,plazo) / (Math.pow(1+tasaUAC,plazo)-1)) : Math.round(monto_fin/plazo);
 
-  // ── Rentabilidad ───────────────────────────────────────────────────
-  const total_costos = com_dealer + com_patio + com_ej;
-  const rentab_af  = ing_tasa_af + ing_seg_af + com_corfo_af - total_costos;
-  const rentab_uac = ing_tasa_uac + ing_seg_uac - total_costos;
+  // ── Rentabilidad (cada panel con SUS comisiones) ───────────────────
+  const rentab_af  = ing_tasa_af + ing_seg_af + com_corfo_af - (C_AF.dealer + C_AF.parque + C_AF.ej);
+  const rentab_uac = ing_tasa_uac + ing_seg_uac - (C_UAC.dealer + C_UAC.parque + C_UAC.ej);
   const pct_af     = monto_fin ? rentab_af  / monto_fin * 100 : 0;
   const pct_uac    = monto_fin ? rentab_uac / monto_fin * 100 : 0;
 
@@ -605,8 +600,9 @@ function simular() {
 
   // ── Renderizar AutoFin ─────────────────────────────────────────────
   document.getElementById('resAf').innerHTML = renderResultados({
+    panel: 'af', tabla: TABLA,
     ing_tasa: ing_tasa_af, ing_seg: ing_seg_af, com_corfo: com_corfo_af,
-    com_dealer, com_patio, com_ej,
+    com_dealer: C_AF.dealer, com_patio: C_AF.parque, com_ej: C_AF.ej,
     rentab: rentab_af, pct: pct_af,
     cuota: cuota_af, esPatio, esCorfo,
     tier_note: null
@@ -614,14 +610,16 @@ function simular() {
 
   // ── Renderizar UAC ─────────────────────────────────────────────────
   document.getElementById('resUac').innerHTML = renderResultados({
+    panel: 'uac', tabla: TABLA,
     ing_tasa: ing_tasa_uac, ing_seg: ing_seg_uac, com_corfo: 0,
-    com_dealer, com_patio, com_ej,
+    com_dealer: C_UAC.dealer, com_patio: C_UAC.parque, com_ej: C_UAC.ej,
     rentab: rentab_uac, pct: pct_uac,
     cuota: cuota_uac, esPatio, esCorfo: false,
     tier_note: `Tier vigente <b>Tier ${uacTierN}</b> (${(uacPct*100).toFixed(1).replace('.',',')}% sobre saldo precio) — ${OPS_UAC} op${OPS_UAC===1?'':'s'} UAC otorgadas/aprobadas en ${MES_UAC||'el mes'}${Math.round(Number(P.uac_modelo))===2 && plazo>=(Math.round(Number(P.uac2_plazo_corte))||36)?` · corte por plazo ≥${Math.round(Number(P.uac2_plazo_corte))||36} aplicado`:''}.`
   });
 
   marcarMejor(rentab_af, rentab_uac);
+  restaurarFoco();
 }
 
 /* Distribución del INGRESO TOTAL: de cada peso que entra, cuánto se queda
@@ -654,7 +652,19 @@ function distribucion(total_ing, rentab, com_dealer, com_patio, com_ej, esPatio)
     </div>`;
 }
 
-function renderResultados({ ing_tasa, ing_seg, com_corfo, com_dealer, com_patio, com_ej, rentab, pct, cuota, esPatio, esCorfo, tier_note }) {
+/* Fila de costo editable: el valor parte de la tabla (azul) y se puede digitar (naranjo, con ↺). */
+function filaCosto(panel, key, label, val, tabla) {
+  const ov = OVR[panel][key] != null;
+  return `<div class="res-row costo">
+      <span class="lbl">${label} <small style="color:${ov ? '#b45309' : '#0369a1'}">${ov ? '(modificada · tabla ' + fN(tabla) + ')' : '(según tabla)'}</small></span>
+      <span style="display:flex;gap:6px;align-items:center">
+        <input id="ov_${panel}_${key}" class="cost-in${ov ? ' ov' : ''}" inputmode="numeric" value="${fN(val)}" oninput="setOvr('${panel}','${key}',this)" title="Digita otra comisión para simular">
+        ${ov ? `<button class="ov-reset" onclick="resetOvr('${panel}','${key}')" title="Volver a la comisión de la tabla"><i class="bi bi-arrow-counterclockwise"></i></button>` : ''}
+      </span>
+    </div>`;
+}
+
+function renderResultados({ panel, tabla, ing_tasa, ing_seg, com_corfo, com_dealer, com_patio, com_ej, rentab, pct, cuota, esPatio, esCorfo, tier_note }) {
   const total_ing = ing_tasa + ing_seg + (com_corfo || 0);
   const total_cos = com_dealer + com_patio + com_ej;
 
@@ -678,15 +688,9 @@ function renderResultados({ ing_tasa, ing_seg, com_corfo, com_dealer, com_patio,
     </div>
     <div class="res-section">
       <div class="res-title"><i class="bi bi-arrow-down-circle-fill" style="color:#dc2626"></i> Costos Directos</div>
-      <div class="res-row costo">
-        <span class="lbl">Comisión Dealer ${esPatio ? '(Parque)' : '(Calle)'}</span>
-        <span class="val">${fN(com_dealer)}</span>
-      </div>
-      ${esPatio ? `<div class="res-row costo"><span class="lbl">Comisión Parque</span><span class="val">${fN(com_patio)}</span></div>` : ''}
-      <div class="res-row costo">
-        <span class="lbl">Comisión Ejecutivo</span>
-        <span class="val">${fN(com_ej)}</span>
-      </div>
+      ${filaCosto(panel, 'dealer', 'Comisión Dealer ' + (esPatio ? '(Parque)' : '(Calle)'), com_dealer, tabla.dealer)}
+      ${esPatio ? filaCosto(panel, 'parque', 'Comisión Parque', com_patio, tabla.parque) : ''}
+      ${filaCosto(panel, 'ej', 'Comisión Ejecutivo', com_ej, tabla.ej)}
       <div class="res-row neutral" style="font-weight:700">
         <span class="lbl">Total Costos</span>
         <span class="val" style="color:#dc2626">${fN(total_cos)}</span>
