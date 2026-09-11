@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Parques a Pagar — AutoFácil</title>
-  <!-- v1.7 — botón TEF B.Internacional (parques con ODP emitida) con el cupo gratis del mes. v1.6 — login conserva el destino (?next=). v1.5 — full width + fecha de emision bajo la Orden de Pago · v1.4 — popup de revisión pre-emisión (factura adjunta + totales) · v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
+  <!-- v1.8 — TEF: generar el archivo registra el pago (y sus correos). v1.7 — botón TEF B.Internacional (parques con ODP emitida) con el cupo gratis del mes. v1.6 — login conserva el destino (?next=). v1.5 — full width + fecha de emision bajo la Orden de Pago · v1.4 — popup de revisión pre-emisión (factura adjunta + totales) · v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -322,6 +322,7 @@ async function cargarCupoTEF(){
 function filasTEF(){ return ROWS.filter(r => r.etapa === 'OP_EMITIDA' && r.odp_numero).map(r => ({ parque: r.parque, odp_numero: r.odp_numero })); }
 async function descargarTEF(){
   const filas = filasTEF(); if (!filas.length) return;
+  if (!confirm(`Se generará el archivo TEF del Banco Internacional con ${filas.length} parque(s) y sus pagos quedarán CONFIRMADOS (con sus avisos). ¿Continuar?`)) return;
   const btn = document.getElementById('btnTEF'); btn.disabled = true;
   try {
     const j = await fetch('/api/tef/internacional', { method:'POST', headers:H, body: JSON.stringify({ plataforma: TEF_PLATAFORMA, filas }) }).then(r=>r.json());
@@ -338,6 +339,9 @@ async function descargarTEF(){
     if ((d.divididas||[]).length) toast(`${d.divididas.length} pago(s) sobre el máximo del banco se dividieron en partes: ` + d.divididas.map(x => `${x.ref} en ${x.partes}`).join(', '));
     if (d.excluidas.length) alert('Quedaron FUERA del archivo (pagar por transferencia individual o corregir la ficha):\n' + d.excluidas.map(x => `• ${x.ref} ${x.nombre}: ${x.motivo}`).join('\n'));
     cargarCupoTEF();
+    // Generado el archivo = pagado: cada parque incluido pasa por la misma acción «Confirmar Pago»
+    const incluidos = filas.filter(f => !(d.excluidas||[]).some(x => x.ref === f.parque));
+    for (const f of incluidos) await ejecutarAccion('pagar', f.parque);
   } catch(e){ toast('Error de red', true); }
   finally { btn.disabled = false; }
 }

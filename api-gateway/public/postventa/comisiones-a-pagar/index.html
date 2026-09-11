@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Dealer a Pagar — AutoFácil</title>
-  <!-- v1.8 — botón TEF B.Internacional con el cupo gratis del mes. v1.7 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v1.9 — TEF: generar el archivo registra el pago (y sus correos). v1.8 — botón TEF B.Internacional con el cupo gratis del mes. v1.7 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -584,9 +584,10 @@ async function cargarCupoTEF(){
     el.title = `Cargos enviados en ${c.mes}: ` + Object.entries(c.por_plataforma||{}).map(([k,v])=>`${k} ${v}`).join(' · ');
   } catch(e){}
 }
-function filasTEF(){ return nominaRows().map(r => ({ ref:'OP '+(r.num_op||''), rut:r.rut_dealer, nombre:r.nombre_dealer, banco:r.banco, tipo_cuenta:r.tipo_cuenta||'', num_cuenta:r.num_cuenta, correo:r.correo||'', monto:Math.round(Number(r.comision)||0), motivo:`Pago comision OP${r.num_op||''}` })); }
+function filasTEF(){ return nominaRows().map(r => ({ id:r.id, ref:'OP '+(r.num_op||''), rut:r.rut_dealer, nombre:r.nombre_dealer, banco:r.banco, tipo_cuenta:r.tipo_cuenta||'', num_cuenta:r.num_cuenta, correo:r.correo||'', monto:Math.round(Number(r.comision)||0), motivo:`Pago comision OP${r.num_op||''}` })); }
 async function descargarTEF(){
   const filas = filasTEF(); if (!filas.length) return;
+  if (!confirm(`Se generará el archivo TEF del Banco Internacional con ${filas.length} pago(s) y esas operaciones quedarán registradas como PAGADAS (con sus correos). ¿Continuar?`)) return;
   const btn = document.getElementById('btnTEF'); btn.disabled = true;
   try {
     const j = await fetch('/api/tef/internacional', { method:'POST', headers:H, body: JSON.stringify({ plataforma: TEF_PLATAFORMA, filas }) }).then(r=>r.json());
@@ -603,8 +604,21 @@ async function descargarTEF(){
     if ((d.divididas||[]).length) toast(`${d.divididas.length} pago(s) sobre el máximo del banco se dividieron en partes: ` + d.divididas.map(x => `${x.ref} en ${x.partes}`).join(', '));
     if (d.excluidas.length) alert('Quedaron FUERA del archivo (pagar por transferencia individual o corregir la ficha):\n' + d.excluidas.map(x => `• ${x.ref} ${x.nombre}: ${x.motivo}`).join('\n'));
     cargarCupoTEF();
+    /* Generado el archivo = pagado (Pato, 11-09-2026): las operaciones incluidas se registran como pagadas
+       por el mismo endpoint de «Confirmar pago» (contabiliza y manda los correos); las excluidas siguen pendientes. */
+    const incluidas = filas.filter(f => !(d.excluidas||[]).some(x => x.ref === f.ref)).map(f => f.id).filter(Boolean);
+    if (d.cargos && incluidas.length) await pagarTrasTEF(incluidas);
   } catch(e){ toast('Error de red', true); }
   finally { btn.disabled = false; }
+}
+async function pagarTrasTEF(ids){
+  try {
+    const j = await fetch('/api/postventa/comisiones-a-pagar/pagar', { method:'POST', headers:H, body: JSON.stringify({ ids }) }).then(r=>r.json());
+    if (!j.success) throw new Error(j.error||'Error');
+    nominaRows().filter(r => ids.includes(r.id)).forEach(r => { r.pagado = true; r.sel = false; });
+    propActiva = null;
+    render(); toast(`${ids.length} comisión(es) registrados como pagados`);
+  } catch(e){ toast('El archivo se generó, pero no se pudo registrar el pago: ' + e.message + '. Usa «Confirmar pago».', true); }
 }
 cargarCupoTEF();
 </script>
