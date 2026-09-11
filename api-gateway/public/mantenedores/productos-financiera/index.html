@@ -7,7 +7,7 @@
   <title>Productos por Financiera — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.2 -->
+  <!-- v2.0 — productos con REGLAS PROPIAS (tasa cliente, comisión dealer por tramo de plazo, parque y ejecutivo): nace AUTOFIN PREFERENTE; footer Qué afecta. v1.2 -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -66,6 +66,15 @@
 
     .empty-state { text-align:center; padding:48px 20px; color:#9ca3af; }
     .empty-state i { font-size:2.5rem; display:block; margin-bottom:10px; }
+    .badge-reglas { background:#fef3c7; color:#92400e; border-radius:20px; padding:2px 10px; font-size:.72rem; font-weight:700; }
+    .reglas-box { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px 14px; margin-bottom:14px; }
+    .reglas-box .form-group { margin-bottom:10px; }
+    .reglas-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .tramo-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; font-size:.82rem; }
+    .tramo-row input { width:90px; border:1px solid #d1d5db; border-radius:8px; padding:6px 8px; font-size:.85rem; }
+    .resumen-reglas { font-size:.74rem; color:#6b7280; }
+    .afecta { background:#f1f5f9; border-left:4px solid #0255c5; border-radius:10px; padding:14px 18px; font-size:.82rem; color:#334155; margin-top:22px; }
+    .afecta ul { margin:8px 0 0; padding-left:18px; }
   </style>
 </head>
 <body>
@@ -102,6 +111,13 @@
       <div class="empty-state"><i class="bi bi-hourglass-split"></i>Cargando...</div>
     </div>
   </div>
+
+  <div class="afecta"><i class="bi bi-diagram-3 me-1"></i><b>Qué afecta este mantenedor</b>
+    <ul>
+      <li><b>Lista de productos por financiera</b> → selector de producto en la <a href="/creditos/digitacion-autofin.html">digitación AutoFin</a> y <a href="/creditos/digitacion-unidad.html">Unidad de Crédito</a>.</li>
+      <li><b>Reglas propias de un producto</b> (tasa cliente ≤/&gt; 200 UF, comisión dealer por tramo de plazo sobre el saldo precio, comisión parque, comisión ejecutivo sobre el monto financiado) → aparece como un panel más en el <a href="/simulador/">Simulador de Rentabilidad</a>, junto a AutoFin y Unidad de Crédito. Ej.: <b>AUTOFIN PREFERENTE</b>. Los productos sin reglas propias usan las pizarras generales de <a href="/mantenedores/parametros/">Parámetros de Crédito</a> y <a href="/mantenedores/tasas/">Tasas</a>.</li>
+    </ul>
+  </div>
 </div>
 
 <!-- Modal agregar/editar -->
@@ -130,6 +146,23 @@
         <option value="1">Activo</option>
         <option value="0">Inactivo</option>
       </select>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="mReglas" onchange="document.getElementById('reglasBox').style.display=this.checked?'':'none'" style="width:auto"> Reglas propias (se simula como otra financiera)</label>
+    </div>
+    <div class="reglas-box" id="reglasBox" style="display:none">
+      <div class="form-group"><label>Descripción</label><input type="text" id="mDesc" placeholder="Qué tiene de especial este producto"></div>
+      <div class="reglas-grid">
+        <div class="form-group"><label>Tasa cliente ≤ 200 UF (% mensual)</label><input type="number" step="0.001" id="mTasaMenor" placeholder="2.39"></div>
+        <div class="form-group"><label>Tasa cliente &gt; 200 UF (% mensual)</label><input type="number" step="0.001" id="mTasaMayor" placeholder="2.09"></div>
+        <div class="form-group"><label>Comisión parque (% del saldo precio)</label><input type="number" step="0.01" id="mParque" placeholder="2.5"></div>
+        <div class="form-group"><label>Comisión ejecutivo (% del monto financiado)</label><input type="number" step="0.01" id="mEjec" placeholder="1"></div>
+      </div>
+      <div class="form-group"><label>Comisión dealer por tramo de plazo (% del saldo precio)</label>
+        <div id="tramos"></div>
+        <button type="button" class="btn-cancel" style="padding:4px 10px;font-size:.78rem" onclick="agregarTramo()"><i class="bi bi-plus-lg me-1"></i>Tramo</button>
+        <div class="resumen-reglas" style="margin-top:6px">Cada tramo dice "hasta N meses → %"; el último tramo cubre los plazos que siguen (usa 999).</div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
@@ -189,6 +222,7 @@
           <th style="width:50px">Orden</th>
           <th>Producto</th>
           <th>Financiera</th>
+          <th>Reglas</th>
           <th>Estado</th>
           <th style="width:80px">Acciones</th>
         </tr></thead>
@@ -196,8 +230,9 @@
           ${rows.map(r => `
             <tr>
               <td style="text-align:center;color:#9ca3af">${r.orden}</td>
-              <td style="font-weight:600;color:#111827">${r.producto}</td>
+              <td style="font-weight:600;color:#111827">${r.producto}${r.descripcion ? '<div class="resumen-reglas">' + r.descripcion + '</div>' : ''}</td>
               <td>${badgeFin}</td>
+              <td>${r.reglas_propias ? '<span class="badge-reglas">Reglas propias</span><div class="resumen-reglas">' + resumenReglas(r) + '</div>' : '<span style="color:#9ca3af;font-size:.75rem">pizarra general</span>'}</td>
               <td>${r.activo ? '<span class="badge-activo">Activo</span>' : '<span class="badge-inactivo">Inactivo</span>'}</td>
               <td>
                 <button class="btn-icon" title="Editar" onclick="editar(${r.id})"><i class="bi bi-pencil-fill" style="color:#1d4ed8"></i></button>
@@ -208,8 +243,39 @@
       </table>`;
   }
 
+  function resumenReglas(r) {
+    const t = (r.dealer_tramos || []).map(x => `≤${x.hasta === 999 ? '∞' : x.hasta}m ${x.pct}%`).join(' · ');
+    return `Tasa ${r.tasa_menor_pct ?? '—'}% / ${r.tasa_mayor_pct ?? '—'}% · Dealer ${t || '—'} · Parque ${r.parque_pct ?? '—'}% · Ejec. ${r.ejecutivo_pct ?? '—'}%`;
+  }
+  function pintarTramos(tramos) {
+    const box = document.getElementById('tramos');
+    box.innerHTML = (tramos && tramos.length ? tramos : [{ hasta: 35, pct: 0 }, { hasta: 47, pct: 2.5 }, { hasta: 999, pct: 5 }]).map((t, i) => `
+      <div class="tramo-row">hasta <input type="number" class="t-hasta" value="${t.hasta}" min="1"> meses → <input type="number" class="t-pct" step="0.01" value="${t.pct}"> %
+        <button type="button" class="btn-icon danger" title="Quitar" onclick="this.parentNode.remove()"><i class="bi bi-x-lg"></i></button></div>`).join('');
+  }
+  function agregarTramo() {
+    const box = document.getElementById('tramos');
+    box.insertAdjacentHTML('beforeend', `<div class="tramo-row">hasta <input type="number" class="t-hasta" value="999" min="1"> meses → <input type="number" class="t-pct" step="0.01" value="0"> %
+        <button type="button" class="btn-icon danger" title="Quitar" onclick="this.parentNode.remove()"><i class="bi bi-x-lg"></i></button></div>`);
+  }
+  function leerTramos() {
+    return [...document.querySelectorAll('#tramos .tramo-row')].map(row => ({ hasta: parseInt(row.querySelector('.t-hasta').value, 10), pct: Number(row.querySelector('.t-pct').value) || 0 })).filter(t => t.hasta > 0);
+  }
+  function cargarReglas(item) {
+    const on = !!(item && item.reglas_propias);
+    document.getElementById('mReglas').checked = on;
+    document.getElementById('reglasBox').style.display = on ? '' : 'none';
+    document.getElementById('mDesc').value = item?.descripcion || '';
+    document.getElementById('mTasaMenor').value = item?.tasa_menor_pct ?? '';
+    document.getElementById('mTasaMayor').value = item?.tasa_mayor_pct ?? '';
+    document.getElementById('mParque').value = item?.parque_pct ?? '';
+    document.getElementById('mEjec').value = item?.ejecutivo_pct ?? '';
+    pintarTramos(item?.dealer_tramos);
+  }
+
   function abrirModal(id) {
     document.getElementById('mId').value = '';
+    cargarReglas(null);
     document.getElementById('mFinanciera').value = finActual;
     document.getElementById('mProducto').value = '';
     document.getElementById('mOrden').value = 0;
@@ -227,6 +293,7 @@
     document.getElementById('mProducto').value = item.producto;
     document.getElementById('mOrden').value = item.orden;
     document.getElementById('mActivo').value = item.activo ? '1' : '0';
+    cargarReglas(item);
     document.getElementById('modalTitulo').textContent = 'Editar Producto';
     document.getElementById('modal').style.display = 'flex';
   }
@@ -242,8 +309,14 @@
       producto:   document.getElementById('mProducto').value.trim(),
       orden:      parseInt(document.getElementById('mOrden').value) || 0,
       activo:     parseInt(document.getElementById('mActivo').value),
+      reglas_propias: document.getElementById('mReglas').checked ? 1 : 0,
+      descripcion: document.getElementById('mDesc').value.trim(),
+      tasa_menor_pct: document.getElementById('mTasaMenor').value, tasa_mayor_pct: document.getElementById('mTasaMayor').value,
+      parque_pct: document.getElementById('mParque').value, ejecutivo_pct: document.getElementById('mEjec').value,
+      dealer_tramos: leerTramos(),
     };
     if (!payload.producto) { alert('El nombre del producto es requerido'); return; }
+    if (payload.reglas_propias && (payload.tasa_menor_pct === '' || payload.tasa_mayor_pct === '' || !payload.dealer_tramos.length)) { alert('Con reglas propias se necesitan las dos tasas y al menos un tramo de comisión dealer'); return; }
     try {
       const url    = id ? `/api/productos-financiera/${id}` : '/api/productos-financiera';
       const method = id ? 'PUT' : 'POST';

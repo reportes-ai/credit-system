@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.0 — comisiones Dealer, Parque y Ejecutivo editables EN CADA PANEL (AutoFin y UAC por separado, ↺ vuelve a la tabla); sale el input global de comisión dealer · v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
+<!-- v3.1 — un panel por producto con reglas propias del mantenedor Productos por Financiera (AUTOFIN PREFERENTE): tasa, dealer por tramo, parque y ejecutivo propios, comisiones editables · v3.0 — comisiones Dealer, Parque y Ejecutivo editables EN CADA PANEL (AutoFin y UAC por separado, ↺ vuelve a la tabla); sale el input global de comisión dealer · v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -52,7 +52,7 @@
     .uf-badge strong { color:#78350f; }
 
     /* Results — columnas paralelas */
-    .res-cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .res-cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; }
     @media(max-width:900px){ .res-cols { grid-template-columns:1fr; } }
     .res-panel { display:block; }
     .badge-mejor { background:#f59e0b; color:#fff; font-size:.7rem; font-weight:700; border-radius:12px; padding:2px 8px; margin-left:8px; }
@@ -254,6 +254,8 @@
           <div class="card-hdr" id="hdrUac" style="background:var(--uac)"><i class="bi bi-building"></i> Unidad de Crédito</div>
           <div class="card-bd" id="resUac"></div>
         </div>
+        <!-- Productos con REGLAS PROPIAS (mantenedor Productos por Financiera): un panel cada uno, ej. AUTOFIN PREFERENTE -->
+        <span id="panelesProd" style="display:contents"></span>
       </div>
     </div>
   </div>
@@ -270,6 +272,7 @@ let P = {};    // parámetros del sistema
 let T = {};    // tasas vigentes (CF / spreads, módulo de tasas)
 let UF = 0;   // valor UF hoy
 let OPS_UAC = 0;   // ops UAC otorgadas/aprobadas del mes en curso (tier vigente)
+let PRODS = [];    // productos con reglas propias (mantenedor Productos por Financiera): tasa, dealer por tramo, parque, ejecutivo
 let MES_UAC = '';  // mes en curso 'YYYY-MM'
 
 /* ── Tier UAC vigente — espejo del motor autoritativo
@@ -309,14 +312,15 @@ function tierUACn(ops) {
 /* Comisiones modificadas a mano, POR PANEL (Pato, 11-09-2026): null = según tabla.
    Se editan dentro del panel de resultados; al recalcular se conserva el foco del input. */
 const OVR = { af: { dealer: null, parque: null, ej: null }, uac: { dealer: null, parque: null, ej: null } };
+const ovrDe = panel => OVR[panel] || (OVR[panel] = { dealer: null, parque: null, ej: null });
 let FOCO = null;
 function setOvr(panel, key, inp) {
   const v = parseMiles(inp.value);
-  OVR[panel][key] = v;
+  ovrDe(panel)[key] = v;
   FOCO = inp.id;
   simular();
 }
-function resetOvr(panel, key) { OVR[panel][key] = null; FOCO = null; simular(); }
+function resetOvr(panel, key) { ovrDe(panel)[key] = null; FOCO = null; simular(); }
 function restaurarFoco() {
   if (!FOCO) return;
   const el = document.getElementById(FOCO); if (!el) return;
@@ -356,22 +360,21 @@ function getToggle(groupId) {
   for (let i=0;i<btns.length;i++) if (btns[i].classList.contains('active')) return i;
   return 0;
 }
-function marcarMejor(rentab_af, rentab_uac) {
-  const hdrAf  = document.getElementById('hdrAf');
-  const hdrUac = document.getElementById('hdrUac');
-  const badge  = '<span class="badge-mejor">⭐ Más rentable</span>';
-  const rentValAf  = `<span style="margin-left:auto;font-size:.95rem;font-weight:800">Rentabilidad ${fN(rentab_af)}</span>`;
-  const rentValUac = `<span style="margin-left:auto;font-size:.95rem;font-weight:800">Rentabilidad ${fN(rentab_uac)}</span>`;
-  if (rentab_af > rentab_uac) {
-    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin' + badge + rentValAf;
-    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito' + rentValUac;
-  } else if (rentab_uac > rentab_af) {
-    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin' + rentValAf;
-    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito' + badge + rentValUac;
-  } else {
-    hdrAf.innerHTML  = '<i class="bi bi-bank"></i> AutoFin' + rentValAf;
-    hdrUac.innerHTML = '<i class="bi bi-building"></i> Unidad de Crédito' + rentValUac;
+/* Cabeceras: cada panel con su rentabilidad; el mayor lleva la estrella (N paneles: AutoFin, UAC y los productos con reglas propias) */
+function marcarMejor(paneles) {
+  const badge = '<span class="badge-mejor">⭐ Más rentable</span>';
+  const max = Math.max(...paneles.map(x => x.rentab));
+  const empate = paneles.filter(x => x.rentab === max).length > 1;
+  for (const x of paneles) {
+    const h = document.getElementById(x.hdr); if (!h) continue;
+    h.innerHTML = `<i class="bi ${x.icono}"></i> ${x.nombre}` + (!empate && x.rentab === max ? badge : '') +
+      `<span style="margin-left:auto;font-size:.95rem;font-weight:800">Rentabilidad ${fN(x.rentab)}</span>`;
   }
+}
+/* Comisión dealer de un producto con reglas propias: % del saldo por tramo de plazo ("hasta N meses") */
+function pctTramo(tramos, plazo) {
+  const t = (tramos || []).slice().sort((a, b) => a.hasta - b.hasta).find(x => plazo <= x.hasta);
+  return t ? (Number(t.pct) || 0) / 100 : ((tramos && tramos.length) ? (Number(tramos[tramos.length - 1].pct) || 0) / 100 : 0);
 }
 
 /* ── Carga inicial ─────────────────────────────────────────────────── */
@@ -384,6 +387,18 @@ async function cargarDatos() {
       jp.data.lista.forEach(r => { P[r.clave] = parseFloat(r.valor); });
     }
   } catch(e) { console.warn('[simulador] parametros-credito:', e.message); }
+
+  // ── Productos con reglas propias (mantenedor Productos por Financiera) ──
+  try {
+    const rr = await fetch('/api/productos-financiera?activo=1', { headers: hdr() });
+    const jr = await rr.json();
+    PRODS = (jr.data || []).filter(x => Number(x.reglas_propias) === 1 && x.tasa_menor_pct != null && x.tasa_mayor_pct != null);
+    document.getElementById('panelesProd').innerHTML = PRODS.map(x => `
+      <div class="res-panel card" id="panelP${x.id}">
+        <div class="card-hdr" id="hdrP${x.id}" style="background:#7c2d12"><i class="bi bi-star-fill"></i> ${x.producto}</div>
+        <div class="card-bd" id="resP${x.id}"></div>
+      </div>`).join('');
+  } catch(e) { console.warn('[simulador] productos-financiera:', e.message); }
 
   // ── Tasas vigentes (CF y spreads) ──
   try {
@@ -618,7 +633,35 @@ function simular() {
     tier_note: `Tier vigente <b>Tier ${uacTierN}</b> (${(uacPct*100).toFixed(1).replace('.',',')}% sobre saldo precio) — ${OPS_UAC} op${OPS_UAC===1?'':'s'} UAC otorgadas/aprobadas en ${MES_UAC||'el mes'}${Math.round(Number(P.uac_modelo))===2 && plazo>=(Math.round(Number(P.uac2_plazo_corte))||36)?` · corte por plazo ≥${Math.round(Number(P.uac2_plazo_corte))||36} aplicado`:''}.`
   });
 
-  marcarMejor(rentab_af, rentab_uac);
+  // ── Productos con REGLAS PROPIAS (ej. AUTOFIN PREFERENTE): tasa propia, dealer por tramo, parque y ejecutivo propios.
+  //    Colocación y seguros con el mismo motor de AutoFin (mismo fondeo); cada panel edita sus comisiones aparte.
+  const paneles = [
+    { hdr: 'hdrAf',  nombre: 'AutoFin',           icono: 'bi-bank',     rentab: rentab_af },
+    { hdr: 'hdrUac', nombre: 'Unidad de Crédito', icono: 'bi-building', rentab: rentab_uac },
+  ];
+  for (const pr of PRODS) {
+    const key = 'p' + pr.id;
+    const tasaP = (esMayor ? Number(pr.tasa_mayor_pct) : Number(pr.tasa_menor_pct)) / 100;
+    const ing_tasa_p = window.AF_RENT_CORE
+      ? AF_RENT_CORE.ingresoColocacionAutoFin({ montoCap: monto_fin, plazo, tasaCli: tasaP, costoFondo })
+      : (tasaP > 0 && costoFondo > 0 ? Math.round(monto_fin * tasaP * Math.pow(1+tasaP,plazo)/(Math.pow(1+tasaP,plazo)-1) * (1-Math.pow(1+costoFondo,-plazo))/costoFondo - monto_fin) : 0);
+    const TAB_P = { dealer: Math.round(saldo * pctTramo(pr.dealer_tramos, plazo)), parque: esPatio ? Math.round(saldo * (Number(pr.parque_pct) || 0) / 100) : 0, ej: Math.round(monto_fin * (Number(pr.ejecutivo_pct) || 0) / 100) };
+    const O = ovrDe(key);
+    const C_P = { dealer: O.dealer != null ? O.dealer : TAB_P.dealer, parque: esPatio ? (O.parque != null ? O.parque : TAB_P.parque) : 0, ej: O.ej != null ? O.ej : TAB_P.ej };
+    const rentab_p = ing_tasa_p + ing_seg_af - (C_P.dealer + C_P.parque + C_P.ej);
+    const cuota_p = tasaP > 0 ? Math.round(window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(monto_fin, tasaP, plazo) : monto_fin * tasaP * Math.pow(1+tasaP,plazo) / (Math.pow(1+tasaP,plazo)-1)) : Math.round(monto_fin/plazo);
+    const el = document.getElementById('resP' + pr.id);
+    if (el) el.innerHTML = renderResultados({
+      panel: key, tabla: TAB_P,
+      ing_tasa: ing_tasa_p, ing_seg: ing_seg_af, com_corfo: 0,
+      com_dealer: C_P.dealer, com_patio: C_P.parque, com_ej: C_P.ej,
+      rentab: rentab_p, pct: monto_fin ? rentab_p / monto_fin * 100 : 0,
+      cuota: cuota_p, esPatio, esCorfo: false,
+      tier_note: `Tasa cliente <b>${(tasaP * 100).toFixed(2).replace('.', ',')}%</b> (${esMayor ? '> 200 UF' : '≤ 200 UF'}) · dealer ${(pctTramo(pr.dealer_tramos, plazo) * 100).toFixed(1).replace('.', ',')}% del saldo a ${plazo} meses · parque ${Number(pr.parque_pct) || 0}% · ejecutivo ${Number(pr.ejecutivo_pct) || 0}% del monto financiado${pr.descripcion ? '<br>' + pr.descripcion : ''}`,
+    });
+    paneles.push({ hdr: 'hdrP' + pr.id, nombre: pr.producto, icono: 'bi-star-fill', rentab: rentab_p });
+  }
+  marcarMejor(paneles);
   restaurarFoco();
 }
 
@@ -715,6 +758,7 @@ function clearResults() {
   document.getElementById('montoFinBox').innerHTML = '';
   document.getElementById('resAf').innerHTML  = '<p style="color:#9ca3af;text-align:center;padding:20px">Ingresa los datos del crédito para ver los resultados.</p>';
   document.getElementById('resUac').innerHTML = '<p style="color:#9ca3af;text-align:center;padding:20px">Ingresa los datos del crédito para ver los resultados.</p>';
+  for (const pr of PRODS) { const el = document.getElementById('resP' + pr.id); if (el) el.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:20px">Ingresa los datos del crédito para ver los resultados.</p>'; }
 }
 
 // Detectar si el usuario modificó la tasa manualmente
