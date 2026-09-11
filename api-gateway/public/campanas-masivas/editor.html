@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.9 — correo de prueba, correos por minuto y cupo diario (continúa otro día), universo y estimación de días. v1.8 — imagen del correo (flyer) con link y botón; audiencia Dealers activos por categoría. v1.7 -->
+<!-- v1.10 — correo de prueba a cualquier dirección. v1.9 — correo de prueba, correos por minuto y cupo diario (continúa otro día), universo y estimación de días. v1.8 — imagen del correo (flyer) con link y botón; audiencia Dealers activos por categoría. v1.7 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -250,7 +250,8 @@
         <button onclick="mergeNav(1)"><i class="bi bi-chevron-right"></i></button>
         <span id="mergeQuien" style="font-size:.8rem;color:#6b7280"></span>
         <button class="btn btn-gris" style="margin-left:auto" onclick="cargarPreview()"><i class="bi bi-arrow-repeat me-1"></i>Actualizar</button>
-        <button class="btn btn-azul" id="btnPrueba" onclick="enviarPrueba(this)"><i class="bi bi-envelope-paper me-1"></i>Enviarme un correo de prueba</button>
+        <input class="f" id="mPruebaMail" placeholder="correo de prueba (vacío = el tuyo)" style="width:260px;padding:6px 10px">
+        <button class="btn btn-azul" id="btnPrueba" onclick="enviarPrueba(this)"><i class="bi bi-envelope-paper me-1"></i>Enviar correo de prueba</button>
       </div>
       <div id="prevAsunto" style="font-weight:700;margin-bottom:8px;display:none"></div>
       <div class="preview-box" id="prevBox"><span style="color:#9ca3af;font-size:.82rem">Guarda el contenido y <b>genera o carga los destinatarios en el paso 3</b> para previsualizar. El correo de prueba se puede mandar igual (usa un dealer de ejemplo).</span></div>
@@ -398,7 +399,8 @@ async function enviarPrueba(btn){
   if (sucio) await guardar();
   const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando…';
   try {
-    const r = await fetch(`/api/campanas-masivas/${ID}/prueba`, { method:'POST', headers: hdrs(1), body: '{}' });
+    const email = document.getElementById('mPruebaMail').value.trim();
+    const r = await fetch(`/api/campanas-masivas/${ID}/prueba`, { method:'POST', headers: hdrs(1), body: JSON.stringify(email ? { email } : {}) });
     const j = await r.json();
     btn.innerHTML = j.success ? `<i class="bi bi-check2 me-1"></i>Enviado a ${j.data.enviado_a}` : `<i class="bi bi-x-lg me-1"></i>${j.error}`;
     setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 6000);
