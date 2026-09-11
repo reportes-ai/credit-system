@@ -2382,6 +2382,10 @@ async function datosComisionesAPagar() {
              DATEDIFF(CURDATE(), COALESCE(fc.fecha_factura, DATE(efa.fecha))) AS dias,
              oc2.id AS orden_id, oc2.numero AS num_orden,
              DATE_FORMAT(oc2.created_at,'%Y-%m-%d') AS fecha_orden,
+             /* Se paga por ORDEN DE PAGO (una por factura/cartola): el monto es el de la ODP, que ya
+                suma la comisión de todas sus operaciones (titular + réplicas) y los ajustes de cartola. */
+             oc2.monto AS monto_odp,
+             (SELECT id FROM postventa_factura_docs fd WHERE fd.origen='COMISION' AND fd.ref_id=s.id ORDER BY fd.id LIMIT 1) AS factura_doc_id,
              (epg.id IS NOT NULL) AS pagado_hoy,
              (eev.id IS NOT NULL) AS enviado,
              eev.usuario AS enviado_por
@@ -2407,6 +2411,21 @@ async function datosComisionesAPagar() {
               AND DATE(ep.fecha) < CURDATE())
       ORDER BY COALESCE(fc.fecha_factura, DATE(efa.fecha)) ASC, s.num_op ASC
     `);
+  /* Detalle de las operaciones de cada orden: la titular + las réplicas de su factura
+     (Pato, 11-09-2026: en la pantalla se paga por ODP y factura, y al hacer click se ven las OP). */
+  const porTitular = new Map(rows.map(r => [r.id, [{ num_op: r.num_op, id_financiera: r.id_financiera, ejecutivo: r.ejecutivo, comision: Number(r.comision) || 0, titular: 1 }]]));
+  if (rows.length) {
+    try {
+      const [reps] = await pool.query(
+        `SELECT fr.id_titular, s2.num_op, s2.ejecutivo, s2.comision, c2.id_financiera
+           FROM postventa_facturas_comision fr
+           JOIN postventa_seguimiento s2 ON s2.id = fr.id_seguimiento
+           LEFT JOIN creditos c2 ON c2.id = s2.id_credito
+          WHERE fr.es_replica = 1 AND fr.id_titular IN (?) ORDER BY s2.num_op`, [rows.map(r => r.id)]);
+      for (const x of reps) porTitular.get(x.id_titular)?.push({ num_op: x.num_op, id_financiera: x.id_financiera, ejecutivo: x.ejecutivo, comision: Number(x.comision) || 0, titular: 0 });
+    } catch (e) { console.error('[comisionesAPagar réplicas]', e.message); }
+  }
+  for (const r of rows) { r.ops = porTitular.get(r.id) || []; r.n_ops = r.ops.length; if (r.monto_odp == null) r.monto_odp = r.ops.reduce((a, o) => a + o.comision, 0); }
   return rows;
 }
 const getComisionesAPagar = async (req, res) => {

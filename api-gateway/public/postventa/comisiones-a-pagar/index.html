@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Dealer a Pagar — AutoFácil</title>
-  <!-- v1.9 — TEF: generar el archivo registra el pago (y sus correos). v1.8 — botón TEF B.Internacional con el cupo gratis del mes. v1.7 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v2.0 — vista por ORDEN DE PAGO y factura (una fila por ODP con sus OP desplegables, monto de la ODP, popup de la orden y factura adjunta); nómina y TEF por ODP. v1.9 — TEF: generar el archivo registra el pago (y sus correos). v1.8 — botón TEF B.Internacional con el cupo gratis del mes. v1.7 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -89,6 +89,14 @@
     #buscar { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.85rem; width:260px; }
     .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
     .toast.err { background:#dc2626; }
+    /* Vista por Orden de Pago: fila = ODP + factura; el detalle de sus OP se despliega al click */
+    .ops-link { cursor:pointer; color:#0141A2; font-weight:800; text-decoration:underline dotted; white-space:nowrap; }
+    tr.det td { background:#f8fafc; padding:6px 14px 10px; border-bottom:1px solid #e2e8f0; }
+    .det table { width:auto; min-width:520px; font-size:.78rem; }
+    .det th { background:#eef2f7; font-size:.66rem; }
+    .det td { padding:4px 10px; background:#fff; }
+    #dlgODP::backdrop { background:rgba(15,23,42,.55); }
+    .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
   </style>
 </head>
 <body>
@@ -99,7 +107,7 @@
   <div class="head-row">
     <div>
       <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-percent me-2"></i>Comisiones Dealer a Pagar</h5>
-      <span style="font-size:.82rem;color:#64748b">Operaciones con orden de pago de comisión emitida, ordenadas por antigüedad de la factura. <b>Selecciona</b> las que se pagarán (o usa una propuesta) y presiona <b>Enviar a Pago</b> para fijarlas. Luego Tesorería genera la <b>nómina</b> y <b>Confirma el pago</b>. Las marcas se pueden revertir dentro del mismo día.</span>
+      <span style="font-size:.82rem;color:#64748b">Órdenes de pago de comisión emitidas (una por factura del dealer, con una o varias operaciones), ordenadas por antigüedad de la factura. Click en el N° de operaciones para ver el detalle. <b>Selecciona</b> las que se pagarán (o usa una propuesta) y presiona <b>Enviar a Pago</b> para fijarlas. Luego Tesorería genera la <b>nómina</b> y <b>Confirma el pago</b>. Las marcas se pueden revertir dentro del mismo día.</span>
     </div>
   </div>
 
@@ -121,15 +129,15 @@
   <div class="resumen">
     <div class="stat pend">
       <div class="lbl">Pendientes de pago</div>
-      <div class="val"><span id="cntPend">0</span> ops X <span id="montoPend">$0</span></div>
+      <div class="val"><span id="cntPend">0</span> ODP X <span id="montoPend">$0</span></div>
     </div>
     <div class="stat pag">
       <div class="lbl">Pagadas hoy</div>
-      <div class="val"><span id="cntPag">0</span> ops X <span id="montoPag">$0</span></div>
+      <div class="val"><span id="cntPag">0</span> ODP X <span id="montoPag">$0</span></div>
     </div>
     <div class="stat selb">
       <div class="lbl">Seleccionadas</div>
-      <div class="val"><span id="selN">0</span> ops X <span id="selM">$0</span></div>
+      <div class="val"><span id="selN">0</span> ODP X <span id="selM">$0</span></div>
       <div class="sub" id="selSub"></div>
     </div>
     <div class="stat fondos">
@@ -143,13 +151,13 @@
   <div class="resumen" id="propBox" style="display:none">
     <div class="stat prop max" id="propMax" onmouseenter="hl('max')" onmouseleave="hl(null)">
       <div class="lbl">Propuesta · Máximo de operaciones</div>
-      <div class="prop-line"><div class="val" id="propMaxN">0 ops X $0</div>
+      <div class="prop-line"><div class="val" id="propMaxN">0 ODP X $0</div>
         <button class="btn-marcar" id="propMaxBtn" onclick="aplicarPropuesta('max')">Marcar</button></div>
       <div class="sub" id="propMaxM">Queda disponible $0</div>
     </div>
     <div class="stat prop ant" id="propAnt" onmouseenter="hl('ant')" onmouseleave="hl(null)">
       <div class="lbl">Propuesta · Prioriza antigüedad</div>
-      <div class="prop-line"><div class="val" id="propAntN">0 ops X $0</div>
+      <div class="prop-line"><div class="val" id="propAntN">0 ODP X $0</div>
         <button class="btn-marcar" id="propAntBtn" onclick="aplicarPropuesta('ant')">Marcar</button></div>
       <div class="sub" id="propAntM">Queda disponible $0</div>
     </div>
@@ -160,23 +168,22 @@
       <table>
         <thead>
           <tr>
-            <th>N° OP</th>
-            <th>ID Financiera</th>
+            <th>Orden de Pago</th>
+            <th>Factura</th>
             <th>Rut Dealer</th>
             <th>Nombre Dealer</th>
             <th>Cuenta Corriente</th>
             <th>Banco</th>
-            <th>Orden de Pago</th>
-            <th>Factura Recibida</th>
+            <th style="text-align:center">Operaciones</th>
             <th style="text-align:center">Días</th>
-            <th class="num">Comisión</th>
+            <th class="num">Monto a pagar</th>
             <th style="text-align:center">Pagar</th>
           </tr>
         </thead>
         <tbody id="body"></tbody>
         <tfoot>
           <tr>
-            <td colspan="9" style="text-align:right">TOTAL COMISIÓN (visible)</td>
+            <td colspan="8" style="text-align:right">TOTAL A PAGAR (visible)</td>
             <td class="num" id="totSaldo">$0</td>
             <td></td>
           </tr>
@@ -269,7 +276,7 @@ function colorearDias(){
 function visibles(){
   const q = document.getElementById('buscar').value||'';
   // Motor único de búsqueda (busqueda-core): + ejecutivo; mayúsculas y RUT sin puntos/guion
-  return DATA.filter(r => AF_BUSCA.coincide([r.num_op,r.nombre_dealer,r.rut_dealer,r.financiera,r.id_financiera,r.numero_factura,r.ejecutivo], q));
+  return DATA.filter(r => AF_BUSCA.coincide([r.num_orden,r.nombre_dealer,r.rut_dealer,r.financiera,r.numero_factura,...(r.ops||[]).flatMap(o=>[o.num_op,o.id_financiera,o.ejecutivo])], q));
 }
 
 function celdaAccion(r){
@@ -296,21 +303,31 @@ function render(){
   document.getElementById('vacio').style.display='none';
   tb.innerHTML = rows.map(r => `
     <tr id="row_${r.id}" class="${r.pagado?'sel':(r.enviado?'row-enviado':(r.sel?'row-sel':''))}">
-      <td><b>${escH(r.num_op)}</b></td>
-      <td>${escH(r.id_financiera||r.financiera||'—')}</td>
+      <td>${r.orden_id ? `<a href="javascript:void 0" onclick="verODP(${r.orden_id})" title="Ver la Orden de Pago" style="color:#0141A2;font-weight:800;text-decoration:none"><i class="bi bi-file-earmark-text me-1"></i>${escH(r.num_orden)}</a><div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_orden)}</div>` : (r.num_orden ? `<b>${escH(r.num_orden)}</b>` : '—')}</td>
+      <td>${r.numero_factura ? `${r.factura_doc_id ? `<a href="javascript:void 0" onclick="verFactura(${r.factura_doc_id})" title="Ver el documento adjunto" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-paperclip me-1"></i>` : '<b>'}${r.es_boleta?'Boleta':'Factura'} N° ${escH(r.numero_factura)}${r.factura_doc_id ? '</a>' : '</b>'}<div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_factura)}${r.monto_factura ? ' · ' + fmt(r.monto_factura) : ''}</div>` : fechaCL(r.fecha_factura)}</td>
       <td>${escH(r.rut_dealer||'—')}</td>
       <td>${escH(r.nombre_dealer||'—')}</td>
       <td>${escH(r.num_cuenta||'—')}</td>
       <td>${escH(r.banco||'—')}</td>
-      <td>${r.num_orden ? `<b>${escH(r.num_orden)}</b><div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_orden)}</div>` : '—'}</td>
-      <td>${r.numero_factura ? `<b>${r.es_boleta?'Boleta':'Factura'} N° ${escH(r.numero_factura)}</b><div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_factura)}</div>` : fechaCL(r.fecha_factura)}</td>
+      <td style="text-align:center"><span class="ops-link" onclick="toggleDet(${r.id})" title="Ver las operaciones de esta orden"><i class="bi bi-chevron-down me-1" id="chev_${r.id}"></i>${r.n_ops||1} OP</span></td>
       <td style="text-align:center"><span class="dias-pill ${r.dcls}">${r.dias==null?'—':r.dias+' d'}</span></td>
-      <td class="num">${fmt(r.comision)}</td>
+      <td class="num">${fmt(montoP(r))}</td>
       <td style="text-align:center">${celdaAccion(r)}</td>
-    </tr>`).join('');
+    </tr>
+    <tr class="det" id="det_${r.id}" style="display:none"><td colspan="10">
+      <table><thead><tr><th>N° OP</th><th>ID Financiera</th><th>Ejecutivo</th><th class="num">Comisión</th></tr></thead>
+      <tbody>${(r.ops||[]).map(o => `<tr><td><b>${escH(o.num_op)}</b>${o.titular ? '' : ' <span style="font-size:.66rem;color:#94a3b8">(misma factura)</span>'}</td><td>${escH(o.id_financiera||'—')}</td><td>${escH(o.ejecutivo||'—')}</td><td class="num">${fmt(o.comision)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="3" style="text-align:right;position:static;font-size:.76rem">Total ODP${montoP(r) !== (r.ops||[]).reduce((a,o)=>a+o.comision,0) ? ' (incluye ajustes de cartola)' : ''}</td><td class="num" style="position:static">${fmt(montoP(r))}</td></tr></tfoot></table>
+    </td></tr>`).join('');
   recalc();
 }
 
+function toggleDet(id){
+  const d = document.getElementById('det_'+id), c = document.getElementById('chev_'+id);
+  if (!d) return; const abierto = d.style.display !== 'none';
+  d.style.display = abierto ? 'none' : ''; if (c) c.className = 'bi me-1 ' + (abierto ? 'bi-chevron-down' : 'bi-chevron-up');
+}
+const montoP = r => Number(r.monto_odp ?? r.comision) || 0;
 function toggleSel(id, chk){
   const r = DATA.find(x => x.id===id); if (!r) return;
   r.sel = chk.checked;
@@ -321,7 +338,7 @@ function toggleSel(id, chk){
 
 async function revertir(id){
   const r = DATA.find(x => x.id===id); if (!r) return;
-  if (!confirm(`¿Revertir el pago de la comisión OP ${r.num_op}?`)) return;
+  if (!confirm(`¿Revertir el pago de la ${r.num_orden||('OP '+r.num_op)}?`)) return;
   try {
     const resp = await fetch('/api/postventa/comisiones-a-pagar/desmarcar', { method:'POST', headers:H, body: JSON.stringify({ ids:[id] }) });
     const j = await resp.json();
@@ -332,7 +349,7 @@ async function revertir(id){
   } catch(e){ toast(e.message, true); }
 }
 
-const sum = arr => arr.reduce((a,r)=>a+Number(r.comision||0),0);
+const sum = arr => arr.reduce((a,r)=>a+montoP(r),0);
 const seleccionadas = () => DATA.filter(r => !r.pagado && !r.enviado && r.sel);
 const enviadas      = () => DATA.filter(r => !r.pagado && r.enviado);
 
@@ -432,15 +449,15 @@ function recalcPropuestas(){
   const cand = DATA.filter(r => !r.pagado && !r.enviado);
 
   const llenar = lista => { const set=[]; let acc=0;
-    for (const r of lista){ const v=Number(r.comision||0); if (acc+v <= D){ set.push(r); acc+=v; } }
+    for (const r of lista){ const v=montoP(r); if (acc+v <= D){ set.push(r); acc+=v; } }
     return { set, monto:acc };
   };
-  lastProp.max = llenar(cand.slice().sort((a,b)=>Number(a.comision||0)-Number(b.comision||0)));
+  lastProp.max = llenar(cand.slice().sort((a,b)=>montoP(a)-montoP(b)));
   lastProp.ant = llenar(cand);
 
   const pintar = (which, nEl, mEl, btn) => {
     const p = lastProp[which];
-    document.getElementById(nEl).textContent = p.set.length + ' ops X ' + fmt(p.monto);
+    document.getElementById(nEl).textContent = p.set.length + ' ODP X ' + fmt(p.monto);
     document.getElementById(mEl).textContent = 'Queda disponible ' + fmt(D - p.monto);
     const b = document.getElementById(btn);
     const on = (propActiva === which);
@@ -489,7 +506,7 @@ function aplicarPropuesta(which){
 async function enviarSeleccion(){
   const sel = seleccionadas();
   if (!sel.length) return;
-  if (!confirm(`Vas a ENVIAR A PAGO ${sel.length} comisión(es) por ${fmt(sum(sel))}. Quedarán fijas para que Tesorería las pague. ¿Confirmas?`)) return;
+  if (!confirm(`Vas a ENVIAR A PAGO ${sel.length} orden(es) de pago por ${fmt(sum(sel))}. Quedarán fijas para que Tesorería las pague. ¿Confirmas?`)) return;
   const ids = sel.map(r => r.id);
   const btn = document.getElementById('btnEnviar');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando…';
@@ -506,7 +523,7 @@ async function enviarSeleccion(){
 
 async function revertirEnvio(id){
   const r = DATA.find(x => x.id===id); if (!r) return;
-  if (!confirm(`¿Deshacer el envío a pago de la OP ${r.num_op}? Volverá a quedar seleccionable.`)) return;
+  if (!confirm(`¿Deshacer el envío a pago de la ${r.num_orden||('OP '+r.num_op)}? Volverá a quedar seleccionable.`)) return;
   try {
     const resp = await fetch('/api/postventa/comisiones-a-pagar/desmarcar', { method:'POST', headers:H, body: JSON.stringify({ ids:[id], etapa:'ENVIADO A PAGO' }) });
     const j = await resp.json();
@@ -520,7 +537,7 @@ async function revertirEnvio(id){
 async function confirmarPago(){
   const env = enviadas();
   if (!env.length) return;
-  if (!confirm(`Vas a registrar el PAGO de ${env.length} comisión(es) por ${fmt(sum(env))}. ¿Confirmas?`)) return;
+  if (!confirm(`Vas a registrar el PAGO de ${env.length} orden(es) de pago por ${fmt(sum(env))}. ¿Confirmas?`)) return;
   const ids = env.map(r => r.id);
   const btn = document.getElementById('btnConfirmar');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Procesando…';
@@ -540,7 +557,7 @@ const COLS = ['RUT Beneficiario','Nombre Beneficiario','Banco','N° Cuenta','Mon
 function nominaMatriz(){
   return nominaRows().map(r => [
     r.rut_dealer||'', r.nombre_dealer||'', r.banco||'', r.num_cuenta||'',
-    Math.round(Number(r.comision)||0), `Comisión OP ${r.num_op||''}`
+    Math.round(montoP(r)), `Pago comision ${r.num_orden||('OP '+(r.num_op||''))}`
   ]);
 }
 async function copiarNomina(){
@@ -584,7 +601,7 @@ async function cargarCupoTEF(){
     el.title = `Cargos enviados en ${c.mes}: ` + Object.entries(c.por_plataforma||{}).map(([k,v])=>`${k} ${v}`).join(' · ');
   } catch(e){}
 }
-function filasTEF(){ return nominaRows().map(r => ({ id:r.id, ref:'OP '+(r.num_op||''), rut:r.rut_dealer, nombre:r.nombre_dealer, banco:r.banco, tipo_cuenta:r.tipo_cuenta||'', num_cuenta:r.num_cuenta, correo:r.correo||'', monto:Math.round(Number(r.comision)||0), motivo:`Pago comision OP${r.num_op||''}` })); }
+function filasTEF(){ return nominaRows().map(r => ({ id:r.id, ref:(r.num_orden||('OP '+(r.num_op||''))), rut:r.rut_dealer, nombre:r.nombre_dealer, banco:r.banco, tipo_cuenta:r.tipo_cuenta||'', num_cuenta:r.num_cuenta, correo:r.correo||'', monto:Math.round(montoP(r)), motivo:`Pago comision ${r.num_orden||('OP'+(r.num_op||''))}` })); }
 async function descargarTEF(){
   const filas = filasTEF(); if (!filas.length) return;
   if (!confirm(`Se generará el archivo TEF del Banco Internacional con ${filas.length} pago(s) y esas operaciones quedarán registradas como PAGADAS (con sus correos). ¿Continuar?`)) return;
@@ -622,6 +639,43 @@ async function pagarTrasTEF(ids){
 }
 cargarCupoTEF();
 </script>
+<script>
+/* Ver la Orden de Pago sin salir de la pantalla — motor único /js/odp-documento.js (igual que Saldos Precios a Pagar) */
+async function verODP(ordenId){
+  const dlg = document.getElementById('dlgODP');
+  document.getElementById('odpTitulo').textContent = 'Orden de Pago';
+  document.getElementById('odpBody').innerHTML = '<p style="color:#94a3b8;padding:20px 0;text-align:center">Cargando…</p>';
+  dlg.showModal();
+  try {
+    const r = await fetch('/api/ordenes-pago/ordenes/'+ordenId+'/documento', { headers:H });
+    const j = await r.json();
+    if (!j.success || !j.data) throw new Error(j.error||'No se pudo cargar la orden');
+    document.getElementById('odpTitulo').textContent = j.data.numero || 'Orden de Pago';
+    document.getElementById('odpBody').innerHTML = AF_ODP_DOC.html(j.data);
+  } catch(e){ document.getElementById('odpBody').innerHTML = '<p style="color:#b91c1c;padding:20px 0;text-align:center">'+escH(e.message)+'</p>'; }
+}
+/* La factura adjunta se sirve con token: se baja como blob y se abre en otra pestaña */
+async function verFactura(docId){
+  try {
+    const r = await fetch('/api/postventa/factura-doc/'+docId, { headers:H });
+    if (!r.ok) throw new Error('No se pudo abrir la factura');
+    const url = URL.createObjectURL(await r.blob()); window.open(url, '_blank'); setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  } catch(e){ toast(e.message, true); }
+}
+</script>
+<dialog id="dlgODP" style="border:none;border-radius:16px;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3);max-width:880px;width:96%">
+  <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:15px 20px;font-weight:700;display:flex;justify-content:space-between">
+    <span id="odpTitulo">Orden de Pago</span>
+    <i class="bi bi-x-lg" style="cursor:pointer" onclick="document.getElementById('dlgODP').close()"></i>
+  </div>
+  <div style="padding:18px 20px;font-size:.86rem;color:#334155" id="odpBody"></div>
+  <div style="padding:13px 20px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
+    <button class="btn-ghost" onclick="document.getElementById('dlgODP').close()">Cerrar</button>
+    <a class="btn-ghost" style="text-decoration:none;color:#334155" href="/ordenes-pago/historial/?origen=COMISION" target="_blank"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir en Órdenes de Pago</a>
+  </div>
+</dialog>
+<script src="/js/timbre-pagado.js"></script>
+<script src="/js/odp-documento.js?v=232.4"></script>
 <script src="/js/busqueda-core.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
