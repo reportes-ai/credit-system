@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.8 — bitacora POR JEFE: la simulacion antes/despues se calcula para cada Jefe Comercial (los totales son la suma) y el detalle lo muestra por jefe. v1.7 — footer: variable Jefatura desde (ficha de Usuarios) y su efecto en meses historicos. v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
+<!-- v1.9 — un Jefe Comercial ve solo su bono (sin botones de otros jefes). v1.8 — bitacora POR JEFE: la simulacion antes/despues se calcula para cada Jefe Comercial (los totales son la suma) y el detalle lo muestra por jefe. v1.7 — footer: variable Jefatura desde (ficha de Usuarios) y su efecto en meses historicos. v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bono Jefe Comercial — AutoFácil</title>
@@ -333,7 +333,8 @@ async function cargarBSC(){
   // Botones por Jefe Comercial: cada uno se mide por su gente a cargo.
   JEFE_SEL = DATA.jefe || JEFE_SEL;
   const jb = document.getElementById('jefesBar');
-  if (jb) jb.innerHTML = (DATA.jefes||[]).map(x =>
+  // Con un solo jefe visible (un Jefe Comercial viendo su propio bono) la barra no muestra botones
+  if (jb) jb.innerHTML = (DATA.jefes||[]).length < 2 ? '' : (DATA.jefes||[]).map(x =>
     `<button class="btn ${x.id_usuario===DATA.jefe?'btn-navy':'btn-line'}" style="padding:5px 13px;font-size:.8rem" onclick="elegirJefe(${x.id_usuario})"><i class="bi bi-person-badge me-1"></i>${esc(x.nombre)}</button>`).join('');
   const p = DATA.params;
   const av = DATA.promedio || {};

@@ -375,8 +375,17 @@ const getBSC = async (req, res) => {
     // Jefe pedido que NO era jefe ese mes (jefatura_desde posterior, ej. Damaris en
     // julio-2026) → cae al titular del mes en vez de mostrar un equipo fantasma.
     if (idJefe && jefes.length && !jefes.some(j => j.id_usuario === idJefe)) idJefe = jefeTitular(jefes).id_usuario;
+    /* Un Jefe Comercial ve SOLO su propio bono (Pato, 11-09-2026): si quien consulta es uno de los
+       jefes del mes y no administra las variables (bono_jefe_variables; Admin pasa), se fuerza su
+       id y la barra de jefes trae solo a él. */
+    let jefesVisibles = jefes;
+    const uid = req.usuario && req.usuario.id_usuario;
+    if (uid && jefes.some(j => j.id_usuario === uid)) {
+      const admin = await require('../../../../shared/middleware/permisos').tieneFunc(uid, 'bono_jefe_variables').catch(() => false);
+      if (!admin) { idJefe = uid; jefesVisibles = jefes.filter(j => j.id_usuario === uid); }
+    }
     const data = await calcularBSC(mes, null, idJefe);
-    data.jefes = jefes;
+    data.jefes = jefesVisibles;
     res.json({ success: true, data, error: null });
   } catch (e) { console.error('[bono-jefe bsc]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
