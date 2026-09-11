@@ -1861,6 +1861,8 @@ async function datosSaldosAPagar() {
              oc.id AS orden_id, oc.numero AS num_orden,
              DATE_FORMAT(oc.created_at,'%Y-%m-%d') AS fecha_orden,
              d.num_cuenta, d.banco,
+             COALESCE(d.tipo_cuenta, d.cuenta_tipo) AS tipo_cuenta,
+             COALESCE(NULLIF(d.correo,''), NULLIF(d.cf_email,'')) AS correo,   -- correo_destinatario del TEF (misma fuente que el aviso de pago)
              efr.fecha AS fecha_fondos,
              efu.fecha AS fecha_fundantes,
              DATEDIFF(CURDATE(), efr.fecha) AS dias,
@@ -1892,11 +1894,11 @@ async function datosSaldosAPagar() {
     // Respaldo por RUT: créditos sin id_dealer enlazado quedaban sin cuenta/banco/
     // categoría aunque la ficha del dealer exista (mismo RUT en otra operación sí
     // los traía). Una sola fuente: la ficha; aquí solo se busca por otra llave.
-    const sinDatos = rows.filter(r => r.rut_dealer && (!r.num_cuenta || !r.banco || !r.categoria));
+    const sinDatos = rows.filter(r => r.rut_dealer && (!r.num_cuenta || !r.banco || !r.categoria || !r.correo));
     if (sinDatos.length) {
       const ruts = [...new Set(sinDatos.map(r => normRutSaldo(r.rut_dealer)))];
       const [ds] = await pool.query(
-        `SELECT rut, num_cuenta, banco,
+        `SELECT rut, num_cuenta, banco, COALESCE(NULLIF(correo,''), NULLIF(cf_email,'')) AS correo,
                 COALESCE(NULLIF(categoria_asignada,''), NULLIF(categoria_propuesta,''), '') AS categoria,
                 COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre
            FROM dealers WHERE activo=1 OR activo IS NULL`);
@@ -1906,6 +1908,7 @@ async function datosSaldosAPagar() {
         const d = mapa.get(normRutSaldo(r.rut_dealer)); if (!d) return;
         if (!r.num_cuenta) r.num_cuenta = d.num_cuenta;
         if (!r.banco) r.banco = d.banco;
+        if (!r.correo) r.correo = d.correo;
         if (!r.categoria) r.categoria = d.categoria;
         if (!r.nombre_dealer) r.nombre_dealer = d.nombre;
       });
@@ -1978,6 +1981,7 @@ const getOrdenPago = async (req, res) => {
              COALESCE(d.rut_pago, dn.rut_pago) AS rut_pago,
              COALESCE(d.tipo_cuenta, d.cuenta_tipo, dn.tipo_cuenta, dn.cuenta_tipo) AS tipo_cuenta,
              COALESCE(d.nombre_cuenta, dn.nombre_cuenta) AS nombre_cuenta,
+             COALESCE(NULLIF(d.correo,''), NULLIF(d.cf_email,''), NULLIF(dn.correo,''), NULLIF(dn.cf_email,'')) AS correo,
              efr.fecha AS fecha_fondos,
              DATEDIFF(CURDATE(), efr.fecha) AS dias, ${SIN_LIM_SQL}
       FROM postventa_seguimiento s
@@ -2449,6 +2453,7 @@ const getOrdenPagoComision = async (req, res) => {
              COALESCE(d.rut_pago, dn.rut_pago) AS rut_pago,
              COALESCE(d.tipo_cuenta, d.cuenta_tipo, dn.tipo_cuenta, dn.cuenta_tipo) AS tipo_cuenta,
              COALESCE(d.nombre_cuenta, dn.nombre_cuenta) AS nombre_cuenta,
+             COALESCE(NULLIF(d.correo,''), NULLIF(d.cf_email,''), NULLIF(dn.correo,''), NULLIF(dn.cf_email,'')) AS correo,
              /* GOTCHA TiDB: COALESCE(DATE, DATETIME) devuelve NULL aunque ambos
                 existan (medido 25-08-2026). Formatear a texto antes de mezclar. */
              COALESCE(DATE_FORMAT(fc.fecha_factura,'%Y-%m-%d'), DATE_FORMAT(efa.fecha,'%Y-%m-%d')) AS fecha_factura,
