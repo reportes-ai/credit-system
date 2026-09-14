@@ -155,7 +155,7 @@ const cmfTipos = async (req, res) => {
     const tipos = await listarTiposCMF(anio, mes);
     res.json({ success: true, data: { anio, mes, tipos }, error: null });
   } catch (e) {
-    res.status(e.code === 'NOCMF' ? 503 : 500).json({ success: false, data: null, error: e.message || 'Error consultando la CMF' });
+    res.status(e.code === 'NOCMF' ? 503 : (e.code === 'CMFERR' || e.code === 'CMFHTTP' || /CMF|ECONN|ETIMEDOUT|timeout/i.test(e.message) ? 502 : 500)).json({ success: false, data: null, error: e.message || 'Error consultando la CMF' });   // 502 = servicio externo: el mensaje llega al usuario (el gateway oculta los 500)
   }
 };
 
@@ -169,7 +169,7 @@ const sincronizarManual = async (req, res) => {
       detalle: r.insertado ? `Cargó la TMC desde la CMF (vigencia ${r.desde} → ${r.hasta})` : `Consultó la TMC en la CMF: ${r.sin_cambios ? 'sin cambios' : (r.motivo || 'pendiente')}`, meta: r });
     res.json({ success: true, data: r, error: null });
   } catch (e) {
-    res.status(e.code === 'NOCMF' ? 503 : 500).json({ success: false, data: null, error: e.message || 'Error consultando la CMF' });
+    res.status(e.code === 'NOCMF' ? 503 : (e.code === 'CMFERR' || e.code === 'CMFHTTP' || /CMF|ECONN|ETIMEDOUT|timeout/i.test(e.message) ? 502 : 500)).json({ success: false, data: null, error: e.message || 'Error consultando la CMF' });   // 502 = servicio externo: el mensaje llega al usuario (el gateway oculta los 500)
   }
 };
 
