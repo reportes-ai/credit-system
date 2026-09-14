@@ -54,7 +54,14 @@ async function calibrar(tmcs) {
 
 async function sincronizarTMC() {
   const now = new Date();
-  const tmcs = await cmfGet('tmc', now.getFullYear(), now.getMonth() + 1);
+  let tmcs;
+  try { tmcs = await cmfGet('tmc', now.getFullYear(), now.getMonth() + 1); }
+  catch (e) {
+    // La CMF responde con CodigoError "No hay datos disponibles" mientras no publica el mes
+    // (14-09-2026: quedó marcado como ERROR y el reintento era a las 24 h): es "pendiente", no falla.
+    if (/no hay datos/i.test(e.message)) return { ok: false, pendiente: true, motivo: 'La CMF aún no publica datos de TMC para este mes.' };
+    throw e;
+  }
   if (!tmcs.length) return { ok: false, pendiente: true, motivo: 'La CMF aún no publica datos de TMC para este mes.' };
 
   let tipoMenor = await getParam('tmc_tipo_menor');

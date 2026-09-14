@@ -3,7 +3,8 @@
  * Sincronizador de indicadores — fuente única: API oficial CMF (cmf-api.js).
  *  - UF y dólar: DIARIOS (siempre).
  *  - UTM e IPC: MENSUALES (mes actual + anterior, por la publicación tardía del IPC).
- *  - TMC: desde el DÍA 13 y hasta encontrar el período nuevo del mes (tmc-sync.js).
+ *  - TMC: desde el DÍA 13 y hasta encontrar el período nuevo del mes (tmc-sync.js); mientras la
+ *    CMF no lo publique se reintenta cada hora (no cada 24 h).
  * Corre al arrancar (force) y cada 24h. Requiere CMF_API_KEY (sin ella, falla suave y avisa).
  */
 const { programar } = require('../../../shared/scheduler.js');
@@ -110,7 +111,12 @@ async function sincronizar(opts = {}) {
         // "pendiente" = la CMF aún no publica el TMC del mes (normal a inicios de mes):
         // NO es un problema y NO debe alarmar; las tasas vigentes siguen OK y el
         // vencimiento real ya lo cubren las alertas de Tasas. Se limpia el estado.
-        else if (out.tmc.pendiente) await setEstado('sync_tmc', '');
+        else if (out.tmc.pendiente) {
+          await setEstado('sync_tmc', '');
+          // Desde el día 13 la TMC nueva puede salir en cualquier momento (rige desde el 14/15):
+          // esperar 24 h dejaba un día entero con la TMC vencida (14-09-2026). Reintento cada hora.
+          if (opts.auto) programarReintento(60 * 60 * 1000, 'TMC pendiente en la CMF');
+        }
         else await setEstado('sync_tmc', 'TMC: ' + (out.tmc.motivo || 'no se pudo sincronizar'));
       }
     } else out.tmc = { skipped: true, motivo: 'la TMC se busca desde el día 13' };
@@ -136,11 +142,11 @@ async function sincronizar(opts = {}) {
 }
 
 let _retryTimer = null;
-function programarReintento() {
+function programarReintento(ms = 30 * 60 * 1000, motivo = 'fallo de red') {
   if (_retryTimer) return;
-  _retryTimer = setTimeout(() => { _retryTimer = null; sincronizar({ auto: true }).catch(() => {}); }, 30 * 60 * 1000);
+  _retryTimer = setTimeout(() => { _retryTimer = null; sincronizar({ auto: true }).catch(() => {}); }, ms);
   if (_retryTimer.unref) _retryTimer.unref();
-  console.log('[indicadores] reintento programado en 30 min (fallo de red)');
+  console.log(`[indicadores] reintento programado en ${Math.round(ms / 60000)} min (${motivo})`);
 }
 
 // Al arrancar: puesta al día (force). Luego cada 24h.
