@@ -19,9 +19,31 @@ require('../../../../shared/migrate').enFila('mant-bancos', async () => {
   console.log('[mant-bancos] card Bancos de la Plaza creada');
 });
 
-const listar = async (_req, res) => {
+/* Uso de cada banco: cuántas fichas (dealers, parques, colaboradores, proveedores) tienen cuenta en él.
+   El nombre escrito en la ficha se resuelve con el mismo motor del TEF (codigoBanco → código SBIF). */
+async function usoPorCodigo() {
+  const { codigoBanco } = require('../../../../shared/tef-internacional');
+  const fuentes = [
+    "SELECT banco b, COUNT(*) n FROM dealers WHERE banco IS NOT NULL AND banco<>'' GROUP BY 1",
+    "SELECT banco b, COUNT(*) n FROM parques_ficha WHERE banco IS NOT NULL AND banco<>'' GROUP BY 1",
+    "SELECT banco_pago b, COUNT(*) n FROM rh_fichas WHERE banco_pago IS NOT NULL AND banco_pago<>'' GROUP BY 1",
+    "SELECT banco b, COUNT(*) n FROM proveedores WHERE banco IS NOT NULL AND banco<>'' GROUP BY 1",
+  ];
+  const uso = {};
+  for (const sql of fuentes) {
+    const [rows] = await pool.query(sql).catch(() => [[]]);
+    for (const r of rows) { const c = await codigoBanco(r.b); if (c != null) uso[c] = (uso[c] || 0) + Number(r.n); }
+  }
+  return uso;
+}
+
+const listar = async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT id, codigo, nombre, activo FROM rh_catalogo WHERE tipo='BANCO' ORDER BY nombre");
+    // Orden: los bancos con más fichas primero (Pato, 14-09-2026); empate por nombre
+    const uso = await usoPorCodigo();
+    for (const r of rows) r.fichas = uso[parseInt(r.codigo, 10)] || 0;
+    rows.sort((a, b) => b.fichas - a.fichas || a.nombre.localeCompare(b.nombre));
     res.json({ success: true, data: rows, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
