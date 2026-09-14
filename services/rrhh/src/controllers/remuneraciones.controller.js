@@ -487,7 +487,11 @@ require('../../../../shared/migrate').enFila('rrhh-descuentos', async () => {
        cuota se guardan en la moneda de ORIGEN y cada mes se convierten a pesos con el
        indicador del mes (motor único shared/tipo-cambio.js); monto_total/valor_cuota
        quedan en pesos al tipo de cambio del día de ingreso, solo de referencia. */
-    for (const col of ["moneda VARCHAR(5) NOT NULL DEFAULT 'CLP'", 'monto_origen DECIMAL(14,4) NULL', 'valor_cuota_origen DECIMAL(14,4) NULL'])
+    for (const col of ["moneda VARCHAR(5) NOT NULL DEFAULT 'CLP'", 'monto_origen DECIMAL(14,4) NULL', 'valor_cuota_origen DECIMAL(14,4) NULL',
+      /* Numeración REAL de la cuota (14-09-2026): un plan que viene andando (AVSOFT "001/004", nómina Caja "17/27")
+         se registra acá solo con las cuotas que faltan; cuota_desde/cuotas_total hacen que la liquidación diga
+         "cuota 3 de 4" y no "2 de 3". */
+      'cuota_desde INT NULL', 'cuotas_total INT NULL'])
       await pool.query(`ALTER TABLE rh_descuentos ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
     console.log('[rrhh-descuentos] listo');
   } catch (e) { console.error('[rrhh-descuentos migration]', e.message); }
@@ -539,7 +543,10 @@ const getDescuentos = async (req, res) => {
     const tc = await tcDelMes(mes);
     const tcHoy = await TC.tiposCambio(hoyChile());
     const delMes = rows.filter(d => d.estado === 'VIGENTE' && cuotaEnMes(d, mes, tc) != null)
-      .map(d => ({ ...d, cuota_mes: cuotaEnMes(d, mes, tc), cuota_num: (d.tipo === 'PERMANENTE' && !(Number(d.cuotas) > 0)) ? null : difMeses(d.mes_inicio, mes) + 1 }));
+      .map(d => ({ ...d, cuota_mes: cuotaEnMes(d, mes, tc),
+        // Numeración real: plan que venía andando parte en cuota_desde y el total es cuotas_total
+        cuota_num: (d.tipo === 'PERMANENTE' && !(Number(d.cuotas) > 0)) ? null : (Number(d.cuota_desde) || 1) + difMeses(d.mes_inicio, mes),
+        cuotas_total: Number(d.cuotas_total) || Number(d.cuotas) || null }));
     const total_mes = delMes.reduce((s, d) => s + d.cuota_mes, 0);
     ok(res, { mes, descuentos: rows, del_mes: delMes, total_mes, bloqueado: await mesEmitido(mes), tmc: await tmcVigente(), subtipos: await subtiposDesc(),
       monedas: TC.MONEDAS, tc_mes: tc, tc_hoy: tcHoy });
@@ -720,9 +727,11 @@ const importarNominaCaja = async (req, res) => {
     const [ant] = await pool.query("UPDATE rh_descuentos SET estado='ANULADO', anulado_por=?, anulado_at=NOW() WHERE estado='VIGENTE' AND tipo='PERMANENTE' AND subtipo=? AND mes_inicio=?", [nombreDe(u) + ' (reimportación nómina Caja)', CAJA_SUBTIPO, mes]);
     for (const f of filas) {
       const detalle = [f.producto, f.codigo, f.cuota && f.cuota !== '0/0' ? 'cuota ' + f.cuota : null, f.obs && f.obs.trim() ? 'obs ' + f.obs.trim() : null].filter(Boolean).join(' · ').slice(0, 200);
+      const mC = /^(\d+)\s*\/\s*(\d+)$/.exec(f.cuota || '');   // "17/27" → cuota 17 de 27 (numeración real en la liquidación)
+      const cDesde = mC && Number(mC[2]) > 0 ? Number(mC[1]) : null, cTotal = mC && Number(mC[2]) > 0 ? Number(mC[2]) : null;
       await pool.query(
-        `INSERT INTO rh_descuentos (id_usuario, tipo, subtipo, detalle_texto, monto_total, cuotas, valor_cuota, mes_inicio, creado_por, moneda) VALUES (?,?,?,?,?,1,?,?,?,'CLP')`,
-        [f.id_usuario, 'PERMANENTE', CAJA_SUBTIPO, detalle, f.valor, f.valor, mes, nombreDe(u) + ' (nómina Caja)']);
+        `INSERT INTO rh_descuentos (id_usuario, tipo, subtipo, detalle_texto, monto_total, cuotas, valor_cuota, mes_inicio, creado_por, moneda, cuota_desde, cuotas_total) VALUES (?,?,?,?,?,1,?,?,?,'CLP',?,?)`,
+        [f.id_usuario, 'PERMANENTE', CAJA_SUBTIPO, detalle, f.valor, f.valor, mes, nombreDe(u) + ' (nómina Caja)', cDesde, cTotal]);
     }
     auditar({ req, accion: 'CARGA_MASIVA', modulo: 'rrhh', entidad: 'descuento', detalle: `Importó la nómina de retenciones de la Caja ${mes}: ${filas.length} descuento(s) por $${lect.suma.toLocaleString('es-CL')}${ant.affectedRows ? ` (reemplazó ${ant.affectedRows} anteriores del mes)` : ''}` });
     ok(res, { ...resumen, creados: filas.length, reemplazados: ant.affectedRows });

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
+  <!-- v1.10 — numeración REAL de la cuota (cuota_desde/cuotas_total): un plan que venía andando muestra "cuota 3 de 4" y no "2 de 3"; la nómina Caja la toma de "17/27" · v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -284,7 +284,7 @@ function renderListaIng(){
       ${d.tipo==='PERMANENTE'
         ? '<span class="pill" style="background:#e0e7ff;color:#3730a3">PERMANENTE</span>'
         : d.cuotas>1
-        ? `<span class="pill" style="background:#dbeafe;color:#1e40af">CUOTA ${d.cuota_num} de ${d.cuotas}</span>`
+        ? `<span class="pill" style="background:#dbeafe;color:#1e40af">CUOTA ${d.cuota_num} de ${d.cuotas_total||d.cuotas}</span>`
         : `<span class="pill" style="background:#fef3c7;color:#92400e">SOLO ${mesTxt(d.mes_inicio)}</span>`}
       <span style="margin-left:auto">
         <button class="btn btn-sm btn-outline-danger py-0" onclick="anular(${d.id})" title="${d.tipo==='PERMANENTE'?'Desmarcar: deja de descontarse desde ahora':'Detiene las cuotas futuras'}">${d.tipo==='PERMANENTE'?'Desmarcar':'Anular'}</button>
@@ -301,7 +301,7 @@ function render(){
     <td>${esc(d.nombre_actual||d.nombre)}</td>
     <td><span class="pill ${d.tipo}">${esc(tipoTxt(d))}</span></td>
     <td>${esc(d.detalle_texto||'')}${d.tasa_pct!=null?` <span class="text-muted">(${String(Number(d.tasa_pct)).replace('.',',')}% mensual)</span>`:''}</td>
-    <td>${d.cuota_num?`${d.cuota_num} de ${d.cuotas}`:'mensual'}</td>
+    <td>${d.cuota_num?`${d.cuota_num} de ${d.cuotas_total||d.cuotas}`:'mensual'}</td>
     <td class="text-right num">$${fmt(d.cuota_mes)} ${origenTxt(d)}</td>
     <td>${esc(d.creado_por||'')}</td></tr>`).join('')
     || '<tr><td colspan="6" class="text-center text-muted py-3">Sin descuentos este mes</td></tr>';
@@ -416,7 +416,7 @@ async function anular(id){
 function exportar(m){
   const filas = m==='M'
     ? [['Mes','Colaborador','Tipo','Detalle','Cuota','Monto del mes','Ingresado por'],
-       ...D.del_mes.map(d=>[fMes.value,d.nombre_actual||d.nombre,tipoTxt(d),d.detalle_texto||'',d.cuota_num?`${d.cuota_num} de ${d.cuotas}`:'mensual',d.cuota_mes,d.creado_por||'']),
+       ...D.del_mes.map(d=>[fMes.value,d.nombre_actual||d.nombre,tipoTxt(d),d.detalle_texto||'',d.cuota_num?`${d.cuota_num} de ${d.cuotas_total||d.cuotas}`:'mensual',d.cuota_mes,d.creado_por||'']),
        [],['','','','','TOTAL',D.total_mes]]
     : m==='A'
     ? [['Colaborador','Tipo','Detalle','Capital','Cuotas','Valor cuota','Inicio','Ingresado por','Anulado el','Anulado por'],
