@@ -131,7 +131,11 @@ async function construirTEF({ plataforma, filas, usuario }) {
     if (monto > P.montoMax && !P.dividir) porque.push(`monto sobre el máximo del banco ($${P.montoMax.toLocaleString('es-CL')} por transferencia)`);
     if (!motivo) porque.push('sin motivo');
     if (porque.length) { excluidas.push({ ref, nombre: f.nombre || '', monto, motivo: porque.join(', ') }); continue; }
-    const correo = alfanum(f.correo, 45).toLowerCase().replace(/ /g, '') || '';
+    /* Correo: alfanum() borraba el @ y los puntos ("felipealfred1gmailcom", JM 14-09-2026).
+       Se limpia como correo: sin acentos ni espacios, en minúsculas, solo caracteres válidos
+       de una dirección; si no tiene forma de correo va vacío (es optativo para el banco). */
+    const correoLimpio = sinAcentos(f.correo || '').toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9@._+-]/g, '').slice(0, 45);
+    const correo = /^[^@]+@[^@]+\.[a-z]{2,}$/.test(correoLimpio) ? correoLimpio : '';
     /* Monto sobre el máximo del banco: se DIVIDE en transferencias a la misma cuenta, cada una por
        el MÁXIMO y la última por la diferencia (Pato, 11-09-2026); glosa "<motivo> Transf. k/n".
        Cada parte es un cargo para el cupo del mes. */
