@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adicionales de Remuneración — AutoFácil</title>
-  <!-- v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <!-- v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -65,7 +65,7 @@
         <input id="fMonto" class="form-control form-control-sm text-end" inputmode="numeric" placeholder="0" oninput="fmtMonto(this)"></div>
       <div class="col-md-4 d-flex align-items-end pb-1 gap-3 flex-wrap">
         <div class="form-check"><input type="checkbox" class="form-check-input" id="fLiq">
-          <label class="form-check-label small fw-semibold" for="fLiq" title="El colaborador recibe exactamente este monto: entra como haber no imponible, sin descuentos">Líquido</label></div>
+          <label class="form-check-label small fw-semibold" for="fLiq" title="El colaborador recibe exactamente este monto. Si la causal es imponible, el sistema calcula el BRUTO de cada persona (AFP, salud, AFC e impuesto) al armar la liquidación">Líquido</label></div>
         <div class="form-check"><input type="checkbox" class="form-check-input" id="fNoImp">
           <label class="form-check-label small fw-semibold" for="fNoImp" title="Manda sobre el default de la causal: este monto no paga AFP, salud ni impuesto">No imponible</label></div>
         <div class="form-check"><input type="checkbox" class="form-check-input" id="fPerm">
@@ -99,8 +99,8 @@
 
   <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.8rem">
     <div class="fw-bold mb-1"><i class="bi bi-diagram-3 me-1"></i>Cómo se integran</div>
-    Los adicionales <b>imponibles</b> entran como "Otros Imponibles" en el <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> del mes (pagan AFP/salud/impuesto); los <b>no imponibles</b> y los marcados <b>Líquido</b> entran como "Otros No Imponibles" (se pagan tal cual). Si en el libro editas esas celdas a mano, tu valor manda. Al <b>emitir</b> el mes, este módulo queda bloqueado.
-    <div class="mt-2"><b>BONO FIESTAS PATRIAS / NAVIDAD / VACACIONES</b> → aguinaldos imponibles. En Colaborador elige <b>★ TODO EL PERSONAL</b> para asignarlo de una vez a
+    Los adicionales <b>imponibles</b> entran como "Otros Imponibles" en el <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> del mes (pagan AFP/salud/impuesto); los <b>no imponibles</b> entran como "Otros No Imponibles" (se pagan tal cual). <b>Líquido</b> significa que la persona recibe exactamente ese monto: si la causal es imponible (ej. aguinaldo $70.000 líquidos), el <b>bruto se calcula por colaborador</b> al armar la liquidación, con su AFP, salud, AFC e impuesto, y por eso es distinto para cada uno. Si en el libro editas esas celdas a mano, tu valor manda. Al <b>emitir</b> el mes, este módulo queda bloqueado.
+    <div class="mt-2"><b>AGUINALDO DE FIESTAS PATRIAS / BONO NAVIDAD / BONO VACACIONES</b> → aguinaldos imponibles. En Colaborador elige <b>★ TODO EL PERSONAL</b> para asignarlo de una vez a
     todos los activos con ficha (sueldo base); quien ya tenga esa causal en el mes se salta, y luego se puede borrar o ajustar uno a uno en la lista.</div>
     <div class="mt-2"><b>SUELDO ASEGURADO / BONO ASEGURADO / VARIABLE ASEGURADO</b> → renta garantizada por un período (ej. ejecutivo nuevo): imponibles, se ingresan
     marcando <b>Permanente</b> con el mes de arriba como <b>desde</b> y un mes <b>hasta</b> (inclusive); al pasar ese mes dejan de pagarse solos y quedan en la lista con su vigencia. Sin "hasta" = hasta desmarcar.</div>
@@ -189,11 +189,12 @@ function hintImp(){
   const liq = document.getElementById('fLiq').checked;
   const noImp = document.getElementById('fNoImp').checked;
   const perm = document.getElementById('fPerm').checked;
-  const imp = (liq||noImp) ? false : (c==='OTRO' ? fOtroImp.value==='1' : CAUSALES[c]===1);
+  const imp0 = c==='OTRO' ? fOtroImp.value==='1' : CAUSALES[c]===1;
+  const imp = noImp ? false : imp0;
   document.getElementById('wHasta').style.display = perm ? '' : 'none';
   const hasta = perm ? document.getElementById('fHasta').value : '';
   document.getElementById('hintImp').innerHTML = (liq
-    ? '<i class="bi bi-info-circle me-1"></i>Marcado <b>Líquido</b>: el colaborador recibe exactamente este monto (entra como haber no imponible).'
+    ? '<i class="bi bi-info-circle me-1"></i>Marcado <b>Líquido</b>: el colaborador recibe exactamente este monto' + (imp0 ? ' — como la causal es <b>imponible</b>, el bruto se calcula por persona al armar la liquidación (será mayor que el líquido).' : '.')
     : noImp
     ? '<i class="bi bi-info-circle me-1"></i>Marcado <b>No imponible</b>: este monto no paga AFP, salud ni impuesto, aunque la causal diga otra cosa.'
     : `<i class="bi bi-info-circle me-1"></i>${esc(c)} es <b>${imp?'IMPONIBLE (paga AFP, salud e impuesto)':'NO imponible (se paga tal cual)'}</b>.`)
@@ -233,7 +234,7 @@ function render(){
     <td>${esc(a.causal)}${a.causal_texto?` — <i>${esc(a.causal_texto)}</i>`:''}${
       // El cálculo queda a la vista: sin esto el monto es un número sin explicación
       a.cantidad ? ` <span class="text-muted small">(${(+a.cantidad)} h × $${fmt(Math.round(a.valor_unitario))})</span>` : ''}</td>
-    <td>${a.es_liquido?'<span class="pill liq">LÍQUIDO</span>':a.imponible?'<span class="pill imp">Imponible</span>':'<span class="pill noimp">No imponible</span>'}</td>
+    <td>${a.es_liquido?'<span class="pill liq">LÍQUIDO</span> ':''}${a.imponible?'<span class="pill imp">Imponible</span>':'<span class="pill noimp">No imponible</span>'}</td>
     <td class="text-right num">$${fmt(a.monto)}</td>
     <td>${esc(a.creado_por||'')}</td>
     <td>${String(a.created_at).slice(0,10)}</td>
@@ -254,7 +255,7 @@ function render(){
         ? `<span class="pill" style="background:#e0e7ff;color:#3730a3" title="Se incluye todos los meses${a.heredado?' (viene de '+a.mes+')':''}">${a.permanente_fin?'DESDE '+mesTxt(a.mes)+' '+String(a.mes).slice(0,4)+' HASTA '+mesTxt(mesAnt(a.permanente_fin))+' '+mesAnt(a.permanente_fin).slice(0,4):'PERMANENTE'}</span>`
         : `<span class="pill" style="background:#fef3c7;color:#92400e">SOLO ${mesTxt(a.mes)}</span>`}
       <span class="pill ${a.es_liquido?'liq':'noimp'}">${a.es_liquido?'LÍQUIDO':'BRUTO'}</span>
-      <span class="pill ${a.imponible&&!a.es_liquido?'imp':'noimp'}">${a.imponible&&!a.es_liquido?'IMPONIBLE':'NO IMPONIBLE'}</span>
+      <span class="pill ${a.imponible?'imp':'noimp'}">${a.imponible?'IMPONIBLE':'NO IMPONIBLE'}</span>
       <span style="margin-left:auto">
         ${a.permanente&&!a.permanente_fin?`<button class="btn btn-sm btn-outline-secondary py-0" onclick="desmarcarPerm(${a.id})" title="Deja de pagarse todos los meses">Desmarcar permanente</button>`:''}
         ${!a.heredado&&!D.bloqueado?`<i class="bi bi-trash text-danger ms-2" style="cursor:pointer" onclick="eliminar(${a.id})"></i>`:''}
@@ -320,7 +321,7 @@ async function eliminar(id){
 function exportar(){
   if (!D?.adicionales.length) return;
   const filas = [['Mes','Colaborador','Causal','Detalle','Tipo','Horas','Valor hora','Monto','Ingresado por','Fecha'],
-    ...D.adicionales.map(a=>[a.mes,a.nombre_actual||a.nombre,a.causal,a.causal_texto||'',a.es_liquido?'LIQUIDO':a.imponible?'IMPONIBLE':'NO IMPONIBLE',a.cantidad||'',a.valor_unitario?Math.round(a.valor_unitario):'',a.monto,a.creado_por||'',String(a.created_at).slice(0,10)]),
+    ...D.adicionales.map(a=>[a.mes,a.nombre_actual||a.nombre,a.causal,a.causal_texto||'',(a.es_liquido?'LIQUIDO ':'')+(a.imponible?'IMPONIBLE':'NO IMPONIBLE'),a.cantidad||'',a.valor_unitario?Math.round(a.valor_unitario):'',a.monto,a.creado_por||'',String(a.created_at).slice(0,10)]),
     // Los totales van bajo la columna Monto, que con Horas y Valor hora corrió al índice 7.
     [],['','','','TOTAL IMPONIBLE','','','',D.totales.imponible],
        ['','','','TOTAL NO IMPONIBLE','','','',D.totales.no_imponible],

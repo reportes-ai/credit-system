@@ -233,7 +233,7 @@ const CAUSALES_ADIC = {
   // se ingresan PERMANENTES con mes desde/hasta.
   'SUELDO ASEGURADO': 1, 'BONO ASEGURADO': 1, 'VARIABLE ASEGURADO': 1,
   // Aguinaldos/bonos de temporada: imponibles (art. 41 CT). Se pueden asignar a TODO el personal.
-  'BONO FIESTAS PATRIAS': 1, 'BONO NAVIDAD': 1, 'BONO VACACIONES': 1,
+  'AGUINALDO DE FIESTAS PATRIAS': 1, 'BONO NAVIDAD': 1, 'BONO VACACIONES': 1,   // 14-09-2026: "BONO FIESTAS PATRIAS" → aguinaldo
   'VIÁTICO': 0, 'COLACIÓN ADICIONAL': 0, 'MOVILIZACIÓN ADICIONAL': 0,
   'DEVOLUCIÓN DE DESCUENTO': 0, 'OTRO': null,   // 'ASIGNACIÓN DE CELULAR' salió 09-09-2026: la causal vigente es ASIGNACION CELULAR (concepto del usuario)
 };
@@ -348,9 +348,13 @@ async function crearUno(b, req, { silencioso = false } = {}) {
     const CAUS = await causalesAdic();
     if (!(causal in CAUS)) return fail('Causal no válida', 400);
     if (causal === 'OTRO' && !String(b.causal_texto || '').trim()) return fail('Describe la causal en "Otro"', 400);
+    /* LÍQUIDO (Pato, 14-09-2026): el colaborador recibe exactamente este monto, pero el haber
+       conserva la imponibilidad de la causal. Si es imponible (aguinaldo $70.000 líquidos), el
+       BRUTO se calcula por persona al armar la liquidación (gross-up con el motor único), porque
+       depende de su AFP, salud e impuesto. Antes "líquido" lo volvía no imponible, y eso está mal. */
     const esLiquido = b.es_liquido ? 1 : 0;
     // "No imponible" marcado a mano MANDA sobre el default de la causal
-    const imponible = (esLiquido || b.no_imponible) ? 0 : (CAUS[causal] != null ? CAUS[causal] : (b.imponible ? 1 : 0));
+    const imponible = b.no_imponible ? 0 : (CAUS[causal] != null ? CAUS[causal] : (b.imponible ? 1 : 0));
     /* Vigencia "desde / hasta" (Pato 08-09-2026): el mes del formulario es el DESDE;
        `hasta` (AAAA-MM, inclusive) fija el último mes que se paga. Con hasta el
        adicional es permanente sí o sí, y permanente_fin = mes siguiente al hasta
@@ -389,23 +393,48 @@ const eliminarAdicional = async (req, res) => {
 // Suma de adicionales del mes por usuario → alimenta el libro de liquidaciones
 async function adicionalesDelMes(mes) {
   // Del mes + los PERMANENTES vigentes nacidos en meses anteriores
+  /* imp = imponibles brutos · noimp = no imponibles (líquido o no: se pagan tal cual)
+     liq_imp = LÍQUIDOS IMPONIBLES (monto = lo que debe recibir la persona): el bruto se calcula
+     por colaborador en aplicarLiquidosImponibles() con el motor de liquidación. */
   const [rows] = await pool.query(
     `SELECT id_usuario,
             SUM(CASE WHEN es_liquido=0 AND imponible=1 THEN monto ELSE 0 END) imp,
-            SUM(CASE WHEN es_liquido=1 OR imponible=0 THEN monto ELSE 0 END) noimp
+            SUM(CASE WHEN imponible=0 THEN monto ELSE 0 END) noimp
        FROM rh_adicionales
       WHERE mes=? OR (permanente=1 AND mes<? AND (permanente_fin IS NULL OR permanente_fin>?))
       GROUP BY id_usuario`, [mes, mes, mes]);
-  const m = {}; rows.forEach(r => m[r.id_usuario] = { imp: Number(r.imp), noimp: Number(r.noimp), items: [] });
+  const m = {}; rows.forEach(r => m[r.id_usuario] = { imp: Number(r.imp), noimp: Number(r.noimp), items: [], liq_imp: [] });
   // Detalle por ítem: la liquidación muestra cada adicional con su nombre (ej. "Asignación de celular (no imponible)")
   const [det] = await pool.query(
-    `SELECT id_usuario, causal, causal_texto, monto, imponible, es_liquido FROM rh_adicionales
+    `SELECT id, id_usuario, causal, causal_texto, monto, imponible, es_liquido FROM rh_adicionales
       WHERE mes=? OR (permanente=1 AND mes<? AND (permanente_fin IS NULL OR permanente_fin>?)) ORDER BY id`, [mes, mes, mes]).catch(() => [[]]);
   const titulo = t => String(t || '').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
-  det.forEach(r => { if (m[r.id_usuario]) m[r.id_usuario].items.push({
-    nombre: titulo(r.causal === 'OTRO' && r.causal_texto ? r.causal_texto : r.causal),
-    monto: Number(r.monto), imponible: !!(r.imponible && !r.es_liquido), liquido: !!r.es_liquido }); });
+  det.forEach(r => { if (!m[r.id_usuario]) return;
+    const it = { id: r.id, nombre: titulo(r.causal === 'OTRO' && r.causal_texto ? r.causal_texto : r.causal),
+      monto: Number(r.monto), imponible: !!r.imponible, liquido: !!r.es_liquido };
+    m[r.id_usuario].items.push(it);
+    if (r.es_liquido && r.imponible) m[r.id_usuario].liq_imp.push(it); });
   return m;
+}
+
+/* GROSS-UP de los adicionales "líquidos imponibles" (Pato, 14-09-2026): para cada ítem se busca el
+   BRUTO tal que el líquido de la liquidación suba exactamente en el monto pedido (AFP, salud, AFC e
+   impuesto incluidos, con topes y tramos), por bisección sobre el motor único calcLiquidacion.
+   Muta inp (suma el bruto a otros_imponibles) y deja en el ítem monto=bruto y liquido_objetivo. */
+function aplicarLiquidosImponibles(inp, adic, ind) {
+  const lista = adic && Array.isArray(adic.liq_imp) ? adic.liq_imp : [];
+  if (!lista.length) return;
+  const liquidoCon = extra => calcLiquidacion({ ...inp, otros_imponibles: R(inp.otros_imponibles) + extra }, ind).liquido;
+  for (const it of lista) {
+    const objetivo = R(it.monto);
+    const base = liquidoCon(0);
+    let lo = objetivo, hi = objetivo * 2 + 1000;   // el bruto está entre el líquido y ~el doble
+    while (liquidoCon(hi) - base < objetivo && hi < objetivo * 10) hi *= 2;
+    while (hi - lo > 1) { const mid = Math.floor((lo + hi) / 2); if (liquidoCon(mid) - base >= objetivo) hi = mid; else lo = mid; }
+    const bruto = liquidoCon(lo) - base >= objetivo ? lo : hi;
+    it.liquido_objetivo = objetivo; it.monto = bruto;
+    inp.otros_imponibles = R(inp.otros_imponibles) + bruto;
+  }
 }
 
 /* Desmarcar un adicional permanente: deja de pagarse DESDE el mes indicado
@@ -1045,6 +1074,7 @@ const getMes = async (req, res) => {
         descuentos_detalle: descs.items[e.id_usuario] || [],
         apv: descs.apv[e.id_usuario] || 0,
       };
+      aplicarLiquidosImponibles(inp, adics[e.id_usuario], ind);   // aguinaldo "$70.000 líquidos" → bruto por persona
       return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo,
         banco_pago: e.banco_pago, tipo_cuenta_pago: e.tipo_cuenta_pago, num_cuenta_pago: e.num_cuenta_pago,
         licencia_dias: 30 - diasTrabajadosMes(mes, null, lics[e.id_usuario]),
@@ -1097,6 +1127,7 @@ const guardar = async (req, res) => {
         descuentos_detalle: descs.items[emp.id_usuario] || [],
         apv: descs.apv[emp.id_usuario] || 0,
       };
+      aplicarLiquidosImponibles(inp, adics[emp.id_usuario], ind);
       const calc = calcLiquidacion(inp, ind);
       calc.comisiones_mes = mesAnteriorDe(mes);   // queda en el snapshot: la liquidación dice de qué mes son
       await pool.query(
