@@ -36,6 +36,20 @@ async function generar(req, res) {
     let filas = Array.isArray(req.body?.filas) ? req.body.filas : [];
     if (!filas.length) return res.status(400).json({ success: false, data: null, error: 'No hay pagos para incluir' });
     if (plataforma === 'PARQUES') filas = await filasParques(filas);
+    /* Segregación de funciones ANTES de generar el archivo (Pato, 14-09-2026): generar el TEF
+       registra el pago, así que quien mandó a pago las operaciones no puede generarlo. El 14-09
+       JM mandó a pago 7 saldos y generó el TEF: el archivo salió pero el pago se rechazó y las
+       operaciones quedaron "enviadas" sin asiento. Mismo motor que «Confirmar pago». */
+    if (plataforma === 'SALDOS' || plataforma === 'COMISIONES') {
+      const pv = require('../../../postventa/src/controllers/postventa.controller');
+      const ids = filas.map(f => Number(f.id)).filter(Boolean);
+      if (ids.length) {
+        const choque = await pv.opsMandadasAPagoPor(ids, pv.loginDe(req.usuario), plataforma === 'SALDOS' ? 'SALDO' : 'COMISION');
+        if (choque.length)
+          return res.status(403).json({ success: false, data: null,
+            error: `No se puede generar el TEF: tú mandaste a pago ${choque.length === 1 ? 'la operación' : 'las operaciones'} ${choque.join(', ')} y el archivo registra el pago. Debe generarlo otra persona (segregación de funciones).` });
+      }
+    }
     const r = await tef.construirTEF({ plataforma, filas, usuario: req.usuario });
     res.json({ success: true, data: { archivo_base64: r.buffer.toString('base64'), nombre_archivo: r.nombre_archivo, cargos: r.cargos,
       monto_total: r.monto_total, excluidas: r.excluidas, divididas: r.divididas, cupo: r.cupo }, error: null });

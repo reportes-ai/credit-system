@@ -3248,5 +3248,6 @@ module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico
   // hooks para otros módulos (ordenes-pago paga la ODP de comisión; anulación/prepago desactivan la comisión)
   notificarPagoComisionDealer, notificarPagoSaldoDealer, idsGrupoFactura, marcarComisionAPagar, probarCorreos,
   contabilizarSaldoPrecio, contabilizarComision,   // el pago desde la ODP también debe generar su asiento
+  opsMandadasAPagoPor, loginDe,   // segregación de funciones: el TEF (tesorería) la valida ANTES de generar el archivo
   getFijosAutoFin, esAutoFin, montoSaldoOrden,
   datosSaldosAPagar, datosComisionesAPagar };   // colas de pago para el correo diario de ODPs pendientes
