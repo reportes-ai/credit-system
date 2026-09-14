@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.1 — Finiquito: botones Recalcular / Vista previa / Imprimir y cerrar (queda inmutable), "Abrir" desde la lista, texto legal paramétrico (Saludos y Certificados RRHH → Finiquito), reserva de derechos, monto en letras (rrhh-core) y anexo "cómo se calculó" (fuente de la base y meses). v3.0 — anexo variable: el factor de cada indicador aplica SOLO sobre la Comisión Base de las ops con ese seguro (cláusulas 5ª, 6ª y ejemplo 8ª), calidad sobre la base total · v2.9 — onboarding: dialog dlgVer que faltaba (Plantilla de tareas no abría), botones + Onboarding / + Offboarding separados · v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
+<!-- v3.2 — Finiquito: selector "Firma por el Empleador" (gerentes activos, por defecto el Gerente General), va al detalle y al documento. v3.1 — Finiquito: botones Recalcular / Vista previa / Imprimir y cerrar (queda inmutable), "Abrir" desde la lista, texto legal paramétrico (Saludos y Certificados RRHH → Finiquito), reserva de derechos, monto en letras (rrhh-core) y anexo "cómo se calculó" (fuente de la base y meses). v3.0 — anexo variable: el factor de cada indicador aplica SOLO sobre la Comisión Base de las ops con ese seguro (cláusulas 5ª, 6ª y ejemplo 8ª), calidad sobre la base total · v2.9 — onboarding: dialog dlgVer que faltaba (Plantilla de tareas no abría), botones + Onboarding / + Offboarding separados · v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -96,6 +96,9 @@
       <div class="fld"><label>Colaborador *</label><select id="fqU"></select></div>
       <div class="fld"><label>Causal *</label><select id="fqCausal"></select></div>
       <div class="fld"><label>Fecha de término *</label><input id="fqFecha" type="date"></div>
+    </div>
+    <div class="grid3">
+      <div class="fld"><label>Firma por el Empleador</label><select id="fqFirmante"></select></div>
     </div>
     <label style="font-size:.82rem;display:flex;align-items:center;gap:8px;margin-bottom:10px"><input type="checkbox" id="fqAvisado" style="width:auto"> Se avisó con 30 días de anticipación (no corresponde mes de aviso)</label>
     <button class="btn" onclick="fqCalcular()"><i class="bi bi-calculator me-1"></i>Calcular</button>
@@ -308,7 +311,7 @@ async function onbNuevaTarea(){
 }
 
 /* ── finiquitos ── */
-let FQ_INIT = false, FQ_CALC = null, FINIQ = [], FQ_ID = null, FQ_ROW = null, FQ_TEXTOS = {}, FQ_EMP = {};
+let FQ_INIT = false, FQ_CALC = null, FINIQ = [], FQ_ID = null, FQ_ROW = null, FQ_TEXTOS = {}, FQ_EMP = {}, FQ_FIRMANTES = [];
 async function fqInit(){
   FQ_INIT = true;
   const [jc, jf] = await Promise.all([
@@ -319,6 +322,9 @@ async function fqInit(){
   $('fqCausal').innerHTML = (jc?.data?.causales||[]).map(c=>`<option value="${esc(c.articulo)}">Art. ${esc(c.articulo)} — ${esc(c.glosa)}</option>`).join('');
   $('fqFecha').value = new Date().toISOString().slice(0,10);
   FQ_TEXTOS = jc?.data?.textos || {}; FQ_EMP = jc?.data?.empresa || {};
+  // Firma por el Empleador: gerentes activos, por defecto el Gerente General (primero de la lista)
+  FQ_FIRMANTES = jc?.data?.firmantes || [];
+  $('fqFirmante').innerHTML = FQ_FIRMANTES.map(f=>`<option value="${f.id_usuario}">${esc(f.nombre)} — ${esc(f.cargo||'')}</option>`).join('') || '<option value="">(sin gerentes activos)</option>';
   FINIQ = jf?.data?.finiquitos||[]; fqPintarLista();
 }
 async function fqRecargarLista(){
@@ -362,6 +368,7 @@ function fqAbrir(id){
   if (![...$('fqU').options].some(o=>o.value==String(f.id_usuario)))
     $('fqU').insertAdjacentHTML('afterbegin', `<option value="${f.id_usuario}">${esc(f.trabajador)} ${f.rut?'· '+esc(rutFmt(f.rut)):''}</option>`);
   $('fqU').value = String(f.id_usuario); $('fqCausal').value = f.causal; $('fqFecha').value = String(f.fecha_termino).slice(0,10); $('fqAvisado').checked = !!d.avisado;
+  if (d.firmante?.id_usuario) $('fqFirmante').value = String(d.firmante.id_usuario);
   fqPintar(d.calc || { base:d.base, anos_servicio:d.anos, vac_dias_habiles:d.vac_dias_habiles, vac_dias_corridos:d.vac_dias_corridos, colaborador:{ id_usuario:f.id_usuario, nombre:f.trabajador, rut:f.rut, cargo:f.cargo, fecha_ingreso:f.fecha_ingreso }, causal:{ articulo:f.causal, glosa:f.causal_glosa } },
     d, [`Finiquito #${f.id} guardado (v${f.version||1}). Puedes recalcular, ver la vista previa o imprimir y cerrar.`]);
   $('pFiniq').scrollIntoView({behavior:'smooth'});
@@ -405,7 +412,11 @@ function fqDetalle(){
     indemnizacion_anos:v('fqIA'), mes_aviso:v('fqMA'), vac_monto:v('fqVac'),
     vac_dias_habiles:d.vac_dias_habiles, vac_dias_corridos:d.vac_dias_corridos,
     otros_haberes:v('fqOtros'), descuentos:v('fqDesc'), prestamos_detalle:d.prestamos_detalle||[],
-    reserva:($('fqReserva')?.value||'').trim()||'Sin reserva de derechos.', calc:d };
+    reserva:($('fqReserva')?.value||'').trim()||'Sin reserva de derechos.', firmante:fqFirmante(), calc:d };
+}
+function fqFirmante(){
+  const f = FQ_FIRMANTES.find(x=>String(x.id_usuario)===$('fqFirmante').value);
+  return f ? { id_usuario:f.id_usuario, nombre:f.nombre, rut:f.rut||'', cargo:f.cargo||'' } : null;
 }
 function fqBody(){
   const d = FQ_CALC || {}, c = d.colaborador || {};
@@ -458,8 +469,9 @@ function finiquitoHTML(f, d, opts){
   const T = FQ_TEXTOS, total = Number(f.total)||0;
   const vars = { ciudad:T.finiq_ciudad||'Santiago', fecha:f.cerrado_at?fqFechaLarga(f.cerrado_at):HOY,
     empresa:esc(T.finiq_empresa||FQ_EMP.organizacion||'AUTOFÁCIL SpA'), rut_empresa:esc(T.finiq_rut_empresa||''),
-    representante:esc(T.finiq_representante||'____________________'),
-    rut_representante_txt:T.finiq_rut_representante?`, cédula de identidad N° ${esc(T.finiq_rut_representante)}`:'',
+    representante:esc(d.firmante?.nombre||T.finiq_representante||'____________________'),
+    rut_representante_txt:(d.firmante?.rut||T.finiq_rut_representante)?`, cédula de identidad N° ${esc(rutFmt(d.firmante?.rut||T.finiq_rut_representante))}`:'',
+    cargo_representante:esc(d.firmante?.cargo||''),
     domicilio:esc(FQ_EMP.direccion||'____________________'),
     trabajador:esc(f.trabajador), rut:esc(rutFmt(f.rut||'')), cargo:esc(f.cargo||''),
     fecha_ingreso:f.fecha_ingreso?fmtF(f.fecha_ingreso):'—', fecha_termino:fmtF(f.fecha_termino),
@@ -480,7 +492,7 @@ function finiquitoHTML(f, d, opts){
     <div style="text-align:center;font-weight:800;font-size:17px;margin-bottom:22px">FINIQUITO DE CONTRATO DE TRABAJO</div>
     ${p('finiq_encabezado')}${p('finiq_c1')}${p('finiq_c2')}${tabla}${p('finiq_c3')}${p('finiq_c4')}${p('finiq_c5')}${p('finiq_c6')}
     <div style="display:flex;justify-content:space-between;margin-top:80px;text-align:center;font-size:13px">
-      <div style="border-top:1px solid #333;padding-top:6px;width:44%">EMPLEADOR<br>${vars.empresa}${T.finiq_representante?`<br><span style="font-size:11.5px">p.p. ${vars.representante}</span>`:''}</div>
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">EMPLEADOR<br>${vars.empresa}${(d.firmante||T.finiq_representante)?`<br><span style="font-size:11.5px">p.p. ${vars.representante}${vars.cargo_representante?'<br>'+vars.cargo_representante:''}</span>`:''}</div>
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">TRABAJADOR<br>${vars.trabajador}<br><span style="font-size:11.5px">${vars.rut}</span></div>
     </div>
     ${T.finiq_pie?`<p style="margin-top:40px;font-size:12.5px">${fqTpl(T.finiq_pie, vars)}</p>`:''}

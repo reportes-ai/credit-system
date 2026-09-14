@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saludos y Certificados RRHH — Mantenedores</title>
-  <!-- v1.5 — card Finiquito: texto legal completo (encabezado, cláusulas 1ª-6ª, pie), datos de la empresa y anexo de cálculo. v1.4 navbar migrada al componente topnav -->
+  <!-- v1.6 — Finiquito: el firmante se elige en cada finiquito; el representante del mantenedor es respaldo. v1.5 — card Finiquito: texto legal completo (encabezado, cláusulas 1ª-6ª, pie), datos de la empresa y anexo de cálculo. v1.4 navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -91,7 +91,7 @@
       <div class="col-md-2"><div class="fld"><label>Representante legal</label><input id="finiq_representante"></div></div>
       <div class="col-md-2"><div class="fld"><label>RUT representante</label><input id="finiq_rut_representante"></div></div>
     </div>
-    <div class="hint" style="margin:-8px 0 12px">El <b>domicilio</b> sale de <a href="/mantenedores/credenciales/">Credenciales Corporativas</a> (fuente única).</div>
+    <div class="hint" style="margin:-8px 0 12px">El <b>domicilio</b> sale de <a href="/mantenedores/credenciales/">Credenciales Corporativas</a> (fuente única). El <b>firmante</b> se elige en cada finiquito entre los gerentes activos (por defecto el Gerente General); el representante de aquí solo se usa si no se elige ninguno.</div>
     <div class="fld"><label>Encabezado (comparecencia)</label><textarea id="finiq_encabezado" rows="3"></textarea></div>
     <div class="fld"><label>PRIMERO — servicios y causal</label><textarea id="finiq_c1" rows="2"></textarea></div>
     <div class="fld"><label>SEGUNDO — pago (después va la tabla de conceptos)</label><textarea id="finiq_c2" rows="2"></textarea></div>

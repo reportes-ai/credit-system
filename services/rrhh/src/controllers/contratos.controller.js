@@ -390,7 +390,12 @@ exports.finiquitoColaboradores = async (req, res) => {
     const [cfg] = await pool.query(`SELECT clave, valor FROM rh_config WHERE clave LIKE 'finiq\\_%'`);
     const textos = {}; cfg.forEach(c => textos[c.clave] = c.valor);
     const [[emp]] = await pool.query('SELECT organizacion, direccion FROM credenciales_empresa WHERE id=1').catch(() => [[null]]);
-    ok(res, { colaboradores: rows, causales, textos, empresa: emp || {} });
+    // Quién firma por el Empleador: gerentes activos; por defecto el Gerente General (Pato, 14-09-2026)
+    const [firmantes] = await pool.query(
+      `SELECT id_usuario, CONCAT_WS(' ', nombre, apellido) nombre, rut, cargo FROM usuarios
+        WHERE estado='activo' AND UPPER(COALESCE(cargo,'')) LIKE '%GERENTE%'
+        ORDER BY (UPPER(cargo) LIKE '%GERENTE GENERAL%') DESC, apellido, nombre`);
+    ok(res, { colaboradores: rows, causales, textos, empresa: emp || {}, firmantes });
   } catch (e) { fail(res, e.message); }
 };
 
