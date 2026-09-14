@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v2.7 — cuenta de depósito con prefijo "Banco" cuando el nombre no lo trae. v2.6 — la vista previa también muestra la cuenta de depósito (solo salía en las emitidas). v2.5 — liquidación más ancha (1000px, montos sin cortar), haberes sin paréntesis, más espacio para las firmas. v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
+  <!-- v2.8 — al emitir avisa la ODP a la Caja Los Andes generada. v2.7 — cuenta de depósito con prefijo "Banco" cuando el nombre no lo trae. v2.6 — la vista previa también muestra la cuenta de depósito (solo salía en las emitidas). v2.5 — liquidación más ancha (1000px, montos sin cortar), haberes sin paréntesis, más espacio para las firmas. v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -197,6 +197,10 @@ async function emitir(){
   const j = await (await fetch('/api/rrhh/remuneraciones/emitir', { method:'POST', headers:HJ, body:JSON.stringify({ mes }) })).json();
   if (!j.success) return alert(j.error);
   toast(`✓ ${j.data.emitidas} liquidaciones emitidas — enviándose por correo a cada colaborador`); cargar();
+  const oc = j.data.odp_caja;
+  if (oc && oc.numero) alert(oc.existente
+    ? `La orden de pago a la Caja Los Andes de ${mes} ya existía: ${oc.numero} por $${oc.total.toLocaleString('es-CL')}.`
+    : `Orden de pago a la Caja Los Andes emitida: ${oc.numero} por $${oc.total.toLocaleString('es-CL')} (${oc.personas} colaboradores, pago hasta el ${String(oc.vence).split('-').reverse().join('-')}).\n\nRevísala en Órdenes de Pago → Historial; si la ficha de la Caja no tiene banco y cuenta, complétalos en Base de Proveedores.`);
 }
 function verPrev(i){
   const r = DATA.filas[i];

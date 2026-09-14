@@ -1175,9 +1175,61 @@ const emitir = async (req, res) => {
     // Envío automático: cada colaborador recibe su liquidación al correo
     // (no bloquea la respuesta; Modo Desarrollo redirige solo, vía shared/mailer)
     enviarLiquidacionesCorreo(mes).catch(e => console.error('[remuneraciones correo]', e.message));
-    ok(res, { emitidas: r.affectedRows });
+    // Máxima 4: lo retenido a la Caja es una obligación con la Caja → orden de pago con detalle
+    let odpCaja = null;
+    try { odpCaja = await ordenPagoCaja(mes, req); } catch (e) { console.error('[remuneraciones ODP Caja]', e.message); }
+    ok(res, { emitidas: r.affectedRows, odp_caja: odpCaja });
   } catch (e) { console.error('[rrhh remuneraciones emitir]', e.message); fail(res, 'Error interno del servidor'); }
 };
+
+/* ── ORDEN DE PAGO A LA CAJA (Pato, 14-09-2026) ───────────────────────────────────
+   Al EMITIR las liquidaciones del mes, lo retenido a los colaboradores por la nómina de la Caja
+   (descuentos PERMANENTE / CAJA LOS ANDES de ese mes) se debe a la Caja y se paga el día 10 del
+   mes siguiente. Se emite UNA orden de pago al proveedor Caja Los Andes por el total, con el
+   detalle por colaborador (producto, código, cuota y monto) en las observaciones. Idempotente:
+   si ya existe una ODP vigente para ese mes no crea otra. */
+const CAJA_PROVEEDOR = { rut: '70016160-9', nombre: 'CAJA DE COMPENSACION DE ASIGNACION FAMILIAR DE LOS ANDES' };
+async function ordenPagoCaja(mes, req) {
+  const [items] = await pool.query(
+    `SELECT d.valor_cuota monto, d.detalle_texto, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut
+       FROM rh_descuentos d JOIN usuarios u ON u.id_usuario=d.id_usuario
+      WHERE d.estado='VIGENTE' AND d.tipo='PERMANENTE' AND d.subtipo=? AND d.mes_inicio=? ORDER BY nombre`, [CAJA_SUBTIPO, mes]);
+  if (!items.length) return null;
+  const total = items.reduce((s, x) => s + Math.round(Number(x.monto) || 0), 0);
+  if (!(total > 0)) return null;
+  const concepto = `Retenciones nómina Caja Los Andes — remuneraciones ${mes}`;
+  const [[ya]] = await pool.query("SELECT numero FROM ordenes_pago WHERE concepto=? AND estado<>'ANULADA' LIMIT 1", [concepto]);
+  if (ya) return { numero: ya.numero, total, existente: true };
+  // Proveedor Caja (se crea la primera vez; banco y cuenta se completan en su ficha)
+  let [[prov]] = await pool.query("SELECT id, nombre, rut, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE REPLACE(REPLACE(rut,'.',''),'-','')=? LIMIT 1", [CAJA_PROVEEDOR.rut.replace('-', '')]);
+  if (!prov) {
+    const [np] = await pool.query('INSERT INTO proveedores (rut, nombre, activo, comentario) VALUES (?,?,1,?)', [CAJA_PROVEEDOR.rut, CAJA_PROVEEDOR.nombre, 'Caja de compensación: retenciones de créditos sociales (nómina mensual). Creado al emitir remuneraciones.']);
+    prov = { id: np.insertId, nombre: CAJA_PROVEEDOR.nombre, rut: CAJA_PROVEEDOR.rut };
+  }
+  const { calcularDoc } = require('../../../ordenes-pago/src/controllers/ordenes-pago.controller');
+  const m = await calcularDoc('Nota de Cobro', 'BRUTO', total);   // sin impuesto: es un traspaso de retenciones
+  const [y, mm] = mes.split('-').map(Number);
+  const vence = `${mm === 12 ? y + 1 : y}-${String(mm === 12 ? 1 : mm + 1).padStart(2, '0')}-10`;
+  const co = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
+  const obs = `Generada automáticamente al EMITIR las liquidaciones de ${mes}. Pago hasta el ${vence.split('-').reverse().join('-')} (último día de pago de la Caja).\n` +
+    `Detalle por colaborador (${items.length}):\n` +
+    items.map(x => ` • ${x.nombre} (${x.rut || '—'}): ${x.detalle_texto || 'Crédito social'} — ${co(x.monto)}`).join('\n') +
+    `\nTOTAL retenido: ${co(total)}`;
+  const destino = prov.numero_cuenta ? [prov.tipo_cuenta || 'Cuenta Corriente', prov.numero_cuenta].join(' ') + (prov.banco ? ' · ' + prov.banco : '') : null;
+  const u = (req && req.usuario) || {};
+  const hoy = hoyChile();
+  const [r] = await pool.query(
+    `INSERT INTO ordenes_pago (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento, tratamiento,
+        monto_bruto, monto_neto, impuesto_pct, impuesto_monto, monto, destino, fecha_emision, fecha_documento, metodo_pago, estado, observaciones, id_usuario, usuario_nombre)
+     VALUES (?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?,'Transferencia','EMITIDA',?,?,?)`,
+    [prov.id, prov.nombre, prov.rut, concepto, 'Administrativos', 'Nota de Cobro', m.clase, m.bruto, m.neto, m.pct, m.imp, m.aPagar, destino, hoy, hoy, obs, u.id_usuario || null, nombreDe(u) || 'Sistema']);
+  const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
+  const { numero } = await emitirCorrelativo({ origen: 'GENERAL', origen_id: r.insertId, concepto: `${concepto} — Caja Los Andes`, monto: m.aPagar, id_usuario: u.id_usuario || null, usuario_nombre: nombreDe(u) || 'Sistema' });
+  await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
+  auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'orden_pago', entidad_id: String(r.insertId),
+    detalle: `ODP ${numero} a la Caja Los Andes por ${co(total)} (retenciones de ${items.length} colaboradores, remuneraciones ${mes}), generada al emitir las liquidaciones` });
+  return { numero, total, personas: items.length, vence };
+}
 
 /* ── Correo de liquidación a cada colaborador al emitir el mes ─────────────── */
 const MESES_TXT = ['', 'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
