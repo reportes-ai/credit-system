@@ -106,6 +106,13 @@ app.get('/js/uac-tier.js', (req, res) => {
   res.sendFile(path.join(__dirname, '../../services/creditos/src/utils/uac-tier.js'));
 });
 
+/* Lista de bancos para los selectores (fichas de dealer, cuentas bancarias): generada desde el
+   mantenedor Bancos de la Plaza (rh_catalogo), no un archivo estático — una sola lista (14-09-2026). */
+app.get('/js/bancos-cl.js', async (req, res) => {
+  try { res.type('application/javascript'); res.set('Cache-Control', 'no-cache'); res.send(await require('../../shared/bancos-cl').generarJS()); }
+  catch (e) { res.status(500).type('application/javascript').send('window.AF_BANCOS=[];window.AF_BANCO_CANON=()=>null;'); }
+});
+
 // Health check (monitoreo + Render): estado del server y ping a la BD
 app.get('/api/health', async (req, res) => {
   let db = false;

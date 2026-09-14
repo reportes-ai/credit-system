@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cuentas Bancarias — AutoFácil</title><!-- v2.5 - Nombre Interno con ayuda: identificador para el equipo; titular = Razon Social -->
+  <title>Cuentas Bancarias — AutoFácil</title><!-- v2.6 - datalist de bancos desde Bancos de la Plaza (/js/bancos-cl.js). v2.5 - Nombre Interno con ayuda: identificador para el equipo; titular = Razon Social -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -187,20 +187,9 @@
           <div class="col-md-6">
             <label class="form-label">Banco</label>
             <input type="text" class="form-control form-control-sm" id="fBanco" list="bancosList" placeholder="Ej: Banco de Chile">
-            <datalist id="bancosList">
-              <option value="Banco de Chile">
-              <option value="BancoEstado">
-              <option value="Santander">
-              <option value="BCI">
-              <option value="Itaú">
-              <option value="Scotiabank">
-              <option value="Security">
-              <option value="Falabella">
-              <option value="Ripley">
-              <option value="Consorcio">
-              <option value="BICE">
-              <option value="Internacional">
-            </datalist>
+            <datalist id="bancosList"><!-- se llena desde /js/bancos-cl.js (mantenedor Bancos de la Plaza) --></datalist>
+            <script src="/js/bancos-cl.js"></script>
+            <script>document.getElementById('bancosList').innerHTML = (window.AF_BANCOS||[]).map(b=>'<option value="'+b+'">').join('');</script>
           </div>
           <div class="col-md-6">
             <label class="form-label">Tipo de Cuenta</label>

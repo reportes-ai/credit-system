@@ -43,6 +43,7 @@ const guardar = async (req, res) => {
       n++;
     }
     if (malos.length) return res.status(400).json({ success: false, data: null, error: 'No se guardó: ' + malos.join(' · ') });
+    require('../../../../shared/bancos-cl').invalidar();   // /js/bancos-cl.js se regenera con la lista nueva
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'bancos', detalle: `Guardó Bancos de la Plaza (${n} bancos)` });
     res.json({ success: true, data: { guardados: n }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
