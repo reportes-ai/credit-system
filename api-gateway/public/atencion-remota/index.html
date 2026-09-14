@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.4 — Solicitudes: nombre, contacto y teléfono desde la ficha de Dealers por RUT; aviso si el correo pedido no es el de la ficha o el RUT no existe. v2.3 — la plantilla de invitación queda GUARDADA al enviar (correos_plantillas: lo editado persiste entre sesiones) · v2.2 — bitácora por cuenta (accesos + actividad del portal) -->
+<!-- v2.5 — Solicitudes: link Ver ficha (abre la ficha del dealer). v2.4 — Solicitudes: nombre, contacto y teléfono desde la ficha de Dealers por RUT; aviso si el correo pedido no es el de la ficha o el RUT no existe. v2.3 — la plantilla de invitación queda GUARDADA al enviar (correos_plantillas: lo editado persiste entre sesiones) · v2.2 — bitácora por cuenta (accesos + actividad del portal) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -771,6 +771,7 @@ async function cargarSolicitudes(){
       <div class="sol-card">
         <div class="sol-main">
           <div><b>${esc(s.razon_social||'Sin ficha en Dealers')}</b> <span class="sol-rut">${esc(s.rut||'')}</span>
+            ${s.ficha_id_dealer ? `<a href="/mantenedores/dealers/?ver=${s.ficha_id_dealer}" target="_blank" style="font-size:.8rem;margin-left:8px"><i class="bi bi-box-arrow-up-right me-1"></i>Ver ficha</a>` : ''}
             ${s.ficha_id_dealer && s.ficha_correo && String(s.ficha_correo).trim().toLowerCase()!==String(s.email||'').trim().toLowerCase()
               ? `<div style="font-size:.78rem;color:#b45309;margin-top:2px"><i class="bi bi-exclamation-triangle me-1"></i>El correo pedido no es el de la ficha (${esc(s.ficha_correo)}): por eso quedó en revisión.</div>` : ''}
             ${!s.ficha_id_dealer ? `<div style="font-size:.78rem;color:#b91c1c;margin-top:2px"><i class="bi bi-exclamation-triangle me-1"></i>Este RUT no existe en Dealers: crea la ficha antes de aprobar.</div>` : ''}

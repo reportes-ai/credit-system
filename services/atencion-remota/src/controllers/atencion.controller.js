@@ -517,6 +517,9 @@ const onboarding = async (req, res) => {
     const email = String((req.body && req.body.email) || '').toLowerCase().trim();
     const rut = normRut((req.body && req.body.rut) || '');
     if (!email || !rut) return res.status(400).json({ success: false, data: null, error: 'Email y RUT requeridos' });
+    // 14-09-2026: llegó una solicitud con "dealers.autofacilchile.com" como correo (sin @): no es un email.
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+      return res.status(400).json({ success: false, data: null, error: 'Escribe un correo válido (ej. nombre@empresa.cl)' });
 
     const [[dEmail]] = await pool.query(
       'SELECT id_dealer, rut, correo, nombre_razon, nombre_indexa FROM dealers WHERE LOWER(correo)=? LIMIT 1', [email]);
