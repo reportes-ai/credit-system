@@ -967,7 +967,14 @@ async function notificarEventoSaldo(evento, { op, id_seguimiento, ejecutivo, cla
     if (!ids.size) return;
     let dest = [...ids];
     try { dest = await require('../../../../shared/backups').expandirAlerta(dest); } catch (_) {}
-    const mensaje = def.mensaje.replace('{op}', op != null ? ('N° ' + op) : 'una operación');
+    /* Con el nombre del dealer (Pato, 14-09-2026): "N° 26090271 · CARLOS AGUILAR EIRL" — un aviso
+       por operación sin el dealer no dice nada a quien lo lee. Sale de postventa_seguimiento
+       (fuente única del nombre en Post Venta). */
+    let dealer = '';
+    if (id_seguimiento) {
+      try { const [[s]] = await pool.query('SELECT nombre_dealer FROM postventa_seguimiento WHERE id=?', [id_seguimiento]); dealer = String(s?.nombre_dealer || '').trim(); } catch (_) {}
+    }
+    const mensaje = def.mensaje.replace('{op}', op != null ? ('N° ' + op + (dealer ? ' · ' + dealer : '')) : 'una operación');
     /* La clave identifica el HECHO, nunca el instante: un `Date.now()` acá hacía
        que cada disparo naciera con clave nueva, así que el "ya existe" nunca daba
        y los avisos se apilaban repitiendo lo mismo. */
