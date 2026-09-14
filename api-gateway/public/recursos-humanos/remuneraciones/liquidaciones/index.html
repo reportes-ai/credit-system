@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v2.5 — liquidación más ancha (1000px, montos sin cortar), haberes sin paréntesis, más espacio para las firmas. v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
+  <!-- v2.6 — la vista previa también muestra la cuenta de depósito (solo salía en las emitidas). v2.5 — liquidación más ancha (1000px, montos sin cortar), haberes sin paréntesis, más espacio para las firmas. v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -200,7 +200,9 @@ async function emitir(){
 }
 function verPrev(i){
   const r = DATA.filas[i];
+  // La cuenta de depósito viene en la fila (ficha): la vista previa la mostraba solo en las emitidas (14-09-2026)
   pintarLiq({ mes: document.getElementById('mes').value, nombre: r.nombre, rut: r.rut, cargo: r.cargo,
+    banco_pago: r.banco_pago, tipo_cuenta_pago: r.tipo_cuenta_pago, num_cuenta_pago: r.num_cuenta_pago,
     estado: 'VISTA PREVIA — aún no emitida' }, r);
 }
 async function verLiq(id){
