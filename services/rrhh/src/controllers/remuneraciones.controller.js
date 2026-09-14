@@ -232,6 +232,11 @@ const CAUSALES_ADIC = {
   // Pato 08-09-2026: renta garantizada por un período (ej. ejecutivo nuevo) — imponibles,
   // se ingresan PERMANENTES con mes desde/hasta.
   'SUELDO ASEGURADO': 1, 'BONO ASEGURADO': 1, 'VARIABLE ASEGURADO': 1,
+  /* Pato 14-09-2026: COMISIÓN MÍNIMA GARANTIZADA — se ingresa por persona con mes de inicio,
+     mes de término y un mínimo por cada mes (una fila rh_adicionales por mes, monto = mínimo).
+     En la liquidación se paga SOLO la diferencia si las comisiones del mes (mes vencido) no
+     alcanzan el mínimo: aplicarGarantiaComision(). Si alcanzan, no aparece. */
+  'COMISIÓN MÍNIMA GARANTIZADA': 1,
   // Aguinaldos/bonos de temporada: imponibles (art. 41 CT). Se pueden asignar a TODO el personal.
   'AGUINALDO FIESTAS PATRIAS': 1, 'BONO NAVIDAD': 1, 'BONO VACACIONES': 1,   // 14-09-2026: "BONO FIESTAS PATRIAS" → aguinaldo
   'VIÁTICO': 0, 'COLACIÓN ADICIONAL': 0, 'MOVILIZACIÓN ADICIONAL': 0,
@@ -310,6 +315,24 @@ const crearAdicional = async (req, res) => {
        Quien ya tenga esa misma causal en el mes se salta, así se puede repetir sin duplicar. */
     const sel = String(b.id_usuario || '');
     const todos = sel === 'TODOS';
+    if (causal === 'COMISIÓN MÍNIMA GARANTIZADA') {
+      const idU = Number(sel);
+      if (!idU) return fail(res, 'La comisión mínima garantizada se ingresa por persona', 400);
+      const lista = Array.isArray(b.garantia) ? b.garantia.filter(g => /^\d{4}-\d{2}$/.test(g.mes || '')) : [];
+      if (!lista.length) return fail(res, 'Indica el mes de inicio, el de término y el mínimo garantizado de cada mes', 400);
+      if (lista.some(g => !(Math.round(Number(g.monto) || 0) > 0))) return fail(res, 'Todos los meses del período deben tener un mínimo mayor a $0', 400);
+      for (const g of lista) if (await mesEmitido(g.mes)) return fail(res, `Las remuneraciones de ${g.mes} ya fueron EMITIDAS: el período no puede incluir ese mes.`, 423);
+      const [dup] = await pool.query(`SELECT mes FROM rh_adicionales WHERE id_usuario=? AND causal=? AND mes IN (?)`, [idU, causal, lista.map(g => g.mes)]);
+      if (dup.length) return fail(res, `Esta persona ya tiene comisión mínima garantizada en ${dup.map(d => d.mes).join(', ')}: elimínala primero.`, 400);
+      let creados = 0;
+      for (const g of lista) {
+        const j = await crearUno({ ...b, mes: g.mes, monto: g.monto, hasta: undefined, permanente: 0, es_liquido: 0, no_imponible: 0 }, req, { silencioso: true });
+        if (j && j.ok) creados++; else if (j && j.error) return fail(res, j.error, j.status || 400);
+      }
+      const meses = lista.map(g => g.mes).sort();
+      auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', detalle: `Comisión mínima garantizada usuario ${idU}: ${meses[0]} → ${meses[meses.length - 1]} (${creados} meses): ${lista.map(g => g.mes + ' $' + Math.round(Number(g.monto)).toLocaleString('es-CL')).join(', ')}` });
+      return ok(res, { creados, meses });
+    }
     // GRUPO (Pato, 14-09-2026): ids marcados con casillas — mismo motor que TODOS, acotado a esas personas
     const grupo = sel === 'GRUPO' ? (Array.isArray(b.ids) ? b.ids.map(Number).filter(Boolean) : []) : null;
     if (grupo && !grupo.length) return fail(res, 'Marca al menos una persona del grupo', 400);
@@ -431,9 +454,30 @@ async function adicionalesDelMes(mes) {
   det.forEach(r => { if (!m[r.id_usuario]) return;
     const it = { id: r.id, nombre: titulo(r.causal === 'OTRO' && r.causal_texto ? r.causal_texto : r.causal),
       monto: Number(r.monto), imponible: !!r.imponible, liquido: !!r.es_liquido };
+    if (r.causal === 'COMISIÓN MÍNIMA GARANTIZADA') { it.garantia = true; it.minimo = Number(r.monto); }
     m[r.id_usuario].items.push(it);
     if (r.es_liquido && r.imponible) m[r.id_usuario].liq_imp.push(it); });
   return m;
+}
+
+/* COMISIÓN MÍNIMA GARANTIZADA (Pato, 14-09-2026): el ítem nace con monto = mínimo del mes; acá,
+   ya conocidas las comisiones del mes (inp.comisiones, mes vencido), se paga SOLO la diferencia
+   (mínimo − comisiones). Si las comisiones alcanzan el mínimo, el ítem se saca de la liquidación.
+   Muta inp (otros_imponibles / otros_no_imponibles ya traían el mínimo completo) y el ítem. */
+function aplicarGarantiaComision(inp, adic) {
+  if (!adic || !Array.isArray(adic.items)) return;
+  const comis = R(inp.comisiones);
+  for (const it of adic.items.filter(x => x.garantia)) {
+    const minimo = R(it.minimo), paga = Math.max(0, minimo - comis);
+    const rebaja = minimo - paga;
+    if (it.imponible && !it.liquido) inp.otros_imponibles = R(inp.otros_imponibles) - rebaja;
+    else if (!it.imponible) inp.otros_no_imponibles = R(inp.otros_no_imponibles) - rebaja;
+    it.monto = paga; it.comisiones_mes = comis;
+    it.nombre = `Comisión Mínima Garantizada ($${minimo.toLocaleString('es-CL')} − comisiones $${comis.toLocaleString('es-CL')})`;
+  }
+  adic.items = adic.items.filter(x => !x.garantia || x.monto > 0);
+  adic.liq_imp = (adic.liq_imp || []).filter(x => !x.garantia || x.monto > 0);
+  if (Array.isArray(inp.adicionales)) inp.adicionales = adic.items;
 }
 
 /* GROSS-UP de los adicionales "líquidos imponibles" (Pato, 14-09-2026): para cada ítem se busca el
@@ -1114,6 +1158,7 @@ const getMes = async (req, res) => {
         descuentos_detalle: descs.items[e.id_usuario] || [],
         apv: descs.apv[e.id_usuario] || 0,
       };
+      aplicarGarantiaComision(inp, adics[e.id_usuario]);          // comisión mínima garantizada: solo la diferencia
       aplicarLiquidosImponibles(inp, adics[e.id_usuario], ind);   // aguinaldo "$70.000 líquidos" → bruto por persona
       return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo, fecha_ingreso: isoDeBD(e.fecha_ingreso),
         banco_pago: e.banco_pago, tipo_cuenta_pago: e.tipo_cuenta_pago, num_cuenta_pago: e.num_cuenta_pago,
@@ -1167,6 +1212,7 @@ const guardar = async (req, res) => {
         descuentos_detalle: descs.items[emp.id_usuario] || [],
         apv: descs.apv[emp.id_usuario] || 0,
       };
+      aplicarGarantiaComision(inp, adics[emp.id_usuario]);
       aplicarLiquidosImponibles(inp, adics[emp.id_usuario], ind);
       const calc = calcLiquidacion(inp, ind);
       calc.comisiones_mes = mesAnteriorDe(mes);   // queda en el snapshot: la liquidación dice de qué mes son

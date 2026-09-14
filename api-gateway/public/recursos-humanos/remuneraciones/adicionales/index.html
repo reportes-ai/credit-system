@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adicionales de Remuneración — AutoFácil</title>
-  <!-- v1.8 — Colaborador "SOLO CONTRATO INDEFINIDO" / "SOLO PLAZO FIJO" (aguinaldo 70.000 / 35.000) + atajos por contrato en el grupo; pestaña Comisiones del mes (variable que entra en la liquidación, mes vencido, con estado de aprobación). v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <!-- v1.9 — COMISIÓN MÍNIMA GARANTIZADA: por persona, mes de inicio y término con un mínimo por cada mes; en la liquidación se paga solo la diferencia si las comisiones del mes no alcanzan el mínimo. v1.8 — Colaborador "SOLO CONTRATO INDEFINIDO" / "SOLO PLAZO FIJO" (aguinaldo 70.000 / 35.000) + atajos por contrato en el grupo; pestaña Comisiones del mes (variable que entra en la liquidación, mes vencido, con estado de aprobación). v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -87,6 +87,18 @@
         <button class="btn btn-sm btn-primary w-100" id="btnGuardar" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
       </div>
     </div>
+    <!-- COMISIÓN MÍNIMA GARANTIZADA: período (mes de arriba = inicio) + mínimo por cada mes.
+         En la liquidación se paga solo la diferencia si las comisiones del mes no alcanzan el mínimo. -->
+    <div id="wCMG" style="display:none" class="mt-2 p-2 rounded" >
+      <div class="d-flex align-items-center gap-2 flex-wrap small">
+        <b>Comisión mínima garantizada</b> · inicio <b id="cmgDesde"></b>
+        <label class="fw-semibold mb-0 ms-2" for="fCMGHasta">término</label>
+        <input type="month" id="fCMGHasta" class="form-control form-control-sm" style="width:auto" onchange="cmgGrid()">
+        <a href="#" class="ms-2" onclick="cmgCopiar();return false" title="Copia el Monto $ de arriba a todos los meses">usar el mismo monto en todos los meses</a>
+      </div>
+      <div id="cmgGrid" class="d-flex gap-2 flex-wrap mt-2"></div>
+      <div class="small text-muted mt-1"><i class="bi bi-info-circle me-1"></i>Se paga <b>solo si las comisiones del mes (mes vencido) no alcanzan el mínimo</b>, por la diferencia. Si las alcanzan, no aparece en la liquidación. Imponible.</div>
+    </div>
     <div class="small mt-2" id="heDetalle" style="color:#0141A2"></div>
     <div class="small text-muted mt-1" id="hintImp"></div>
     <div class="mt-2"><button class="btn btn-sm btn-outline-primary" onclick="nuevoConcepto()"><i class="bi bi-plus-circle me-1"></i>Concepto de Pago</button>
@@ -165,6 +177,22 @@ async function cargarComisiones(){
 }
 
 const esHE = () => fCausal.value === 'HORAS EXTRAS';
+const esCMG = () => fCausal.value === 'COMISIÓN MÍNIMA GARANTIZADA';
+const mesMas = (m, n) => { let [y, mm] = m.split('-').map(Number); mm += n; while (mm > 12) { mm -= 12; y++; } return `${y}-${String(mm).padStart(2,'0')}`; };
+function cmgGrid(){
+  const w = document.getElementById('wCMG'); w.style.display = esCMG() ? '' : 'none';
+  if (!esCMG()) return;
+  document.getElementById('cmgDesde').textContent = fMes.value;
+  const h = document.getElementById('fCMGHasta');
+  if (!h.value || h.value < fMes.value) h.value = mesMas(fMes.value, 2);
+  const prev = {}; document.querySelectorAll('#cmgGrid input').forEach(i => prev[i.dataset.mes] = i.value);
+  const meses = []; for (let m = fMes.value; m <= h.value && meses.length < 24; m = mesMas(m, 1)) meses.push(m);
+  document.getElementById('cmgGrid').innerHTML = meses.map(m => `<div><label class="small fw-semibold mb-0">${m.split('-').reverse().join('-')}</label>
+    <input class="form-control form-control-sm text-end" style="width:120px" inputmode="numeric" data-mes="${m}" value="${prev[m] ?? (document.getElementById('fMonto').value || '')}" placeholder="mínimo $" oninput="fmtMonto(this)"></div>`).join('');
+}
+function cmgCopiar(){ const v = document.getElementById('fMonto').value; document.querySelectorAll('#cmgGrid input').forEach(i => i.value = v); }
+function cmgLista(){ return [...document.querySelectorAll('#cmgGrid input')].map(i => ({ mes: i.dataset.mes, monto: parseInt(String(i.value).replace(/\D/g,''))||0 })); }
+document.addEventListener('change', e=>{ if (e.target.id==='fMes') cmgGrid(); });
 
 function causalUI(){
   const otro = fCausal.value==='OTRO';
@@ -176,6 +204,10 @@ function causalUI(){
   m.placeholder = esHE() ? 'lo calcula el sistema' : '0';
   if (!esHE()) { document.getElementById('fHoras').value=''; document.getElementById('heDetalle').innerHTML=''; }
   else calcHE();
+  // Comisión mínima garantizada: período + mínimo por mes; no admite líquido/permanente/grupo
+  ['fLiq','fNoImp','fPerm'].forEach(id => { const el = document.getElementById(id); el.disabled = esCMG(); if (esCMG()) el.checked = false; });
+  document.getElementById('wHasta').style.display = 'none';
+  cmgGrid();
   hintImp();
 }
 
@@ -329,6 +361,15 @@ async function guardar(){
     hasta: document.getElementById('fPerm').checked ? (document.getElementById('fHasta').value || undefined) : undefined,
     monto: montoVal(), horas: esHE() ? horas : undefined };
   if (!body.id_usuario) return alert('Elige el colaborador');
+  if (esCMG()) {
+    if (!/^\d+$/.test(body.id_usuario)) return alert('La comisión mínima garantizada se ingresa por persona');
+    body.garantia = cmgLista();
+    if (!body.garantia.length) return alert('Indica el mes de término del período');
+    const sin = body.garantia.filter(g => !g.monto).map(g => g.mes);
+    if (sin.length) return alert('Falta el mínimo garantizado de: ' + sin.join(', '));
+    body.monto = body.garantia[0].monto;
+    if (!confirm(`¿Garantizar a ${fColab.selectedOptions[0].textContent} una comisión mínima desde ${body.garantia[0].mes} hasta ${body.garantia[body.garantia.length-1].mes} (${body.garantia.length} meses)?\n\nSe paga solo la diferencia cuando las comisiones del mes no alcancen el mínimo.`)) return;
+  }
   if (body.hasta && body.hasta < body.mes) return alert('El mes "hasta" no puede ser anterior al mes desde');
   const porContrato = body.id_usuario.startsWith('CONTRATO:') ? body.id_usuario.slice(9) : null;
   if (body.id_usuario==='TODOS' || grupo || porContrato) {
@@ -340,12 +381,14 @@ async function guardar(){
   else if (!body.monto) return alert('Ingresa el monto');
   const r = await fetch('/api/rrhh/remuneraciones/adicionales',{method:'POST',headers:H,body:JSON.stringify(body)});
   const j = await r.json(); if (!j.success) return alert(j.error);
-  if (j.data && j.data.creados != null) alert(`Asignado a ${j.data.creados} personas:\n${j.data.personas.join(', ')}`);
+  if (j.data && j.data.meses) alert(`Comisión mínima garantizada creada para ${j.data.creados} meses: ${j.data.meses.join(', ')}`);
+  else if (j.data && j.data.creados != null) alert(`Asignado a ${j.data.creados} personas:\n${j.data.personas.join(', ')}`);
   // listo para el siguiente: limpia colaborador/monto/otro, mantiene mes y causal
   fColab.value=''; grupoTodos(false); grupoUI(); document.getElementById('fMonto').value=''; fOtro.value=''; document.getElementById('fLiq').checked=false;
   document.getElementById('fNoImp').checked=false; document.getElementById('fPerm').checked=false;
   document.getElementById('fHasta').value=''; document.getElementById('wHasta').style.display='none';
   document.getElementById('fHoras').value=''; document.getElementById('heDetalle').innerHTML='';
+  document.querySelectorAll('#cmgGrid input').forEach(i => i.value='');
   fColab.focus();
   cargar();
 }
