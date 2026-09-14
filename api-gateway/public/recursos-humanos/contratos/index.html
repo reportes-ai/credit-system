@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.2 — Finiquito: selector "Firma por el Empleador" (gerentes activos, por defecto el Gerente General), va al detalle y al documento. v3.1 — Finiquito: botones Recalcular / Vista previa / Imprimir y cerrar (queda inmutable), "Abrir" desde la lista, texto legal paramétrico (Saludos y Certificados RRHH → Finiquito), reserva de derechos, monto en letras (rrhh-core) y anexo "cómo se calculó" (fuente de la base y meses). v3.0 — anexo variable: el factor de cada indicador aplica SOLO sobre la Comisión Base de las ops con ese seguro (cláusulas 5ª, 6ª y ejemplo 8ª), calidad sobre la base total · v2.9 — onboarding: dialog dlgVer que faltaba (Plantilla de tareas no abría), botones + Onboarding / + Offboarding separados · v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
+<!-- v3.3 — Finiquito: el documento y el anexo son hojas carta separadas (pantalla y PDF). v3.2 — Finiquito: selector "Firma por el Empleador" (gerentes activos, por defecto el Gerente General), va al detalle y al documento. v3.1 — Finiquito: botones Recalcular / Vista previa / Imprimir y cerrar (queda inmutable), "Abrir" desde la lista, texto legal paramétrico (Saludos y Certificados RRHH → Finiquito), reserva de derechos, monto en letras (rrhh-core) y anexo "cómo se calculó" (fuente de la base y meses). v3.0 — anexo variable: el factor de cada indicador aplica SOLO sobre la Comisión Base de las ops con ese seguro (cláusulas 5ª, 6ª y ejemplo 8ª), calidad sobre la base total · v2.9 — onboarding: dialog dlgVer que faltaba (Plantilla de tareas no abría), botones + Onboarding / + Offboarding separados · v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,6 +7,9 @@
 <link href="/css/bootstrap-icons.css" rel="stylesheet">
 <style>
   :root { --navy:#0141A2; --navy-dark:#012d70; --bg:#f0f4f8; }
+  /* Finiquito: cada hoja es una carta separada (pantalla: hoja con sombra; impresión: salto de página) */
+  .fq-hoja { width:21.6cm; min-height:27.9cm; margin:0 auto 18px; padding:1.8cm 2cm; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.18); box-sizing:border-box; }
+  @media print { @page { size:letter; margin:0; } .fq-hoja { box-shadow:none; margin:0; page-break-after:always; break-after:page; } .fq-hoja:last-child { page-break-after:auto; break-after:auto; } }
   * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:#1e293b; }
   .main { max-width:1150px; margin:0 auto; padding:24px 20px 70px; }
   .banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy) 60%,#009AFE); border-radius:16px; color:#fff; padding:20px 26px; margin-bottom:18px; display:flex; gap:14px; align-items:center; }
@@ -112,11 +115,11 @@
     <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid #e5e7eb;background:#f8fafc;border-radius:14px 14px 0 0">
       <b><i class="bi bi-eye me-1"></i>Vista previa del finiquito</b>
       <div style="display:flex;gap:8px">
-        <button class="btn-g" onclick="window.print()" title="Imprime la vista previa marcada como BORRADOR"><i class="bi bi-printer me-1"></i>Imprimir borrador</button>
+        <button class="btn-g" onclick="fqImprimirBorrador()" title="Imprime la vista previa marcada como BORRADOR"><i class="bi bi-printer me-1"></i>Imprimir borrador</button>
         <button class="btn-g" onclick="$('fqPrev').close()"><i class="bi bi-x-lg me-1"></i>Cerrar</button>
       </div>
     </div>
-    <div id="fqPrevBody" style="overflow:auto;max-height:calc(92vh - 60px);padding:18px 0;background:#fff"></div>
+    <div id="fqPrevBody" style="overflow:auto;max-height:calc(92vh - 60px);padding:18px 0;background:#e5e7eb"></div>
   </dialog>
 
   <div class="panel" id="pAnexos" style="display:none">
@@ -448,8 +451,12 @@ function fqActual(){
 function fqVistaPrevia(){
   if (!FQ_CALC && !FQ_ROW) return alert('Calcula primero');
   const f = fqActual();
-  $('fqPrevBody').innerHTML = `<div style="font-family:Georgia,serif;max-width:750px;margin:0 auto;padding:0 30px 30px;color:#111;line-height:1.7;font-size:14px">${finiquitoHTML(f, fqDet(f), { borrador:!f.cerrado_at })}</div>`;
+  $('fqPrevBody').innerHTML = `<div style="font-family:Georgia,serif;color:#111;line-height:1.7;font-size:14px">${finiquitoHTML(f, fqDet(f), { borrador:!f.cerrado_at })}</div>`;
   $('fqPrev').showModal();
+}
+function fqImprimirBorrador(){
+  const f = fqActual();
+  bloqueDoc(finiquitoHTML(f, fqDet(f), { borrador:true }), `Finiquito BORRADOR ${nombreCorto(f.trabajador||'')}`, true);
 }
 async function fqImprimirCerrar(){
   if (!FQ_CALC && !FQ_ROW) return alert('Calcula primero');
@@ -488,7 +495,7 @@ function finiquitoHTML(f, d, opts){
     </table>`;
   const p = k => T[k] ? `<p>${fqTpl(T[k], vars)}</p>` : '';
   const marca = opts.borrador ? `<div style="text-align:center;color:#b91c1c;font-weight:800;letter-spacing:2px;border:2px dashed #b91c1c;padding:4px;margin-bottom:12px">VISTA PREVIA — BORRADOR (no cerrado)</div>` : '';
-  let html = `${cabecera}${marca}
+  let html = `<div class="fq-hoja">${cabecera}${marca}
     <div style="text-align:center;font-weight:800;font-size:17px;margin-bottom:22px">FINIQUITO DE CONTRATO DE TRABAJO</div>
     ${p('finiq_encabezado')}${p('finiq_c1')}${p('finiq_c2')}${tabla}${p('finiq_c3')}${p('finiq_c4')}${p('finiq_c5')}${p('finiq_c6')}
     <div style="display:flex;justify-content:space-between;margin-top:80px;text-align:center;font-size:13px">
@@ -496,7 +503,7 @@ function finiquitoHTML(f, d, opts){
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">TRABAJADOR<br>${vars.trabajador}<br><span style="font-size:11.5px">${vars.rut}</span></div>
     </div>
     ${T.finiq_pie?`<p style="margin-top:40px;font-size:12.5px">${fqTpl(T.finiq_pie, vars)}</p>`:''}
-    <p style="font-size:11px;color:#777;margin-top:20px">Generado por el Business Suite${f.id?` — finiquito #${f.id}${f.version&&f.version>1?' v'+f.version:''}`:''}${f.cerrado_at?` — cerrado el ${fmtF(f.cerrado_at)} por ${esc(f.cerrado_por||'')}`:''}. Debe ratificarse ante notario o inspección del trabajo.</p>`;
+    <p style="font-size:11px;color:#777;margin-top:20px">Generado por el Business Suite${f.id?` — finiquito #${f.id}${f.version&&f.version>1?' v'+f.version:''}`:''}${f.cerrado_at?` — cerrado el ${fmtF(f.cerrado_at)} por ${esc(f.cerrado_por||'')}`:''}. Debe ratificarse ante notario o inspección del trabajo.</p></div>`;
   if (T.finiq_anexo === '1') html += fqAnexoHTML(f, d, vars);
   return html;
 }
@@ -508,7 +515,7 @@ function fqAnexoHTML(f, d, vars){
   const tr = (a,b) => `<tr><td style="padding:3px 0">${a}</td><td style="text-align:right;white-space:nowrap">${b}</td></tr>`;
   const sec = (t, filas) => `<div style="font-weight:800;margin:14px 0 4px;font-size:13px">${t}</div><table style="width:100%;max-width:560px;font-size:12.5px">${filas}</table>`;
   const anosCalc = d.meses_servicio!=null ? `${d.meses_servicio} meses → ${d.anos||0} año/s (fracción ≥ 6 meses = 1 año${d.tope_anos?`, tope ${d.tope_anos} años`:''})` : `${d.anos||0} año/s`;
-  return `<div style="page-break-before:always">${cabecera}
+  return `<div class="fq-hoja">${cabecera}
     <div style="text-align:center;font-weight:800;font-size:15px;margin-bottom:6px">ANEXO — DETALLE DEL CÁLCULO DEL FINIQUITO</div>
     <div style="text-align:center;font-size:12.5px;color:#555;margin-bottom:14px">${vars.trabajador} · ${vars.rut} · término ${vars.fecha_termino}</div>
     ${sec('1. Base de remuneración', (meses.length?meses.map(m=>tr('Imponible '+mesTxt(m.mes), CLP(m.imponible))).join(''):'') + tr('<i>'+fuente+'</i>','') + tr('<b>Base (promedio)</b>','<b>'+CLP(d.base||0)+'</b>')
@@ -523,7 +530,7 @@ function fqAnexoHTML(f, d, vars){
 }
 function imprimirFiniquito(id){
   const f = FINIQ.find(x=>x.id===id); if(!f) return;
-  bloqueDoc(finiquitoHTML(f, fqDet(f), { borrador:!f.cerrado_at }), `Finiquito ${nombreCorto(f.trabajador)}`);
+  bloqueDoc(finiquitoHTML(f, fqDet(f), { borrador:!f.cerrado_at }), `Finiquito ${nombreCorto(f.trabajador)}`, true);
 }
 function pintar(){
   $('tbCartas').innerHTML = CARTAS.map(c=>{
@@ -688,9 +695,11 @@ const HOY = new Date().toLocaleDateString('es-CL',{day:'numeric',month:'long',ye
 /* nombreArchivo: al guardar como PDF el navegador propone el TÍTULO de la página, así que
    se cambia momentáneamente para que el archivo salga con un nombre útil (ej: "Anexo
    Variable Hans Vargas 08-06-2026") en vez de "Contratos y Cartas Oferta — AutoFácil". */
-function bloqueDoc(inner, nombreArchivo){
+function bloqueDoc(inner, nombreArchivo, hojas){
   const cont = $('docPrint');
-  cont.innerHTML = `<div style="font-family:Georgia,serif;max-width:750px;margin:0 auto;padding:0 40px 40px;color:#111;line-height:1.7;font-size:14px">${inner}</div>`;
+  cont.innerHTML = hojas
+    ? `<div style="font-family:Georgia,serif;color:#111;line-height:1.7;font-size:14px">${inner}</div>`   // el documento ya viene en hojas carta (.fq-hoja)
+    : `<div style="font-family:Georgia,serif;max-width:750px;margin:0 auto;padding:0 40px 40px;color:#111;line-height:1.7;font-size:14px">${inner}</div>`;
   cont.style.display = 'block';
   const imgs = [...cont.querySelectorAll('img')];
   const listas = imgs.map(im => (im.complete && im.naturalWidth)
