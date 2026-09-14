@@ -184,6 +184,7 @@ router.post('/remuneraciones/adicionales/conceptos', verifyToken, requireFunc('r
 router.post('/remuneraciones/descuentos/conceptos',  verifyToken, requireFunc('rh_remuneraciones'), rem.crearConceptoDesc);
 router.get('/remuneraciones/descuentos',         verifyToken, requireFunc('rh_remuneraciones'), rem.getDescuentos);
 router.post('/remuneraciones/descuentos',        verifyToken, requireFunc('rh_remuneraciones'), rem.crearDescuento);
+router.post('/remuneraciones/descuentos/importar-caja', verifyToken, requireFunc('rh_remuneraciones'), rem.importarNominaCaja);   // nómina de retenciones de la Caja (Excel)
 router.post('/remuneraciones/descuentos/:id/convenio', verifyToken, requireFunc('rh_remuneraciones'), rem.subirConvenioDescuento);
 router.post('/remuneraciones/descuentos/:id/anular', verifyToken, requireFunc('rh_remuneraciones'), rem.anularDescuento);
 router.get('/remuneraciones/catalogo',        verifyToken, rem.getCatalogo);   // AFP/Isapres/Bancos con código: selectores de la ficha (cualquier usuario logueado)

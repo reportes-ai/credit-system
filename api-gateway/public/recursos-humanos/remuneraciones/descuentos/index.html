@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
+  <!-- v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -89,8 +89,13 @@
       </div>
     </div>
     <div class="preview mt-3" id="prev"></div>
-    <div class="mt-2"><button class="btn btn-sm btn-outline-primary" onclick="nuevoConceptoDesc()"><i class="bi bi-plus-circle me-1"></i>Concepto Descuento</button>
-      <span class="small text-muted ms-2">agrega un concepto permanente nuevo a la lista (queda disponible para siempre)</span></div>
+    <div class="mt-2 d-flex align-items-center gap-2 flex-wrap"><button class="btn btn-sm btn-outline-primary" onclick="nuevoConceptoDesc()"><i class="bi bi-plus-circle me-1"></i>Concepto Descuento</button>
+      <span class="small text-muted">agrega un concepto permanente nuevo a la lista (queda disponible para siempre)</span>
+      <span class="ms-auto"></span>
+      <input type="file" id="fCaja" accept=".xlsx,.xls" style="display:none" onchange="importarCaja(this)">
+      <button class="btn btn-sm btn-success" onclick="document.getElementById('fCaja').click()" title="Excel 'Retenciones_credito_AAAAMM.xlsx' que manda la Caja cada mes"><i class="bi bi-file-earmark-arrow-up me-1"></i>Importar nómina Caja</button></div>
+    <!-- Vista previa de la nómina de la Caja (Pato, 14-09-2026): se confirma después de revisar -->
+    <div id="cajaPrev" class="mt-3" style="display:none"></div>
     <div id="listaIng" class="mt-3"></div>
   </div>
 
@@ -208,6 +213,41 @@ function preview(){
 }
 // Etiqueta de origen para las listas: "UF 2,5" cuando el descuento no es en pesos
 const origenTxt = d => (d.moneda && d.moneda!=='CLP' && d.valor_cuota_origen!=null) ? `<span class="pill" style="background:#ecfeff;color:#0e7490" title="Se convierte cada mes al ${d.moneda} del mes">${fmtO(d.valor_cuota_origen, d.moneda)}</span>` : '';
+
+/* Nómina de retenciones de la Caja: 1) se lee y previsualiza, 2) se confirma. Reemplaza los de la Caja del mismo mes. */
+let CAJA_B64 = null;
+async function importarCaja(inp){
+  const f = inp.files && inp.files[0]; if (!f) return; inp.value = '';
+  CAJA_B64 = await new Promise((ok,ko)=>{ const fr=new FileReader(); fr.onload=()=>ok(String(fr.result).split(',')[1]); fr.onerror=ko; fr.readAsDataURL(f); });
+  const box = document.getElementById('cajaPrev'); box.style.display=''; box.innerHTML = '<div class="text-muted small">Leyendo la nómina…</div>';
+  const r = await fetch('/api/rrhh/remuneraciones/descuentos/importar-caja',{method:'POST',headers:H,body:JSON.stringify({ base64: CAJA_B64, confirmar: 0 })});
+  const j = await r.json(); if (!j.success) { box.innerHTML = `<div class="alert alert-danger py-2 small mb-0">${esc(j.error||'No se pudo leer')}</div>`; return; }
+  const d = j.data; const mal = d.filas.filter(x=>x.problema).length;
+  const puede = !d.bloqueado && d.cuadra && !mal;
+  box.innerHTML = `<div class="panel" style="border:2px solid ${puede?'#16a34a':'#f59e0b'};margin:0">
+    <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
+      <b><i class="bi bi-bank me-1"></i>Nómina de la Caja — período <span class="num">${esc(d.mes)}</span></b>
+      <span class="small">${d.n} beneficiario(s) · suma <b>$${fmt(d.suma)}</b>${d.total_archivo!=null?` · TOTAL del archivo $${fmt(d.total_archivo)} ${d.cuadra?'<span class="text-success">✓ cuadra</span>':'<span class="text-danger">✗ no cuadra</span>'}`:''}</span>
+      ${d.bloqueado?'<span class="pill ANULADO"><i class="bi bi-lock-fill"></i> MES EMITIDO</span>':''}
+      <span class="ms-auto"></span>
+      <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('cajaPrev').style.display='none'">Cancelar</button>
+      <button class="btn btn-sm btn-success" ${puede?'':'disabled'} onclick="confirmarCaja('${esc(d.mes)}')"><i class="bi bi-check-lg me-1"></i>Confirmar ${d.n} descuento(s)</button>
+    </div>
+    <table><thead><tr><th>RUT</th><th>Nombre en la nómina</th><th>Colaborador</th><th>Producto</th><th>Código</th><th>Cuota</th><th class="text-right">Valor</th><th>Obs.</th></tr></thead><tbody>
+      ${d.filas.map(x=>`<tr style="${x.problema?'background:#fef2f2':''}"><td>${esc(x.rut)}</td><td>${esc(x.nombre)}</td><td>${x.problema?`<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${esc(x.problema)}</span>`:esc(x.colaborador)}</td><td>${esc(x.producto)}</td><td>${esc(x.codigo)}</td><td>${esc(x.cuota)}</td><td class="text-right num">$${fmt(x.valor)}</td><td class="small text-muted">${esc(x.obs||'')}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="small text-muted mt-2">Cada fila queda como descuento <b>Permanente / ${esc(d.subtipo)}</b> de una sola cuota en la remuneración de ${esc(d.mes)} (el mes siguiente se importa la nómina nueva). Si ya había descuentos de la Caja en ese mes, se reemplazan.</div>
+  </div>`;
+}
+async function confirmarCaja(mes){
+  if (!CAJA_B64) return;
+  if (!confirm(`Se crearán los descuentos de la Caja para la remuneración de ${mes} (reemplazando los que ya hubiera de ese mes). ¿Continuar?`)) return;
+  const r = await fetch('/api/rrhh/remuneraciones/descuentos/importar-caja',{method:'POST',headers:H,body:JSON.stringify({ base64: CAJA_B64, confirmar: 1, mes })});
+  const j = await r.json(); if (!j.success) return alert(j.error||'No se pudo importar');
+  document.getElementById('cajaPrev').style.display='none'; CAJA_B64 = null;
+  alert(`✓ ${j.data.creados} descuento(s) de la Caja cargados para ${mes}${j.data.reemplazados?` (${j.data.reemplazados} anteriores reemplazados)`:''}`);
+  fMes.value = mes; cargar();
+}
 
 async function cargar(){
   const r = await fetch('/api/rrhh/remuneraciones/descuentos?mes='+fMes.value,{headers:H});

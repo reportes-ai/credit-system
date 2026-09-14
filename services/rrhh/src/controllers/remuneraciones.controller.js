@@ -647,6 +647,88 @@ const anularDescuento = async (req, res) => {
   } catch (e) { fail(res, 'Error interno del servidor'); }
 };
 
+/* ── Importar NÓMINA MENSUAL DE RETENCIONES de la Caja (Pato, 14-09-2026) ──────────────
+   Cada mes la Caja (Los Andes) manda el Excel "Retenciones_credito_AAAAMM.xlsx": por colaborador,
+   producto (Crédito Social / CCAF La Araucana), código de crédito, cuota N/M y valor a descontar;
+   los montos cambian mes a mes. Lector DETERMINISTA (formato fijo: encabezado con "R.U.T." y
+   "Valor", fila TOTAL al final) — sin IA: en descuentos de sueldo no se puede errar ni por $1.
+   Cada fila se convierte en un descuento PERMANENTE / CAJA LOS ANDES de UNA cuota en el mes del
+   período (cuotas=1 + mes_inicio = período: cuotaEnMes lo aplica solo ese mes). Reimportar el
+   mismo mes reemplaza (anula los de ese mes y crea los nuevos). Con confirmar=0 solo previsualiza. */
+const CAJA_SUBTIPO = 'CAJA LOS ANDES';
+const MESES_ES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 };
+function leerNominaCaja(buffer) {
+  const XLSX = require('xlsx');
+  const wb = XLSX.read(buffer, { type: 'buffer' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const filas = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+  const txt = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+  const sinAc = s => txt(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+  // Período: celda "Agosto de 2026" (bajo "Período")
+  let periodo = null;
+  for (const f of filas) for (const c of f) {
+    const m = /^([a-záéíóú]+)\s+de\s+(\d{4})$/i.exec(txt(c));
+    if (m && MESES_ES[m[1].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')]) { periodo = `${m[2]}-${String(MESES_ES[m[1].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')]).padStart(2, '0')}`; break; }
+  }
+  // Encabezado: fila que contiene "R.U.T." y "Valor"
+  const iH = filas.findIndex(f => f.some(c => /R\.?U\.?T/i.test(txt(c))) && f.some(c => /VALOR/i.test(sinAc(c))));
+  if (iH < 0) return { error: 'No encontré el encabezado (R.U.T. / Valor a Descontar): ¿es la nómina de retenciones de la Caja?' };
+  const H = filas[iH].map(sinAc);
+  const col = re => H.findIndex(h => re.test(h));
+  const cRut = col(/R\.?U\.?T/), cNom = col(/NOMBRE/), cProd = col(/PRODUCTO/), cCod = col(/CODIGO/), cCuo = col(/^CUOTA/), cVal = col(/VALOR A DESCONTAR|^VALOR/), cObs = col(/^OBS/);
+  if (cRut < 0 || cVal < 0) return { error: 'Faltan columnas R.U.T. o Valor a Descontar' };
+  const num = v => { if (v == null || v === '') return 0; if (typeof v === 'number') return Math.round(v); const s = String(v).replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, ''); return Math.round(Number(s) || 0); };
+  const items = []; let total = null;
+  for (let i = iH + 1; i < filas.length; i++) {
+    const f = filas[i];
+    if (f.some(c => /^TOTAL/i.test(txt(c)))) { const v = f.slice().reverse().find(c => num(c) > 0); total = num(v); break; }
+    const rut = txt(f[cRut]).replace(/\./g, '').toUpperCase();
+    if (!/^\d{6,9}-[\dK]$/.test(rut)) { if (f.every(c => c == null || txt(c) === '')) continue; else continue; }
+    items.push({ rut, nombre: txt(f[cNom]), producto: txt(f[cProd]), codigo: txt(f[cCod]), cuota: txt(f[cCuo]), valor: num(f[cVal]), obs: cObs >= 0 ? txt(f[cObs]) : '' });
+  }
+  return { periodo, items, total, suma: items.reduce((s, x) => s + x.valor, 0) };
+}
+
+const importarNominaCaja = async (req, res) => {
+  try {
+    const u = req.usuario || {}; const b = req.body || {};
+    if (!b.base64) return fail(res, 'Adjunta el Excel de la Caja', 400);
+    const buffer = Buffer.from(String(b.base64), 'base64');
+    if (buffer.length > 5 * 1024 * 1024) return fail(res, 'El archivo supera 5 MB', 400);
+    const lect = leerNominaCaja(buffer);
+    if (lect.error) return fail(res, lect.error, 400);
+    const mes = /^\d{4}-\d{2}$/.test(b.mes || '') ? b.mes : lect.periodo;
+    if (!mes) return fail(res, 'No pude leer el período de la nómina; indícalo a mano', 400);
+    if (!lect.items.length) return fail(res, 'La nómina no trae filas de beneficiarios', 400);
+    const normR = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
+    const [gente] = await pool.query("SELECT id_usuario, rut, TRIM(CONCAT_WS(' ', nombre, apellido)) nombre, estado FROM usuarios WHERE rut IS NOT NULL AND rut<>''");
+    const porRut = new Map(gente.map(g => [normR(g.rut), g]));
+    const filas = lect.items.map(it => {
+      const g = porRut.get(normR(it.rut));
+      return { ...it, id_usuario: g ? g.id_usuario : null, colaborador: g ? g.nombre : null, activo: g ? g.estado === 'activo' : false,
+        problema: !g ? 'RUT no está en Usuarios' : g.estado !== 'activo' ? 'Colaborador inactivo' : !(it.valor > 0) ? 'Valor en cero' : null };
+    });
+    const bloqueado = await mesEmitido(mes);
+    const cuadra = lect.total == null || lect.total === lect.suma;
+    const resumen = { mes, total_archivo: lect.total, suma: lect.suma, cuadra, n: filas.length, ok: filas.filter(f => !f.problema).length, bloqueado, subtipo: CAJA_SUBTIPO };
+    if (!b.confirmar) return ok(res, { ...resumen, filas });
+    if (bloqueado) return fail(res, `El mes ${mes} ya está emitido: no se pueden cambiar sus descuentos`, 400);
+    if (!cuadra) return fail(res, `La suma de las filas ($${lect.suma.toLocaleString('es-CL')}) no cuadra con el TOTAL del archivo ($${Number(lect.total).toLocaleString('es-CL')})`, 400);
+    if (filas.some(f => f.problema)) return fail(res, 'Hay filas con problema (RUT sin colaborador o inactivo): corrígelas antes de confirmar', 400);
+    await pool.query('INSERT INTO rh_conceptos_desc (nombre, creado_por) VALUES (?,?) ON DUPLICATE KEY UPDATE activo=1', [CAJA_SUBTIPO, nombreDe(u)]).catch(() => {});
+    // Reemplazo del mes: se anulan los de la Caja de ese período y se crean los nuevos
+    const [ant] = await pool.query("UPDATE rh_descuentos SET estado='ANULADO', anulado_por=?, anulado_at=NOW() WHERE estado='VIGENTE' AND tipo='PERMANENTE' AND subtipo=? AND mes_inicio=?", [nombreDe(u) + ' (reimportación nómina Caja)', CAJA_SUBTIPO, mes]);
+    for (const f of filas) {
+      const detalle = [f.producto, f.codigo, f.cuota && f.cuota !== '0/0' ? 'cuota ' + f.cuota : null, f.obs && f.obs.trim() ? 'obs ' + f.obs.trim() : null].filter(Boolean).join(' · ').slice(0, 200);
+      await pool.query(
+        `INSERT INTO rh_descuentos (id_usuario, tipo, subtipo, detalle_texto, monto_total, cuotas, valor_cuota, mes_inicio, creado_por, moneda) VALUES (?,?,?,?,?,1,?,?,?,'CLP')`,
+        [f.id_usuario, 'PERMANENTE', CAJA_SUBTIPO, detalle, f.valor, f.valor, mes, nombreDe(u) + ' (nómina Caja)']);
+    }
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'rrhh', entidad: 'descuento', detalle: `Importó la nómina de retenciones de la Caja ${mes}: ${filas.length} descuento(s) por $${lect.suma.toLocaleString('es-CL')}${ant.affectedRows ? ` (reemplazó ${ant.affectedRows} anteriores del mes)` : ''}` });
+    ok(res, { ...resumen, creados: filas.length, reemplazados: ant.affectedRows });
+  } catch (e) { console.error('[rrhh importar nomina caja]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 // Suma de cuotas de descuento del mes por usuario → alimenta el libro
 async function descuentosDelMes(mes) {
   const [rows] = await pool.query("SELECT * FROM rh_descuentos WHERE estado='VIGENTE'");
@@ -1730,4 +1812,4 @@ async function getNominaBanco(req, res) {
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   permanenteAdicional, crearConceptoAdic, crearConceptoDesc,
-  getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
+  getDescuentos, crearDescuento, anularDescuento, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
