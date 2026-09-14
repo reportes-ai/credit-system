@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v2.8 — al emitir avisa la ODP a la Caja Los Andes generada. v2.7 — cuenta de depósito con prefijo "Banco" cuando el nombre no lo trae. v2.6 — la vista previa también muestra la cuenta de depósito (solo salía en las emitidas). v2.5 — liquidación más ancha (1000px, montos sin cortar), haberes sin paréntesis, más espacio para las firmas. v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
+  <!-- v2.9 — cabecera con Fecha de contrato (en vez de AFP/Salud), descuentos "Salud <isapre>" y "Adicional <isapre>", total descuentos en negro. v2.8 — al emitir avisa la ODP a la Caja Los Andes generada. v2.7 — cuenta de depósito con prefijo "Banco" cuando el nombre no lo trae. v2.6 — la vista previa también muestra la cuenta de depósito (solo salía en las emitidas). v2.5 — liquidación más ancha (1000px, montos sin cortar), haberes sin paréntesis, más espacio para las firmas. v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -206,7 +206,7 @@ function verPrev(i){
   const r = DATA.filas[i];
   // La cuenta de depósito viene en la fila (ficha): la vista previa la mostraba solo en las emitidas (14-09-2026)
   pintarLiq({ mes: document.getElementById('mes').value, nombre: r.nombre, rut: r.rut, cargo: r.cargo,
-    banco_pago: r.banco_pago, tipo_cuenta_pago: r.tipo_cuenta_pago, num_cuenta_pago: r.num_cuenta_pago,
+    banco_pago: r.banco_pago, tipo_cuenta_pago: r.tipo_cuenta_pago, num_cuenta_pago: r.num_cuenta_pago, fecha_ingreso: r.fecha_ingreso,
     estado: 'VISTA PREVIA — aún no emitida' }, r);
 }
 async function verLiq(id){
@@ -266,7 +266,7 @@ function pintarLiq(l, d){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 26px;padding:14px 24px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:.8rem">
         <div>${infoTd('Colaborador', esc(l.nombre))}${infoTd('RUT', esc(fmtRut(l.rut)))}${infoTd('Cargo', esc(l.cargo||'—'))}</div>
-        <div>${infoTd('Contrato', esc(d.tipo_contrato||'—'))}${infoTd('AFP / Salud', esc(d.afp||'—')+' · '+esc(d.salud||'—'))}${infoTd('Días trabajados', (d.dias??30)+' de 30')}</div>
+        <div>${infoTd('Contrato', esc(d.tipo_contrato||'—'))}${infoTd('Fecha de contrato', l.fecha_ingreso ? String(l.fecha_ingreso).slice(0,10).split('-').reverse().join('-') : '—')}${infoTd('Días trabajados', (d.dias??30)+' de 30')}</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;align-items:start">
         <table style="width:100%;border-collapse:collapse;font-size:.8rem;border-right:1px solid #e2e8f0">
@@ -283,12 +283,12 @@ function pintarLiq(l, d){
         <table style="width:100%;border-collapse:collapse;font-size:.8rem">
           ${cab('DESCUENTOS')}
           ${fila('AFP '+(d.afp||'')+' ('+String(d.afp_pct||0).replace('.',',')+'%)', d.desc_afp)}
-          ${fila('Salud ('+String(d.salud_pct||7).replace('.',',')+'%)', d.desc_salud)}
-          ${fila('Adicional Isapre (plan '+String(d.plan_isapre_uf||'').replace('.',',')+' UF)', d.desc_salud_adicional)}
+          ${fila('Salud '+esc(d.salud||'')+' ('+String(d.salud_pct||7).replace('.',',')+'%)', d.desc_salud)}
+          ${fila('Adicional '+esc(d.salud||'Isapre')+' (plan '+String(d.plan_isapre_uf||'').replace('.',',')+' UF)', d.desc_salud_adicional)}
           ${fila('Seguro cesantía AFC ('+String(d.afc_pct||0).replace('.',',')+'%)', d.desc_afc)}
           ${fila('Impuesto único 2ª categoría' + (d.apv_deducible>0 ? ` (base rebajada por APV ${$(d.apv_deducible)})` : ''), d.impuesto)}
           ${(d.descuentos_detalle||[]).length ? d.descuentos_detalle.map(x=>fila(esc(x.glosa), x.monto)).join('') : fila('Otros descuentos', d.otros_descuentos)}
-          ${sub('TOTAL DESCUENTOS', d.total_descuentos, '#b91c1c')}
+          ${sub('TOTAL DESCUENTOS', d.total_descuentos)}
         </table>
       </div>
       <div style="background:#012d70;color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center">

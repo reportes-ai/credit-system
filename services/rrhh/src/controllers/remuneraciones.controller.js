@@ -530,7 +530,7 @@ require('../../../../shared/migrate').enFila('rrhh-descuentos', async () => {
   } catch (e) { console.error('[rrhh-descuentos migration]', e.message); }
 });
 const TC = require('../../../../shared/tipo-cambio');
-const { hoyISO: hoyChile } = require('../../../../shared/fecha-chile');
+const { hoyISO: hoyChile, isoDeBD } = require('../../../../shared/fecha-chile');
 
 const mesMas = (mes, n) => { const [y, m] = mes.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const difMeses = (a, b) => { const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number); return (yb - ya) * 12 + (mb - ma); };
@@ -1061,7 +1061,7 @@ const getMes = async (req, res) => {
         // Emitida = congelada: se devuelve el snapshot tal cual
         let det = {}; try { det = typeof g.detalle === 'string' ? JSON.parse(g.detalle) : (g.detalle || {}); } catch (_) {}
         return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo, estado: 'EMITIDA', id_liq: g.id,
-                 banco_pago: e.banco_pago, tipo_cuenta_pago: e.tipo_cuenta_pago, num_cuenta_pago: e.num_cuenta_pago, ...det };
+                 banco_pago: e.banco_pago, tipo_cuenta_pago: e.tipo_cuenta_pago, num_cuenta_pago: e.num_cuenta_pago, fecha_ingreso: isoDeBD(e.fecha_ingreso), ...det };
       }
       const inp = {
         sueldo_base: e.sueldo_base, afp: e.afp, salud: e.salud, tipo_contrato: e.tipo_contrato, pensionado: e.pensionado,
@@ -1079,7 +1079,7 @@ const getMes = async (req, res) => {
         apv: descs.apv[e.id_usuario] || 0,
       };
       aplicarLiquidosImponibles(inp, adics[e.id_usuario], ind);   // aguinaldo "$70.000 líquidos" → bruto por persona
-      return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo,
+      return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo, fecha_ingreso: isoDeBD(e.fecha_ingreso),
         banco_pago: e.banco_pago, tipo_cuenta_pago: e.tipo_cuenta_pago, num_cuenta_pago: e.num_cuenta_pago,
         licencia_dias: 30 - diasTrabajadosMes(mes, null, lics[e.id_usuario]),
         estado: g ? 'BORRADOR' : 'SIN GUARDAR', id_liq: g?.id || null, comisiones_mes: mesAnteriorDe(mes), ...calcLiquidacion(inp, ind) };
@@ -1277,7 +1277,8 @@ const getLiquidacion = async (req, res) => {
     let det = {}; try { det = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) {}
     // Cuenta de depósito: de la ficha (fuente única, la misma que usa Nómina Banco)
     const [[fb]] = await pool.query('SELECT banco_pago, tipo_cuenta_pago, num_cuenta_pago FROM rh_fichas WHERE id_usuario=? LIMIT 1', [l.id_usuario]).catch(() => [[null]]);
-    ok(res, { ...l, detalle: det, banco_pago: fb?.banco_pago || null, tipo_cuenta_pago: fb?.tipo_cuenta_pago || null, num_cuenta_pago: fb?.num_cuenta_pago || null });
+    const [[ui]] = await pool.query('SELECT fecha_ingreso FROM usuarios WHERE id_usuario=? LIMIT 1', [l.id_usuario]).catch(() => [[null]]);
+    ok(res, { ...l, detalle: det, banco_pago: fb?.banco_pago || null, tipo_cuenta_pago: fb?.tipo_cuenta_pago || null, num_cuenta_pago: fb?.num_cuenta_pago || null, fecha_ingreso: isoDeBD(ui?.fecha_ingreso) });
   } catch (e) { fail(res, 'Error interno del servidor'); }
 };
 
