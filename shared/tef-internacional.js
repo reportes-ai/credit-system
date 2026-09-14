@@ -89,13 +89,14 @@ let _cat = null, _catExp = 0;
 async function catalogoBancos() {
   if (_cat && _catExp > Date.now()) return _cat;
   const [rows] = await pool.query("SELECT codigo, nombre FROM rh_catalogo WHERE tipo='BANCO'");
-  _cat = rows.map(r => ({ codigo: parseInt(r.codigo, 10), clave: sinAcentos(r.nombre).toUpperCase().replace(/^BANCO\s+/, '').trim() }));
+  // "BANCO DE CHILE / EDWARDS": cada marca es una clave con el mismo código (14-09-2026)
+  _cat = rows.flatMap(r => String(r.nombre).split('/').map(p => ({ codigo: parseInt(r.codigo, 10), clave: sinAcentos(p).toUpperCase().replace(/^BANCO\s+/, '').trim() })).filter(x => x.clave));
   _catExp = Date.now() + 5 * 60 * 1000;
   return _cat;
 }
 const ALIAS = [
   [/CREDITO E INVERSIONES|\bBCI\b/, 'BCI'], [/EDWARDS|CITI|\bCHILE\b/, 'BANCO DE CHILE'], [/ITAU|CORPBANCA/, 'ITAU'],
-  [/\bESTADO\b/, 'BANCO ESTADO'], [/SANTANDER/, 'SANTANDER'], [/SCOTIA/, 'SCOTIABANK'], [/FALABELLA/, 'FALABELLA'],
+  [/\bESTADO\b/, 'BANCO ESTADO'], [/SANTANDER/, 'SANTANDER'], [/SCOTIA|BBVA|DESARROLLO/, 'SCOTIABANK'], [/FALABELLA/, 'FALABELLA'],
   [/SECURITY/, 'SECURITY'], [/BICE/, 'BICE'], [/CONSORCIO/, 'CONSORCIO'], [/RIPLEY/, 'RIPLEY'], [/COOPEUCH/, 'COOPEUCH'],
   [/INTERNACIONAL/, 'INTERNACIONAL'], [/MERCADO ?PAGO/, 'MERCADO PAGO'], [/TENPO/, 'TENPO'], [/HSBC/, 'HSBC'],
 ];

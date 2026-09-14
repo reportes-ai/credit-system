@@ -11,7 +11,7 @@ const sinAcentos = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
 // sinónimo escrito por el usuario → cómo reconocer el banco del catálogo
 const SINONIMOS = [
   ['chile', /EDWARDS|CITI|\bCHILE\b/], ['de chile', /\bCHILE\b/], ['banco de chile', /\bCHILE\b/], ['edwards', /EDWARDS|\bCHILE\b/],
-  ['internacional', /INTERNACIONAL/], ['scotiabank', /SCOTIA/], ['bbva', /SCOTIA/], ['scotia', /SCOTIA/],
+  ['internacional', /INTERNACIONAL/], ['scotiabank', /SCOTIA/], ['bbva', /SCOTIA/], ['scotia', /SCOTIA/], ['desarrollo', /SCOTIA|DESARROLLO/], ['banco del desarrollo', /SCOTIA|DESARROLLO/], ['banco desarrollo', /SCOTIA|DESARROLLO/],
   ['bci', /\bBCI\b|CREDITO E INVERSIONES/], ['banco bci', /\bBCI\b|CREDITO E INVERSIONES/], ['credito e inversiones', /\bBCI\b|CREDITO E INVERSIONES/],
   ['bice', /BICE/], ['hsbc', /HSBC/], ['santander', /SANTANDER/], ['itau', /ITAU|CORPBANCA/], ['corpbanca', /ITAU|CORPBANCA/],
   ['falabella', /FALABELLA/], ['ripley', /RIPLEY/], ['consorcio', /CONSORCIO/], ['tenpo', /TENPO/],

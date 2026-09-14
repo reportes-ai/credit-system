@@ -1464,8 +1464,10 @@ function codigoDe(lista, nombre) {
   const sinBanco = s => s.replace(/^BANCO\s+(DEL?\s+)?/, '');
   const norm = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
   const n2 = sinBanco(n);
-  const ex = lista.find(r => norm(r.nombre) === n || sinBanco(norm(r.nombre)) === n2); if (ex) return ex.codigo;
-  const inc = lista.find(r => n2.includes(sinBanco(norm(r.nombre)))); return inc ? inc.codigo : null;
+  // Un banco del catálogo puede llevar dos marcas ("BANCO DE CHILE / EDWARDS"): cada parte calza por separado
+  const partes = r => String(r.nombre || '').split('/').map(p => sinBanco(norm(p))).filter(Boolean);
+  const ex = lista.find(r => norm(r.nombre) === n || partes(r).includes(n2)); if (ex) return ex.codigo;
+  const inc = lista.find(r => partes(r).some(p => n2.includes(p))); return inc ? inc.codigo : null;
 }
 /* GET /api/rrhh/remuneraciones/catalogo — AFP + SALUD + BANCO para los selectores de la ficha (cualquier usuario logueado) */
 const getCatalogo = async (_req, res) => {
