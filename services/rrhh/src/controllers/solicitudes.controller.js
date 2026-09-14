@@ -264,7 +264,8 @@ exports.todas = async (req, res) => {
 };
 
 /* ── EJECUCIÓN al aprobar el último paso — contra los motores existentes ────── */
-const mesProximo = () => { const d = new Date(); const y = d.getFullYear(), m = d.getMonth() + 2; return `${m > 12 ? y + 1 : y}-${String(m > 12 ? m - 12 : m).padStart(2, '0')}`; };
+// Próxima liquidación que se emita (mes en curso si no está emitida): motor único de Remuneraciones (14-09-2026)
+const mesProximo = () => require('./remuneraciones.controller').proximaLiquidacion();
 const { cuotaFrancesa } = require('../../../../api-gateway/public/js/rrhh-core'); // motor único (mismo de Descuentos y su preview)
 
 /* ODP del desembolso (anticipo/préstamo): correlativo del libro central + aviso
@@ -314,7 +315,7 @@ async function validarTope15(idUsuario, valorCuota) {
 }
 
 async function ejecutar(sol, datos, req) {
-  const mes = mesProximo();
+  const mes = await mesProximo();
   if (sol.tipo === 'ANTICIPO') {
     await validarTope15(sol.id_usuario, Math.round(datos.monto / datos.cuotas));
     await pool.query(`INSERT INTO rh_descuentos (id_usuario, tipo, monto_total, cuotas, valor_cuota, mes_inicio, creado_por)

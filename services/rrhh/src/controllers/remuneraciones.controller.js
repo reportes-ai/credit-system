@@ -268,6 +268,17 @@ const mesEmitido = async (mes) => {
   const [[e]] = await pool.query("SELECT COUNT(*) c FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
   return (e?.c || 0) > 0;
 };
+/* PRÓXIMA LIQUIDACIÓN (Pato, 14-09-2026): un anticipo aprobado y depositado el 14 se descuenta en la
+   liquidación de ESE mes si todavía no se emitió; solo si ya está emitida pasa al mes siguiente.
+   Antes partía siempre el mes siguiente y el anticipo quedaba un mes sin descontar. Motor único:
+   lo usan Descuentos (ingreso manual) y las Solicitudes del colaborador (anticipo/préstamo aprobado). */
+async function proximaLiquidacion() {
+  const { mesActualISO } = require('../../../../shared/fecha-chile');
+  const actual = mesActualISO();
+  if (!(await mesEmitido(actual))) return actual;
+  const [y, m] = actual.split('-').map(Number);
+  return `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}`;
+}
 
 const getAdicionales = async (req, res) => {
   try {
@@ -625,8 +636,8 @@ const crearDescuento = async (req, res) => {
       destinos = [colab];
     }
     const colab = destinos[0];
-    // Siempre parte en la PRÓXIMA remuneración (mes siguiente al actual)
-    const mesInicio = mesMas(new Date().toISOString().slice(0, 7), 1);
+    // Parte en la PRÓXIMA liquidación que se emita (el mes en curso si aún no está emitida)
+    const mesInicio = await proximaLiquidacion();
     let cuotas = 1, valorCuota = monto, tasa = null, subtipo = null, detalle = null, mesRef = null;
     let cuotaOrigen = montoOrigen;   // cuota en la moneda de origen (la que se convierte cada mes)
     if (tipo === 'ANTICIPO') {
@@ -1958,5 +1969,5 @@ async function getNominaBanco(req, res) {
 
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
-  permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes,
+  permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion,
   getDescuentos, crearDescuento, anularDescuento, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
