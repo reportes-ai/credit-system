@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bancos de la Plaza — AutoFácil</title>
+  <!-- v1.0 — mantenedor propio (antes vivía en Indicadores de Remuneraciones): catálogo de bancos con código SBIF, fuente única de TEF, nómina banco y fichas -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .main { padding:26px 30px; max-width:860px; margin:0 auto; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.2rem; opacity:.85; } .banner h2 { font-weight:700; margin:0; font-size:1.2rem; } .banner p { margin:2px 0 0; opacity:.85; font-size:.85rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 20px; margin-bottom:16px; }
+    .panel h5 { font-weight:700; font-size:.92rem; color:#0141A2; margin:0 0 12px; }
+    table { width:100%; border-collapse:collapse; font-size:.86rem; }
+    th { background:#f8fafc; color:#475569; font-size:.7rem; text-transform:uppercase; padding:7px 10px; text-align:left; border-bottom:2px solid #e2e8f0; }
+    td { padding:6px 10px; border-bottom:1px solid #f1f5f9; }
+    td input[type=text] { border:1.5px solid #e2e8f0; border-radius:6px; padding:5px 9px; font-size:.84rem; width:100%; box-sizing:border-box; }
+    td input.cod { width:90px; text-align:center; font-weight:700; letter-spacing:1px; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:9px 20px; font-weight:700; font-size:.87rem; cursor:pointer; }
+    .btn-ghost { background:#fff; border:1.5px solid #cbd5e1; border-radius:8px; padding:6px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
+    .footer-afecta { background:#f7f9fc; border-left:4px solid #0255c5; border-radius:10px; padding:14px 20px; font-size:.8rem; color:#475569; line-height:1.9; }
+    .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.86rem; z-index:2000; display:none; }
+    .toast.err { background:#dc2626; }
+    tr.off td { opacity:.55; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Bancos de la Plaza',icon:'bi-bank',current:true}]};</script>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-bank"></i><div style="flex:1"><h2>Bancos de la Plaza</h2><p>Catálogo único de bancos con su código SBIF: lo usan el archivo TEF del Banco Internacional, la nómina de sueldos y las fichas de colaboradores, dealers y parques.</p></div></div>
+
+  <div class="panel">
+    <h5><i class="bi bi-list-check me-1"></i>Bancos (código SBIF, 3 dígitos)</h5>
+    <div style="font-size:.78rem;color:#64748b;margin-bottom:8px">Un banco no se borra: se desactiva, así los registros históricos siguen resolviendo su código. El nombre debe ser el que se reconoce en las fichas (ej. BCI, SANTANDER, BANCO DE CHILE).</div>
+    <table><thead><tr><th>Banco</th><th style="width:120px">Código SBIF</th><th style="width:80px">Activo</th></tr></thead><tbody id="tb"></tbody></table>
+    <div style="display:flex;justify-content:space-between;margin-top:10px">
+      <button class="btn-ghost" onclick="agregar()"><i class="bi bi-plus-lg me-1"></i>Agregar banco</button>
+      <button class="btn-navy" onclick="guardar()"><i class="bi bi-check2 me-1"></i>Guardar cambios</button>
+    </div>
+  </div>
+
+  <div class="footer-afecta">
+    <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+    <ul style="margin:6px 0 0;padding-left:18px">
+      <li><b>Código SBIF</b> → columna <code>codigo_banco</code> del archivo <b>TEF B.Internacional</b> en <a href="/postventa/saldos-a-pagar/">Saldos Precios a Pagar</a>, <a href="/postventa/comisiones-a-pagar/">Comisiones Dealer a Pagar</a> y <a href="/postventa/comisiones-parques/">Comisiones Parques a Pagar</a>; un banco no reconocido deja la transferencia FUERA del archivo.</li>
+      <li><b>Nombre del banco</b> → reconocimiento del banco escrito en la ficha del <a href="/mantenedores/dealers/">dealer</a> y del <a href="/mantenedores/parques-base/">parque</a> (alias como "BANCO DE CREDITO E INVERSIONES" → BCI viven en <code>shared/tef-internacional.js</code>).</li>
+      <li><b>Bancos activos</b> → selector Banco de la <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a>; el código va a la <b>Nómina Banco</b> de <a href="/recursos-humanos/remuneraciones/liquidaciones/">Liquidaciones de Sueldo</a>.</li>
+    </ul>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'), yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+if (!token||!yo) location.href='/login.html';
+const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'application/json' };
+function toast(m, err){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',3200); }
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const fila = r => `<tr class="${Number(r.activo??1)?'':'off'}">
+  <td><input type="text" class="n" value="${esc(r.nombre)}" placeholder="NOMBRE DEL BANCO" style="text-transform:uppercase"></td>
+  <td><input type="text" class="cod c" maxlength="3" inputmode="numeric" value="${esc(r.codigo)}" placeholder="000"></td>
+  <td style="text-align:center"><input type="checkbox" class="a" ${Number(r.activo??1)?'checked':''} onchange="this.closest('tr').classList.toggle('off',!this.checked)"></td></tr>`;
+async function cargar(){
+  const j = await (await fetch('/api/bancos', { headers:H })).json();
+  if (!j.success) return toast(j.error||'Error al cargar', true);
+  document.getElementById('tb').innerHTML = (j.data||[]).map(fila).join('');
+}
+function agregar(){ document.getElementById('tb').insertAdjacentHTML('beforeend', fila({ nombre:'', codigo:'', activo:1 })); document.querySelector('#tb tr:last-child .n').focus(); }
+async function guardar(){
+  const bancos = [...document.querySelectorAll('#tb tr')].map(tr => ({ nombre: tr.querySelector('.n').value.trim().toUpperCase(), codigo: tr.querySelector('.c').value.trim(), activo: tr.querySelector('.a').checked ? 1 : 0 })).filter(x => x.nombre || x.codigo);
+  const j = await (await fetch('/api/bancos', { method:'PUT', headers:HJ, body: JSON.stringify({ bancos }) })).json();
+  if (!j.success) return toast(j.error||'No se pudo guardar', true);
+  toast(`✓ ${j.data.guardados} banco(s) guardados`); cargar();
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

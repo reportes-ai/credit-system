@@ -292,6 +292,7 @@ app.use('/api/avisos', require('../../services/mantenedores/src/routes/avisos.ro
 app.use('/api/endpoints-catalogo', require('../../services/mantenedores/src/routes/endpoints-catalogo.routes'));
 app.use('/api/estado-cartera',  require('../../services/mantenedores/src/routes/estado-cartera.routes'));
 app.use('/api/tasas',           require('../../services/mantenedores/src/routes/tasas.routes'));
+app.use('/api/bancos',          require('../../services/mantenedores/src/routes/bancos.routes'));   // Bancos de la Plaza (código SBIF)
 app.use('/api/uf',              require('../../services/mantenedores/src/routes/uf.routes'));
 app.use('/api/utm',             require('../../services/mantenedores/src/routes/utm.routes'));
 app.use('/api/dolar',           require('../../services/mantenedores/src/routes/dolar.routes'));
@@ -544,6 +545,7 @@ const PAGINAS = [
   ['/mantenedores/backups', 'mantenedores/backups/index.html'],
   ['/recursos-humanos/mi-backup', 'recursos-humanos/mi-backup/index.html'],
   ['/mantenedores/tasas', 'mantenedores/tasas/index.html'],
+  ['/mantenedores/bancos', 'mantenedores/bancos/index.html'],
   ['/mantenedores/uf', 'mantenedores/uf/index.html'],
   ['/mantenedores/vehiculos', 'mantenedores/vehiculos/index.html'],
   // La card "Dealers" vive en el Home (no en Mantenedores) → URL limpia /dealers/.
