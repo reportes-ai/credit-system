@@ -41,3 +41,15 @@ test('con saldos compara PORCENTAJE y aplica el % pactado al saldo vigente', () 
   // Sin saldo de carta → cae a la comparación en pesos.
   assert.equal(comisionDealerEfectiva({ calculada: 299250, carta: 284250, saldo: 3990000, saldoCarta: 0 }), 284250);
 });
+
+test('comisión CORREGIDA en la carta manda en ambos sentidos (op 26080591, 14-09-2026)', () => {
+  // Corregida al 6,5% sobre 5.990.000: la tabla daba 5% (299.500) → rige la carta.
+  assert.equal(comisionDealerEfectiva({ calculada: 299500, carta: 389350, saldo: 5990000, saldoCarta: 5990000, comisionCorregida: true }), 389350);
+  // Hacia abajo también, y el % se aplica al saldo vigente si cambió.
+  assert.equal(comisionDealerEfectiva({ calculada: 638000, carta: 338000, saldo: 6380000, saldoCarta: 6380000, comisionCorregida: true }), 338000);
+  assert.equal(comisionDealerEfectiva({ calculada: 299250, carta: 311220, saldo: 3990000, saldoCarta: 3790000, comisionCorregida: true }), 327643);
+  // Sin corrección, la misma carta mayor NO manda.
+  assert.equal(comisionDealerEfectiva({ calculada: 299500, carta: 389350, saldo: 5990000, saldoCarta: 5990000 }), 299500);
+  // Corregida a $0 no anula la comisión: cae a la regla normal.
+  assert.equal(comisionDealerEfectiva({ calculada: 299500, carta: 0, comisionCorregida: true }), 299500);
+});

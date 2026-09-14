@@ -495,7 +495,7 @@ const emitir = async (req, res) => {
     const quien = `${req.user?.nombre || ''} ${req.user?.apellido || ''}`.trim() || 'sistema';
     const concepto = arriendo > 0
       ? `Comisión Parque ${parque} — ${mes} (arriendo ${CLP(arriendo)} + comisión créditos ${CLP(comision)})`
-      : `Comisión Parque ${parque} — ${mes} (comisión créditos ${CLP(comision)}; arriendo por Pagos Recurrentes)`;
+      : `Comisión Parque ${parque} — ${mes} (comisión créditos ${CLP(comision)})`;
     const odp = await emitirCorrelativo({ origen: 'PARQUE', origen_id: e.id, concepto, monto: total, id_usuario: req.user?.id_usuario, usuario_nombre: quien });
 
     await pool.query("UPDATE parques_pagos_mes SET etapa='OP_EMITIDA', odp_id=?, odp_numero=?, emitida_por=?, fecha_emitida=NOW() WHERE id=?",

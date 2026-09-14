@@ -174,10 +174,10 @@ async function calcularOperacion(op) {
   if (op.id_financiera) {
     try {
       const [cs] = await pool.query(
-        `SELECT part_bruto, saldo FROM cartas_aprobacion
+        `SELECT part_bruto, saldo, comision_corregida FROM cartas_aprobacion
           WHERE status='APROBADA' AND COALESCE(part_bruto,0) > 0 AND id_financiera = ?
           ORDER BY id DESC LIMIT 1`, [String(op.id_financiera)]);
-      if (cs[0]) comdea_real = comisionDealerEfectiva({ calculada: comdea_real, carta: cs[0].part_bruto, saldo: saldo_precio, saldoCarta: cs[0].saldo });
+      if (cs[0]) comdea_real = comisionDealerEfectiva({ calculada: comdea_real, carta: cs[0].part_bruto, saldo: saldo_precio, saldoCarta: cs[0].saldo, comisionCorregida: Number(cs[0].comision_corregida) === 1 });
     } catch (e) { /* sin tabla de cartas → queda el cálculo */ }
   }
 

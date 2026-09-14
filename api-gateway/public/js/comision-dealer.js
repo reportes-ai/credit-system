@@ -7,7 +7,7 @@
  *   2. Si no, la PIZARRA (parametros_credito: dealer_pct_* parque, dealer_calle_pct_* calle),
  *      que es solo el default/semilla al crear la ficha de un dealer nuevo.
  * Y sobre el resultado, la CARTA solo manda hacia abajo (comisionDealerEfectiva):
- *   forzado a mano > carta si es MENOR que el cálculo > cálculo.
+ *   forzado a mano > carta con comisión CORREGIDA (ambos sentidos) > carta si es MENOR que el cálculo > cálculo.
  *
  * Comisión parque = lo que se paga al DUEÑO del parque automotriz: arriendo (fijo) +
  * % del saldo precio, paramétrico por parque (parques_comisiones) con fallback a patio_pct.
@@ -124,10 +124,15 @@
    * mantiene es la NEGOCIACIÓN (el % pactado más bajo aplicado al saldo vigente), no
    * un monto viejo. Si el saldo subió después de la carta, comparar pesos habría
    * pagado menos de la tabla sin que nadie lo negociara. Sin saldos, compara pesos. */
-  function comisionDealerEfectiva({ calculada, carta, saldo, saldoCarta }) {
+  /*   comisionCorregida = la comisión de la carta se cambió por Corrección de Cartas
+   * (motivo obligatorio y auditado). Esa corrección ES la negociación autorizada:
+   * manda en AMBOS sentidos, con el mismo % aplicado al saldo vigente (Pato, 14-09-2026:
+   * op 26080591 corregida al 6,5% seguía pagando el 5% de la tabla). */
+  function comisionDealerEfectiva({ calculada, carta, saldo, saldoCarta, comisionCorregida }) {
     const calc = Math.round(parseFloat(calculada) || 0);
     const pc   = Math.round(parseFloat(carta) || 0);
     const s    = parseFloat(saldo) || 0, sc = parseFloat(saldoCarta) || 0;
+    if (comisionCorregida && pc > 0) return s > 0 && sc > 0 ? Math.round(s * (pc / sc)) : pc;
     if (pc > 0 && s > 0 && sc > 0 && calc > 0) {
       const pctCarta = pc / sc, pctCalc = calc / s;
       return pctCarta < pctCalc - 1e-9 ? Math.round(s * pctCarta) : calc;

@@ -490,6 +490,8 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS motivo_correccion VARCHAR(400) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS corregida_por_nombre VARCHAR(200) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS fecha_correccion_carta DATETIME DEFAULT NULL`);
+    // 1 = la corrección cambió la comisión (part_bruto): manda en ambos sentidos (motor comisionDealerEfectiva)
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS comision_corregida TINYINT NOT NULL DEFAULT 0`);
     // Compra para un tercero (persona natural o jurídica distinta del cliente que
     // solicita el crédito) — cláusula 13 de la carta antigua. Opcional: NULL = sin tercero.
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS compra_para VARCHAR(200) DEFAULT NULL`);
@@ -2380,6 +2382,10 @@ const corregirCarta = async (req, res) => {
     nueva.motivo_correccion      = String(motivo).trim().slice(0, 400);
     nueva.corregida_por_nombre   = quien;
     nueva.fecha_correccion_carta = new Date();
+    // Corregir la comisión es negociarla con autorización: desde acá manda en ambos sentidos.
+    // Una corrección posterior de otro dato la hereda (la copia trae la marca).
+    const cambioComision = cambios.some(c => c.campo === 'part_bruto');
+    if (cambioComision) nueva.comision_corregida = 1;
     nueva.fecha_creacion         = new Date();
     nueva.reemplazada_por_id     = null;
     nueva.reemplazada_por_op     = null;
@@ -2431,6 +2437,12 @@ const corregirCarta = async (req, res) => {
          orig.op_carta, opNueva, quien, String(motivo).trim().slice(0, 200), id]);
       cartola = mv.affectedRows;
     } catch (e) { console.error('[cartas corregir cartola]', e.message); }
+
+    // 6-bis) Comisión corregida → el crédito la toma por el motor (comdea_real), y de ahí
+    // Post Venta / Orden de Pago. Sin esto la cartola decía la carta y la ODP pagaba la tabla
+    // (op 26080591, 14-09-2026). Meses cerrados los salta el propio recálculo.
+    if (cambioComision && orig.id_credito_creado)
+      recalcularPorOps([orig.id_credito_creado]).catch(e => console.error('[cartas corregir→recalc comisión]', e.message));
 
     /* Si la corrección cambió el DEALER, se propaga completo al crédito
        (automotora + rut + ficha id_dealer) y al seguimiento de Post Venta —

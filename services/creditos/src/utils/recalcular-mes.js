@@ -212,10 +212,10 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
   if (idsFin.length) {
     try {
       const [cs] = await pool.query(
-        `SELECT id_financiera, part_bruto, saldo FROM cartas_aprobacion
+        `SELECT id_financiera, part_bruto, saldo, comision_corregida FROM cartas_aprobacion
           WHERE status='APROBADA' AND COALESCE(part_bruto,0) > 0 AND id_financiera IN (?)
           ORDER BY id ASC`, [idsFin]);
-      cs.forEach(c => partCartaDe.set(String(c.id_financiera), { part_bruto: Number(c.part_bruto), saldo: Number(c.saldo) || 0 }));  // id mayor gana (vigente)
+      cs.forEach(c => partCartaDe.set(String(c.id_financiera), { part_bruto: Number(c.part_bruto), saldo: Number(c.saldo) || 0, corregida: Number(c.comision_corregida) === 1 }));  // id mayor gana (vigente)
     } catch (e) { /* sin tabla de cartas → se compara contra el cálculo */ }
   }
   for (const op of ops) {
@@ -234,7 +234,7 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
       // Un valor que coincide con la carta NO es "digitado a mano" aunque la carta
       // supere al cálculo: no se marca forzado, así el recálculo lo baja al efectivo.
       const esperado  = campo === 'comdea_real'
-        ? comisionDealerEfectiva({ calculada: calc[campo], carta: partCarta, saldo: op.saldo_precio, saldoCarta: cartaInfo && cartaInfo.saldo })
+        ? comisionDealerEfectiva({ calculada: calc[campo], carta: partCarta, saldo: op.saldo_precio, saldoCarta: cartaInfo && cartaInfo.saldo, comisionCorregida: cartaInfo && cartaInfo.corregida })
         : (parseFloat(calc[campo]) || 0);
       const valor = parseFloat(op[campo]) || 0;
       const dif = Math.abs(valor - esperado) > tol
@@ -303,10 +303,10 @@ async function recalcularMeses(meses, opciones = {}) {
     const partCartaDe = new Map();
     for (let i = 0; i < idsFin.length; i += 500) {
       const [cs] = await pool.query(
-        `SELECT id_financiera, part_bruto, saldo FROM cartas_aprobacion
+        `SELECT id_financiera, part_bruto, saldo, comision_corregida FROM cartas_aprobacion
           WHERE status='APROBADA' AND COALESCE(part_bruto,0) > 0 AND id_financiera IN (?)
           ORDER BY id ASC`, [idsFin.slice(i, i + 500)]);
-      cs.forEach(c => partCartaDe.set(String(c.id_financiera), { part_bruto: Number(c.part_bruto), saldo: Number(c.saldo) || 0 }));  // id mayor gana (vigente)
+      cs.forEach(c => partCartaDe.set(String(c.id_financiera), { part_bruto: Number(c.part_bruto), saldo: Number(c.saldo) || 0, corregida: Number(c.comision_corregida) === 1 }));  // id mayor gana (vigente)
     }
 
     // ── Conteo UAC (penetración de seguros no se recalcula aquí) ────
@@ -380,7 +380,7 @@ async function recalcularMeses(meses, opciones = {}) {
       const cdrGuardado = parseFloat(op.comdea_real) || 0;
       const forzadoAMano = forz.has('comdea_real') && !(partCarta > 0 && Math.abs(cdrGuardado - partCarta) <= 1);
       const eff_cdr = forzadoAMano ? cdrGuardado
-                    : comisionDealerEfectiva({ calculada: comdea_real, carta: partCarta, saldo: op.saldo_precio, saldoCarta: cartaInfo && cartaInfo.saldo });
+                    : comisionDealerEfectiva({ calculada: comdea_real, carta: partCarta, saldo: op.saldo_precio, saldoCarta: cartaInfo && cartaInfo.saldo, comisionCorregida: cartaInfo && cartaInfo.corregida });
       const eff_cpq = forz.has('com_parque')         ? (parseFloat(op.com_parque)         || 0) : com_parque_val;
 
       // 5. Ingreso neto total ─────────────────────────────────────────
