@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Base de Proveedores — AutoFácil</title>
-  <!-- v1.3 — navbar migrada al componente topnav -->
+  <!-- v1.4 — Banco con lista del mantenedor Bancos de la Plaza. v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -90,7 +90,8 @@
         <div class="fld"><label>Email</label><input id="fEmail" maxlength="150"></div>
         <div class="fld"><label>Teléfono</label><input id="fTelefono" maxlength="40"></div>
         <div class="fld" style="grid-column:1 / -1"><label>Dirección</label><input id="fDireccion" maxlength="300"></div>
-        <div class="fld"><label>Banco</label><input id="fBanco" maxlength="80"></div>
+        <div class="fld"><label>Banco</label><input id="fBanco" maxlength="80" list="bancosList" placeholder="Escribe para buscar…" autocomplete="off"><datalist id="bancosList"></datalist>
+          <script src="/js/bancos-cl.js"></script><script>document.getElementById('bancosList').innerHTML=(window.AF_BANCOS||[]).map(b=>'<option value="'+b+'">').join('');</script></div>
         <div class="fld"><label>Tipo de cuenta</label>
           <select id="fTipoCuenta"><option value="">—</option><option>Cuenta Corriente</option><option>Cuenta Vista</option><option>Cuenta de Ahorro</option><option>Chequera Electrónica</option></select>
         </div>

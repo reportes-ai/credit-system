@@ -57,7 +57,7 @@
   </style>
 </head>
 <body>
-<!-- v1.2 -->
+<!-- v1.3 — Banco con lista del mantenedor Bancos de la Plaza. v1.2 -->
 <div id="af-topnav"></div>
 <script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Tesorería',href:'/tesoreria'},{label:'Brokerage',current:true}]};</script>
 
@@ -177,7 +177,8 @@
             </select>
           </div>
           <div class="f-group"><label>Monto $ *</label><input id="fPagoMonto" type="number" placeholder="0"></div>
-          <div class="f-group"><label>Banco</label><input id="fPagoBanco" placeholder="Ej: Banco de Chile"></div>
+          <div class="f-group"><label>Banco</label><input id="fPagoBanco" list="bancosList" placeholder="Escribe para buscar…" autocomplete="off"><datalist id="bancosList"></datalist>
+            <script src="/js/bancos-cl.js"></script><script>document.getElementById('bancosList').innerHTML=(window.AF_BANCOS||[]).map(b=>'<option value="'+b+'">').join('');</script></div>
           <div class="f-group"><label>Cuenta Destino</label><input id="fPagoCuenta" placeholder="N° cuenta bancaria"></div>
           <div class="f-group"><label>N° Transacción</label><input id="fPagoTrans" placeholder="Comprobante transferencia"></div>
           <div class="f-group"><label>Fecha Pago</label><input id="fPagoFecha" type="date"></div>
