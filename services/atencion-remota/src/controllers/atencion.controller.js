@@ -1039,7 +1039,20 @@ const solicitarCuenta = async (req, res) => {
 const listarSolicitudes = async (req, res) => {
   try {
     const estado = (req.query.estado || 'PENDIENTE').toUpperCase();
-    const [rows] = await pool.query('SELECT * FROM ar_solicitudes_cuenta WHERE estado=? ORDER BY created_at DESC', [estado]);
+    /* Nombre desde la ficha del dealer por RUT (Pato, 14-09-2026): el onboarding que no logra validar
+       guarda solo RUT + correo, y la solicitud salía como "—". Si el RUT está en Dealers se completa
+       razón social, contacto, teléfono, dirección y se avisa qué correo tiene la ficha (para decidir). */
+    const [rows] = await pool.query(`
+      SELECT s.*,
+             COALESCE(NULLIF(s.razon_social,''), NULLIF(d.nombre_indexa,''), d.nombre_razon) AS razon_social,
+             COALESCE(NULLIF(s.contacto,''), d.cf_nombre, d.rl_nombre) AS contacto,
+             COALESCE(NULLIF(s.telefono,''), d.telefono, d.cf_telefono) AS telefono,
+             COALESCE(NULLIF(s.direccion,''), d.direccion) AS direccion,
+             d.id_dealer AS ficha_id_dealer, d.correo AS ficha_correo
+        FROM ar_solicitudes_cuenta s
+        LEFT JOIN dealers d ON REPLACE(REPLACE(REPLACE(UPPER(COALESCE(d.rut,'')),'.',''),'-',''),' ','')
+                             = REPLACE(REPLACE(REPLACE(UPPER(COALESCE(s.rut,'')),'.',''),'-',''),' ','')
+       WHERE s.estado=? ORDER BY s.created_at DESC`, [estado]);
     res.json({ success:true, data:rows, error:null });
   } catch (e) { errSrv(res, e, 'listarSolicitudes'); }
 };
