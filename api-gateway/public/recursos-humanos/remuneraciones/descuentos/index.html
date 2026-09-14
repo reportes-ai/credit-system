@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.10 — numeración REAL de la cuota (cuota_desde/cuotas_total): un plan que venía andando muestra "cuota 3 de 4" y no "2 de 3"; la nómina Caja la toma de "17/27" · v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
+  <!-- v1.11 — la nómina Caja muestra CUOTA 49 de 60 (no PERMANENTE) · v1.10 — numeración REAL de la cuota (cuota_desde/cuotas_total): un plan que venía andando muestra "cuota 3 de 4" y no "2 de 3"; la nómina Caja la toma de "17/27" · v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -281,7 +281,9 @@ function renderListaIng(){
       <b style="font-size:.82rem">${esc(d.nombre_actual||d.nombre)}</b>
       <span class="small text-muted">${esc(tipoTxt(d))}${d.detalle_texto?' — '+esc(d.detalle_texto):''}</span>
       <span class="num" style="font-size:.85rem">$${fmt(d.cuota_mes)}</span> ${origenTxt(d)}
-      ${d.tipo==='PERMANENTE'
+      ${d.cuotas_total>1 && d.cuota_num
+        ? `<span class="pill" style="background:#dbeafe;color:#1e40af">CUOTA ${d.cuota_num} de ${d.cuotas_total}</span>`
+        : d.tipo==='PERMANENTE'
         ? '<span class="pill" style="background:#e0e7ff;color:#3730a3">PERMANENTE</span>'
         : d.cuotas>1
         ? `<span class="pill" style="background:#dbeafe;color:#1e40af">CUOTA ${d.cuota_num} de ${d.cuotas_total||d.cuotas}</span>`
