@@ -221,7 +221,15 @@ async function saldoCuenta(idUsuario, aFecha) {
     const cumplidos = Math.floor(mesesTot / 12);
     const n = cumplidos + 1;
     const progAnual = progresivoDelPeriodo(u.previos, n);
-    proporcional = Math.round(mesesEnCurso * ((anuales + progAnual) / 12) * 10) / 10;
+    /* Proporcional POR DÍAS (Pato, 14-09-2026): el feriado se devenga también por la fracción del
+       mes en curso (art. 73 CT: "proporcional al tiempo"). Antes solo contaban meses completos:
+       Fernando Contreras (21-04 → 12-09-2026) salía con 4 meses = 5 días; con los 22 días del
+       mes en curso son 4,73 meses ≈ 5,9 días. La fracción = días transcurridos desde el último
+       aniversario mensual / días que dura ese mes (30 o 31, según el calendario). */
+    const ultimoAniv = new Date(fi); ultimoAniv.setMonth(fi.getMonth() + mesesTot);
+    const sigAniv = new Date(ultimoAniv); sigAniv.setMonth(ultimoAniv.getMonth() + 1);
+    const fraccion = Math.max(0, Math.min(1, (h - ultimoAniv) / (sigAniv - ultimoAniv)));
+    proporcional = Math.round((mesesEnCurso + fraccion) * ((anuales + progAnual) / 12) * 10) / 10;
     // períodos cumplidos a la fecha que todavía no están depositados en la cuenta
     for (let k = Number(m.n_devengos) + 1; k <= cumplidos; k++) virtuales += anuales + progresivoDelPeriodo(u.previos, k);
   }
