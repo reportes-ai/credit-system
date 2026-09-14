@@ -4,6 +4,7 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 
 router.get('/cmf-tipos', verifyToken, requireFunc('mantenedores_tasas'), ctrl.cmfTipos);   // diagnóstico: catálogo de tipos TMC de la CMF
+router.post('/sincronizar', verifyToken, requireFunc('mantenedores_tasas'), ctrl.sincronizarManual);   // "Actualizar desde internet" (TMC desde la CMF)
 router.get('/vigente', verifyToken, ctrl.getVigente);
 router.get('/en/:fecha', verifyToken, ctrl.getEnFecha);
 router.get('/', verifyToken, ctrl.getAll);

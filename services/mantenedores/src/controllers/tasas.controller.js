@@ -159,4 +159,18 @@ const cmfTipos = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getVigente, getEnFecha, getById, create, update, remove, cmfTipos };
+/* POST /sincronizar — "Actualizar desde internet" (Pato, 14-09-2026): trae la TMC del mes desde la CMF
+   ahora mismo, sin esperar el reintento del motor. Mismo motor que el auto-sync (tmc-sync.js). */
+const sincronizarManual = async (req, res) => {
+  try {
+    const { sincronizarTMC } = require('../tmc-sync');
+    const r = await sincronizarTMC();
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'mantenedores', entidad: 'tasas',
+      detalle: r.insertado ? `Cargó la TMC desde la CMF (vigencia ${r.desde} → ${r.hasta})` : `Consultó la TMC en la CMF: ${r.sin_cambios ? 'sin cambios' : (r.motivo || 'pendiente')}`, meta: r });
+    res.json({ success: true, data: r, error: null });
+  } catch (e) {
+    res.status(e.code === 'NOCMF' ? 503 : 500).json({ success: false, data: null, error: e.message || 'Error consultando la CMF' });
+  }
+};
+
+module.exports = { getAll, getVigente, getEnFecha, getById, create, update, remove, cmfTipos, sincronizarManual };

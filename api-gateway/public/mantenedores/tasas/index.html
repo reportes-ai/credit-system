@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v1.1 — botón "Actualizar desde internet": trae la TMC del mes desde la CMF al instante (POST /api/tasas/sincronizar) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -82,6 +83,7 @@
       </div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px;">
+      <button class="btn btn-outline-primary btn-sm" id="btnSync" onclick="sincronizarWeb()" title="Trae la TMC del mes desde la CMF ahora mismo (sin esperar al motor automático)"><i class="bi bi-cloud-download me-1"></i>Actualizar desde internet</button>
       <button class="btn btn-outline-info btn-sm" onclick="verTiposCMF()"><i class="bi bi-list-check me-1"></i>Ver tipos TMC (CMF)</button>
       <button class="btn btn-outline-secondary btn-sm" onclick="abrirUmbrales()"><i class="bi bi-sliders me-1"></i>Modificar Umbrales</button>
       <button class="btn btn-primary btn-sm" onclick="abrirModal()"><i class="bi bi-plus-lg me-1"></i>Nueva Tasa</button>
@@ -288,6 +290,7 @@
       <ul style="margin:0;padding-left:18px">
         <li><b>Tasas mensuales/anuales</b> → cálculo de comisión financiera (UAC/AutoFin) en la <a href="/creditos/">Carga de Créditos</a> y recálculo de meses; márgenes del <a href="/dashboard/">Dashboard</a>.</li>
         <li><b>Umbral UF (tramo MENOR/MAYOR)</b> → clasificación MENOR/MAYOR y selección de tasa/TMC en los cálculos de comisión, y la composición por tramo del <a href="/dashboard/">Dashboard</a>.</li>
+        <li><b>Actualizar desde internet</b> → carga la TMC del mes desde la CMF (mismo motor que el automático, que la busca desde el día 13 cada hora); al entrar una vigencia nueva se recalculan los meses abiertos y se apaga la alerta de TMC vencida del <a href="/">Home</a>.</li>
       </ul>
     </div>
   </div>
@@ -311,6 +314,18 @@
       if (r.status === 401) { logout(); return null; }
       return r.json();
     };
+    // "Actualizar desde internet": misma idea que en Indicadores, pero solo la TMC (motor tmc-sync).
+    async function sincronizarWeb() {
+      const b = document.getElementById('btnSync');
+      b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Consultando CMF...';
+      const d = await api('POST', '/api/tasas/sincronizar');
+      b.disabled = false; b.innerHTML = '<i class="bi bi-cloud-download me-1"></i>Actualizar desde internet';
+      if (!d?.success) return showToast(d?.error || 'No se pudo consultar la CMF (¿key configurada en el servidor?)', 'danger');
+      const t = d.data || {};
+      if (t.insertado) { showToast(`TMC cargada desde la CMF: vigencia ${t.desde} → ${t.hasta}`); cargar(); cargarSyncTMC(); }
+      else if (t.sin_cambios) showToast('La TMC del mes ya estaba cargada', 'info');
+      else showToast(t.motivo || 'La CMF aún no publica la TMC de este mes', 'warning');
+    }
     async function verTiposCMF() {
       const box = document.getElementById('cmfTiposBox');
       const tabla = document.getElementById('cmfTiposTabla');
