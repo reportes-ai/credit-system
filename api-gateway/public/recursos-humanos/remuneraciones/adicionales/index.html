@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adicionales de Remuneración — AutoFácil</title>
-  <!-- v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <!-- v1.8 — Colaborador "SOLO CONTRATO INDEFINIDO" / "SOLO PLAZO FIJO" (aguinaldo 70.000 / 35.000) + atajos por contrato en el grupo; pestaña Comisiones del mes (variable que entra en la liquidación, mes vencido, con estado de aprobación). v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -38,6 +38,7 @@
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><a class="nav-link active" href="#" id="tabI" onclick="tab('I');return false"><i class="bi bi-plus-circle me-1"></i>Ingresar</a></li>
     <li class="nav-item"><a class="nav-link" href="#" id="tabD" onclick="tab('D');return false"><i class="bi bi-list-ul me-1"></i>Detalle del mes</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabC" onclick="tab('C');return false"><i class="bi bi-graph-up-arrow me-1"></i>Comisiones del mes</a></li>
   </ul>
 
   <div class="d-flex gap-2 align-items-end mb-3">
@@ -52,7 +53,7 @@
         <select id="fColab" class="form-select form-select-sm" onchange="grupoUI()"><option value="">— elegir —</option></select>
         <!-- GRUPO (Pato, 14-09-2026): lista con casillas para pagar algo a varios, no a todos -->
         <div id="wGrupo" style="display:none;margin-top:6px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;max-height:220px;overflow:auto;background:#fff">
-          <div class="d-flex gap-3 mb-1 small"><a href="#" onclick="grupoTodos(true);return false">Marcar todos</a><a href="#" onclick="grupoTodos(false);return false">Ninguno</a><span class="ms-auto text-muted" id="grupoN"></span></div>
+          <div class="d-flex gap-3 mb-1 small"><a href="#" onclick="grupoTodos(true);return false">Marcar todos</a><a href="#" onclick="grupoTodos(false);return false">Ninguno</a><a href="#" onclick="grupoContrato('INDEFINIDO');return false">Indefinidos</a><a href="#" onclick="grupoContrato('PLAZO FIJO');return false">Plazo fijo</a><span class="ms-auto text-muted" id="grupoN"></span></div>
           <div id="grupoLista" style="columns:2;column-gap:14px"></div>
         </div></div>
       <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Causal del pago</label>
@@ -102,6 +103,16 @@
     <button class="btn btn-sm btn-outline-success" onclick="exportar()"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
   </div>
 
+  <!-- Comisiones del mes (Pato, 14-09-2026): la variable que entra en la liquidación del mes (mes vencido), motor único de comisiones -->
+  <div id="secC" style="display:none">
+    <div id="comisAviso" class="mb-2 small text-muted"></div>
+    <div class="d-flex gap-3 mb-3 flex-wrap" id="kpisC"></div>
+    <div class="panel" style="padding:0;overflow:auto">
+      <table><thead><tr><th>Colaborador</th><th>Cargo</th><th>Contrato</th><th class="text-right">Comisión</th><th>Estado</th></tr></thead>
+      <tbody id="tbCom"><tr><td colspan="5" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
   <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.8rem">
     <div class="fw-bold mb-1"><i class="bi bi-diagram-3 me-1"></i>Cómo se integran</div>
     Los adicionales <b>imponibles</b> entran como "Otros Imponibles" en el <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> del mes (pagan AFP/salud/impuesto); los <b>no imponibles</b> entran como "Otros No Imponibles" (se pagan tal cual). <b>Líquido</b> significa que la persona recibe exactamente ese monto: si la causal es imponible (ej. aguinaldo $70.000 líquidos), el <b>bruto se calcula por colaborador</b> al armar la liquidación, con su AFP, salud, AFC e impuesto, y por eso es distinto para cada uno. Si en el libro editas esas celdas a mano, tu valor manda. Al <b>emitir</b> el mes, este módulo queda bloqueado.
@@ -135,8 +146,22 @@ function fmtMonto(el){
 const montoVal = () => Number(document.getElementById('fMonto').value.replace(/[^\d]/g,''))||0;
 
 function tab(m){
-  tabI.classList.toggle('active', m==='I'); tabD.classList.toggle('active', m==='D');
-  secI.style.display = m==='I'?'':'none'; secD.style.display = m==='D'?'':'none';
+  tabI.classList.toggle('active', m==='I'); tabD.classList.toggle('active', m==='D'); tabC.classList.toggle('active', m==='C');
+  secI.style.display = m==='I'?'':'none'; secD.style.display = m==='D'?'':'none'; secC.style.display = m==='C'?'':'none';
+  if (m==='C') cargarComisiones();
+}
+async function cargarComisiones(){
+  const j = await (await fetch('/api/rrhh/remuneraciones/adicionales/comisiones?mes='+fMes.value,{headers:H})).json();
+  if (!j.success) return alert(j.error||'Error');
+  const d = j.data, mesC = String(d.comisiones_mes).split('-').reverse().join('-');
+  document.getElementById('comisAviso').innerHTML = `Comisiones de <b>${mesC}</b> que entran en la liquidación de ${String(d.mes).split('-').reverse().join('-')} (mes vencido). ${d.nomina?`Vienen de la <b>Nómina de Comisiones</b> v${esc(d.nomina.version)} generada por ${esc(d.nomina.generada_por||'')} (foto congelada).`:'Calculadas en vivo por el motor de comisiones (aún no hay nómina generada).'}`;
+  const sinAp = d.filas.filter(f=>!f.aprobada).length;
+  document.getElementById('kpisC').innerHTML = `
+    <div class="card-kpi"><div class="v">${d.filas.length}</div><div class="l">Con variable</div></div>
+    <div class="card-kpi"><div class="v">$${fmt(d.total)}</div><div class="l">Total comisiones</div></div>
+    <div class="card-kpi"><div class="v" style="color:${sinAp?'#dc2626':'#15803d'}">${sinAp}</div><div class="l">Sin aprobar</div></div>`;
+  document.getElementById('tbCom').innerHTML = d.filas.length ? d.filas.map(f=>`<tr><td>${esc(f.nombre)}</td><td>${esc(f.cargo||'')}</td><td>${esc(f.tipo_contrato||'')}</td><td class="text-right num">$${fmt(f.comision)}</td><td>${f.aprobada?'<span class="pill imp">APROBADA</span>':'<span class="pill" style="background:#fee2e2;color:#991b1b">SIN APROBAR</span>'}</td></tr>`).join('')
+    : '<tr><td colspan="5" class="text-center text-muted py-3">Nadie con comisión este mes</td></tr>';
 }
 
 const esHE = () => fCausal.value === 'HORAS EXTRAS';
@@ -217,8 +242,8 @@ async function cargar(){
   if (sel && CAUSALES[sel]!==undefined) fCausal.value = sel;
   if (!fColab.options.length || fColab.options.length===1){
     const jd = await (await fetch('/api/rrhh/directorio',{headers:H})).json();
-    fColab.innerHTML = '<option value="">— elegir —</option><option value="TODOS">★ TODO EL PERSONAL (todos los activos con ficha)</option><option value="GRUPO">☑ UN GRUPO (marcar con casillas)</option>' + (jd.data||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
-    document.getElementById('grupoLista').innerHTML = (jd.data||[]).map(c=>`<label class="d-block small" style="break-inside:avoid;cursor:pointer"><input type="checkbox" class="form-check-input me-1 gr" value="${c.id_usuario}" onchange="grupoN()">${esc(c.nombre)}</label>`).join('');
+    fColab.innerHTML = '<option value="">— elegir —</option><option value="TODOS">★ TODO EL PERSONAL (todos los activos con ficha)</option><option value="GRUPO">☑ UN GRUPO (marcar con casillas)</option><option value="CONTRATO:INDEFINIDO">★ SOLO CONTRATO INDEFINIDO</option><option value="CONTRATO:PLAZO FIJO">★ SOLO PLAZO FIJO</option>' + (jd.data||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
+    document.getElementById('grupoLista').innerHTML = (jd.data||[]).map(c=>`<label class="d-block small" style="break-inside:avoid;cursor:pointer"><input type="checkbox" class="form-check-input me-1 gr" value="${c.id_usuario}" data-contrato="${esc(c.tipo_contrato||'')}" onchange="grupoN()">${esc(c.nombre)}${c.tipo_contrato?` <span class="text-muted" style="font-size:.66rem">${String(c.tipo_contrato).toUpperCase()==='PLAZO FIJO'?'PF':'IND'}</span>`:''}</label>`).join('');
     causalUI();
   }
   document.getElementById('avisoBloq').style.display = D.bloqueado?'':'none';
@@ -291,6 +316,7 @@ async function nuevoConcepto(){
 function grupoUI(){ document.getElementById('wGrupo').style.display = fColab.value==='GRUPO' ? '' : 'none'; grupoN(); }
 function grupoSel(){ return [...document.querySelectorAll('#grupoLista .gr:checked')].map(x=>Number(x.value)); }
 function grupoTodos(v){ document.querySelectorAll('#grupoLista .gr').forEach(x=>x.checked=v); grupoN(); }
+function grupoContrato(t){ document.querySelectorAll('#grupoLista .gr').forEach(x=>x.checked = String(x.dataset.contrato||'').toUpperCase()===t); grupoN(); }
 function grupoN(){ const n = grupoSel().length; document.getElementById('grupoN').textContent = n ? `${n} seleccionado(s)` : ''; }
 async function guardar(){
   const horas = parseFloat(String(document.getElementById('fHoras').value).replace(',','.')) || 0;
@@ -304,9 +330,10 @@ async function guardar(){
     monto: montoVal(), horas: esHE() ? horas : undefined };
   if (!body.id_usuario) return alert('Elige el colaborador');
   if (body.hasta && body.hasta < body.mes) return alert('El mes "hasta" no puede ser anterior al mes desde');
-  if (body.id_usuario==='TODOS' || grupo) {
+  const porContrato = body.id_usuario.startsWith('CONTRATO:') ? body.id_usuario.slice(9) : null;
+  if (body.id_usuario==='TODOS' || grupo || porContrato) {
     if (esHE()) return alert('Las horas extras se digitan por persona');
-    if (!confirm(`¿Asignar ${fCausal.value} de $${fmt(body.monto)}${document.getElementById('fLiq').checked?' líquidos':''} a ${grupo?grupo.length+' persona(s) del grupo':'TODO el personal activo'} en ${fMes.value}?\n\nQuien ya lo tenga este mes se salta.`)) return;
+    if (!confirm(`¿Asignar ${fCausal.value} de $${fmt(body.monto)}${document.getElementById('fLiq').checked?' líquidos':''} a ${grupo?grupo.length+' persona(s) del grupo':porContrato?'todo el personal con contrato '+porContrato:'TODO el personal activo'} en ${fMes.value}?\n\nQuien ya lo tenga este mes se salta.`)) return;
   }
   // En horas extras manda la cantidad de horas: el monto lo recalcula el servidor.
   if (esHE()) { if (!(horas > 0)) return alert('Indica cuántas horas extras se pagan'); }

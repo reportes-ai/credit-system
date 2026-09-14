@@ -304,10 +304,12 @@ const directorio = async (req, res) => {
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) AS nombre,
               u.cargo, u.email, u.telefono,
               DATE_FORMAT(u.fecha_nacimiento, '%d-%m') AS cumple,
-              TRIM(CONCAT_WS(' ', s.nombre, s.apellido)) AS supervisor
+              TRIM(CONCAT_WS(' ', s.nombre, s.apellido)) AS supervisor,
+              f.tipo_contrato   -- Adicionales: atajos por contrato en el grupo (14-09-2026)
          FROM usuarios u
          LEFT JOIN usuarios s ON s.id_usuario = u.id_supervisor
          LEFT JOIN rh_directorio_config c ON c.id_usuario = u.id_usuario
+         LEFT JOIN rh_fichas f ON f.id_usuario = u.id_usuario
         WHERE u.estado = 'activo' AND COALESCE(c.en_directorio, 1) = 1
           AND COALESCE(u.externo, 0) = 0
         ORDER BY nombre LIMIT 800`);

@@ -297,26 +297,30 @@ const crearAdicional = async (req, res) => {
     /* TODO EL PERSONAL (Pato 08-09-2026): id_usuario='TODOS' crea el mismo adicional
        para cada colaborador activo con ficha (bono Fiestas Patrias, Navidad, vacaciones…).
        Quien ya tenga esa misma causal en el mes se salta, así se puede repetir sin duplicar. */
-    const todos = String(b.id_usuario) === 'TODOS';
+    const sel = String(b.id_usuario || '');
+    const todos = sel === 'TODOS';
     // GRUPO (Pato, 14-09-2026): ids marcados con casillas — mismo motor que TODOS, acotado a esas personas
-    const grupo = String(b.id_usuario) === 'GRUPO' ? (Array.isArray(b.ids) ? b.ids.map(Number).filter(Boolean) : []) : null;
+    const grupo = sel === 'GRUPO' ? (Array.isArray(b.ids) ? b.ids.map(Number).filter(Boolean) : []) : null;
     if (grupo && !grupo.length) return fail(res, 'Marca al menos una persona del grupo', 400);
-    if (todos || grupo) {
+    // Por TIPO DE CONTRATO (Pato, 14-09-2026): aguinaldo $70.000 indefinidos / $35.000 plazo fijo
+    const contrato = /^CONTRATO:/.test(sel) ? sel.slice(9).toUpperCase() : null;
+    if (todos || grupo || contrato) {
       if (causal === 'HORAS EXTRAS') return fail(res, 'Las horas extras se digitan por persona', 400);
       const [gente] = await pool.query(
         `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre FROM usuarios u
            JOIN rh_fichas f ON f.id_usuario=u.id_usuario
           WHERE u.estado='activo' AND COALESCE(f.sueldo_base,0) > 0
             ${grupo ? 'AND u.id_usuario IN (?)' : ''}
+            ${contrato ? "AND UPPER(COALESCE(f.tipo_contrato,''))=?" : ''}
             AND u.id_usuario NOT IN (SELECT id_usuario FROM rh_adicionales WHERE mes=? AND causal=?)
-          ORDER BY nombre`, grupo ? [grupo, mes, causal] : [mes, causal]);
-      if (!gente.length) return fail(res, grupo ? 'Las personas marcadas ya tienen esta causal este mes' : 'Todo el personal ya tiene esta causal este mes', 400);
+          ORDER BY nombre`, [...(grupo ? [grupo] : []), ...(contrato ? [contrato] : []), mes, causal]);
+      if (!gente.length) return fail(res, grupo ? 'Las personas marcadas ya tienen esta causal este mes' : contrato ? `Todo el personal ${contrato} ya tiene esta causal este mes` : 'Todo el personal ya tiene esta causal este mes', 400);
       let creados = 0;
       for (const g of gente) {
         const j = await crearUno({ ...b, id_usuario: g.id_usuario }, req, { silencioso: true });
         if (j && j.ok) creados++; else if (j && j.error) return fail(res, j.error, j.status || 400);
       }
-      auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', detalle: `Adicional ${mes} a ${grupo ? 'un GRUPO' : 'TODO EL PERSONAL'} (${creados}): ${causal} $${Math.round(Number(b.monto) || 0).toLocaleString('es-CL')}${b.es_liquido ? ' LÍQUIDO' : ''}` });
+      auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', detalle: `Adicional ${mes} a ${grupo ? 'un GRUPO' : contrato ? 'el personal ' + contrato : 'TODO EL PERSONAL'} (${creados}): ${causal} $${Math.round(Number(b.monto) || 0).toLocaleString('es-CL')}${b.es_liquido ? ' LÍQUIDO' : ''}` });
       return ok(res, { creados, personas: gente.map(g => g.nombre) });
     }
     const j = await crearUno(b, req);
@@ -1029,6 +1033,27 @@ async function comisionesDelMes(mes) {
     return porNombre;
   } catch (e) { console.error('[remuneraciones comisiones]', e.message); return {}; }
 }
+
+/* ── GET /api/rrhh/remuneraciones/adicionales/comisiones?mes=YYYY-MM (Pato, 14-09-2026) ──
+   Pestaña "Comisiones del mes" en Adicionales: qué comisión (variable) entra en la liquidación
+   del mes para cada colaborador con renta variable — mes vencido, motor único de comisiones. */
+const getComisionesMes = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
+    const comis = await comisionesDelMes(mes);
+    const sinAprobar = new Set(await comisionesSinAprobar(mes, comis));
+    const [emps] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.cargo, f.tipo_contrato,
+              CONCAT(UPPER(COALESCE(u.nombre,'')), ' ', UPPER(COALESCE(u.apellido,''))) nombre_corto
+         FROM usuarios u JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE u.estado='activo' AND COALESCE(f.sueldo_base,0) > 0 ORDER BY nombre`);
+    const filas = emps.map(e => ({ id_usuario: e.id_usuario, nombre: e.nombre, cargo: e.cargo, tipo_contrato: e.tipo_contrato,
+      comision: Number(comis[String(e.nombre_corto).trim()] || 0), aprobada: !sinAprobar.has(String(e.nombre_corto).trim()) }))
+      .filter(f => f.comision > 0);
+    let nomina = null;
+    try { const { montosNomina } = require('../../../comisiones/src/controllers/nomina.controller'); const n = await montosNomina(mesAnteriorDe(mes)); if (n) nomina = { version: n.version, generada_por: n.generada_por, created_at: n.created_at }; } catch (_) {}
+    ok(res, { mes, comisiones_mes: mesAnteriorDe(mes), filas, total: filas.reduce((s, f) => s + f.comision, 0), nomina });
+  } catch (e) { console.error('[rrhh adicionales comisiones]', e.message); fail(res, 'Error interno del servidor'); }
+};
 
 /* ── GET /api/rrhh/remuneraciones?mes=YYYY-MM ───────────────────────────────── */
 const getMes = async (req, res) => {
@@ -1933,5 +1958,5 @@ async function getNominaBanco(req, res) {
 
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
-  permanenteAdicional, crearConceptoAdic, crearConceptoDesc,
+  permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes,
   getDescuentos, crearDescuento, anularDescuento, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
