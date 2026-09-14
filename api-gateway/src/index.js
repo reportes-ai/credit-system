@@ -713,6 +713,7 @@ const PAGINAS = [
   ['/contabilidad/libros-auxiliares', 'contabilidad/libros-auxiliares/index.html'],
   ['/contabilidad/f29', 'contabilidad/f29/index.html'],
   ['/contabilidad/lre', 'contabilidad/lre/index.html'],
+  ['/contabilidad/libros-legales', 'contabilidad/libros-legales/index.html'],
   ['/contabilidad/presupuesto', 'contabilidad/presupuesto/index.html'],
   ['/contabilidad/finanzas-ia', 'contabilidad/finanzas-ia/index.html'],
   ['/recursos-humanos', 'recursos-humanos/index.html'],

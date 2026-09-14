@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Libros Legales y Exportables — AutoFácil</title>
+  <!-- v1.0 — catálogo de libros para auditoría y fiscalizadores; Libro de Remuneraciones por persona (MOTOR o AVSOFT) con Excel firmado (SHA-256) y registro de generaciones -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:28px 30px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; margin-bottom:22px; }
+    .card-l { background:#fff; border-radius:12px; padding:14px 16px; box-shadow:0 1px 4px rgba(0,0,0,.07); border-left:4px solid var(--navy); cursor:pointer; }
+    .card-l.off { opacity:.55; border-left-color:#cbd5e1; cursor:default; }
+    .card-l.activa { outline:2px solid var(--accent); }
+    .card-l b { display:block; font-size:.86rem; color:var(--navy-dark); } .card-l small { color:#64748b; font-size:.72rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; margin-bottom:18px; }
+    table { border-collapse:collapse; font-size:.72rem; width:100%; }
+    thead th { background:#012d70; color:#fff; font-weight:700; padding:6px 8px; text-align:right; white-space:nowrap; position:sticky; top:0; }
+    thead th.l { text-align:left; }
+    tbody td { padding:4px 8px; border-bottom:1px solid #f1f5f9; text-align:right; white-space:nowrap; font-family:Consolas,monospace; }
+    tbody td.l { text-align:left; font-family:'Segoe UI'; }
+    tfoot td { padding:6px 8px; font-weight:800; text-align:right; background:#f8fafc; font-family:Consolas,monospace; }
+    .pill { border-radius:9px; padding:2px 10px; font-size:.7rem; font-weight:700; }
+    .hash { font-family:Consolas,monospace; font-size:.68rem; color:#475569; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Libros Legales y Exportables', icon:'bi-journal-bookmark-fill', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-journal-bookmark-fill"></i><div><h2>Libros Legales y Exportables</h2><p>Los documentos que piden auditores y fiscalizadores (SII, Dirección del Trabajo, Previred, CMF), generados desde su fuente única y registrados con hash SHA-256 para probar que el archivo entregado salió del sistema.</p></div></div>
+
+  <div class="cards" id="cards"></div>
+
+  <div id="secRem" style="display:none">
+    <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+      <div><label class="form-label small fw-semibold mb-1">Mes</label><input type="month" id="fMes" class="form-control form-control-sm" onchange="cargarRem()"></div>
+      <span id="lblFuente"></span>
+      <span class="flex-grow-1"></span>
+      <button class="btn btn-sm btn-success" id="btnXlsx" onclick="descargarRem()" disabled><i class="bi bi-file-earmark-excel me-1"></i>Generar Excel (queda registrado)</button>
+    </div>
+    <div class="panel" style="max-height:60vh"><table id="tabla"><thead id="thead"></thead><tbody id="tbody"><tr><td class="text-muted p-3 l">Elige un mes</td></tr></tbody><tfoot id="tfoot"></tfoot></table></div>
+    <div class="p-3 mb-3" style="background:#fff7ed;border-left:4px solid #f59e0b;border-radius:8px;font-size:.8rem">
+      <b><i class="bi bi-info-circle me-1"></i>Fuente:</b> MOTOR = liquidaciones emitidas en el Suite (la semana corrida va dentro de Comisiones, factor art. 45). AVSOFT = auxiliar importado del LIBREMUN, con la apertura del imponible desde 2026 (semana corrida separada como la pagaba AVSOFT). Colación y movilización del auxiliar van en "Otros no imponibles" porque el export no las separa.
+    </div>
+  </div>
+
+  <h6 class="fw-bold mt-2" style="color:var(--navy-dark)"><i class="bi bi-clock-history me-1"></i>Libros generados (registro de auditoría)</h6>
+  <div class="panel" style="max-height:32vh"><table>
+    <thead><tr><th class="l">Fecha</th><th class="l">Libro</th><th class="l">Período</th><th class="l">Fuente</th><th>Filas</th><th>Total haberes</th><th>Líquido</th><th class="l">Generado por</th><th class="l">SHA-256</th></tr></thead>
+    <tbody id="tbLog"><tr><td class="text-muted p-3 l" colspan="9">Sin libros generados aún.</td></tr></tbody>
+  </table></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const CLP = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CL');
+let D = null, LIBROS = [];
+const hoy = new Date(); hoy.setMonth(hoy.getMonth()-1);
+fMes.value = hoy.toISOString().slice(0,7);
+
+async function init(){
+  const j = await (await fetch('/api/contabilidad/libros-legales',{headers:H})).json();
+  if (!j.success) return alert(j.error);
+  LIBROS = j.data.libros;
+  cards.innerHTML = LIBROS.map(l => `<div class="card-l ${l.disponible?'':'off'} ${l.codigo==='REMUNERACIONES'?'activa':''}" onclick="abrir('${l.codigo}')" title="${esc(l.descripcion||'')}">
+      <b>${esc(l.nombre)}</b><small>${esc(l.fiscalizador)} · por ${esc(l.periodo)}${l.disponible?'':' · <i>próximamente</i>'}${l.href?' · <i class="bi bi-box-arrow-up-right"></i>':''}</small></div>`).join('');
+  pintarLog(j.data.log);
+  abrir('REMUNERACIONES');
+}
+function abrir(cod){
+  const l = LIBROS.find(x=>x.codigo===cod); if (!l || !l.disponible) return;
+  if (l.href) { location.href = l.href; return; }
+  document.querySelectorAll('.card-l').forEach(c=>c.classList.remove('activa'));
+  [...document.querySelectorAll('.card-l')].find(c=>c.querySelector('b').textContent===l.nombre)?.classList.add('activa');
+  if (cod==='REMUNERACIONES') { secRem.style.display=''; cargarRem(); }
+}
+function pintarLog(log){
+  tbLog.innerHTML = (log||[]).map(r=>`<tr><td class="l">${esc(String(r.created_at).replace('T',' ').slice(0,16))}</td><td class="l">${esc(r.libro)}</td><td class="l">${esc(r.periodo)}</td><td class="l">${esc(r.fuente||'')}</td><td>${r.filas}</td><td>${CLP(r.total_1)}</td><td>${CLP(r.total_2)}</td><td class="l">${esc(r.generado_por||'')}</td><td class="l hash" title="${esc(r.sha256)}">${esc(r.sha256).slice(0,16)}…</td></tr>`).join('')
+    || '<tr><td class="text-muted p-3 l" colspan="9">Sin libros generados aún.</td></tr>';
+}
+async function cargarRem(){
+  const j = await (await fetch('/api/contabilidad/libros-legales/remuneraciones?mes='+fMes.value,{headers:H})).json();
+  if (!j.success){ D=null; btnXlsx.disabled=true; lblFuente.innerHTML=''; thead.innerHTML=''; tfoot.innerHTML='';
+    tbody.innerHTML=`<tr><td class="text-muted p-3 l">${esc(j.error)}</td></tr>`; return; }
+  D = j.data; btnXlsx.disabled = false;
+  lblFuente.innerHTML = D.fuente==='MOTOR'
+    ? '<span class="pill" style="background:#dcfce7;color:#15803d">FUENTE: MOTOR PROPIO (liquidaciones emitidas)</span>'
+    : '<span class="pill" style="background:#fef3c7;color:#92400e">FUENTE: AVSOFT importado</span>';
+  const txt = new Set(['rut','nombre','cargo','tipo_contrato','fecha_ingreso','afp','salud']);
+  thead.innerHTML = '<tr>' + D.columnas.map(c=>`<th class="${txt.has(c[0])?'l':''}">${esc(c[1])}</th>`).join('') + '</tr>';
+  tbody.innerHTML = D.filas.map(f=>'<tr>' + D.columnas.map(c=>`<td class="${txt.has(c[0])?'l':''}">${txt.has(c[0])||c[0]==='dias'?esc(f[c[0]]):CLP(f[c[0]])}</td>`).join('') + '</tr>').join('');
+  tfoot.innerHTML = '<tr>' + D.columnas.map(c=>`<td>${c[0]==='nombre'?'TOTALES ('+D.filas.length+')':(D.totales[c[0]]!=null&&c[0]!=='dias'?CLP(D.totales[c[0]]):'')}</td>`).join('') + '</tr>';
+}
+async function descargarRem(){
+  if (!D) return;
+  btnXlsx.disabled = true;
+  try {
+    const r = await fetch('/api/contabilidad/libros-legales/remuneraciones.xlsx?mes='+fMes.value,{headers:H});
+    if (!r.ok) { const j = await r.json().catch(()=>({})); return alert(j.error||'No se pudo generar'); }
+    const blob = await r.blob(); const sha = r.headers.get('X-SHA256')||'';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Libro-Remuneraciones-${fMes.value}.xlsx`; a.click(); URL.revokeObjectURL(a.href);
+    const j = await (await fetch('/api/contabilidad/libros-legales',{headers:H})).json(); if (j.success) pintarLog(j.data.log);
+    if (sha) alert('Libro generado y registrado.\nSHA-256: '+sha);
+  } finally { btnXlsx.disabled = false; }
+}
+init();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

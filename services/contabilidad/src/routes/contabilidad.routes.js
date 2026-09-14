@@ -101,6 +101,11 @@ router.delete('/docs-aux/:tipo/:id',   verifyToken, requireFunc('ctb_libros_aux'
 router.post('/remun-aux/importar', verifyToken, requireFunc('ctb_libros_aux'), ctrl.importarRemunAux);
 router.get('/remun-aux/lista',     verifyToken, requireFunc('ctb_libros_aux', 'ctb_libros'), ctrl.listaRemunAux);
 router.get('/lre',   verifyToken, requireFunc('ctb_lre', 'ctb_libros_aux'), ctrl.getLRE);
+// Libros Legales y Exportables (auditoría / fiscalizadores): catálogo, libro de remuneraciones por persona (vista + Excel con hash)
+const libros = require('../controllers/libros-legales.controller');
+router.get('/libros-legales',                     verifyToken, requireFunc('ctb_libros_legales', 'ctb_lre'), libros.catalogo);
+router.get('/libros-legales/remuneraciones',      verifyToken, requireFunc('ctb_libros_legales', 'ctb_lre'), libros.remuneraciones);
+router.get('/libros-legales/remuneraciones.xlsx', verifyToken, requireFunc('ctb_libros_legales', 'ctb_lre'), libros.remuneracionesXlsx);
 router.get('/f29',   verifyToken, requireFunc('ctb_f29', 'ctb_libros_aux'), ctrl.getF29);
 router.post('/f29',  verifyToken, requireFunc('ctb_f29', 'ctb_libros_aux'), ctrl.guardarF29);
 router.get('/dj/1879',     verifyToken, requireFunc('ctb_dj'), ctrl.getDJ1879);
