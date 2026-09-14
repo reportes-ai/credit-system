@@ -250,7 +250,11 @@ const updateCredito = async (req, res) => {
     // Campos calculados editados a mano: se evalúan luego contra la fórmula.
     const calcEditados = Object.keys(cambios).filter(c => CAMPOS_CALCULADOS.includes(c) && colsValidas.has(c));
 
-    await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, [...vals, id]);
+    /* Desde el corte el mes contable SIGUE a la fecha de curse (motor único shared/mes-atribucion):
+       se agrega al final del SET para que vea fecha_otorgado ya definitiva. 14-09-2026: dos ops
+       cursadas el 11-09 quedaron en agosto por una edición del mes desde esta grilla. */
+    const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
+    await pool.query(`UPDATE creditos SET ${sets.join(', ')}, ${SET_MES_SQL(await mesCorte())}, updated_at = NOW() WHERE id = ?`, [...vals, id]);
 
     if (logEntries.length) {
       await pool.query(

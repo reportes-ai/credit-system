@@ -120,7 +120,9 @@ const update = async (req, res) => {
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Sin campos válidos' });
 
     vals.push(id);
-    await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, vals);
+    // Desde el corte el mes contable SIGUE a la fecha de curse (motor único shared/mes-atribucion); va al final del SET.
+    const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
+    await pool.query(`UPDATE creditos SET ${sets.join(', ')}, ${SET_MES_SQL(await mesCorte())}, updated_at = NOW() WHERE id = ?`, vals);
 
     const [[updated]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [id]);
     EXCLUIR.forEach(f => delete updated[f]);
