@@ -1444,8 +1444,13 @@ require('../../../../shared/migrate').enFila('rh-catalogo', async () => {
     id INT AUTO_INCREMENT PRIMARY KEY, tipo VARCHAR(10) NOT NULL, codigo VARCHAR(6) NOT NULL, nombre VARCHAR(60) NOT NULL,
     activo TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_tipo_nombre (tipo, nombre), KEY idx_tipo (tipo))`);
-  for (const [c, n] of CAT_SALUD_SEED) await pool.query('INSERT IGNORE INTO rh_catalogo (tipo, codigo, nombre) VALUES (?,?,?)', ['SALUD', c, n]);
-  for (const [c, n] of CAT_BANCO_SEED) await pool.query('INSERT IGNORE INTO rh_catalogo (tipo, codigo, nombre) VALUES (?,?,?)', ['BANCO', c, n]);
+  /* Semilla SOLO si el catálogo del tipo está vacío: con INSERT IGNORE en cada arranque, un banco
+     renombrado en el mantenedor ("FALABELLA" → "BANCO FALABELLA") reaparecía con el nombre viejo
+     tras cada deploy y quedaba duplicado (14-09-2026). El mantenedor es la fuente; la semilla es solo el arranque. */
+  const [[nS]] = await pool.query("SELECT COUNT(*) n FROM rh_catalogo WHERE tipo='SALUD'");
+  if (!nS.n) for (const [c, n] of CAT_SALUD_SEED) await pool.query('INSERT IGNORE INTO rh_catalogo (tipo, codigo, nombre) VALUES (?,?,?)', ['SALUD', c, n]);
+  const [[nB]] = await pool.query("SELECT COUNT(*) n FROM rh_catalogo WHERE tipo='BANCO'");
+  if (!nB.n) for (const [c, n] of CAT_BANCO_SEED) await pool.query('INSERT IGNORE INTO rh_catalogo (tipo, codigo, nombre) VALUES (?,?,?)', ['BANCO', c, n]);
 });
 async function catalogo(tipo) {
   const [rows] = await pool.query('SELECT codigo, nombre, activo FROM rh_catalogo WHERE tipo=? ORDER BY nombre', [tipo]).catch(() => [[]]);
