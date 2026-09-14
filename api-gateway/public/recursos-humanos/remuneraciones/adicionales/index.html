@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adicionales de Remuneración — AutoFácil</title>
-  <!-- v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <!-- v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -49,7 +49,12 @@
     <div id="avisoBloq" class="bloq" style="display:none"><i class="bi bi-lock-fill me-1"></i>Las remuneraciones de este mes ya fueron <b>EMITIDAS</b>: bloqueado para nuevos adicionales.</div>
     <div class="row g-2">
       <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Colaborador</label>
-        <select id="fColab" class="form-select form-select-sm"><option value="">— elegir —</option></select></div>
+        <select id="fColab" class="form-select form-select-sm" onchange="grupoUI()"><option value="">— elegir —</option></select>
+        <!-- GRUPO (Pato, 14-09-2026): lista con casillas para pagar algo a varios, no a todos -->
+        <div id="wGrupo" style="display:none;margin-top:6px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;max-height:220px;overflow:auto;background:#fff">
+          <div class="d-flex gap-3 mb-1 small"><a href="#" onclick="grupoTodos(true);return false">Marcar todos</a><a href="#" onclick="grupoTodos(false);return false">Ninguno</a><span class="ms-auto text-muted" id="grupoN"></span></div>
+          <div id="grupoLista" style="columns:2;column-gap:14px"></div>
+        </div></div>
       <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Causal del pago</label>
         <select id="fCausal" class="form-select form-select-sm" onchange="causalUI()"></select></div>
       <div class="col-md-3" id="wOtro" style="display:none"><label class="form-label small fw-semibold mb-1">Concepto (texto libre)</label>
@@ -212,7 +217,8 @@ async function cargar(){
   if (sel && CAUSALES[sel]!==undefined) fCausal.value = sel;
   if (!fColab.options.length || fColab.options.length===1){
     const jd = await (await fetch('/api/rrhh/directorio',{headers:H})).json();
-    fColab.innerHTML = '<option value="">— elegir —</option><option value="TODOS">★ TODO EL PERSONAL (todos los activos con ficha)</option>' + (jd.data||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
+    fColab.innerHTML = '<option value="">— elegir —</option><option value="TODOS">★ TODO EL PERSONAL (todos los activos con ficha)</option><option value="GRUPO">☑ UN GRUPO (marcar con casillas)</option>' + (jd.data||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
+    document.getElementById('grupoLista').innerHTML = (jd.data||[]).map(c=>`<label class="d-block small" style="break-inside:avoid;cursor:pointer"><input type="checkbox" class="form-check-input me-1 gr" value="${c.id_usuario}" onchange="grupoN()">${esc(c.nombre)}</label>`).join('');
     causalUI();
   }
   document.getElementById('avisoBloq').style.display = D.bloqueado?'':'none';
@@ -282,9 +288,15 @@ async function nuevoConcepto(){
   fCausal.value = j.data.nombre; causalUI();
 }
 
+function grupoUI(){ document.getElementById('wGrupo').style.display = fColab.value==='GRUPO' ? '' : 'none'; grupoN(); }
+function grupoSel(){ return [...document.querySelectorAll('#grupoLista .gr:checked')].map(x=>Number(x.value)); }
+function grupoTodos(v){ document.querySelectorAll('#grupoLista .gr').forEach(x=>x.checked=v); grupoN(); }
+function grupoN(){ const n = grupoSel().length; document.getElementById('grupoN').textContent = n ? `${n} seleccionado(s)` : ''; }
 async function guardar(){
   const horas = parseFloat(String(document.getElementById('fHoras').value).replace(',','.')) || 0;
-  const body = { mes: fMes.value, id_usuario: fColab.value, causal: fCausal.value,
+  const grupo = fColab.value==='GRUPO' ? grupoSel() : null;
+  if (grupo && !grupo.length) return alert('Marca al menos una persona del grupo');
+  const body = { mes: fMes.value, id_usuario: fColab.value, ids: grupo || undefined, causal: fCausal.value,
     causal_texto: fOtro.value, imponible: fOtroImp.value==='1', es_liquido: document.getElementById('fLiq').checked,
     no_imponible: document.getElementById('fNoImp').checked,
     permanente: document.getElementById('fPerm').checked,
@@ -292,9 +304,9 @@ async function guardar(){
     monto: montoVal(), horas: esHE() ? horas : undefined };
   if (!body.id_usuario) return alert('Elige el colaborador');
   if (body.hasta && body.hasta < body.mes) return alert('El mes "hasta" no puede ser anterior al mes desde');
-  if (body.id_usuario==='TODOS') {
+  if (body.id_usuario==='TODOS' || grupo) {
     if (esHE()) return alert('Las horas extras se digitan por persona');
-    if (!confirm(`¿Asignar ${fCausal.value} de $${fmt(body.monto)} a TODO el personal activo en ${fMes.value}?\n\nQuien ya lo tenga este mes se salta.`)) return;
+    if (!confirm(`¿Asignar ${fCausal.value} de $${fmt(body.monto)}${document.getElementById('fLiq').checked?' líquidos':''} a ${grupo?grupo.length+' persona(s) del grupo':'TODO el personal activo'} en ${fMes.value}?\n\nQuien ya lo tenga este mes se salta.`)) return;
   }
   // En horas extras manda la cantidad de horas: el monto lo recalcula el servidor.
   if (esHE()) { if (!(horas > 0)) return alert('Indica cuántas horas extras se pagan'); }
@@ -303,7 +315,7 @@ async function guardar(){
   const j = await r.json(); if (!j.success) return alert(j.error);
   if (j.data && j.data.creados != null) alert(`Asignado a ${j.data.creados} personas:\n${j.data.personas.join(', ')}`);
   // listo para el siguiente: limpia colaborador/monto/otro, mantiene mes y causal
-  fColab.value=''; document.getElementById('fMonto').value=''; fOtro.value=''; document.getElementById('fLiq').checked=false;
+  fColab.value=''; grupoTodos(false); grupoUI(); document.getElementById('fMonto').value=''; fOtro.value=''; document.getElementById('fLiq').checked=false;
   document.getElementById('fNoImp').checked=false; document.getElementById('fPerm').checked=false;
   document.getElementById('fHasta').value=''; document.getElementById('wHasta').style.display='none';
   document.getElementById('fHoras').value=''; document.getElementById('heDetalle').innerHTML='';

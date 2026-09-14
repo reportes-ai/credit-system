@@ -298,21 +298,25 @@ const crearAdicional = async (req, res) => {
        para cada colaborador activo con ficha (bono Fiestas Patrias, Navidad, vacaciones…).
        Quien ya tenga esa misma causal en el mes se salta, así se puede repetir sin duplicar. */
     const todos = String(b.id_usuario) === 'TODOS';
-    if (todos) {
+    // GRUPO (Pato, 14-09-2026): ids marcados con casillas — mismo motor que TODOS, acotado a esas personas
+    const grupo = String(b.id_usuario) === 'GRUPO' ? (Array.isArray(b.ids) ? b.ids.map(Number).filter(Boolean) : []) : null;
+    if (grupo && !grupo.length) return fail(res, 'Marca al menos una persona del grupo', 400);
+    if (todos || grupo) {
       if (causal === 'HORAS EXTRAS') return fail(res, 'Las horas extras se digitan por persona', 400);
       const [gente] = await pool.query(
         `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre FROM usuarios u
            JOIN rh_fichas f ON f.id_usuario=u.id_usuario
           WHERE u.estado='activo' AND COALESCE(f.sueldo_base,0) > 0
+            ${grupo ? 'AND u.id_usuario IN (?)' : ''}
             AND u.id_usuario NOT IN (SELECT id_usuario FROM rh_adicionales WHERE mes=? AND causal=?)
-          ORDER BY nombre`, [mes, causal]);
-      if (!gente.length) return fail(res, 'Todo el personal ya tiene esta causal este mes', 400);
+          ORDER BY nombre`, grupo ? [grupo, mes, causal] : [mes, causal]);
+      if (!gente.length) return fail(res, grupo ? 'Las personas marcadas ya tienen esta causal este mes' : 'Todo el personal ya tiene esta causal este mes', 400);
       let creados = 0;
       for (const g of gente) {
         const j = await crearUno({ ...b, id_usuario: g.id_usuario }, req, { silencioso: true });
         if (j && j.ok) creados++; else if (j && j.error) return fail(res, j.error, j.status || 400);
       }
-      auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', detalle: `Adicional ${mes} a TODO EL PERSONAL (${creados}): ${causal} $${Math.round(Number(b.monto) || 0).toLocaleString('es-CL')}${b.es_liquido ? ' LÍQUIDO' : ''}` });
+      auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', detalle: `Adicional ${mes} a ${grupo ? 'un GRUPO' : 'TODO EL PERSONAL'} (${creados}): ${causal} $${Math.round(Number(b.monto) || 0).toLocaleString('es-CL')}${b.es_liquido ? ' LÍQUIDO' : ''}` });
       return ok(res, { creados, personas: gente.map(g => g.nombre) });
     }
     const j = await crearUno(b, req);
