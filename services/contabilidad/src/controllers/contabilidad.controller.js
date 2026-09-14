@@ -1631,12 +1631,11 @@ exports.importarRemunAux = async (req, res) => {
     if (iHead < 0) return fail(res, 'El archivo no parece el Libro de Remuneraciones de AVSOFT (LIBREMUN)', 400);
     const head = lineas[iHead].split(';').map(s => s.trim().toUpperCase());
     const col = (nom) => head.findIndex(h => h === nom);
-    const cols = (nom) => head.map((h, i) => h === nom ? i : -1).filter(i => i >= 0);   // encabezados repetidos (COMISION POR VENTAS ×8)
-    // Haberes imponibles: posición fija desde el INICIO (van antes del hueco del encabezado)
-    const ini2 = {
-      comis: [...cols('COMISION POR VENTAS'), col('COMISIONES MES ANTERIOR'), col('ANTICIPO COMISIONES Y SEMANA CORRIDA')].filter(i => i >= 0),
-      semcorr: [col('SEM.CORRIDA'), col('SEMANA CORRIDA MES ANTERIOR'), col('SEMANA CORRIDA RETROACT.')].filter(i => i >= 0),
-    };
+    /* El hueco del encabezado está en "COMISION POR VENTAS" (8 títulos, 1 columna de datos): desde
+       ahí TODO va corrido 7 → los haberes variables se leen desde el FINAL. Cuadrado contra la
+       liquidación AVSOFT de F. Contreras ago-2026 (14-09-2026): semana corrida 268.698, comisiones
+       mes anterior 1.192.985, bono comercial 69.023. */
+    const colUlt = (nom) => head.map((h, i) => h === nom ? i : -1).filter(i => i >= 0).pop() ?? -1;
     // Columnas de identificación: posición fija desde el INICIO.
     const ini = {
       rut: col('RUT'), nombre: col('NOMBRE'), pat: col('AP PATERNO'), mat: col('AP MATERNO'),
@@ -1655,7 +1654,9 @@ exports.importarRemunAux = async (req, res) => {
       vacProp: 'VACACIONES PROPORCIONALES', mesAviso: 'INDEMINIZACION MES DE AVISO', indVol: 'INDEMNIZACION VOLUNTARIA',
       ley16744: 'LEY 17.644 (ACT.)', capInd: 'APORTE CAP.INDIVIDUAL', expVida: 'APORTE EXPECTATIVA DE VIDA',
       rentProt: 'APORTE RENTABILIDAD PROTEGIDA', pesadoEmp: 'MONTO TRAB.PESADO', grat: 'GRATIFICACION',
-    })) { const i = col(nom); off[k] = i < 0 ? -1 : head.length - i; }
+      comis: 'COMISION POR VENTAS', comisAnt: 'COMISIONES MES ANTERIOR',
+      semcorr: 'SEM.CORRIDA', semcorrAnt: 'SEMANA CORRIDA MES ANTERIOR', semcorrRetro: 'SEMANA CORRIDA RETROACT.',
+    })) { const i = colUlt(nom); off[k] = i < 0 ? -1 : head.length - i; }
     // La Ñ de "AÑOS" llega mal codificada según el export: se busca por patrón.
     { const i = head.findIndex(h => /^INDEMNIZACION A.OS DE SERVICIO$/.test(h)); off.ias = i < 0 ? -1 : head.length - i; }
     if (ini.rut < 0 || off.imponible < 0 || off.liquido < 0) return fail(res, 'No se reconocieron las columnas del LIBREMUN', 400);
@@ -1667,8 +1668,9 @@ exports.importarRemunAux = async (req, res) => {
       if (!/^\d{4}-\d{2}$/.test(mes)) continue;
       const fin = k => off[k] < 0 ? undefined : c[c.length - off[k]];
       const n = v => Math.round(Number(v) || 0);
-      const sumIni = idx => idx.reduce((s, i) => s + n(c[i]), 0);
-      const comis = sumIni(ini2.comis), semcorr = sumIni(ini2.semcorr), grat = n(fin('grat'));
+      const comis = n(fin('comis')) + n(fin('comisAnt'));
+      const semcorr = n(fin('semcorr')) + n(fin('semcorrAnt')) + n(fin('semcorrRetro'));
+      const grat = n(fin('grat'));
       const ganado = n(fin('ganado')) || n(fin('imponible'));
       const otrosImp = Math.max(0, ganado - n(c[ini.base]) - comis - semcorr - grat);
       filas.push([mes, c[ini.rut]?.trim() || null,
