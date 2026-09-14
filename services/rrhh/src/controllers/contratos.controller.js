@@ -382,12 +382,14 @@ exports.finiquitoCalcular = async (req, res) => {
     const avisos = [];
 
     // MOTOR ÚNICO base-remuneracion.js (el mismo de la provisión de Vacaciones):
-    // promedio 3 últimas liquidaciones EMITIDAS o sueldo base ×1,25
-    const [liqs] = await pool.query(
-      `SELECT 1 FROM rh_liquidaciones WHERE id_usuario=? AND estado='EMITIDA' LIMIT 3`, [idU]);
-    const base = await require('../base-remuneracion').remuneracionBase(idU);
-    if (liqs.length > 1) avisos.push(`Base = promedio de las últimas ${liqs.length} liquidaciones emitidas (rentas variables).`);
-    else if (!liqs.length) avisos.push('Sin liquidaciones emitidas: base estimada = sueldo base + 25% de gratificación. Revísala y ajústala.');
+    // promedio 3 últimas liquidaciones EMITIDAS → Libro de Remuneraciones AVSOFT
+    // (meses anteriores al del término) → sueldo base ×1,25
+    const bd = await require('../base-remuneracion').remuneracionBaseDetalle(idU, fechaT.slice(0, 7));
+    const base = bd.base;
+    const mesesTxt = bd.meses.map(m => m.split('-').reverse().join('-')).join(', ');
+    if (bd.fuente === 'MOTOR') avisos.push(`Base = promedio de las últimas ${bd.meses.length} liquidaciones emitidas (${mesesTxt}).`);
+    else if (bd.fuente === 'AVSOFT') avisos.push(`Base = promedio del imponible de ${mesesTxt} según el Libro de Remuneraciones de AVSOFT (Contabilidad › Auxiliares › Remuneraciones); incluye comisiones.`);
+    else avisos.push('Sin liquidaciones emitidas ni Libro de Remuneraciones cargado: base estimada = sueldo base + 25% de gratificación. Revísala y ajústala.');
     const [[cfgA]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_tope_anos'");
     const [[cfgU]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_tope_uf'");
     const topeAnos = parseInt(cfgA?.valor) || 11, topeUFn = parseFloat(cfgU?.valor) || 90;
