@@ -455,7 +455,7 @@ exports.getClimaCorrelacion = async (req, res) => {
       `SELECT DATE(fecha_otorgado) f, COUNT(*) q, SUM(COALESCE(monto_financiado,0)) m
        FROM creditos WHERE estado_eval='OTORGADO' AND fecha_otorgado BETWEEN ? AND ?
        GROUP BY 1`, [desde, hasta]);
-    const qPorDia = new Map(ops.map(r => [F.isoDe(r.f), { q: Number(r.q), m: Number(r.m) }]));
+    const qPorDia = new Map(ops.map(r => [F.isoDeBD(r.f), { q: Number(r.q), m: Number(r.m) }]));   // DATE de la BD: offset del pool, no la zona (borde cambio de hora)
     const clima = await climaRango(desde, hasta);
     const { esFeriado, cargarFeriados } = require('../../../../shared/feriados');
     await cargarFeriados();   // asegurar el set en frío (carga async al boot)

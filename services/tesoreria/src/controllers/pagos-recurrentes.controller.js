@@ -154,8 +154,8 @@ const fmtOrigen = (n, mon) => mon === 'CLP' ? fmtCLP(n) : `${Number(n).toLocaleS
    número emitido. Idempotente por (pago, vencimiento): si ya se generó para esa
    fecha, no hace nada. */
 async function generarUno(p, hoyISO, req) {
-  const venc = fc.isoDe(p.fecha_proximo_pago) || String(p.fecha_proximo_pago).slice(0, 10);
-  if (p.fecha_ultima_generacion && fc.isoDe(p.fecha_ultima_generacion) >= venc) return null;
+  const venc = fc.isoDeBD(p.fecha_proximo_pago) || String(p.fecha_proximo_pago).slice(0, 10);
+  if (p.fecha_ultima_generacion && fc.isoDeBD(p.fecha_ultima_generacion) >= venc) return null;
 
   const [[prov]] = await pool.query('SELECT id, nombre, rut, email, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE id=?', [p.id_proveedor]);
   if (!prov) throw new Error(`Proveedor ${p.id_proveedor} no existe`);
@@ -239,7 +239,7 @@ async function onOdpPagada(idOrdenPago) {
   const [[op]] = await pool.query(
     'SELECT id, numero, concepto, monto, fecha_pago, id_proveedor, id_pago_recurrente FROM ordenes_pago WHERE id=? AND id_pago_recurrente IS NOT NULL', [idOrdenPago]);
   if (!op) return;
-  const fechaPago = fc.isoDe(op.fecha_pago) || fc.hoyISO();
+  const fechaPago = fc.isoDeBD(op.fecha_pago) || fc.hoyISO();
   await pool.query('UPDATE tesoreria_pagos_recurrentes SET fecha_ultimo_pago=? WHERE id=?', [fechaPago, op.id_pago_recurrente]);
   const [[prov]] = await pool.query('SELECT nombre, email FROM proveedores WHERE id=?', [op.id_proveedor]);
   if (!prov || !prov.email) { console.warn('[pagos-recurrentes] proveedor sin correo, no se avisa el pago de', op.numero); return; }

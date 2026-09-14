@@ -13,7 +13,7 @@
 const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
-const { hoyISO, isoDe, desdeISO } = require('../../../../shared/fecha-chile');
+const { hoyISO, isoDe, isoDeBD, desdeISO } = require('../../../../shared/fecha-chile');
 require('../motor-asientos'); // Fase 2: carga el motor (migra reglas + log al boot)
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
@@ -3193,7 +3193,7 @@ exports.rcvPendientes = async (req, res) => {
       docs.push({
         tipo_doc: String(d.tipo_dte), tipo_nombre: d.tipo_dte_nombre, num_doc: String(d.folio),
         rut: d.rut_proveedor, razon_social: d.razon_social,
-        fecha_doc: isoDe(d.fecha_emision), fecha_recepcion: isoDe(d.fecha_recepcion),
+        fecha_doc: isoDeBD(d.fecha_emision), fecha_recepcion: isoDeBD(d.fecha_recepcion),   // DATE de la BD
         neto: Number(d.monto_neto || 0), exento: Number(d.monto_exento || 0),
         iva: Number(d.iva_recuperable || 0), total: Number(d.monto_total || 0),
         cuenta_sugerida: sug?.cuenta_gasto || null, veces_cuenta: sug?.n || 0,

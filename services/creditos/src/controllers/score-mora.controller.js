@@ -12,7 +12,7 @@
  * con atraso > X días o impaga vencida hace > X días (X configurable).
  * ─────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
-const { isoDe } = require('../../../../shared/fecha-chile');   // Date de la BD → 'YYYY-MM-DD'
+const { isoDeBD: isoDe } = require('../../../../shared/fecha-chile');   // Date de la BD → 'YYYY-MM-DD' (offset del pool, no la zona)
 
 require('../../../../shared/migrate').enFila('score-mora', async () => {
   try {
