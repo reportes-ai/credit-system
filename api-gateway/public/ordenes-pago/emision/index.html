@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v2.5 — hasta 4 documentos adjuntos, 7 MB en total (todos viajan al correo de Contabilidad). v2.4 — Categoría con lista fija (Administrativos/Arriendos/Otros/Comisión Dealer/Comisión Parque/Saldo Precio), reemplaza el texto libre · v2.3 — "Se paga a: banco · tipo · cuenta" visible bajo el proveedor al elegirlo · v2.2 — banco/cuenta del proveedor solo criticos con pago por Transferencia (cheque/efectivo/tarjeta no los exigen) · v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
+  <!-- v2.6 — Proveedor: secciones Dealers y Parques automotrices al final de la lista (se enlazan a un proveedor por RUT con banco y cuenta de su ficha). v2.5 — hasta 4 documentos adjuntos, 7 MB en total (todos viajan al correo de Contabilidad). v2.4 — Categoría con lista fija (Administrativos/Arriendos/Otros/Comisión Dealer/Comisión Parque/Saldo Precio), reemplaza el texto libre · v2.3 — "Se paga a: banco · tipo · cuenta" visible bajo el proveedor al elegirlo · v2.2 — banco/cuenta del proveedor solo criticos con pago por Transferencia (cheque/efectivo/tarjeta no los exigen) · v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -219,12 +219,19 @@ function onTipo(){
 let PROVS = [];
 async function cargarProv(){
   try {
-    const r = await fetch('/api/ordenes-pago/proveedores', { headers:H });
+    const r = await fetch('/api/ordenes-pago/proveedores?con_terceros=1', { headers:H });
     const j = await r.json();
-    PROVS = j.data||[];
-    const opts = (j.data||[]).map(p=>`<option value="${p.id}">${escH(p.nombre)}${p.rut?' — '+escH(formatRUT(p.rut)):''}</option>`).join('');
+    // Dealers y parques (Pato, 14-09-2026): secciones al final de la base; value "D<id>" / "P<id>" y
+    // se guardan en PROVS con id string para que onProvChange/emitir muestren su banco y cuenta.
+    const dealers = (j.dealers||[]).map(d => ({ ...d, id: 'D' + d.id, tercero_tipo: 'DEALER', tercero_id: d.id }));
+    const parques = (j.parques||[]).map(p => ({ ...p, id: 'P' + p.id, tercero_tipo: 'PARQUE', tercero_id: p.id, nombre: p.parque && p.parque !== p.nombre ? `${p.parque} · ${p.nombre}` : p.nombre }));
+    PROVS = [...(j.data||[]), ...dealers, ...parques];
+    const op = p => `<option value="${p.id}">${escH(p.nombre)}${p.rut?' — '+escH(formatRUT(p.rut)):''}</option>`;
+    const opts = (j.data||[]).map(op).join('');
+    const grp = (t, arr) => arr.length ? `<optgroup label="${t}">${arr.map(op).join('')}</optgroup>` : '';
     document.getElementById('fProv').innerHTML =
-      '<option value="">— Seleccionar proveedor —</option>' + opts + '<option value="__otro">+ Proveedor no registrado…</option>';
+      '<option value="">— Seleccionar proveedor —</option>' + opts + '<option value="__otro">+ Proveedor no registrado…</option>'
+      + grp('Dealers', dealers) + grp('Parques automotrices', parques);
   } catch(e) {
     document.getElementById('fProv').innerHTML = '<option value="">Error al cargar</option><option value="__otro">+ Proveedor no registrado…</option>';
   }
@@ -238,11 +245,16 @@ function onProvChange(){
   // (solo si el pago es por Transferencia: cheque/efectivo/tarjeta no los necesitan)
   const met = document.getElementById('fMetodo').value;
   const p = (!otro && v) ? PROVS.find(x=>String(x.id)===String(v)) : null;
-  const falta = p && (met === 'Transferencia' || !met) && (!(p.banco||'').trim() || !(p.numero_cuenta||'').trim());
+  // Dealer/parque: sus datos bancarios se corrigen en SU ficha (fuente única), no acá
+  const falta = p && !p.tercero_tipo && (met === 'Transferencia' || !met) && (!(p.banco||'').trim() || !String(p.numero_cuenta||'').trim());
   // Cuenta de PAGO del proveedor a la vista (a dónde se le transfiere)
   const info = document.getElementById('provCuentaInfo');
-  if (p && (p.banco||'').trim() && (p.numero_cuenta||'').trim()) {
-    info.innerHTML = `<i class="bi bi-bank me-1"></i>Se paga a: <b>${escH(p.banco)}</b> · ${escH(p.tipo_cuenta||'Cuenta Corriente')} <b>${escH(p.numero_cuenta)}</b>`;
+  if (p && (p.banco||'').trim() && String(p.numero_cuenta||'').trim()) {
+    info.innerHTML = `<i class="bi bi-bank me-1"></i>Se paga a: <b>${escH(p.banco)}</b> · ${escH(p.tipo_cuenta||'Cuenta Corriente')} <b>${escH(p.numero_cuenta)}</b>`
+      + (p.tercero_tipo ? ` <span style="color:#64748b">(ficha del ${p.tercero_tipo==='DEALER'?'dealer':'parque'})</span>` : '');
+    info.style.display = '';
+  } else if (p && p.tercero_tipo) {
+    info.innerHTML = `<i class="bi bi-exclamation-triangle me-1" style="color:#b45309"></i>La ficha del ${p.tercero_tipo==='DEALER'?'dealer':'parque'} no tiene banco/cuenta: complétala en su mantenedor antes de pagar por transferencia.`;
     info.style.display = '';
   } else info.style.display = 'none';
   document.getElementById('boxProvBanco').style.display = falta ? '' : 'none';
@@ -346,7 +358,11 @@ async function emitirDefinitivo(){
   if (provSel==='__otro') {
     body.proveedor_nombre = document.getElementById('fProvNombre').value.trim();
     body.proveedor_rut = document.getElementById('fProvRut').value.trim();
-  } else { body.id_proveedor = parseInt(provSel); }
+  } else {
+    const p = PROVS.find(x=>String(x.id)===String(provSel));
+    if (p && p.tercero_tipo) { body.tercero_tipo = p.tercero_tipo; body.tercero_id = p.tercero_id; }
+    else body.id_proveedor = parseInt(provSel);
+  }
 
   const btn = document.getElementById('btnEmitir'); btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Emitiendo…';
   try {

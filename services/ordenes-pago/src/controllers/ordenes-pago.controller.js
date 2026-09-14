@@ -303,11 +303,60 @@ const listarProveedores = async (req, res) => {
     if (q) { const qq = `%${q.toUpperCase()}%`; where.push('(UPPER(nombre) LIKE ? OR UPPER(rut) LIKE ? OR UPPER(giro) LIKE ? OR UPPER(codigo_actividad) LIKE ? OR UPPER(comentario) LIKE ?)'); args.push(qq, qq, qq, qq, qq); }
     const [rows] = await pool.query(
       `SELECT * FROM proveedores ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY nombre LIMIT 500`, args);
-    res.json({ success: true, data: rows, error: null });
+    /* Terceros para la orden MANUAL (Pato, 14-09-2026): al final de la base de proveedores, una sección con
+       los DEALERS activos y otra con los PARQUES (ficha). Se leen de su fuente única (dealers / parques_ficha);
+       al emitir, crearOrden los enlaza a un proveedor por RUT (tercero_tipo + tercero_id). */
+    let dealers = [], parques = [];
+    if (req.query.con_terceros === '1') {
+      [dealers] = await pool.query(`
+        SELECT id_dealer AS id, COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre, rut, banco,
+               COALESCE(tipo_cuenta, cuenta_tipo) AS tipo_cuenta, num_cuenta AS numero_cuenta
+          FROM dealers WHERE activo = 1 ORDER BY nombre`);
+      [parques] = await pool.query(`
+        SELECT f.id_parque AS id, COALESCE(NULLIF(f.razon_social,''), p.nombre) AS nombre, COALESCE(f.rut_cuenta, f.rut) AS rut,
+               f.banco, f.cuenta_tipo AS tipo_cuenta, f.num_cuenta AS numero_cuenta, p.nombre AS parque
+          FROM parques_ficha f JOIN parques_comisiones p ON p.id = f.id_parque ORDER BY p.nombre`);
+    }
+    res.json({ success: true, data: rows, dealers, parques, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
+
+/* Dealer o parque elegido en la orden manual → proveedor (creado o reutilizado por RUT, con banco y cuenta
+   de su ficha). Devuelve el id de proveedores, para que la orden siga el flujo normal. */
+async function proveedorDesdeTercero(req, tipo, id) {
+  let t = null;
+  if (tipo === 'DEALER') {
+    [[t]] = await pool.query(`SELECT COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre, rut, banco,
+                                     COALESCE(tipo_cuenta, cuenta_tipo) AS tipo_cuenta, num_cuenta AS numero_cuenta,
+                                     COALESCE(NULLIF(correo,''), NULLIF(cf_email,'')) AS email, telefono, direccion
+                                FROM dealers WHERE id_dealer=?`, [id]);
+  } else if (tipo === 'PARQUE') {
+    [[t]] = await pool.query(`SELECT COALESCE(NULLIF(f.razon_social,''), p.nombre) AS nombre, COALESCE(f.rut_cuenta, f.rut) AS rut, f.banco,
+                                     f.cuenta_tipo AS tipo_cuenta, f.num_cuenta AS numero_cuenta, COALESCE(f.cf_email, f.correo_confirmacion) AS email,
+                                     f.cf_telefono AS telefono, f.direccion
+                                FROM parques_ficha f JOIN parques_comisiones p ON p.id = f.id_parque WHERE f.id_parque=?`, [id]);
+  }
+  if (!t || !t.nombre) return null;
+  const rut = t.rut ? normRut(t.rut) : null;
+  const [[dup]] = rut
+    ? await pool.query("SELECT id, banco, numero_cuenta FROM proveedores WHERE REPLACE(rut,'.','')=REPLACE(?,'.','') LIMIT 1", [rut])
+    : await pool.query('SELECT id, banco, numero_cuenta FROM proveedores WHERE UPPER(nombre)=UPPER(?) LIMIT 1', [t.nombre]);
+  if (dup) {
+    // Si el proveedor ya existe pero sin datos de transferencia, se completan desde la ficha (fuente única)
+    if ((!dup.banco || !dup.numero_cuenta) && t.banco && t.numero_cuenta)
+      await pool.query('UPDATE proveedores SET banco=?, tipo_cuenta=?, numero_cuenta=? WHERE id=?', [t.banco, t.tipo_cuenta || 'Cuenta Corriente', String(t.numero_cuenta), dup.id]);
+    return dup.id;
+  }
+  const [np] = await pool.query(
+    'INSERT INTO proveedores (rut, nombre, email, telefono, direccion, banco, tipo_cuenta, numero_cuenta, activo, comentario) VALUES (?,?,?,?,?,?,?,?,1,?)',
+    [rut, t.nombre, t.email || null, t.telefono || null, t.direccion || null, t.banco || null, t.banco ? (t.tipo_cuenta || 'Cuenta Corriente') : null,
+     t.numero_cuenta ? String(t.numero_cuenta) : null, tipo === 'DEALER' ? 'Dealer (creado desde una orden de pago manual)' : 'Parque automotriz (creado desde una orden de pago manual)']);
+  auditar({ req, accion: 'CREAR', modulo: 'ordenes-pago', entidad: 'proveedor', entidad_id: np.insertId,
+    detalle: `Creó proveedor ${t.nombre} desde la ficha de ${tipo === 'DEALER' ? 'dealer' : 'parque'} (orden de pago manual)` });
+  return np.insertId;
+}
 
 /* POST /api/ordenes-pago/proveedores */
 const crearProveedor = async (req, res) => {
@@ -906,6 +955,11 @@ const crearOrden = async (req, res) => {
     let provNombre = norm(b.proveedor_nombre);
     let provRut = b.proveedor_rut ? normRut(b.proveedor_rut) : null;
     let destino = null;
+    // Dealer o parque elegido en la lista → proveedor por RUT (con banco y cuenta de su ficha)
+    if (!idProv && b.tercero_tipo && parseInt(b.tercero_id)) {
+      idProv = await proveedorDesdeTercero(req, String(b.tercero_tipo).toUpperCase(), parseInt(b.tercero_id));
+      if (!idProv) return res.status(400).json({ success: false, data: null, error: 'No se encontró la ficha del dealer/parque elegido' });
+    }
     if (idProv) {
       const [[p]] = await pool.query('SELECT nombre, rut, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE id=?', [idProv]);
       if (!p) return res.status(400).json({ success: false, data: null, error: 'Proveedor no encontrado' });
