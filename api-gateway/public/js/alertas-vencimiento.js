@@ -5,9 +5,17 @@
  */
 (function () {
   const STORAGE_KEY = 'alertas_venc_mostradas';
+  const POSPUESTO_KEY = 'alertas_venc_pospuesto_hasta';   // "Entendido, no mostrar hoy" = hasta mañana 08:00 (localStorage, sobrevive al cierre del navegador)
   const token = sessionStorage.getItem('token');
   if (!token) return;                              // no autenticado
   if (sessionStorage.getItem(STORAGE_KEY)) return; // ya se mostró en esta sesión
+  try { const h = localStorage.getItem(POSPUESTO_KEY); if (h && Date.now() < Number(h)) return; } catch (_) {}
+  // Hasta mañana a las 08:00 (hora local del navegador)
+  window.AF_ALERTAS_POSPONER = function () {
+    const m = new Date(); m.setDate(m.getDate() + 1); m.setHours(8, 0, 0, 0);
+    try { localStorage.setItem(POSPUESTO_KEY, String(m.getTime())); } catch (_) {}
+    return m;
+  };
 
   // Esperar a que el DOM esté listo
   function init() {
@@ -97,7 +105,7 @@
           <button onclick="cerrarAlertaVencHoy()"
                   style="background:#1a237e;color:#fff;border:none;border-radius:8px;
                          padding:9px 22px;font-weight:700;font-size:.88rem;cursor:pointer">
-            Entendido, no mostrar hoy
+            Entendido, no mostrar hasta mañana
           </button>
         </div>
       </div>`;
@@ -120,7 +128,10 @@
   window.cerrarAlertaVencHoy = function () {
     const el = document.getElementById('av-overlay');
     if (el) el.remove();
-    // Ya está guardado en sessionStorage — no aparecerá en toda la sesión
+    // Pospuesto hasta mañana 08:00 (antes solo duraba la sesión del navegador; Pato, 14-09-2026).
+    // También esconde la franja roja del Home hasta esa hora.
+    window.AF_ALERTAS_POSPONER();
+    const b = document.getElementById('alertaTMC'); if (b) b.style.display = 'none';
   };
 
   // Ejecutar tras 1.5s para no interferir con la carga inicial de la página

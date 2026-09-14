@@ -353,6 +353,7 @@
       <i class="bi bi-exclamation-triangle-fill"></i>
       <span id="alertaTMCMsg"></span>
       <span class="cta">Actualizar ahora →</span>
+      <span class="cta" title="Ocultar esta franja hasta mañana a las 08:00" style="background:transparent;padding:6px 8px" onclick="event.preventDefault();event.stopPropagation();(window.AF_ALERTAS_POSPONER||function(){})();document.getElementById('alertaTMC').style.display='none';"><i class="bi bi-x-lg"></i></span>
     </a>
     <div class="welcome-banner">
       <h2><span id="bienvenidoSaludo">Bienvenido</span>, <span id="bienvenidoNombre">—</span></h2>
@@ -532,6 +533,8 @@
         const hasta = new Date(t.fecha_hasta).toISOString().slice(0, 10);
         const hoy = new Date().toISOString().slice(0, 10);
         if (hasta < hoy) {
+          // Pospuesto desde el popup ("no mostrar hasta mañana"): la franja también se calla hasta esa hora
+          try { const p = localStorage.getItem('alertas_venc_pospuesto_hasta'); if (p && Date.now() < Number(p)) return; } catch (_) {}
           const fLbl = hasta.split('-').reverse().join('-');   // DD-MM-YYYY
           document.getElementById('alertaTMCMsg').innerHTML =
             `<b>Tasa Máxima Convencional (TMC) vencida.</b> Rigió hasta el ${fLbl} y no se actualizó automáticamente. ` +
