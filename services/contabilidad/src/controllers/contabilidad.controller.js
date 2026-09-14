@@ -1612,8 +1612,11 @@ require('../../../../shared/migrate').enFila('contabilidad-remun-aux', async () 
        de servicio (renta no gravada / mes del finiquito). */
     /* finiquito_otros = vacaciones proporcionales + mes de aviso + indemnización voluntaria (marca "F" de la DJ 1887);
        aportes_emp_otros = ley de accidentes + aportes de la reforma previsional + trabajo pesado del empleador (leyes sociales C36). */
+    /* Apertura del imponible (Pato 14-09-2026, anexo del finiquito): comisiones (todas las columnas
+       COMISION POR VENTAS + comisiones mes anterior + anticipo comisiones y semana corrida), semana
+       corrida (+ mes anterior + retroactiva), gratificación y el resto (horas extras, bonos, aguinaldos…). */
     for (const c of ['seg_ces_trab', 'salud_legal', 'salud_adicional', 'total_imposicion', 'apv', 'mayor_retencion', 'prestamo_3pct', 'ias', 'total_ganado',
-                     'finiquito_otros', 'aportes_emp_otros'])
+                     'finiquito_otros', 'aportes_emp_otros', 'comisiones', 'semana_corrida', 'gratificacion', 'otros_imponibles'])
       await pool.query(`ALTER TABLE ctb_remun_aux ADD COLUMN ${c} DECIMAL(14,0) NOT NULL DEFAULT 0`).catch(() => {});
   } catch (e) { console.error('[contabilidad-remun-aux migration]', e.message); }
 });
@@ -1628,6 +1631,12 @@ exports.importarRemunAux = async (req, res) => {
     if (iHead < 0) return fail(res, 'El archivo no parece el Libro de Remuneraciones de AVSOFT (LIBREMUN)', 400);
     const head = lineas[iHead].split(';').map(s => s.trim().toUpperCase());
     const col = (nom) => head.findIndex(h => h === nom);
+    const cols = (nom) => head.map((h, i) => h === nom ? i : -1).filter(i => i >= 0);   // encabezados repetidos (COMISION POR VENTAS ×8)
+    // Haberes imponibles: posición fija desde el INICIO (van antes del hueco del encabezado)
+    const ini2 = {
+      comis: [...cols('COMISION POR VENTAS'), col('COMISIONES MES ANTERIOR'), col('ANTICIPO COMISIONES Y SEMANA CORRIDA')].filter(i => i >= 0),
+      semcorr: [col('SEM.CORRIDA'), col('SEMANA CORRIDA MES ANTERIOR'), col('SEMANA CORRIDA RETROACT.')].filter(i => i >= 0),
+    };
     // Columnas de identificación: posición fija desde el INICIO.
     const ini = {
       rut: col('RUT'), nombre: col('NOMBRE'), pat: col('AP PATERNO'), mat: col('AP MATERNO'),
@@ -1645,7 +1654,7 @@ exports.importarRemunAux = async (req, res) => {
       apv: 'AHORRO PREV.', mayorRet: 'MAYOR RETEN.SOLIC.', prest3: 'RETENCION 3% PRESTAMO SOLIDARIO',
       vacProp: 'VACACIONES PROPORCIONALES', mesAviso: 'INDEMINIZACION MES DE AVISO', indVol: 'INDEMNIZACION VOLUNTARIA',
       ley16744: 'LEY 17.644 (ACT.)', capInd: 'APORTE CAP.INDIVIDUAL', expVida: 'APORTE EXPECTATIVA DE VIDA',
-      rentProt: 'APORTE RENTABILIDAD PROTEGIDA', pesadoEmp: 'MONTO TRAB.PESADO',
+      rentProt: 'APORTE RENTABILIDAD PROTEGIDA', pesadoEmp: 'MONTO TRAB.PESADO', grat: 'GRATIFICACION',
     })) { const i = col(nom); off[k] = i < 0 ? -1 : head.length - i; }
     // La Ñ de "AÑOS" llega mal codificada según el export: se busca por patrón.
     { const i = head.findIndex(h => /^INDEMNIZACION A.OS DE SERVICIO$/.test(h)); off.ias = i < 0 ? -1 : head.length - i; }
@@ -1658,6 +1667,10 @@ exports.importarRemunAux = async (req, res) => {
       if (!/^\d{4}-\d{2}$/.test(mes)) continue;
       const fin = k => off[k] < 0 ? undefined : c[c.length - off[k]];
       const n = v => Math.round(Number(v) || 0);
+      const sumIni = idx => idx.reduce((s, i) => s + n(c[i]), 0);
+      const comis = sumIni(ini2.comis), semcorr = sumIni(ini2.semcorr), grat = n(fin('grat'));
+      const ganado = n(fin('ganado')) || n(fin('imponible'));
+      const otrosImp = Math.max(0, ganado - n(c[ini.base]) - comis - semcorr - grat);
       filas.push([mes, c[ini.rut]?.trim() || null,
         `${c[ini.nombre] || ''} ${c[ini.pat] || ''} ${c[ini.mat] || ''}`.replace(/\s+/g, ' ').trim().slice(0, 200) || null,
         c[ini.cargo]?.trim().slice(0, 120) || null, c[ini.cc]?.trim().slice(0, 80) || null,
@@ -1668,7 +1681,8 @@ exports.importarRemunAux = async (req, res) => {
         n(fin('segCesT')), n(fin('salud7')), n(fin('saludAd')), n(fin('imposicion')), n(fin('apv')),
         n(fin('mayorRet')), n(fin('prest3')), n(fin('ias')), n(fin('ganado')),
         n(fin('vacProp')) + n(fin('mesAviso')) + n(fin('indVol')),
-        n(fin('ley16744')) + n(fin('capInd')) + n(fin('expVida')) + n(fin('rentProt')) + n(fin('pesadoEmp'))]);
+        n(fin('ley16744')) + n(fin('capInd')) + n(fin('expVida')) + n(fin('rentProt')) + n(fin('pesadoEmp')),
+        comis, semcorr, grat, otrosImp]);
     }
     if (!filas.length) return fail(res, 'No se pudo interpretar ninguna fila', 400);
     const meses = [...new Set(filas.map(f => f[0]))];
@@ -1678,7 +1692,7 @@ exports.importarRemunAux = async (req, res) => {
         `INSERT INTO ctb_remun_aux (mes, rut, nombre, cargo, centro_costo, dias, sueldo_base, imponible, haberes,
           afp_nombre, afp_monto, salud_nombre, salud_monto, impuesto_unico, descuentos, liquido, seg_ces_emp, sis_emp,
           seg_ces_trab, salud_legal, salud_adicional, total_imposicion, apv, mayor_retencion, prestamo_3pct, ias, total_ganado,
-          finiquito_otros, aportes_emp_otros) VALUES ?`,
+          finiquito_otros, aportes_emp_otros, comisiones, semana_corrida, gratificacion, otros_imponibles) VALUES ?`,
         [filas.slice(i, i + 300)]);
     auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'remun_aux', entidad_id: null, detalle: `Import remuneraciones AVSOFT: ${filas.length} liquidaciones, meses ${meses.join(', ')}` });
     ok(res, { liquidaciones: filas.length, meses });

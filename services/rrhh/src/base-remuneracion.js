@@ -29,10 +29,14 @@ async function remuneracionBaseDetalle(idUsuario, hastaMes) {
   if (rut) {
     const [aux] = await pool.query(
       // total_ganado = imponible REAL; la columna imponible del LIBREMUN viene topada (87,8 UF) — el tope lo aplica el finiquito
-      `SELECT mes, COALESCE(NULLIF(total_ganado,0), imponible) imponible FROM ctb_remun_aux WHERE UPPER(REPLACE(rut,'.',''))=? AND mes < ? AND imponible > 0 ORDER BY mes DESC LIMIT 3`, [rut, hasta]);
+      `SELECT mes, COALESCE(NULLIF(total_ganado,0), imponible) imponible, sueldo_base, comisiones, semana_corrida, gratificacion, otros_imponibles
+         FROM ctb_remun_aux WHERE UPPER(REPLACE(rut,'.',''))=? AND mes < ? AND imponible > 0 ORDER BY mes DESC LIMIT 3`, [rut, hasta]);
     if (aux.length)
       return { base: Math.round(aux.reduce((a, l) => a + Number(l.imponible), 0) / aux.length), fuente: 'AVSOFT', meses: aux.map(l => l.mes),
-        detalle: aux.map(l => ({ mes: l.mes, imponible: Number(l.imponible) })) };
+        // apertura (solo si el auxiliar la trae: importaciones desde v241.1)
+        detalle: aux.map(l => ({ mes: l.mes, imponible: Number(l.imponible), sueldo: Number(l.sueldo_base) || 0, comisiones: Number(l.comisiones) || 0,
+          semana_corrida: Number(l.semana_corrida) || 0, gratificacion: Number(l.gratificacion) || 0, otros: Number(l.otros_imponibles) || 0,
+          con_apertura: (Number(l.comisiones) || 0) + (Number(l.gratificacion) || 0) + (Number(l.semana_corrida) || 0) > 0 })) };
   }
   const [[f]] = await pool.query(`SELECT sueldo_base FROM rh_fichas WHERE id_usuario=?`, [idUsuario]);
   return { base: Math.round((Number(f?.sueldo_base) || 0) * 1.25), fuente: 'ESTIMADA', meses: [], detalle: [], sueldo_base: Number(f?.sueldo_base) || 0 };
