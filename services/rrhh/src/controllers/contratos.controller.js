@@ -344,6 +344,31 @@ require('../../../../shared/migrate').enFila('rrhh-finiquitos', async () => {
     estado VARCHAR(15) DEFAULT 'BORRADOR',
     creado_por INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+  /* Cierre del finiquito (Pato, 14-09-2026): mientras no esté cerrado se puede recalcular
+     y volver a guardar; "Imprimir y cerrar" lo deja inmutable (cerrado_at). */
+  for (const c of ['cerrado_at DATETIME NULL', 'cerrado_por VARCHAR(160) NULL', 'version INT NOT NULL DEFAULT 1', 'updated_at DATETIME NULL'])
+    await pool.query(`ALTER TABLE rh_finiquitos ADD COLUMN ${c}`).catch(() => {});
+  /* Texto legal del finiquito — PARAMÉTRICO (mantenedor Saludos y Certificados RRHH → card
+     Finiquito). Contenido mínimo según art. 177 CT (ratificación ante ministro de fe),
+     art. 162 inc. 5° (constancia de cotizaciones pagadas — Ley Bustos), art. 73 (feriado
+     proporcional) y art. 163 (indemnizaciones). Variables entre llaves. */
+  const T = [
+    ['finiq_ciudad', 'Santiago'],
+    ['finiq_empresa', 'AUTOFÁCIL SpA'],
+    ['finiq_rut_empresa', '76.545.638-K'],
+    ['finiq_representante', ''],
+    ['finiq_rut_representante', ''],
+    ['finiq_encabezado', 'En {ciudad}, a {fecha}, entre <b>{empresa}</b>, RUT {rut_empresa}, representada por don/doña <b>{representante}</b>{rut_representante_txt}, ambos domiciliados en {domicilio}, en adelante "el Empleador", y don/doña <b>{trabajador}</b>, cédula de identidad N° <b>{rut}</b>, en adelante "el Trabajador", se ha convenido el siguiente finiquito:'],
+    ['finiq_c1', '<b>PRIMERO.</b> El Trabajador prestó servicios al Empleador desde el <b>{fecha_ingreso}</b> hasta el <b>{fecha_termino}</b>, desempeñándose como <b>{cargo}</b>. El contrato de trabajo terminó por la causal del artículo <b>{causal_articulo}</b> del Código del Trabajo, esto es, <b>{causal_glosa}</b>.'],
+    ['finiq_c2', '<b>SEGUNDO.</b> El Empleador paga en este acto al Trabajador, quien declara recibir a su entera y total satisfacción, la suma de <b>{total}</b> ({total_letras} pesos), por los conceptos que se detallan a continuación:'],
+    ['finiq_c3', '<b>TERCERO.</b> El Empleador deja constancia de que las cotizaciones previsionales, de salud y de seguro de cesantía del Trabajador se encuentran íntegramente pagadas hasta el último día del mes anterior al del término del contrato, lo que acredita con los certificados de cotizaciones que se adjuntan, conforme al inciso quinto del artículo 162 del Código del Trabajo.'],
+    ['finiq_c4', '<b>CUARTO.</b> El Trabajador declara que durante la vigencia del contrato recibió oportuna y correctamente sus remuneraciones, feriados, asignaciones y demás beneficios legales y contractuales, y que nada se le adeuda por dichos conceptos ni por ningún otro derivado de la relación laboral o de su término, por lo que otorga al Empleador el más amplio, completo y total finiquito, renunciando a toda acción judicial o extrajudicial que pudiera corresponderle.'],
+    ['finiq_c5', '<b>QUINTO.</b> Reserva de derechos: {reserva}'],
+    ['finiq_c6', '<b>SEXTO.</b> El presente finiquito se firma y ratifica ante ministro de fe, de conformidad con el artículo 177 del Código del Trabajo, en dos ejemplares del mismo tenor y fecha, quedando uno en poder de cada parte.'],
+    ['finiq_pie', 'Ratificado ante ministro de fe: ______________________________ Fecha: ____/____/________'],
+    ['finiq_anexo', '1'],
+  ];
+  for (const [k, v] of T) await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES (?,?)`, [k, v]);
   console.log('[rrhh-finiquitos] listo');
 });
 
@@ -361,7 +386,11 @@ exports.finiquitoColaboradores = async (req, res) => {
                OR (u.fecha_baja IS NOT NULL AND NOT EXISTS (SELECT 1 FROM rh_finiquitos fq WHERE fq.id_usuario=u.id_usuario)))
         ORDER BY u.apellido, u.nombre`);
     const [causales] = await pool.query(`SELECT * FROM rh_finiquito_causales WHERE activo=1 ORDER BY articulo`);
-    ok(res, { colaboradores: rows, causales });
+    // Texto legal paramétrico + datos de la empresa (domicilio desde Credenciales Corporativas: fuente única)
+    const [cfg] = await pool.query(`SELECT clave, valor FROM rh_config WHERE clave LIKE 'finiq\\_%'`);
+    const textos = {}; cfg.forEach(c => textos[c.clave] = c.valor);
+    const [[emp]] = await pool.query('SELECT organizacion, direccion FROM credenciales_empresa WHERE id=1').catch(() => [[null]]);
+    ok(res, { colaboradores: rows, causales, textos, empresa: emp || {} });
   } catch (e) { fail(res, e.message); }
 };
 
@@ -440,6 +469,9 @@ exports.finiquitoCalcular = async (req, res) => {
     ok(res, {
       descuentos_prestamos: saldoPrestamos, prestamos_detalle: prestamosDetalle,
       colaborador: u, causal: cau, uf, base, base_topada: baseTopada,
+      // Trazabilidad para el anexo "cómo se calculó" del documento impreso
+      base_fuente: bd.fuente, base_meses: bd.detalle || [], sueldo_base: Number(u.sueldo_base) || 0,
+      tope_anos: topeAnos, tope_uf_n: topeUFn, tope_uf: topeUF, avisado,
       anos_servicio: anos, meses_servicio: meses,
       indemnizacion_anos: indemAnos, mes_aviso: mesAviso,
       vac_dias_habiles: vacHabiles, vac_dias_corridos: vacCorridos, vac_monto: vacMonto,
@@ -530,6 +562,65 @@ exports.finiquitoGuardar = async (req, res) => {
       } catch (e) { console.error('[finiquito ODP]', e.message); }
     }
     ok(res, { id: r.insertId, total, odp });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* PUT /finiquitos/:id — Recalcular / editar un finiquito guardado que aún NO está cerrado.
+   Los efectos del primer guardado (baja del usuario, offboarding, anulación de descuentos)
+   no se repiten; lo que sí sigue al nuevo total: la ODP (si aún no está pagada) y el
+   comprobante contable (se anula el anterior y se centraliza el nuevo — Máxima 4). */
+exports.finiquitoActualizar = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const b = req.body || {};
+    const [[fq]] = await pool.query(`SELECT * FROM rh_finiquitos WHERE id=?`, [id]);
+    if (!fq) return fail(res, 'Finiquito no existe', 404);
+    if (fq.cerrado_at) return fail(res, 'El finiquito está CERRADO: no se puede recalcular ni editar.', 409);
+    if (!b.fecha_termino || !b.causal) return fail(res, 'Faltan datos', 400);
+    const detalle = b.detalle || {};
+    const total = ['indemnizacion_anos', 'mes_aviso', 'vac_monto', 'otros_haberes'].reduce((s, k) => s + (parseInt(detalle[k]) || 0), 0)
+      - (parseInt(detalle.descuentos) || 0);
+    await pool.query(
+      `UPDATE rh_finiquitos SET fecha_termino=?, causal=?, causal_glosa=?, detalle=?, total=?, version=version+1, updated_at=NOW() WHERE id=?`,
+      [b.fecha_termino, String(b.causal).slice(0, 20), String(b.causal_glosa || '').slice(0, 200), JSON.stringify(detalle), total, id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_finiquito', entidad_id: id,
+      detalle: `Finiquito ${fq.trabajador} recalculado: ${CLP(Number(fq.total))} → ${CLP(total)} (v${(fq.version || 1) + 1})` });
+    let odp = null, aviso = null;
+    if (Number(fq.total) !== total) {
+      // ODP: sigue al nuevo total mientras no esté pagada
+      try {
+        const [ro] = await pool.query(`UPDATE ordenes_pago SET monto=? WHERE categoria='REMUNERACIONES' AND estado='EMITIDA' AND observaciones LIKE ?`,
+          [total, `%finiquito #${id}.%`]);
+        if (ro.affectedRows) { const [[o]] = await pool.query(`SELECT numero FROM ordenes_pago WHERE observaciones LIKE ? ORDER BY id DESC LIMIT 1`, [`%finiquito #${id}.%`]); odp = o?.numero || null; }
+        else aviso = 'La ODP del finiquito ya está pagada o no existe: ajústala a mano en Órdenes de Pago.';
+      } catch (e) { console.error('[finiquito upd ODP]', e.message); }
+      // Contabilidad: se anula el comprobante anterior y se centraliza el nuevo total
+      try {
+        await pool.query(`UPDATE ctb_comprobantes SET estado='ANULADO', anulado_por=?, anulado_motivo=? WHERE origen='FINIQUITO_EMITIDO' AND origen_ref LIKE ? AND estado='CONTABILIZADO'`,
+          [String(req.usuario?.nombre || req.usuario?.id_usuario || 'sistema'), `Finiquito #${id} recalculado (nuevo total ${CLP(total)})`, `FINIQ-${id}%`]);
+        if (total > 0) await require('../../../contabilidad/src/motor-asientos').contabilizar({
+          evento: 'FINIQUITO_EMITIDO', fecha: b.fecha_termino,
+          glosa: `Finiquito ${fq.trabajador} (art. ${b.causal}) v${(fq.version || 1) + 1}`, ref: `FINIQ-${id}-v${(fq.version || 1) + 1}`,
+          montos: { total },
+        });
+      } catch (e) { console.error('[finiquito upd asiento]', e.message); }
+    }
+    ok(res, { id, total, odp, aviso });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* POST /finiquitos/:id/cerrar — "Imprimir y cerrar": queda inmutable (no se recalcula ni edita) */
+exports.finiquitoCerrar = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [[fq]] = await pool.query(`SELECT id, trabajador, total, cerrado_at FROM rh_finiquitos WHERE id=?`, [id]);
+    if (!fq) return fail(res, 'Finiquito no existe', 404);
+    if (fq.cerrado_at) return ok(res, { id, ya_cerrado: true });
+    const [[ap]] = await pool.query(`SELECT CONCAT_WS(' ', nombre, apellido) nombre FROM usuarios WHERE id_usuario=?`, [req.usuario.id_usuario]);
+    await pool.query(`UPDATE rh_finiquitos SET cerrado_at=NOW(), cerrado_por=? WHERE id=?`, [ap?.nombre || String(req.usuario.id_usuario), id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_finiquito', entidad_id: id,
+      detalle: `Finiquito ${fq.trabajador} CERRADO (impreso) por ${CLP(Number(fq.total))} — ya no se recalcula` });
+    ok(res, { id, cerrado: true });
   } catch (e) { fail(res, e.message); }
 };
 

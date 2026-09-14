@@ -60,6 +60,8 @@ router.get('/finiquitos/colaboradores', verifyToken, requireFunc('rh_contratos',
 router.get('/finiquitos/calcular',      verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoCalcular);
 router.post('/finiquitos',              verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoGuardar);
 router.get('/finiquitos',               verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoLista);
+router.put('/finiquitos/:id',           verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoActualizar);   // recalcular/editar mientras no esté cerrado
+router.post('/finiquitos/:id/cerrar',   verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoCerrar);       // Imprimir y cerrar: queda inmutable
 router.get('/onboarding',              verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbLista);
 router.post('/onboarding',             verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbCrearManual);
 router.put('/onboarding/items/:id',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbMarcar);

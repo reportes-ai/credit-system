@@ -44,7 +44,34 @@
     return t.getFullYear() + '-S' + String(1 + Math.round(((t - w1) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7)).padStart(2, '0');
   }
 
-  const api = { cuotaFrancesa, provisionVacaciones, mesesAntiguedad, semanaISO };
+  // Monto en palabras (es-CL) para documentos legales: convenios de descuento,
+  // aumento de renta y finiquito ("$1.234.567 (un millón doscientos ... pesos)").
+  function numeroALetras(n) {
+    n = Math.round(Number(n) || 0);
+    if (!isFinite(n) || n < 0) return '';
+    const U = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve', 'veinte'];
+    const D = ['', '', 'veinti', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+    const C = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+    const tres = x => {
+      if (x === 0) return ''; if (x === 100) return 'cien';
+      let s = C[Math.floor(x / 100)]; const r = x % 100;
+      if (r === 0) return s;
+      if (s) s += ' ';
+      if (r <= 20) return s + U[r];
+      const d = Math.floor(r / 10), u = r % 10;
+      if (d === 2) return s + 'veinti' + (u === 1 ? 'ún' : U[u]);
+      return s + D[d] + (u ? ' y ' + (u === 1 ? 'un' : U[u]) : '');
+    };
+    if (n === 0) return 'cero';
+    const mm = Math.floor(n / 1000000), mil = Math.floor(n % 1000000 / 1000), un = n % 1000;
+    let out = '';
+    if (mm) out += (mm === 1 ? 'un millón' : tres(mm) + ' millones');
+    if (mil) out += (out ? ' ' : '') + (mil === 1 ? 'mil' : tres(mil) + ' mil');
+    if (un) out += (out ? ' ' : '') + tres(un);
+    return out;
+  }
+
+  const api = { cuotaFrancesa, provisionVacaciones, mesesAntiguedad, semanaISO, numeroALetras };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.AF_RRHH = api;
 })(typeof self !== 'undefined' ? self : this);

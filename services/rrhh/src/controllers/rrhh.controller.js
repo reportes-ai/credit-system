@@ -539,7 +539,10 @@ const getConfigApi = async (req, res) => {
 const setConfigApi = async (req, res) => {
   try {
     const b = req.body || {};
-    const PERMITIDAS = ['cert_min_meses', 'cert_cooldown_dias', 'cert_cuerpo', 'cert_cierre', 'cumple_popup_activo', 'cumple_campana_activo', 'cumple_musica', 'cumple_titulo', 'cumple_linea1', 'cumple_linea2', 'cumple_aviso_titulo', 'cumple_aviso_msg', 'cumple_aviso_tarde', 'cumple_dias_tope', 'cumple_midia_dias', 'cumple_banner_dur', 'cumple_banner_sonido'];
+    const PERMITIDAS = ['cert_min_meses', 'cert_cooldown_dias', 'cert_cuerpo', 'cert_cierre', 'cumple_popup_activo', 'cumple_campana_activo', 'cumple_musica', 'cumple_titulo', 'cumple_linea1', 'cumple_linea2', 'cumple_aviso_titulo', 'cumple_aviso_msg', 'cumple_aviso_tarde', 'cumple_dias_tope', 'cumple_midia_dias', 'cumple_banner_dur', 'cumple_banner_sonido',
+      // Texto del finiquito (mantenedor Saludos y Certificados RRHH → card Finiquito)
+      'finiq_ciudad', 'finiq_empresa', 'finiq_rut_empresa', 'finiq_representante', 'finiq_rut_representante',
+      'finiq_encabezado', 'finiq_c1', 'finiq_c2', 'finiq_c3', 'finiq_c4', 'finiq_c5', 'finiq_c6', 'finiq_pie', 'finiq_anexo'];
     for (const [k, v] of Object.entries(b)) {
       if (!PERMITIDAS.includes(k)) continue;
       await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(v == null ? '' : v)]);

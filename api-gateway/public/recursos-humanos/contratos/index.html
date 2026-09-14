@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.0 — anexo variable: el factor de cada indicador aplica SOLO sobre la Comisión Base de las ops con ese seguro (cláusulas 5ª, 6ª y ejemplo 8ª), calidad sobre la base total · v2.9 — onboarding: dialog dlgVer que faltaba (Plantilla de tareas no abría), botones + Onboarding / + Offboarding separados · v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
+<!-- v3.1 — Finiquito: botones Recalcular / Vista previa / Imprimir y cerrar (queda inmutable), "Abrir" desde la lista, texto legal paramétrico (Saludos y Certificados RRHH → Finiquito), reserva de derechos, monto en letras (rrhh-core) y anexo "cómo se calculó" (fuente de la base y meses). v3.0 — anexo variable: el factor de cada indicador aplica SOLO sobre la Comisión Base de las ops con ese seguro (cláusulas 5ª, 6ª y ejemplo 8ª), calidad sobre la base total · v2.9 — onboarding: dialog dlgVer que faltaba (Plantilla de tareas no abría), botones + Onboarding / + Offboarding separados · v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -105,6 +105,17 @@
     <table style="margin-top:8px"><thead><tr><th>Trabajador</th><th>Causal</th><th>Término</th><th>Total</th><th></th></tr></thead><tbody id="tbFiniq"></tbody></table>
   </div>
 
+  <dialog id="fqPrev" style="width:min(860px,96vw);max-height:92vh;border:none;border-radius:14px;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid #e5e7eb;background:#f8fafc;border-radius:14px 14px 0 0">
+      <b><i class="bi bi-eye me-1"></i>Vista previa del finiquito</b>
+      <div style="display:flex;gap:8px">
+        <button class="btn-g" onclick="window.print()" title="Imprime la vista previa marcada como BORRADOR"><i class="bi bi-printer me-1"></i>Imprimir borrador</button>
+        <button class="btn-g" onclick="$('fqPrev').close()"><i class="bi bi-x-lg me-1"></i>Cerrar</button>
+      </div>
+    </div>
+    <div id="fqPrevBody" style="overflow:auto;max-height:calc(92vh - 60px);padding:18px 0;background:#fff"></div>
+  </dialog>
+
   <div class="panel" id="pAnexos" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <b>Modelos de anexo vigentes</b>
@@ -185,6 +196,7 @@
 </div></dialog>
 <div id="docPrint" style="display:none"></div>
 
+<script src="/js/rrhh-core.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/rut-core.js"></script>
 <script>
@@ -296,7 +308,7 @@ async function onbNuevaTarea(){
 }
 
 /* ── finiquitos ── */
-let FQ_INIT = false, FQ_CALC = null, FINIQ = [];
+let FQ_INIT = false, FQ_CALC = null, FINIQ = [], FQ_ID = null, FQ_ROW = null, FQ_TEXTOS = {}, FQ_EMP = {};
 async function fqInit(){
   FQ_INIT = true;
   const [jc, jf] = await Promise.all([
@@ -306,83 +318,200 @@ async function fqInit(){
   $('fqU').innerHTML = (jc?.data?.colaboradores||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)} ${c.rut?'· '+esc(rutFmt(c.rut)):''}${c.estado==='inactivo'?' — DADO DE BAJA'+(c.fecha_baja?' el '+c.fecha_baja:''):''}</option>`).join('');
   $('fqCausal').innerHTML = (jc?.data?.causales||[]).map(c=>`<option value="${esc(c.articulo)}">Art. ${esc(c.articulo)} — ${esc(c.glosa)}</option>`).join('');
   $('fqFecha').value = new Date().toISOString().slice(0,10);
+  FQ_TEXTOS = jc?.data?.textos || {}; FQ_EMP = jc?.data?.empresa || {};
+  FINIQ = jf?.data?.finiquitos||[]; fqPintarLista();
+}
+async function fqRecargarLista(){
+  const jf = await (await fetch('/api/rrhh/finiquitos',{headers:H})).json();
   FINIQ = jf?.data?.finiquitos||[]; fqPintarLista();
 }
 function fqPintarLista(){
   $('tbFiniq').innerHTML = FINIQ.map(f=>`<tr><td><b>${esc(f.trabajador)}</b><br><span style="color:#94a3b8;font-size:.75rem">${esc(f.rut||'')}</span></td>
-    <td>Art. ${esc(f.causal)}</td><td>${fmtF(f.fecha_termino)}</td><td style="font-weight:800">${CLP(f.total)}</td>
-    <td style="white-space:nowrap"><button class="btn-mini" onclick="imprimirFiniquito(${f.id})"><i class="bi bi-printer"></i></button>
+    <td>Art. ${esc(f.causal)}</td><td>${fmtF(f.fecha_termino)}</td><td style="font-weight:800">${CLP(f.total)}${(f.version||1)>1?` <span style="color:#94a3b8;font-size:.72rem">v${f.version}</span>`:''}</td>
+    <td style="white-space:nowrap">
+      ${f.cerrado_at?`<span class="chip" style="background:#e2e8f0;color:#334155" title="Cerrado por ${esc(f.cerrado_por||'')} el ${fmtF(f.cerrado_at)}"><i class="bi bi-lock-fill"></i> CERRADO</span>`
+                    :`<button class="btn-mini" onclick="fqAbrir(${f.id})" title="Abrir para recalcular o cerrar"><i class="bi bi-pencil-square"></i> Abrir</button>`}
+      <button class="btn-mini" onclick="imprimirFiniquito(${f.id})" title="Imprimir"><i class="bi bi-printer"></i></button>
       ${f.estado==='BORRADOR'?`<button class="btn-mini" style="background:#0141A2;color:#fff" onclick="enviarFirma('FINIQUITO',${f.id})"><i class="bi bi-pen"></i> A firma</button>`:''}
       ${f.estado==='EN_FIRMA'||f.estado==='FIRMADO'?`<button class="btn-mini" onclick="verFirmas('FINIQUITO',${f.id})"><i class="bi bi-patch-check"></i> Firmas</button>`:''} ${pillFirma(f.estado)}</td></tr>`).join('')
     || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:18px">Sin finiquitos guardados.</td></tr>';
 }
 function fqFmt(el){ const n=parseInt(String(el.value).replace(/\D/g,''))||0; el.value=n?CLP(n):'$0'; }
 function fqVal(id){ return parseInt(String($(id).value).replace(/\D/g,''))||0; }
+const fqDet = f => typeof f.detalle==='string'?JSON.parse(f.detalle||'{}'):(f.detalle||{});
+
+/* Calcular (primera vez) y Recalcular (mismo motor, con los datos actuales del formulario) */
 async function fqCalcular(){
+  if (FQ_ROW?.cerrado_at) return alert('Este finiquito está CERRADO: no se recalcula.');
   const q = new URLSearchParams({ id_usuario:$('fqU').value, causal:$('fqCausal').value, fecha_termino:$('fqFecha').value, avisado:$('fqAvisado').checked?'1':'0' });
   const j = await (await fetch('/api/rrhh/finiquitos/calcular?'+q,{headers:H})).json();
   if (!j.success) return alert(j.error);
+  const reservaPrev = $('fqReserva') ? $('fqReserva').value : (FQ_ROW ? (fqDet(FQ_ROW).reserva||'') : '');
+  const otrosPrev = $('fqOtros') ? fqVal('fqOtros') : (FQ_ROW ? (fqDet(FQ_ROW).otros_haberes||0) : 0);
   FQ_CALC = j.data;
-  const d = j.data;
+  fqPintar(j.data, { indemnizacion_anos:j.data.indemnizacion_anos, mes_aviso:j.data.mes_aviso, vac_monto:j.data.vac_monto,
+    otros_haberes:otrosPrev, descuentos:j.data.descuentos_prestamos||0, reserva:reservaPrev }, j.data.avisos);
+}
+/* Abrir uno guardado (no cerrado): muestra lo guardado tal cual; Recalcular vuelve al motor */
+function fqAbrir(id){
+  const f = FINIQ.find(x=>x.id===id); if(!f) return;
+  if (f.cerrado_at) return alert('Cerrado: solo se puede imprimir.');
+  const d = fqDet(f);
+  FQ_ID = f.id; FQ_ROW = f; FQ_CALC = d.calc || null;
+  // El selector excluye a los ya finiquitados: se agrega la opción para poder recalcular
+  if (![...$('fqU').options].some(o=>o.value==String(f.id_usuario)))
+    $('fqU').insertAdjacentHTML('afterbegin', `<option value="${f.id_usuario}">${esc(f.trabajador)} ${f.rut?'· '+esc(rutFmt(f.rut)):''}</option>`);
+  $('fqU').value = String(f.id_usuario); $('fqCausal').value = f.causal; $('fqFecha').value = String(f.fecha_termino).slice(0,10); $('fqAvisado').checked = !!d.avisado;
+  fqPintar(d.calc || { base:d.base, anos_servicio:d.anos, vac_dias_habiles:d.vac_dias_habiles, vac_dias_corridos:d.vac_dias_corridos, colaborador:{ id_usuario:f.id_usuario, nombre:f.trabajador, rut:f.rut, cargo:f.cargo, fecha_ingreso:f.fecha_ingreso }, causal:{ articulo:f.causal, glosa:f.causal_glosa } },
+    d, [`Finiquito #${f.id} guardado (v${f.version||1}). Puedes recalcular, ver la vista previa o imprimir y cerrar.`]);
+  $('pFiniq').scrollIntoView({behavior:'smooth'});
+}
+function fqPintar(d, v, avisos){
   const fila = (lbl, id, val, nota) => `<tr><td>${lbl}${nota?`<br><span style="color:#94a3b8;font-size:.74rem">${nota}</span>`:''}</td>
     <td style="text-align:right"><input id="${id}" inputmode="numeric" value="${CLP(val)}" style="width:160px;text-align:right;border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 10px;font-weight:700" oninput="fqFmt(this);fqTotal()"></td></tr>`;
   $('fqResultado').innerHTML = `
-    ${d.avisos.length?`<div class="rojo" style="background:#fffbeb;border-color:#d97706">${d.avisos.map(a=>'• '+esc(a)).join('<br>')}</div>`:''}
+    ${(avisos||[]).length?`<div class="rojo" style="background:#fffbeb;border-color:#d97706">${avisos.map(a=>'• '+esc(a)).join('<br>')}</div>`:''}
     <table style="max-width:640px">
       <tr><td>Base (última remuneración)</td><td style="text-align:right"><input id="fqBase" value="${CLP(d.base)}" style="width:160px;text-align:right;border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 10px" disabled></td></tr>
-      ${fila(`Indemnización años de servicio (${d.anos_servicio} año/s × base topada)`, 'fqIA', d.indemnizacion_anos)}
-      ${fila('Indemnización sustitutiva del aviso previo', 'fqMA', d.mes_aviso)}
-      ${fila(`Feriado proporcional (${d.vac_dias_habiles} hábiles ≈ ${d.vac_dias_corridos} corridos)`, 'fqVac', d.vac_monto)}
-      ${fila('Otros haberes (bonos pendientes, etc.)', 'fqOtros', 0)}
-      ${fila('Descuentos (anticipos, préstamos pendientes)', 'fqDesc', d.descuentos_prestamos||0, 'se resta — precargado desde los convenios vigentes')}
+      ${fila(`Indemnización años de servicio (${d.anos_servicio||0} año/s × base topada)`, 'fqIA', v.indemnizacion_anos||0)}
+      ${fila('Indemnización sustitutiva del aviso previo', 'fqMA', v.mes_aviso||0)}
+      ${fila(`Feriado proporcional (${d.vac_dias_habiles||0} hábiles ≈ ${d.vac_dias_corridos||0} corridos)`, 'fqVac', v.vac_monto||0)}
+      ${fila('Otros haberes (bonos pendientes, comisiones del mes, etc.)', 'fqOtros', v.otros_haberes||0)}
+      ${fila('Descuentos (anticipos, préstamos pendientes)', 'fqDesc', v.descuentos||0, 'se resta — precargado desde los convenios vigentes')}
       <tr><td style="font-weight:800">TOTAL FINIQUITO</td><td style="text-align:right;font-weight:800;font-size:1.1rem" id="fqTotalCell"></td></tr>
     </table>
-    <div class="pie" style="justify-content:flex-start"><button class="btn" onclick="fqGuardar()"><i class="bi bi-save me-1"></i>Guardar finiquito</button></div>`;
-  fqTotal();
+    <div class="fld" style="max-width:640px;margin-top:10px"><label>Reserva de derechos (cláusula QUINTA)</label>
+      <input id="fqReserva" value="${esc(v.reserva||'Sin reserva de derechos.')}" placeholder="Sin reserva de derechos."></div>
+    <div class="pie" style="justify-content:flex-start;flex-wrap:wrap;gap:8px" id="fqPie"></div>`;
+  fqTotal(); fqBotones();
+}
+function fqBotones(){
+  const b = [];
+  b.push(`<button class="btn" onclick="fqGuardar()"><i class="bi bi-save me-1"></i>${FQ_ID?'Guardar cambios':'Guardar finiquito'}</button>`);
+  b.push(`<button class="btn-g" onclick="fqCalcular()" title="Vuelve a calcular con el motor (cambio de fecha, causal, base o saldos)"><i class="bi bi-arrow-repeat me-1"></i>Recalcular</button>`);
+  b.push(`<button class="btn-g" onclick="fqVistaPrevia()"><i class="bi bi-eye me-1"></i>Vista previa</button>`);
+  b.push(`<button class="btn" style="background:#15803d" onclick="fqImprimirCerrar()" title="Imprime el documento definitivo y lo deja cerrado: ya no se recalcula"><i class="bi bi-printer-fill me-1"></i>Imprimir y cerrar</button>`);
+  $('fqPie').innerHTML = b.join('');
 }
 function fqTotal(){
   $('fqTotalCell').textContent = CLP(fqVal('fqIA')+fqVal('fqMA')+fqVal('fqVac')+fqVal('fqOtros')-fqVal('fqDesc'));
 }
-async function fqGuardar(){
-  const v = fqVal;
-  const d = FQ_CALC;
-  const body = { id_usuario:d.colaborador.id_usuario, trabajador:d.colaborador.nombre, rut:d.colaborador.rut, cargo:d.colaborador.cargo,
-    fecha_ingreso:d.colaborador.fecha_ingreso, fecha_termino:$('fqFecha').value, causal:d.causal.articulo, causal_glosa:d.causal.glosa,
-    detalle:{ base:d.base, base_topada:d.base_topada, anos:d.anos_servicio, uf:d.uf,
-      indemnizacion_anos:v('fqIA'), mes_aviso:v('fqMA'), vac_monto:v('fqVac'),
-      vac_dias_habiles:d.vac_dias_habiles, vac_dias_corridos:d.vac_dias_corridos,
-      otros_haberes:v('fqOtros'), descuentos:v('fqDesc') } };
-  const j = await (await fetch('/api/rrhh/finiquitos',{method:'POST',headers:HJ,body:JSON.stringify(body)})).json();
-  if (!j.success) return alert(j.error);
-  alert('Finiquito guardado — total '+CLP(j.data.total)+'. Imprímelo desde la lista.');
-  const jf = await (await fetch('/api/rrhh/finiquitos',{headers:H})).json();
-  FINIQ = jf?.data?.finiquitos||[]; fqPintarLista(); $('fqResultado').innerHTML='';
+/* detalle que se guarda: montos editados + foto del cálculo (para el anexo "cómo se calculó") */
+function fqDetalle(){
+  const v = fqVal, d = FQ_CALC || {};
+  return { base:d.base, base_topada:d.base_topada, base_fuente:d.base_fuente, base_meses:d.base_meses||[], sueldo_base:d.sueldo_base,
+    anos:d.anos_servicio, meses_servicio:d.meses_servicio, uf:d.uf, tope_uf_n:d.tope_uf_n, tope_uf:d.tope_uf, tope_anos:d.tope_anos,
+    causal_indemniza:!!(d.causal||{}).indemniza_anos, causal_mes_aviso:!!(d.causal||{}).mes_aviso, avisado:$('fqAvisado').checked,
+    indemnizacion_anos:v('fqIA'), mes_aviso:v('fqMA'), vac_monto:v('fqVac'),
+    vac_dias_habiles:d.vac_dias_habiles, vac_dias_corridos:d.vac_dias_corridos,
+    otros_haberes:v('fqOtros'), descuentos:v('fqDesc'), prestamos_detalle:d.prestamos_detalle||[],
+    reserva:($('fqReserva')?.value||'').trim()||'Sin reserva de derechos.', calc:d };
 }
-function imprimirFiniquito(id){
-  const f = FINIQ.find(x=>x.id===id); if(!f) return;
-  const d = typeof f.detalle==='string'?JSON.parse(f.detalle||'{}'):(f.detalle||{});
+function fqBody(){
+  const d = FQ_CALC || {}, c = d.colaborador || {};
+  return { id_usuario:c.id_usuario||FQ_ROW?.id_usuario, trabajador:c.nombre||FQ_ROW?.trabajador, rut:c.rut||FQ_ROW?.rut, cargo:c.cargo||FQ_ROW?.cargo,
+    fecha_ingreso:c.fecha_ingreso||FQ_ROW?.fecha_ingreso||null, fecha_termino:$('fqFecha').value,
+    causal:(d.causal||{}).articulo||$('fqCausal').value, causal_glosa:(d.causal||{}).glosa||$('fqCausal').selectedOptions[0]?.textContent.replace(/^Art\. [^—]+— /,'')||'',
+    detalle:fqDetalle() };
+}
+async function fqGuardar(silencioso){
+  if (!FQ_CALC && !FQ_ROW) return alert('Calcula primero');
+  const body = fqBody();
+  const j = FQ_ID
+    ? await (await fetch('/api/rrhh/finiquitos/'+FQ_ID,{method:'PUT',headers:HJ,body:JSON.stringify(body)})).json()
+    : await (await fetch('/api/rrhh/finiquitos',{method:'POST',headers:HJ,body:JSON.stringify(body)})).json();
+  if (!j.success) { alert(j.error); return false; }
+  FQ_ID = j.data.id;
+  await fqRecargarLista();
+  FQ_ROW = FINIQ.find(x=>x.id===FQ_ID) || FQ_ROW;
+  fqBotones();
+  if (!silencioso) alert('Finiquito guardado — total '+CLP(j.data.total)+(j.data.odp?' · ODP '+j.data.odp:'')+(j.data.aviso?'\n'+j.data.aviso:'')+'\nPuedes recalcular hasta que lo imprimas y cierres.');
+  return true;
+}
+/* Documento actual (guardado o no) para vista previa / impresión */
+function fqActual(){
+  if (FQ_ROW && !FQ_CALC) return FQ_ROW;
+  const b = fqBody();
+  return { ...(FQ_ROW||{}), ...b, id:FQ_ID, total: fqVal('fqIA')+fqVal('fqMA')+fqVal('fqVac')+fqVal('fqOtros')-fqVal('fqDesc') };
+}
+function fqVistaPrevia(){
+  if (!FQ_CALC && !FQ_ROW) return alert('Calcula primero');
+  const f = fqActual();
+  $('fqPrevBody').innerHTML = `<div style="font-family:Georgia,serif;max-width:750px;margin:0 auto;padding:0 30px 30px;color:#111;line-height:1.7;font-size:14px">${finiquitoHTML(f, fqDet(f), { borrador:!f.cerrado_at })}</div>`;
+  $('fqPrev').showModal();
+}
+async function fqImprimirCerrar(){
+  if (!FQ_CALC && !FQ_ROW) return alert('Calcula primero');
+  if (!confirm('Se imprime el finiquito DEFINITIVO y queda CERRADO: no se podrá recalcular ni editar. ¿Continuar?')) return;
+  if (!(await fqGuardar(true))) return;
+  const j = await (await fetch('/api/rrhh/finiquitos/'+FQ_ID+'/cerrar',{method:'POST',headers:HJ,body:'{}'})).json();
+  if (!j.success) return alert(j.error);
+  await fqRecargarLista();
+  const id = FQ_ID; FQ_ID = null; FQ_ROW = null; FQ_CALC = null; $('fqResultado').innerHTML = '';
+  imprimirFiniquito(id);
+}
+/* Texto legal paramétrico (mantenedor Saludos y Certificados RRHH → Finiquito) */
+const fqTpl = (t, vars) => String(t||'').replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? vars[k] : ''));
+const fqFechaLarga = iso => iso ? new Date(String(iso).slice(0,10)+'T12:00:00').toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'}) : HOY;
+function finiquitoHTML(f, d, opts){
+  opts = opts || {};
+  const T = FQ_TEXTOS, total = Number(f.total)||0;
+  const vars = { ciudad:T.finiq_ciudad||'Santiago', fecha:f.cerrado_at?fqFechaLarga(f.cerrado_at):HOY,
+    empresa:esc(T.finiq_empresa||FQ_EMP.organizacion||'AUTOFÁCIL SpA'), rut_empresa:esc(T.finiq_rut_empresa||''),
+    representante:esc(T.finiq_representante||'____________________'),
+    rut_representante_txt:T.finiq_rut_representante?`, cédula de identidad N° ${esc(T.finiq_rut_representante)}`:'',
+    domicilio:esc(FQ_EMP.direccion||'____________________'),
+    trabajador:esc(f.trabajador), rut:esc(rutFmt(f.rut||'')), cargo:esc(f.cargo||''),
+    fecha_ingreso:f.fecha_ingreso?fmtF(f.fecha_ingreso):'—', fecha_termino:fmtF(f.fecha_termino),
+    causal_articulo:esc(f.causal), causal_glosa:esc(f.causal_glosa||''),
+    total:CLP(total), total_letras:window.AF_RRHH.numeroALetras(total), reserva:esc(d.reserva||'Sin reserva de derechos.') };
   const li = (lbl,m)=> m ? `<tr><td style="padding:4px 0">${lbl}</td><td style="text-align:right">${CLP(m)}</td></tr>` : '';
-  bloqueDoc(`${cabecera}
-    <div style="text-align:center;font-weight:800;font-size:17px;margin-bottom:22px">FINIQUITO DE CONTRATO DE TRABAJO</div>
-    <p>En Santiago de Chile, a ${HOY}, entre <b>AUTOFÁCIL SpA</b> y don/doña <b>${esc(f.trabajador)}</b>${f.rut?`, cédula de identidad N° <b>${esc(rutFmt(f.rut))}</b>`:''}, quien se desempeñó como <b>${esc(f.cargo||'')}</b>${f.fecha_ingreso?` desde el <b>${fmtF(f.fecha_ingreso)}</b>`:''} hasta el <b>${fmtF(f.fecha_termino)}</b>, se deja constancia de lo siguiente:</p>
-    <p><b>PRIMERO.</b> El contrato de trabajo terminó por la causal del artículo <b>${esc(f.causal)}</b> del Código del Trabajo: <b>${esc(f.causal_glosa||'')}</b>.</p>
-    <p><b>SEGUNDO.</b> El Empleador paga al Trabajador, quien declara recibir a su entera satisfacción, las siguientes sumas:</p>
-    <table style="width:100%;max-width:520px;margin:0 auto 14px;font-size:13.5px">
+  const tabla = `<table style="width:100%;max-width:520px;margin:0 auto 14px;font-size:13.5px">
       ${li('Indemnización por años de servicio ('+(d.anos||0)+' años)', d.indemnizacion_anos)}
       ${li('Indemnización sustitutiva del aviso previo', d.mes_aviso)}
       ${li('Feriado proporcional ('+(d.vac_dias_corridos||0)+' días corridos)', d.vac_monto)}
       ${li('Otros haberes', d.otros_haberes)}
-      ${d.descuentos?`<tr><td style="padding:4px 0">Descuentos</td><td style="text-align:right">−${CLP(d.descuentos)}</td></tr>`:''}
-      <tr style="border-top:2px solid #333"><td style="padding:6px 0;font-weight:800">TOTAL</td><td style="text-align:right;font-weight:800">${CLP(f.total)}</td></tr>
-    </table>
-    <p><b>TERCERO.</b> El Trabajador declara que durante la vigencia del contrato recibió oportunamente sus remuneraciones y que nada se le adeuda por los conceptos indicados ni por ningún otro, otorgando el más amplio y total finiquito.</p>
-    <p><b>CUARTO.</b> El presente finiquito se firma y ratifica ante ministro de fe, conforme al artículo 177 del Código del Trabajo.</p>
-    <div style="display:flex;justify-content:space-between;margin-top:90px;text-align:center;font-size:13px">
-      <div style="border-top:1px solid #333;padding-top:6px;width:44%">EMPLEADOR<br>AUTOFÁCIL SpA</div>
-      <div style="border-top:1px solid #333;padding-top:6px;width:44%">TRABAJADOR<br>${esc(f.trabajador)}</div>
+      ${d.descuentos?`<tr><td style="padding:4px 0">Descuentos (anticipos y préstamos pendientes)</td><td style="text-align:right">−${CLP(d.descuentos)}</td></tr>`:''}
+      <tr style="border-top:2px solid #333"><td style="padding:6px 0;font-weight:800">TOTAL</td><td style="text-align:right;font-weight:800">${CLP(total)}</td></tr>
+    </table>`;
+  const p = k => T[k] ? `<p>${fqTpl(T[k], vars)}</p>` : '';
+  const marca = opts.borrador ? `<div style="text-align:center;color:#b91c1c;font-weight:800;letter-spacing:2px;border:2px dashed #b91c1c;padding:4px;margin-bottom:12px">VISTA PREVIA — BORRADOR (no cerrado)</div>` : '';
+  let html = `${cabecera}${marca}
+    <div style="text-align:center;font-weight:800;font-size:17px;margin-bottom:22px">FINIQUITO DE CONTRATO DE TRABAJO</div>
+    ${p('finiq_encabezado')}${p('finiq_c1')}${p('finiq_c2')}${tabla}${p('finiq_c3')}${p('finiq_c4')}${p('finiq_c5')}${p('finiq_c6')}
+    <div style="display:flex;justify-content:space-between;margin-top:80px;text-align:center;font-size:13px">
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">EMPLEADOR<br>${vars.empresa}${T.finiq_representante?`<br><span style="font-size:11.5px">p.p. ${vars.representante}</span>`:''}</div>
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">TRABAJADOR<br>${vars.trabajador}<br><span style="font-size:11.5px">${vars.rut}</span></div>
     </div>
-    <p style="font-size:11px;color:#777;margin-top:30px">Generado por el Business Suite — el finiquito debe ratificarse ante notario o inspección del trabajo; revisar con asesoría legal.</p>`,
-    `Finiquito ${nombreCorto(f.trabajador)}`);
+    ${T.finiq_pie?`<p style="margin-top:40px;font-size:12.5px">${fqTpl(T.finiq_pie, vars)}</p>`:''}
+    <p style="font-size:11px;color:#777;margin-top:20px">Generado por el Business Suite${f.id?` — finiquito #${f.id}${f.version&&f.version>1?' v'+f.version:''}`:''}${f.cerrado_at?` — cerrado el ${fmtF(f.cerrado_at)} por ${esc(f.cerrado_por||'')}`:''}. Debe ratificarse ante notario o inspección del trabajo.</p>`;
+  if (T.finiq_anexo === '1') html += fqAnexoHTML(f, d, vars);
+  return html;
+}
+/* Hoja adicional: cómo se calculó (fuente de la base, meses, topes, años, feriado, préstamos) */
+function fqAnexoHTML(f, d, vars){
+  const fuente = { MOTOR:'promedio de las últimas liquidaciones emitidas por el sistema', AVSOFT:'promedio del total imponible según el Libro de Remuneraciones (AVSOFT), meses anteriores al del término', ESTIMADA:'estimación: sueldo base × 1,25 (no hay liquidaciones registradas)' }[d.base_fuente] || 'según liquidaciones';
+  const meses = (d.base_meses||[]).slice().sort((a,b)=>a.mes<b.mes?-1:1);
+  const mesTxt = m => { const [y,mm]=String(m).split('-'); return ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][Number(mm)-1]+'-'+y; };
+  const tr = (a,b) => `<tr><td style="padding:3px 0">${a}</td><td style="text-align:right;white-space:nowrap">${b}</td></tr>`;
+  const sec = (t, filas) => `<div style="font-weight:800;margin:14px 0 4px;font-size:13px">${t}</div><table style="width:100%;max-width:560px;font-size:12.5px">${filas}</table>`;
+  const anosCalc = d.meses_servicio!=null ? `${d.meses_servicio} meses → ${d.anos||0} año/s (fracción ≥ 6 meses = 1 año${d.tope_anos?`, tope ${d.tope_anos} años`:''})` : `${d.anos||0} año/s`;
+  return `<div style="page-break-before:always">${cabecera}
+    <div style="text-align:center;font-weight:800;font-size:15px;margin-bottom:6px">ANEXO — DETALLE DEL CÁLCULO DEL FINIQUITO</div>
+    <div style="text-align:center;font-size:12.5px;color:#555;margin-bottom:14px">${vars.trabajador} · ${vars.rut} · término ${vars.fecha_termino}</div>
+    ${sec('1. Base de remuneración', (meses.length?meses.map(m=>tr('Imponible '+mesTxt(m.mes), CLP(m.imponible))).join(''):'') + tr('<i>'+fuente+'</i>','') + tr('<b>Base (promedio)</b>','<b>'+CLP(d.base||0)+'</b>')
+      + (d.tope_uf?tr(`Tope legal ${d.tope_uf_n||90} UF × UF ${CLP(Math.round(d.uf||0))}`, CLP(d.tope_uf)) + tr('Base topada (art. 172)', CLP(d.base_topada||d.base||0)):''))}
+    ${sec('2. Indemnización por años de servicio', tr('Años de servicio', anosCalc) + (d.causal_indemniza?tr(`${d.anos||0} × ${CLP(d.base_topada||d.base||0)}`, CLP(d.indemnizacion_anos||0)):tr('<i>No corresponde por la causal (art. '+vars.causal_articulo+')</i>', CLP(d.indemnizacion_anos||0))))}
+    ${sec('3. Indemnización sustitutiva del aviso previo', d.causal_mes_aviso ? (d.avisado?tr('<i>Avisado con 30 días de anticipación: no corresponde</i>', CLP(d.mes_aviso||0)):tr('1 remuneración (base topada)', CLP(d.mes_aviso||0))) : tr('<i>No corresponde por la causal</i>', CLP(d.mes_aviso||0)))}
+    ${sec('4. Feriado proporcional (art. 73)', tr('Saldo de vacaciones a la fecha de término', (d.vac_dias_habiles||0)+' días hábiles') + tr('× 1,4 (sábados y domingos)', (d.vac_dias_corridos||0)+' días corridos') + tr(`${d.vac_dias_corridos||0} × ${CLP(d.base||0)} / 30`, CLP(d.vac_monto||0)))}
+    ${d.otros_haberes?sec('5. Otros haberes', tr('Ingresado por RRHH', CLP(d.otros_haberes))):''}
+    ${sec('6. Descuentos', ((d.prestamos_detalle||[]).map(p=>tr(`${p.tipo} #${p.id} — ${p.cuotas_pendientes} cuota/s pendiente/s`, CLP(p.saldo))).join('')) + tr('<b>Total descuentos</b>','<b>−'+CLP(d.descuentos||0)+'</b>'))}
+    ${sec('TOTAL FINIQUITO', tr('<b>Haberes − descuentos</b>','<b>'+CLP(Number(f.total)||0)+'</b>'))}
+    <p style="font-size:11px;color:#777;margin-top:24px">Anexo informativo generado por el Business Suite: no forma parte del finiquito ratificado. Base y topes según el mantenedor de RRHH vigente al cierre.</p></div>`;
+}
+function imprimirFiniquito(id){
+  const f = FINIQ.find(x=>x.id===id); if(!f) return;
+  bloqueDoc(finiquitoHTML(f, fqDet(f), { borrador:!f.cerrado_at }), `Finiquito ${nombreCorto(f.trabajador)}`);
 }
 function pintar(){
   $('tbCartas').innerHTML = CARTAS.map(c=>{

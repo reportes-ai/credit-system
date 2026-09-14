@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aumento de Renta — AutoFácil</title>
-  <!-- v1.4 — navbar migrada al componente topnav -->
+  <!-- v1.5 — monto en letras desde rrhh-core.js (motor único, lo comparte el finiquito). v1.4 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -274,32 +274,11 @@ function generarAnexo(nuevoCargo){
   w.document.write(html); w.document.close();
 }
 
-// Monto en palabras (es-CL) para documentos legales
-function numeroALetras(n){
-  if (!isFinite(n) || n < 0) return '';
-  const U=['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte'];
-  const D=['','','veinti','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
-  const C=['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
-  const tres = x => {
-    if (x===0) return ''; if (x===100) return 'cien';
-    let s = C[Math.floor(x/100)]; const r = x%100;
-    if (r===0) return s;
-    if (s) s += ' ';
-    if (r<=20) return s+U[r];
-    const d=Math.floor(r/10), u=r%10;
-    if (d===2) return s+'veinti'+(u===1?'ún':U[u]);
-    return s+D[d]+(u?' y '+(u===1?'un':U[u]):'');
-  };
-  if (n===0) return 'cero';
-  const mm=Math.floor(n/1000000), mil=Math.floor(n%1000000/1000), un=n%1000;
-  let out='';
-  if (mm) out += (mm===1?'un millón':tres(mm)+' millones');
-  if (mil) out += (out?' ':'')+(mil===1?'mil':tres(mil)+' mil');
-  if (un) out += (out?' ':'')+tres(un);
-  return out;
-}
+// Monto en palabras (es-CL) para documentos legales — MOTOR ÚNICO rrhh-core.js (lo comparte el finiquito)
+const numeroALetras = n => window.AF_RRHH.numeroALetras(n);
 const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 </script>
+<script src="/js/rrhh-core.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>

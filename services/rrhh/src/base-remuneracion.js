@@ -22,7 +22,8 @@ async function remuneracionBaseDetalle(idUsuario, hastaMes) {
   const [liqs] = await pool.query(
     `SELECT mes, total_imponible FROM rh_liquidaciones WHERE id_usuario=? AND estado='EMITIDA' ORDER BY mes DESC LIMIT 3`, [idUsuario]);
   if (liqs.length)
-    return { base: Math.round(liqs.reduce((a, l) => a + Number(l.total_imponible), 0) / liqs.length), fuente: 'MOTOR', meses: liqs.map(l => l.mes) };
+    return { base: Math.round(liqs.reduce((a, l) => a + Number(l.total_imponible), 0) / liqs.length), fuente: 'MOTOR', meses: liqs.map(l => l.mes),
+      detalle: liqs.map(l => ({ mes: l.mes, imponible: Number(l.total_imponible) })) };
   const [[u]] = await pool.query(`SELECT rut FROM usuarios WHERE id_usuario=?`, [idUsuario]);
   const rut = String(u?.rut || '').replace(/\./g, '').toUpperCase();
   if (rut) {
@@ -30,10 +31,11 @@ async function remuneracionBaseDetalle(idUsuario, hastaMes) {
       // total_ganado = imponible REAL; la columna imponible del LIBREMUN viene topada (87,8 UF) — el tope lo aplica el finiquito
       `SELECT mes, COALESCE(NULLIF(total_ganado,0), imponible) imponible FROM ctb_remun_aux WHERE UPPER(REPLACE(rut,'.',''))=? AND mes < ? AND imponible > 0 ORDER BY mes DESC LIMIT 3`, [rut, hasta]);
     if (aux.length)
-      return { base: Math.round(aux.reduce((a, l) => a + Number(l.imponible), 0) / aux.length), fuente: 'AVSOFT', meses: aux.map(l => l.mes) };
+      return { base: Math.round(aux.reduce((a, l) => a + Number(l.imponible), 0) / aux.length), fuente: 'AVSOFT', meses: aux.map(l => l.mes),
+        detalle: aux.map(l => ({ mes: l.mes, imponible: Number(l.imponible) })) };
   }
   const [[f]] = await pool.query(`SELECT sueldo_base FROM rh_fichas WHERE id_usuario=?`, [idUsuario]);
-  return { base: Math.round((Number(f?.sueldo_base) || 0) * 1.25), fuente: 'ESTIMADA', meses: [] };
+  return { base: Math.round((Number(f?.sueldo_base) || 0) * 1.25), fuente: 'ESTIMADA', meses: [], detalle: [], sueldo_base: Number(f?.sueldo_base) || 0 };
 }
 
 async function remuneracionBase(idUsuario, hastaMes) {
