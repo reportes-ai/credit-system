@@ -747,13 +747,35 @@ async function descuentosDelMes(mes) {
      impuesto único con tope rem_apv_tope_uf (50 UF). Va en m.apv[id]. Detectado
      cuadrando a Sevilla contra AVSOFT (08-09-2026): $809.544 de APV → $246.101 menos de impuesto. */
   const apv = {};
+  /* Glosa por descuento (Pato, 14-09-2026): la liquidación ya no dice solo "Otros descuentos"
+     sino cada línea con su nombre y cuota real ("Préstamo empresa · cuota 3 de 4",
+     "Caja Los Andes · Crédito Social · cuota 17 de 27"). Va en m.items[id] y al snapshot. */
+  const items = {};
+  const TIPO_TXT = { ANTICIPO: 'Anticipo de sueldo', PRESTAMO: 'Préstamo empresa', PAGO_EXCESO: 'Devolución pago en exceso' };
+  // "PENSIÓN DE ALIMENTOS" → "Pensión de Alimentos"; siglas cortas (APV, TGR, CCAF) quedan en mayúscula
+  const MINUS = new Set(['de', 'del', 'la', 'las', 'los', 'y', 'a', 'en', 'el']);
+  const SIGLAS = new Set(['APV', 'TGR', 'CCAF', 'AFP', 'AFC', 'SII', 'TNE', 'ISAPRE']);
+  const cap = s => String(s || '').trim().split(/\s+/).map((w, i) => {
+    const l = w.toLowerCase(); if (i > 0 && MINUS.has(l)) return l;
+    if (SIGLAS.has(w.toUpperCase().replace(/\./g, ''))) return w.toUpperCase();
+    return l.charAt(0).toUpperCase() + l.slice(1);
+  }).join(' ');
   for (const d of rows) {
     const c = cuotaEnMes(d, mes, tc);
     if (c == null) continue;
     m[d.id_usuario] = (m[d.id_usuario] || 0) + c;
     if (d.tipo === 'PERMANENTE' && /\bAPV\b/i.test(d.subtipo || '')) apv[d.id_usuario] = (apv[d.id_usuario] || 0) + c;
+    const total = Number(d.cuotas_total) || (Number(d.cuotas) > 0 ? Number(d.cuotas) : 0);
+    const nCuota = total > 0 ? (Number(d.cuota_desde) || 1) + difMeses(d.mes_inicio, mes) : null;
+    const base = d.tipo === 'PERMANENTE' ? cap(d.subtipo || 'Descuento') : TIPO_TXT[d.tipo] || cap(d.tipo);
+    // El detalle solo si agrega información (en la Caja trae producto y código; "cuota N/M" ya va en la glosa)
+    const det = String(d.detalle_texto || '').replace(/\s*·\s*cuota\s+\d+\s*\/\s*\d+/i, '').replace(/\s*·\s*obs\s+.*$/i, '').trim();
+    const partes = [base, det && !det.toUpperCase().startsWith(base.toUpperCase()) ? det : null, nCuota && total > 1 ? `cuota ${nCuota} de ${total}` : null,
+      d.tipo === 'PAGO_EXCESO' && d.mes_referencia ? `de ${d.mes_referencia}` : null].filter(Boolean);
+    (items[d.id_usuario] = items[d.id_usuario] || []).push({ glosa: partes.join(' · ').slice(0, 160), monto: c });
   }
   Object.defineProperty(m, 'apv', { value: apv, enumerable: false });
+  Object.defineProperty(m, 'items', { value: items, enumerable: false });
   return m;
 }
 
@@ -852,6 +874,7 @@ function calcLiquidacion(inp, ind) {
     afc_pct: esIndef ? ind.rem_afc_trabajador_pct : 0, desc_afc: descAfc, base_afc: baseAfc,
     base_tributable: baseTrib, apv_deducible: apvDeducible, impuesto,
     otros_descuentos: otrosDesc, total_descuentos: totalDescuentos,
+    descuentos_detalle: Array.isArray(inp.descuentos_detalle) ? inp.descuentos_detalle : [],   // glosa + monto de cada "otro descuento"
     liquido: totalHaberes - totalDescuentos,
     aporte_sis: aporteSis, aporte_afc_emp: aporteAfcEmp, aporte_mutual: aporteMutual, aporte_sanna: aporteSanna,
     costo_empresa: totalHaberes + aporteSis + aporteAfcEmp + aporteMutual + aporteSanna,
@@ -1019,6 +1042,7 @@ const getMes = async (req, res) => {
         otros_no_imponibles: adics[e.id_usuario]?.noimp || 0,
         adicionales: adics[e.id_usuario]?.items || [],
         otros_descuentos: descs[e.id_usuario] || 0,
+        descuentos_detalle: descs.items[e.id_usuario] || [],
         apv: descs.apv[e.id_usuario] || 0,
       };
       return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo,
@@ -1070,6 +1094,7 @@ const guardar = async (req, res) => {
         otros_imponibles: adics[emp.id_usuario]?.imp || 0,
         otros_no_imponibles: adics[emp.id_usuario]?.noimp || 0,
         otros_descuentos: descs[emp.id_usuario] || 0,
+        descuentos_detalle: descs.items[emp.id_usuario] || [],
         apv: descs.apv[emp.id_usuario] || 0,
       };
       const calc = calcLiquidacion(inp, ind);
@@ -1140,7 +1165,7 @@ async function enviarLiquidacionesCorreo(mes) {
         ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila('Comisiones' + (d.comisiones_mes ? ' ' + d.comisiones_mes : ''), d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación' + (d.dias != null && d.dias !== 30 && d.colacion ? ` (${d.dias}/30 días)` : ''), d.colacion)}${fila('Movilización' + (d.dias != null && d.dias !== 30 && d.movilizacion ? ` (${d.dias}/30 días)` : ''), d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
         <tr><td style="padding:3px 10px;font-weight:700">Total haberes</td><td style="padding:3px 10px;text-align:right;font-weight:700">${co(d.total_haberes)}</td></tr>
         <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">DESCUENTOS</td></tr>
-        ${fila('AFP ' + (d.afp || ''), d.desc_afp, 1)}${fila('Salud 7%', d.desc_salud, 1)}${fila('Adicional Isapre', d.desc_salud_adicional, 1)}${fila('Seguro cesantía', d.desc_afc, 1)}${fila('Impuesto único', d.impuesto, 1)}${fila('Otros descuentos', d.otros_descuentos, 1)}
+        ${fila('AFP ' + (d.afp || ''), d.desc_afp, 1)}${fila('Salud 7%', d.desc_salud, 1)}${fila('Adicional Isapre', d.desc_salud_adicional, 1)}${fila('Seguro cesantía', d.desc_afc, 1)}${fila('Impuesto único', d.impuesto, 1)}${(d.descuentos_detalle || []).length ? d.descuentos_detalle.map(x => fila(x.glosa, x.monto, 1)).join('') : fila('Otros descuentos', d.otros_descuentos, 1)}
         <tr><td style="padding:3px 10px;font-weight:700">Total descuentos</td><td style="padding:3px 10px;text-align:right;font-weight:700;color:#b91c1c">−${co(d.total_descuentos)}</td></tr>
         <tr><td style="padding:8px 10px;font-weight:800;font-size:14px">LÍQUIDO A PAGAR</td><td style="padding:8px 10px;text-align:right;font-weight:800;font-size:14px;color:#15803d">${co(d.liquido)}</td></tr>
       </table>

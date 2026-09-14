@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
+  <!-- v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -277,7 +277,7 @@ function pintarLiq(l, d){
           ${fila('Adicional Isapre (plan '+String(d.plan_isapre_uf||'').replace('.',',')+' UF)', d.desc_salud_adicional)}
           ${fila('Seguro cesantía AFC ('+String(d.afc_pct||0).replace('.',',')+'%)', d.desc_afc)}
           ${fila('Impuesto único 2ª categoría' + (d.apv_deducible>0 ? ` (base rebajada por APV ${$(d.apv_deducible)})` : ''), d.impuesto)}
-          ${fila('Otros descuentos', d.otros_descuentos)}
+          ${(d.descuentos_detalle||[]).length ? d.descuentos_detalle.map(x=>fila(esc(x.glosa), x.monto)).join('') : fila('Otros descuentos', d.otros_descuentos)}
           ${sub('TOTAL DESCUENTOS', d.total_descuentos, '#b91c1c')}
         </table>
       </div>
