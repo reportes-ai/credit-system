@@ -271,10 +271,13 @@ exports.siguiente = async (req, res) => {
       WHERE ob.id = ?`, [id]);
 
     // Normalizar fechas a YYYY-MM-DD / YYYY-MM para los inputs
+    /* Con getFullYear/getMonth del servidor, una DATE anterior al cambio de hora leída después
+       del cambio se corría un día (2026-09-01 → 31-08) y el Mes se precargaba en agosto
+       (14-09-2026, 9 ops). Motor único: isoDeBD deshace el offset con que mysql2 la leyó. */
+    const { isoDeBD } = require('../../../../shared/fecha-chile');
     for (const c of CAMPOS) {
       if (cr[c.col] instanceof Date) {
-        const d = cr[c.col];
-        const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        const iso = isoDeBD(cr[c.col]);
         cr[c.col] = c.tipo === 'month' ? iso.slice(0,7) : iso;
       }
     }
@@ -400,7 +403,11 @@ exports.guardar = async (req, res) => {
     const usuario = ((req.usuario.nombre||'') + ' ' + (req.usuario.apellido||'')).trim() || req.usuario.email || '';
     if (sets.length) {
       vals.push(id);
-      await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at=NOW() WHERE id=?`, vals);
+      /* Desde el corte el mes contable SIGUE a la fecha de curse (motor único shared/mes-atribucion); va al
+         final del SET. 14-09-2026: 9 ops cursadas el 11/12-09 quedaron en agosto al completarlas por esta cola
+         (el formulario traía el mes corrido un mes) y el vigía las devolvió a septiembre. */
+      const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
+      await pool.query(`UPDATE creditos SET ${sets.join(', ')}, ${SET_MES_SQL(await mesCorte())}, updated_at=NOW() WHERE id=?`, vals);
       for (const c of cambios) {
         pool.query(`INSERT INTO creditos_edicion_log (id_credito, num_op, usuario, campo, valor_antes, valor_despues)
                     VALUES (?, ?, ?, ?, ?, ?)`,

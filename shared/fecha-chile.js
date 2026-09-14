@@ -49,7 +49,9 @@ function isoDe(d) {
 function mesDe(v) {
   if (v === null || v === undefined || v === '') return null;
   if (v instanceof Date) {
-    const iso = isoDe(v);
+    // Un Date acá SIEMPRE viene de la base (columna DATE): se deshace el offset de mysql2,
+    // no el de la zona (ver isoDeBD: el borde del cambio de hora corría el mes).
+    const iso = isoDeBD(v);
     return iso ? iso.slice(0, 7) : null;
   }
   const m = String(v).match(/^(\d{4}-\d{2})/);
@@ -95,4 +97,24 @@ function primerDiaMes(iso) {
    medianoche. */
 const finDelDia = iso => `${String(iso).slice(0, 10)} 23:59:59.999999`;
 
-module.exports = { TZ, isoDe, mesDe, hoyISO, mesActualISO, desdeISO, sumarDias, sumarMeses, primerDiaMes, finDelDia };
+/* ── FECHA LEÍDA DE LA BASE (DATE / DATETIME vía mysql2) ────────────────────
+   mysql2 interpreta lo que viene de la base con UN offset fijo para toda la corrida
+   (pool.offsetBD(), -03:00 en verano / -04:00 en invierno). Una DATE '2026-09-01' leída
+   en verano es 2026-09-01T03:00Z; pero el 1 de septiembre Chile aún estaba en -04:00, así
+   que isoDe() (zona de Chile) la muestra como 31 de agosto 23:00 → "2026-08-31". Con ese
+   valor la cola de Digitación Faltantes precargó Mes = agosto en 9 ops cursadas en
+   septiembre (14-09-2026). La única reconstrucción exacta es deshacer el MISMO offset con
+   que mysql2 la interpretó: así vuelve la hora de pared tal cual se guardó, en cualquier
+   fecha del año. Úsala para todo Date que venga de la base. */
+function isoDeBD(d) {
+  if (d == null || d === '') return null;
+  if (!(d instanceof Date)) return isoDe(d);
+  if (isNaN(d)) return null;
+  let off = '-04:00';
+  try { off = require('./config/database').offsetBD() || off; } catch (_) {}
+  const m = /^([+-])(\d{2}):(\d{2})$/.exec(off);
+  const ms = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : -4 * 3600000;
+  return new Date(d.getTime() + ms).toISOString().slice(0, 10);
+}
+
+module.exports = { TZ, isoDe, isoDeBD, mesDe, hoyISO, mesActualISO, desdeISO, sumarDias, sumarMeses, primerDiaMes, finDelDia };
