@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 -->
+<!-- v1.4 — Continuar envío desde la bandeja y el informe cuando quedan pendientes (cupo diario). v1.3 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -98,6 +98,7 @@
 <dialog id="dlgRes">
   <div class="dlg-head">
     <i class="bi bi-graph-up-arrow"></i><h5 id="resTitulo">Resultados</h5>
+    <a id="btnContinuar" class="btnx" style="display:none;background:#16a34a;color:#fff;text-decoration:none;margin-right:8px" href="#"><i class="bi bi-send-fill me-1"></i>Continuar envío</a>
     <button id="btnRecalc" class="btnx" style="background:rgba(255,255,255,.2);color:#fff" onclick="recalcular()"><i class="bi bi-arrow-repeat me-1"></i>Recalcular conversión</button>
     <button onclick="dlgRes.close()"><i class="bi bi-x-lg"></i></button>
   </div>
@@ -146,8 +147,10 @@ async function cargar(){
           <td class="num">${N(c.enviados)}</td>
           <td class="num" style="color:${c.errores>0?'#dc2626':'inherit'}">${N(c.errores)}</td>
           <td class="num"><b>${N(c.conversiones)}</b></td>
-          <td>${c.estado==='BORRADOR' ? `<a href="/campanas-masivas/editor?id=${c.id}" title="Editar" style="color:var(--accent);text-decoration:none"><i class="bi bi-pencil-square" style="font-size:.95rem"></i></a>`
-              : `<span class="corr" title="Ver informe" style="text-decoration:none" onclick="abrirResultados(${c.id})"><i class="bi bi-graph-up-arrow" style="font-size:.95rem"></i></span>`}</td>
+          <td style="white-space:nowrap">${c.estado==='BORRADOR' ? `<a href="/campanas-masivas/editor?id=${c.id}" title="Editar" style="color:var(--accent);text-decoration:none"><i class="bi bi-pencil-square" style="font-size:.95rem"></i></a>`
+              : `<span class="corr" title="Ver informe" style="text-decoration:none" onclick="abrirResultados(${c.id})"><i class="bi bi-graph-up-arrow" style="font-size:.95rem"></i></span>`}
+              ${c.estado!=='BORRADOR' && Number(c.destinatarios) - Number(c.enviados) - Number(c.errores) > 0
+                ? `<a href="/campanas-masivas/editor?id=${c.id}" title="Continuar envío: quedan ${N(Number(c.destinatarios)-Number(c.enviados)-Number(c.errores))} pendientes (cupo diario)" style="color:#16a34a;text-decoration:none;margin-left:8px"><i class="bi bi-send-fill" style="font-size:.95rem"></i></a>` : ''}</td>
         </tr>`).join('')}
       </tbody></table></div>`;
   }
@@ -162,6 +165,11 @@ async function abrirResultados(id){
   document.getElementById('resTitulo').textContent = `${c.correlativo} — ${c.descripcion}`;
   document.getElementById('btnRecalc').style.display = c.es_test ? 'none' : '';
   const em = Object.fromEntries(estados.map(e => [e.estado, Number(e.n)]));
+  // Envío por partes (cupo diario): con pendientes se puede continuar desde el editor
+  const bc = document.getElementById('btnContinuar'); const pend = Number(em.PENDIENTE || 0);
+  bc.style.display = pend > 0 && c.estado !== 'BORRADOR' ? '' : 'none';
+  bc.href = `/campanas-masivas/editor?id=${c.id}`;
+  bc.innerHTML = `<i class="bi bi-send-fill me-1"></i>Continuar envío (quedan ${N(pend)})`;
   const gCamp = grupos.find(g=>g.grupo==='CAMPANA') || { n:0, conv:0, monto:0 };
   const gCtrl = grupos.find(g=>g.grupo==='CONTROL') || { n:0, conv:0, monto:0 };
   const tasa = g => g.n ? (Number(g.conv)/Number(g.n)*100) : 0;
