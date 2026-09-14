@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bancos de la Plaza — AutoFácil</title>
-  <!-- v1.0 — mantenedor propio (antes vivía en Indicadores de Remuneraciones): catálogo de bancos con código SBIF, fuente única de TEF, nómina banco y fichas -->
+  <!-- v1.1 — renombrar edita la misma fila (por id), ya no duplica. v1.0 — mantenedor propio (antes vivía en Indicadores de Remuneraciones): catálogo de bancos con código SBIF, fuente única de TEF, nómina banco y fichas -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -64,7 +64,7 @@ if (!token||!yo) location.href='/login.html';
 const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'application/json' };
 function toast(m, err){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',3200); }
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-const fila = r => `<tr class="${Number(r.activo??1)?'':'off'}">
+const fila = r => `<tr class="${Number(r.activo??1)?'':'off'}" data-id="${r.id||''}">
   <td><input type="text" class="n" value="${esc(r.nombre)}" placeholder="NOMBRE DEL BANCO" style="text-transform:uppercase"></td>
   <td><input type="text" class="cod c" maxlength="3" inputmode="numeric" value="${esc(r.codigo)}" placeholder="000"></td>
   <td style="text-align:center"><input type="checkbox" class="a" ${Number(r.activo??1)?'checked':''} onchange="this.closest('tr').classList.toggle('off',!this.checked)"></td></tr>`;
@@ -75,7 +75,7 @@ async function cargar(){
 }
 function agregar(){ document.getElementById('tb').insertAdjacentHTML('beforeend', fila({ nombre:'', codigo:'', activo:1 })); document.querySelector('#tb tr:last-child .n').focus(); }
 async function guardar(){
-  const bancos = [...document.querySelectorAll('#tb tr')].map(tr => ({ nombre: tr.querySelector('.n').value.trim().toUpperCase(), codigo: tr.querySelector('.c').value.trim(), activo: tr.querySelector('.a').checked ? 1 : 0 })).filter(x => x.nombre || x.codigo);
+  const bancos = [...document.querySelectorAll('#tb tr')].map(tr => ({ id: tr.dataset.id || null, nombre: tr.querySelector('.n').value.trim().toUpperCase(), codigo: tr.querySelector('.c').value.trim(), activo: tr.querySelector('.a').checked ? 1 : 0 })).filter(x => x.nombre || x.codigo);
   const j = await (await fetch('/api/bancos', { method:'PUT', headers:HJ, body: JSON.stringify({ bancos }) })).json();
   if (!j.success) return toast(j.error||'No se pudo guardar', true);
   toast(`✓ ${j.data.guardados} banco(s) guardados`); cargar();

@@ -1455,9 +1455,12 @@ async function catalogo(tipo) {
 function codigoDe(lista, nombre) {
   const n = String(nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
   if (!n) return null;
+  // El prefijo "BANCO" no distingue: "FALABELLA" en la ficha debe calzar con "BANCO FALABELLA" del cat\u00e1logo y viceversa (14-09-2026)
+  const sinBanco = s => s.replace(/^BANCO\s+(DEL?\s+)?/, '');
   const norm = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
-  const ex = lista.find(r => norm(r.nombre) === n); if (ex) return ex.codigo;
-  const inc = lista.find(r => n.includes(norm(r.nombre))); return inc ? inc.codigo : null;
+  const n2 = sinBanco(n);
+  const ex = lista.find(r => norm(r.nombre) === n || sinBanco(norm(r.nombre)) === n2); if (ex) return ex.codigo;
+  const inc = lista.find(r => n2.includes(sinBanco(norm(r.nombre)))); return inc ? inc.codigo : null;
 }
 /* GET /api/rrhh/remuneraciones/catalogo — AFP + SALUD + BANCO para los selectores de la ficha (cualquier usuario logueado) */
 const getCatalogo = async (_req, res) => {

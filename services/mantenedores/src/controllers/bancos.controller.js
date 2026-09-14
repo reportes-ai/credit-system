@@ -36,10 +36,19 @@ const guardar = async (req, res) => {
     for (const r of lista) {
       const nombre = String(r.nombre || '').toUpperCase().replace(/\s+/g, ' ').trim();
       const cod = String(r.codigo || '').trim();
+      const activo = r.activo === 0 || r.activo === false || r.activo === '0' ? 0 : 1;
+      const id = parseInt(r.id) || null;
       if (!nombre) continue;
       if (!/^\d{3}$/.test(cod)) { malos.push(`${nombre}: código "${cod}" (deben ser 3 dígitos SBIF)`); continue; }
-      await pool.query("INSERT INTO rh_catalogo (tipo, codigo, nombre, activo) VALUES ('BANCO',?,?,?) ON DUPLICATE KEY UPDATE codigo=VALUES(codigo), activo=VALUES(activo)",
-        [cod, nombre, r.activo === 0 || r.activo === false || r.activo === '0' ? 0 : 1]);
+      /* Por ID cuando la fila ya existe: renombrar ("FALABELLA" → "BANCO FALABELLA") edita la misma fila.
+         Con el upsert por nombre el renombre creaba un banco nuevo y quedaban duplicados (14-09-2026). */
+      if (id) {
+        const [[dupN]] = await pool.query("SELECT id FROM rh_catalogo WHERE tipo='BANCO' AND nombre=? AND id<>? LIMIT 1", [nombre, id]);
+        if (dupN) { malos.push(`${nombre}: ya existe otro banco con ese nombre`); continue; }
+        const [u] = await pool.query("UPDATE rh_catalogo SET nombre=?, codigo=?, activo=? WHERE id=? AND tipo='BANCO'", [nombre, cod, activo, id]);
+        if (u.affectedRows) { n++; continue; }
+      }
+      await pool.query("INSERT INTO rh_catalogo (tipo, codigo, nombre, activo) VALUES ('BANCO',?,?,?) ON DUPLICATE KEY UPDATE codigo=VALUES(codigo), activo=VALUES(activo)", [cod, nombre, activo]);
       n++;
     }
     if (malos.length) return res.status(400).json({ success: false, data: null, error: 'No se guardó: ' + malos.join(' · ') });
