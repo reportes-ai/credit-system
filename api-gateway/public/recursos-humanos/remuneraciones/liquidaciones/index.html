@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
+  <!-- v2.5 — liquidación más ancha (1000px, montos sin cortar), haberes sin paréntesis, más espacio para las firmas. v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -30,7 +30,7 @@
     .btn-ghost { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:9px; padding:7px 12px; font-weight:600; font-size:.82rem; cursor:pointer; }
     .empty { text-align:center; color:#9ca3af; padding:30px 0; }
     .foot { background:#f7f9fc; border-left:4px solid #0255c5; border-radius:10px; padding:12px 18px; font-size:.76rem; color:#475569; line-height:1.8; }
-    dialog { border:none; border-radius:14px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:780px; width:95%; }
+    dialog { border:none; border-radius:14px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:1000px; width:96%; }
     dialog::backdrop { background:rgba(15,23,42,.55); }
     .liq { font-family:'Segoe UI',sans-serif; padding:26px 30px; font-size:.82rem; color:#1e293b; }
     .liq h4 { font-weight:800; color:#012d70; margin:0; font-size:1rem; }
@@ -236,9 +236,10 @@ function pintarLiq(l, d){
     const suma = items.reduce((a, x) => a + (Number(x.monto) || 0), 0);
     if (!items.length || Math.round(suma) !== Math.round(total)) return fila(imp ? 'Otros imponibles' : 'Otros no imponibles', total);
     // Líquido imponible (aguinaldo): se muestra el BRUTO y, entre paréntesis, el líquido que recibe la persona
-    return items.map(a => fila(esc(a.nombre) + (imp ? (a.liquido_objetivo ? ` (bruto por ${$(a.liquido_objetivo)} líquidos)` : '') : (a.liquido ? ' (líquido, no imponible)' : ' (no imponible)')), a.monto)).join('');
+    // Solo el nombre del haber (Pato, 14-09-2026): sin paréntesis; "de" en minúscula
+    return items.map(a => fila(esc(String(a.nombre).replace(/De/g,'de')), a.monto)).join('');
   };
-  const fila = (lbl,v) => (Number(v)||0) ? `<tr><td style="padding:4px 12px;color:#334155">${lbl}</td><td style="padding:4px 12px;text-align:right;font-family:Consolas,monospace">${co(v)}</td></tr>` : '';
+  const fila = (lbl,v) => (Number(v)||0) ? `<tr><td style="padding:4px 12px;color:#334155">${lbl}</td><td style="padding:4px 12px;text-align:right;font-family:Consolas,monospace;white-space:nowrap">${co(v)}</td></tr>` : '';
   const cab = t => `<tr><td colspan="2" style="background:#012d70;color:#fff;font-weight:700;font-size:.68rem;letter-spacing:.8px;padding:6px 12px">${t}</td></tr>`;
   const sub = (t,v,color) => `<tr><td style="padding:6px 12px;font-weight:800;border-top:1.5px solid #cbd5e1;color:${color||'#0f172a'}">${t}</td><td style="padding:6px 12px;text-align:right;font-weight:800;border-top:1.5px solid #cbd5e1;font-family:Consolas,monospace;color:${color||'#0f172a'}">${co(v)}</td></tr>`;
   const infoTd = (k,v)=>`<div style="display:flex;justify-content:space-between;gap:14px;padding:2px 0"><span style="color:#64748b;font-size:.72rem;text-transform:uppercase;letter-spacing:.4px">${k}</span><span style="font-weight:600;text-align:right">${v}</span></div>`;
@@ -266,7 +267,7 @@ function pintarLiq(l, d){
           ${fila('Comisiones' + (d.comisiones_mes ? ' ' + d.comisiones_mes : ''), d.comisiones)}
           ${d.feriado_variable>0?fila(`Feriado renta variable art. 71 (${d.feriado_var_dias} día/s, prom. 3 meses)`, d.feriado_variable):''}
           ${adicFilas(d, true)}
-          ${fila('Gratificación legal (tope 4,75 IMM/12)', d.gratificacion)}
+          ${fila('Gratificación legal', d.gratificacion)}
           ${sub('Total imponible', d.total_imponible)}
           ${fila('Colación' + (d.dias!=null && d.dias!==30 && d.colacion ? ` (${d.dias}/30 días)` : ''), d.colacion)}${fila('Movilización' + (d.dias!=null && d.dias!==30 && d.movilizacion ? ` (${d.dias}/30 días)` : ''), d.movilizacion)}${adicFilas(d, false)}
           ${sub('TOTAL HABERES', d.total_haberes)}
@@ -290,8 +291,8 @@ function pintarLiq(l, d){
         SON: ${numAPalabras(Math.round(Number(d.liquido)||0))} PESOS.
       </div>
       <div style="padding:26px 24px 18px;display:grid;grid-template-columns:1fr 1fr;gap:40px;font-size:.7rem;color:#64748b;text-align:center">
-        <div><div style="border-top:1px solid #94a3b8;padding-top:5px;margin-top:24px">FIRMA EMPLEADOR</div></div>
-        <div><div style="border-top:1px solid #94a3b8;padding-top:5px;margin-top:24px">FIRMA TRABAJADOR</div>
+        <div><div style="border-top:1px solid #94a3b8;padding-top:5px;margin-top:64px">FIRMA EMPLEADOR</div></div>
+        <div><div style="border-top:1px solid #94a3b8;padding-top:5px;margin-top:64px">FIRMA TRABAJADOR</div>
           <div style="font-size:.62rem;color:#64748b;text-align:justify;margin-top:6px;line-height:1.35">Certifico que he recibido a entera satisfacción los valores contenidos en la presente liquidación de sueldo, por lo cual no tengo ningún cargo o reclamo posterior que efectuar a mi empleador.</div></div>
       </div>
       ${l.banco_pago || l.num_cuenta_pago ? `<div style="padding:0 24px 14px;font-size:.68rem;color:#475569"><i class="bi bi-bank me-1"></i>Líquido depositado en <b>${esc(l.banco_pago||'—')}</b>${l.tipo_cuenta_pago?' · '+esc(l.tipo_cuenta_pago):''}${l.num_cuenta_pago?' · N° '+esc(l.num_cuenta_pago):''}</div>` : ''}

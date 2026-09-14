@@ -233,7 +233,7 @@ const CAUSALES_ADIC = {
   // se ingresan PERMANENTES con mes desde/hasta.
   'SUELDO ASEGURADO': 1, 'BONO ASEGURADO': 1, 'VARIABLE ASEGURADO': 1,
   // Aguinaldos/bonos de temporada: imponibles (art. 41 CT). Se pueden asignar a TODO el personal.
-  'AGUINALDO DE FIESTAS PATRIAS': 1, 'BONO NAVIDAD': 1, 'BONO VACACIONES': 1,   // 14-09-2026: "BONO FIESTAS PATRIAS" → aguinaldo
+  'AGUINALDO FIESTAS PATRIAS': 1, 'BONO NAVIDAD': 1, 'BONO VACACIONES': 1,   // 14-09-2026: "BONO FIESTAS PATRIAS" → aguinaldo
   'VIÁTICO': 0, 'COLACIÓN ADICIONAL': 0, 'MOVILIZACIÓN ADICIONAL': 0,
   'DEVOLUCIÓN DE DESCUENTO': 0, 'OTRO': null,   // 'ASIGNACIÓN DE CELULAR' salió 09-09-2026: la causal vigente es ASIGNACION CELULAR (concepto del usuario)
 };
