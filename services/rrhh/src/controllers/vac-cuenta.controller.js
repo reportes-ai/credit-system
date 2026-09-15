@@ -229,14 +229,14 @@ async function saldoCuenta(idUsuario, aFecha) {
     const ultimoAniv = new Date(fi); ultimoAniv.setMonth(fi.getMonth() + mesesTot);
     const sigAniv = new Date(ultimoAniv); sigAniv.setMonth(ultimoAniv.getMonth() + 1);
     const fraccion = Math.max(0, Math.min(1, (h - ultimoAniv) / (sigAniv - ultimoAniv)));
-    proporcional = Math.round((mesesEnCurso + fraccion) * ((anuales + progAnual) / 12) * 10) / 10;
+    proporcional = Math.round((mesesEnCurso + fraccion) * ((anuales + progAnual) / 12) * 100) / 100;   // 2 decimales (5,92, no 5,9)
     // períodos cumplidos a la fecha que todavía no están depositados en la cuenta
     for (let k = Number(m.n_devengos) + 1; k <= cumplidos; k++) virtuales += anuales + progresivoDelPeriodo(u.previos, k);
   }
   const saldoPer = Number(m.s) + virtuales;
   return {
     saldo_periodos: saldoPer, abonos: Number(m.abonos) + virtuales, cargos: Number(m.cargos),
-    proporcional, disponibles: Math.round((saldoPer + proporcional) * 10) / 10,
+    proporcional, disponibles: Math.round((saldoPer + proporcional) * 100) / 100,
   };
 }
 exports.saldoCuenta = saldoCuenta;

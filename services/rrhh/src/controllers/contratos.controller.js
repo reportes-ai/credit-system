@@ -449,9 +449,12 @@ exports.finiquitoCalcular = async (req, res) => {
       const s = await require('./vac-cuenta.controller').saldoCuenta(idU, fechaT);
       vacHabiles = Math.max(0, s.disponibles);
     }
-    const vacCorridos = Math.round(vacHabiles * 1.4 * 10) / 10;
-    // MOTOR ÚNICO rrhh-core.provisionVacaciones (misma fórmula de la cartola de Vacaciones)
-    const vacMonto = require('../../../../api-gateway/public/js/rrhh-core').provisionVacaciones(vacHabiles, base);
+    // Los hábiles se proyectan en el calendario desde el día siguiente al término (art. 73):
+    // los sábados, domingos y festivos que quedan dentro también se pagan. Antes era un
+    // factor 1,4 aproximado (Fernando: 5,92 hábiles → 8,3; en el calendario real son 9,92).
+    const proy = require('../../../../shared/feriados').diasCorridosDeHabiles(fechaT, vacHabiles);
+    const vacCorridos = proy.corridos, vacInhabiles = proy.inhabiles, vacHasta = proy.hasta;
+    const vacMonto = Math.max(0, Math.round(vacCorridos * base / 30));
 
     // Saldo pendiente de anticipos/préstamos: se descuenta del finiquito
     // (cláusula del convenio firmado). Cuotas cobradas = meses transcurridos
@@ -479,7 +482,7 @@ exports.finiquitoCalcular = async (req, res) => {
       tope_anos: topeAnos, tope_uf_n: topeUFn, tope_uf: topeUF, avisado,
       anos_servicio: anos, meses_servicio: meses,
       indemnizacion_anos: indemAnos, mes_aviso: mesAviso,
-      vac_dias_habiles: vacHabiles, vac_dias_corridos: vacCorridos, vac_monto: vacMonto,
+      vac_dias_habiles: vacHabiles, vac_dias_corridos: vacCorridos, vac_inhabiles: vacInhabiles, vac_hasta: vacHasta, vac_monto: vacMonto,
       total: indemAnos + mesAviso + vacMonto,
       avisos,
     });

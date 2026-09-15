@@ -108,6 +108,26 @@ function diasHabilesEntre(desde, hasta) {
   return n;
 }
 
+// Feriado proporcional (art. 73 CT): N días HÁBILES de vacaciones proyectados en el
+// calendario desde el día siguiente a `desdeISO` → cuántos días CORRIDOS son (los
+// sábados, domingos y festivos que quedan dentro se pagan también). La fracción del
+// último día hábil se conserva. Ej.: 5,92 hábiles desde el 12-09-2026 → dom 13,
+// 14-17 hábiles, 18-19 festivos, dom 20, lun 21, mar 22 (0,92) = 9,92 corridos.
+// MOTOR ÚNICO: reemplaza el factor 1,4 aproximado del finiquito (Pato, 15-09-2026).
+function diasCorridosDeHabiles(desdeISO, habiles) {
+  const n = Number(habiles) || 0;
+  if (n <= 0) return { corridos: 0, inhabiles: 0, hasta: null };
+  const d = new Date(String(desdeISO).slice(0, 10) + 'T12:00:00');
+  let hab = 0, corridos = 0, inh = 0, hasta = null;
+  while (hab < n) {
+    d.setDate(d.getDate() + 1);
+    if (esHabil(d)) { const resto = n - hab; const toma = Math.min(1, resto); hab += toma; corridos += toma; }
+    else { inh++; corridos++; }
+    hasta = fmt(d);
+  }
+  return { corridos: Math.round(corridos * 100) / 100, inhabiles: inh, hasta };
+}
+
 // Si la fecha no es hábil, avanza hasta el siguiente día hábil (Date in/out)
 function siguienteHabil(fecha) {
   const d = new Date(fecha);
@@ -115,4 +135,4 @@ function siguienteHabil(fecha) {
   return d;
 }
 
-module.exports = { sumarDiasHabiles, proximosDiasHabiles, siguienteHabil, esHabil, esFeriado, diasHabilesEntre, cargarFeriados: cargar, feriadosDeAnio };
+module.exports = { sumarDiasHabiles, proximosDiasHabiles, siguienteHabil, esHabil, esFeriado, diasHabilesEntre, diasCorridosDeHabiles, cargarFeriados: cargar, feriadosDeAnio };
