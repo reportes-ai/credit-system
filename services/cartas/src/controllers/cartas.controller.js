@@ -2454,7 +2454,7 @@ const corregirCarta = async (req, res) => {
       const dealerCambio = String(nueva.nombre_dealer || '') !== String(orig.nombre_dealer || '')
                         || String(nueva.rut_dealer || '') !== String(orig.rut_dealer || '');
       if (dealerCambio && nueva.rut_dealer)
-        propDealer = await propagarDealerCredito(orig.id_credito_creado, nueva.nombre_dealer, String(nueva.rut_dealer).trim().toUpperCase());
+        propDealer = await propagarDealerCredito(orig.id_credito_creado, nueva.nombre_dealer, String(nueva.rut_dealer).trim().toUpperCase(), nueva.parque);
     } catch (e) { console.error('[cartas corregir→dealer credito]', e.message); }
 
     auditar({ req, accion: 'CORREGIR', modulo: 'cartas', entidad: 'carta_aprobacion', entidad_id: idNueva,
@@ -2507,8 +2507,8 @@ const cadenaCorrecciones = async (req, res) => {
    CUENTA DE DEPÓSITO por `id_dealer`, así que la plata iba a la cuenta
    equivocada. También el seguimiento de Post Venta quedaba con el nombre viejo.
    Solo en meses abiertos; devuelve qué tocó para la auditoría. ── */
-async function propagarDealerCredito(idCredito, nom, rut) {
-  const out = { credito: 0, seguimiento: 0, id_dealer: null };
+async function propagarDealerCredito(idCredito, nom, rut, parqueCarta) {
+  const out = { credito: 0, seguimiento: 0, id_dealer: null, parque: null };
   if (!idCredito) return out;
   const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
   const [[cr]] = await pool.query("SELECT id, DATE_FORMAT(mes,'%Y-%m') mes FROM creditos WHERE id=?", [idCredito]);
@@ -2523,10 +2523,24 @@ async function propagarDealerCredito(idCredito, nom, rut) {
   // son columnas GENERADAS desde rut_dealer (split v77.23): escribirlas hace fallar el UPDATE
   // ("value specified for generated column … is not allowed") y la corrección quedaba a medias
   // — carta y cartola corregidas, crédito no (detectado 10-09-2026 al corregir AUTEN 26081170).
+  /* El PARQUE también cambia con el dealer (op 26080280, 15-09-2026): el crédito quedó con
+     PARQUE MAIPU del dealer viejo y el motor pagó 2,5% de parque ($74.500) + comisión al parque,
+     cuando el dealer nuevo es de CALLE (5% = $149.000, lo que decía la carta). Manda la carta
+     (parque de la carta; vacío = calle); si la carta no lo trae, la ficha del dealer nuevo. */
+  let parque = parqueCarta === undefined ? undefined : String(parqueCarta || '').trim().toUpperCase();
+  if (parque === undefined && d) {
+    const [[f]] = await pool.query('SELECT ccs_parque FROM dealers WHERE id_dealer=?', [d.id_dealer]);
+    const p = String(f?.ccs_parque || '').trim().toUpperCase();
+    parque = (!p || p === 'CALLE' || p === 'PARTICULAR') ? '' : p;
+  }
+  if (parque === 'CALLE') parque = '';
+  out.parque = parque ?? null;
   const [rc] = await pool.query(
-    'UPDATE creditos SET automotora=?, rut_dealer=?, id_dealer=COALESCE(?, id_dealer), updated_at=NOW() WHERE id=?',
-    [nom, rut, out.id_dealer, cr.id]);
+    'UPDATE creditos SET automotora=?, rut_dealer=?, id_dealer=COALESCE(?, id_dealer), parque=COALESCE(?, parque), updated_at=NOW() WHERE id=?',
+    [nom, rut, out.id_dealer, parque ?? null, cr.id]);
   out.credito = rc.affectedRows;
+  // Comisión dealer / parque siguen al dealer y al parque nuevos (meses cerrados los salta el propio recálculo)
+  recalcularPorOps([cr.id]).catch(e => console.error('[cartas propagar dealer→recalc]', e.message));
   const [rs] = await pool.query(
     'UPDATE postventa_seguimiento SET nombre_dealer=?, rut_dealer=? WHERE id_credito=?', [nom, rut, cr.id]);
   out.seguimiento = rs.affectedRows;
