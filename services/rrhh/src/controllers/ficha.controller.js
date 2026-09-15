@@ -177,12 +177,72 @@ require('../../../../shared/migrate').enFila('rrhh-ficha-previred', async () => 
   } catch (e) { console.error('[rrhh-ficha-previred migration]', e.message); }
 });
 
+/* ── Plazo fijo (Pato, 15-09-2026): 1er y 2do vencimiento. Vencido el último plazo sin
+   desvinculación, el contrato pasa SOLO a INDEFINIDO (art. 159 N°4 CT: la segunda
+   renovación lo transforma en indefinido; también si la persona sigue prestando
+   servicios vencido el plazo). Motor diario + aviso a RRHH 30 días antes de cada vencimiento. */
+require('../../../../shared/migrate').enFila('rrhh-ficha-plazo-fijo', async () => {
+  try {
+    await pool.query('ALTER TABLE rh_fichas ADD COLUMN IF NOT EXISTS plazo_fijo_venc1 DATE NULL').catch(() => {});
+    await pool.query('ALTER TABLE rh_fichas ADD COLUMN IF NOT EXISTS plazo_fijo_venc2 DATE NULL').catch(() => {});
+    console.log('[rrhh-ficha-plazo-fijo] listo');
+  } catch (e) { console.error('[rrhh-ficha-plazo-fijo migration]', e.message); }
+});
+async function vigilarPlazoFijo() {
+  try {
+    const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+    const { hoyISO } = require('../../../../shared/fecha-chile');
+    const hoy = hoyISO();
+    const [rows] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre,
+              DATE_FORMAT(f.plazo_fijo_venc1,'%Y-%m-%d') v1, DATE_FORMAT(f.plazo_fijo_venc2,'%Y-%m-%d') v2
+         FROM rh_fichas f JOIN usuarios u ON u.id_usuario=f.id_usuario
+        WHERE UPPER(COALESCE(f.tipo_contrato,''))='PLAZO FIJO' AND u.estado='activo' AND u.fecha_baja IS NULL
+          AND (f.plazo_fijo_venc1 IS NOT NULL OR f.plazo_fijo_venc2 IS NOT NULL)`);
+    if (!rows.length) return;
+    const [dest] = await pool.query(
+      `SELECT DISTINCT u.id_usuario FROM usuarios u JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+         JOIN funcionalidades fn ON fn.id_funcionalidad=pp.id_funcionalidad WHERE fn.codigo='rh_colaboradores' AND u.estado='activo'`);
+    const ids = dest.map(d => d.id_usuario);
+    const dias = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
+    const fCL = s => new Date(s + 'T12:00:00').toLocaleDateString('es-CL');
+    for (const r of rows) {
+      const ultimo = r.v2 || r.v1;
+      if (ultimo < hoy) {
+        // Venció el último plazo y sigue activo → INDEFINIDO
+        await pool.query("UPDATE rh_fichas SET tipo_contrato='INDEFINIDO', updated_by='Sistema (plazo fijo vencido)' WHERE id_usuario=?", [r.id_usuario]);
+        auditar({ req: null, accion: 'EDITAR', modulo: 'rrhh', entidad: 'ficha', entidad_id: r.id_usuario,
+          detalle: `Contrato de ${r.nombre} pasó de PLAZO FIJO a INDEFINIDO: venció el ${r.v2 ? '2do' : '1er'} vencimiento (${fCL(ultimo)}) y sigue activo (art. 159 N°4 CT)` });
+        await notificar(ids, { tipo: 'RRHH', prioridad: 'alta', sonar: true,
+          titulo: `${r.nombre}: contrato pasó a INDEFINIDO`,
+          mensaje: `Venció el ${r.v2 ? 'segundo' : 'primer'} vencimiento del plazo fijo (${fCL(ultimo)}) sin desvinculación: la ficha quedó como INDEFINIDO. Si corresponde un anexo de contrato, emítelo en Contratos.`,
+          href: '/recursos-humanos/colaboradores/', clave: `pf_indef_${r.id_usuario}_${ultimo}` }).catch(() => {});
+        continue;
+      }
+      // Aviso 30 días antes del vencimiento que viene (una vez por vencimiento)
+      const prox = (r.v1 && r.v1 >= hoy) ? { f: r.v1, n: 'primer' } : { f: ultimo, n: r.v2 ? 'segundo' : 'primer' };
+      const d = dias(hoy, prox.f);
+      if (d <= 30) {
+        const clave = `pf_aviso_${r.id_usuario}_${prox.f}`;
+        const [[ya]] = await pool.query('SELECT 1 ok FROM notificaciones WHERE clave=? LIMIT 1', [clave]);
+        if (ya) continue;
+        await notificar(ids, { tipo: 'RRHH', prioridad: 'alta', sonar: true,
+          titulo: `${r.nombre}: plazo fijo vence en ${d} día${d === 1 ? '' : 's'}`,
+          mensaje: `El ${prox.n} vencimiento es el ${fCL(prox.f)}. ${prox.n === 'primer' && !r.v2 ? 'Registra el segundo vencimiento (renovación) en la ficha o' : 'Si no se renueva ni se desvincula,'} el contrato pasará solo a INDEFINIDO al día siguiente${prox.n === 'primer' && !r.v2 ? ' si no hay renovación' : ''}.`,
+          href: '/recursos-humanos/colaboradores/', clave }).catch(() => {});
+      }
+    }
+  } catch (e) { console.error('[rrhh plazo fijo]', e.message); }
+}
+setTimeout(vigilarPlazoFijo, 150 * 1000);
+require('../../../../shared/scheduler').programar('rrhh-plazo-fijo', vigilarPlazoFijo, 24 * 60 * 60 * 1000);
+
 /* ── Campos de la ficha ─────────────────────────────────────────────────────── */
 const CAMPOS_CONTACTO = ['direccion', 'comuna', 'ciudad', 'email_personal', 'telefono_personal',
   'emergencia_nombre', 'emergencia_fono', 'emergencia2_nombre', 'emergencia2_fono',
   'estado_civil', 'nacionalidad',
   'conyuge_nombre', 'conyuge_rut', 'conyuge_telefono', 'conyuge_direccion', 'conyuge_misma_dir'];
-const CAMPOS_LABORAL = ['tipo_contrato', 'tipo_renta', 'pensionado', 'jornada', 'afp', 'salud', 'plan_isapre_uf', 'sueldo_base',
+const CAMPOS_LABORAL = ['tipo_contrato', 'plazo_fijo_venc1', 'plazo_fijo_venc2', 'tipo_renta', 'pensionado', 'jornada', 'afp', 'salud', 'plan_isapre_uf', 'sueldo_base',
   'banco_pago', 'tipo_cuenta_pago', 'num_cuenta_pago', 'observaciones',
   'tramo_asignacion', 'cargas_otras', 'cargas_maternales', 'cargas_invalidas', 'anos_trabajados_previos'];
 // Identidad en usuarios que RRHH puede actualizar desde la ficha
@@ -202,6 +262,9 @@ async function armarFicha(idUsuario, conSueldo, soloVisibles) {
   const [[f]] = await pool.query('SELECT * FROM rh_fichas WHERE id_usuario = ?', [idUsuario]);
   const ficha = f || {};
   if (!conSueldo) delete ficha.sueldo_base;
+  // Fechas DATE como texto (gotcha del offset: un Date serializado corre un día)
+  const { isoDeBD } = require('../../../../shared/fecha-chile');
+  for (const k of ['plazo_fijo_venc1', 'plazo_fijo_venc2']) if (ficha[k]) ficha[k] = isoDeBD(ficha[k]);
   // soloVisibles: el colaborador ve únicamente lo marcado "Mostrar en Mi Ficha";
   // RRHH ve todo con el flag para poder alternarlo.
   const [docs] = await pool.query(
