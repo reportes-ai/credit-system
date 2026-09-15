@@ -157,7 +157,8 @@ async function carteraTmc(mes) {
     ['tasa_mensual', 'Tasa mensual %'], ['tasa_anual', 'Tasa anual %'], ['tmc_mensual', 'TMC mensual %'], ['tmc_anual', 'TMC anual %'], ['margen', 'Holgura (TMC − tasa)'], ['cumple', 'Cumple TMC']];
   return { fuente: 'CARTERA', total_1: sum(filas, 'monto_financiado'), total_2: sum(filas, 'saldo_insoluto'),
     hojas: [{ nombre: `Cartera ${mes}`, columnas, filas, totales: { nombre: 'TOTALES', monto_financiado: sum(filas, 'monto_financiado'), saldo_insoluto: sum(filas, 'saldo_insoluto') } }],
-    resumen: { operaciones: filas.length, corte, fuera_de_tmc: fuera, sin_tasa_o_tmc: sinTasa, umbral_uf: umbral } };
+    resumen: { operaciones: filas.length, corte, fuera_de_tmc: fuera, sin_tasa_o_tmc: sinTasa, umbral_uf: umbral,
+      nota: 'Las operaciones con origen CARTERA_AFA / CARTERA_XLSX son cartera migrada: la tasa es la que vino en la migración (otorgada por AFA con su pizarra), no digitada en el Suite. Diferencias de milésimas contra la TMC corresponden a redondeo (tasa a 2 decimales, TMC a 3) o a la fecha de vigencia de la TMC cargada en el mantenedor.' } };
 }
 
 /* ── 5. MORA Y GASTOS DE COBRANZA POR OPERACIÓN (mes) — cobrado en el mes (pagos_credito) + stock de mora (MORA_SQL de cobranza) ── */
