@@ -162,7 +162,7 @@ async function carteraTmc(mes) {
 }
 
 /* ── 5. MORA Y GASTOS DE COBRANZA POR OPERACIÓN (mes) — cobrado en el mes (pagos_credito) + stock de mora (MORA_SQL de cobranza) ── */
-async function cobranza(mes) {
+async function cobranza(mes, conStock = true) {
   const corte = finDeMes(mes);
   const [pagos] = await pool.query(
     `SELECT c.num_op, COALESCE(cl.rut,'') rut, COALESCE(cl.nombre_completo,'') nombre, p.numero_cuota, p.fecha_vencimiento, p.fecha_pago,
@@ -177,7 +177,8 @@ async function cobranza(mes) {
       monto_cuota: R(p.monto_cuota), interes_mora: R(p.interes_mora), gastos_cobranza: R(p.gastos_cobranza), total_pagado: R(p.total_pagado), registrado_por: p.registrado_por || '', origen_fondos: p.origen_fondos || '' };
   });
   const cob = require('../../cobranza/src/controllers/cobranza.controller');
-  const [stock] = await pool.query(cob._motor.MORA_SQL() + ' ORDER BY dias_mora DESC');
+  // conStock=false (meses pasados en la carpeta ZIP): el stock es de hoy, repetirlo 12 veces no aporta
+  const [stock] = conStock ? await pool.query(cob._motor.MORA_SQL() + ' ORDER BY dias_mora DESC') : [[]];
   const filasStock = stock.map(s => ({ num_op: s.num_op, rut: nRut(s.rut_cliente), nombre: s.nombre_cliente, financiera: s.financiera, fecha_otorgado: iso(s.fecha_otorgado), plazo: s.plazo,
     cuotas_pagadas: s.cuotas_pagadas, cuotas_mora: s.cuotas_mora, dias_mora: s.dias_mora, monto_mora: R(s.monto_mora), saldo_insoluto: R(s.saldo_insoluto), estado_cartera: s.estado_cartera || '' }));
   const cols1 = [['num_op', 'N° op'], ['rut', 'RUT'], ['nombre', 'Cliente'], ['cuota', 'Cuota'], ['vencimiento', 'Vencimiento'], ['fecha_pago', 'F. pago'], ['dias_atraso', 'Días de atraso'], ['monto_cuota', 'Cuota'], ['interes_mora', 'Interés por mora'], ['gastos_cobranza', 'Gastos de cobranza'], ['total_pagado', 'Total pagado'], ['registrado_por', 'Registrado por'], ['origen_fondos', 'Origen fondos']];
@@ -185,8 +186,8 @@ async function cobranza(mes) {
   const tot1 = { nombre: 'TOTALES', monto_cuota: sum(filasPagos, 'monto_cuota'), interes_mora: sum(filasPagos, 'interes_mora'), gastos_cobranza: sum(filasPagos, 'gastos_cobranza'), total_pagado: sum(filasPagos, 'total_pagado') };
   const tot2 = { nombre: 'TOTALES', monto_mora: sum(filasStock, 'monto_mora'), saldo_insoluto: sum(filasStock, 'saldo_insoluto') };
   return { fuente: 'COBRANZA', total_1: tot1.interes_mora + tot1.gastos_cobranza, total_2: tot2.monto_mora,
-    hojas: [{ nombre: `Cobrado ${mes}`, columnas: cols1, filas: filasPagos, totales: tot1 }, { nombre: `Mora vigente al ${hoyISO()}`, columnas: cols2, filas: filasStock, totales: tot2 }],
-    resumen: { pagos: filasPagos.length, en_mora: filasStock.length, nota: 'El stock de mora es al día de hoy (la mora se calcula al vuelo, no se guarda por mes).' } };
+    hojas: [{ nombre: `Cobrado ${mes}`, columnas: cols1, filas: filasPagos, totales: tot1 }, ...(conStock ? [{ nombre: `Mora vigente al ${hoyISO()}`, columnas: cols2, filas: filasStock, totales: tot2 }] : [])],
+    resumen: conStock ? { pagos: filasPagos.length, en_mora: filasStock.length, nota: 'El stock de mora es al día de hoy (la mora se calcula al vuelo, no se guarda por mes).' } : { pagos: filasPagos.length } };
 }
 
 /* ── Libro Diario y Mayor del año para la carpeta (mismas queries que Libros Contables, sin tope) ── */

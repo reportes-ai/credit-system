@@ -154,7 +154,7 @@ exports.carpetaZip = async (req, res) => {
     await agregar('03-Personal', L('VACACIONES'), anio, () => motores.vacaciones(anio));
     for (const mes of meses) await agregar('03-Personal', L('ASISTENCIA'), mes, () => motores.asistencia(mes));
     await agregar('04-Cartera', L('CARTERA_TMC'), meses[meses.length - 1], () => motores.carteraTmc(meses[meses.length - 1]));
-    for (const mes of meses) await agregar('05-Cobranza', L('COBRANZA'), mes, () => motores.cobranza(mes));
+    for (const mes of meses) await agregar('05-Cobranza', L('COBRANZA'), mes, () => motores.cobranza(mes, mes === meses[meses.length - 1]));   // stock de mora solo en el último mes
     zip.file('INDICE.txt', indice.join('\n'));
     const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
     const sha = crypto.createHash('sha256').update(buffer).digest('hex');
