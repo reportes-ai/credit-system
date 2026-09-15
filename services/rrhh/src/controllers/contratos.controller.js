@@ -507,16 +507,8 @@ exports.finiquitoGuardar = async (req, res) => {
        JSON.stringify(detalle), total, req.usuario.id_usuario]);
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'rh_finiquito', entidad_id: r.insertId,
       detalle: `Finiquito ${b.trabajador} (${b.causal}) total ${CLP(total)}` });
-    // Contabilización automática: gasto finiquito → finiquitos por pagar
-    if (total > 0) {
-      try {
-        await require('../../../contabilidad/src/motor-asientos').contabilizar({
-          evento: 'FINIQUITO_EMITIDO', fecha: b.fecha_termino,
-          glosa: `Finiquito ${b.trabajador} (art. ${b.causal})`, ref: `FINIQ-${r.insertId}`,
-          montos: { total },
-        });
-      } catch (e) { console.error('[finiquito asiento]', e.message); }
-    }
+    // Asiento y ODP: recién al CERRAR (Pato, 15-09-2026) — mientras se discute el monto no
+    // debe existir una orden de pago viva ni un comprobante contable. Ver efectosDeCierre().
     // Offboarding automático desde la fecha de término
     try { await crearProceso({ tipo: 'OFFBOARDING', persona: b.trabajador, rut: b.rut, id_usuario: idU,
       id_ref: r.insertId, fecha_base: b.fecha_termino, creado_por: req.usuario.id_usuario }); } catch (e) { console.error('[offb auto]', e.message); }
@@ -544,34 +536,7 @@ exports.finiquitoGuardar = async (req, res) => {
           detalle: `Usuario suspendido automáticamente por el finiquito #${r.insertId} (término ${b.fecha_termino})` });
       }
     } catch (e) { console.error('[finiquito baja usuario]', e.message); }
-    // Pago: ODP automática del finiquito (correlativo central) + campana a Tesorería
-    let odp = null;
-    if (total > 0) {
-      try {
-        const concepto = `Finiquito — ${b.trabajador} (art. ${b.causal})`;
-        const [[ap]] = await pool.query(`SELECT CONCAT_WS(' ', nombre, apellido) nombre FROM usuarios WHERE id_usuario=?`, [req.usuario.id_usuario]);
-        const [ro] = await pool.query(`INSERT INTO ordenes_pago (proveedor_nombre, proveedor_rut, concepto, categoria, monto, fecha_emision, estado, id_usuario, usuario_nombre, observaciones)
-          VALUES (?,?,?,?,?,CURDATE(),'EMITIDA',?,?,?)`,
-          [b.trabajador, b.rut || null, concepto, 'REMUNERACIONES', total, req.usuario.id_usuario, ap?.nombre || '',
-           `Generada automáticamente al guardar el finiquito #${r.insertId}. Pagar tras la ratificación (art. 177 CT).`]);
-        try {
-          const num = (await require('../../../../shared/ordenes-pago').emitirCorrelativo({ origen: 'GENERAL', origen_id: ro.insertId,
-            concepto, monto: total, id_usuario: req.usuario.id_usuario, usuario_nombre: ap?.nombre || '' }))?.numero || null;
-          if (num) { await pool.query(`UPDATE ordenes_pago SET numero=? WHERE id=?`, [num, ro.insertId]); odp = num; }
-        } catch (e) { console.error('[finiquito correlativo ODP]', e.message); }
-        const [tes] = await pool.query(
-          `SELECT DISTINCT u.id_usuario FROM usuarios u
-            JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
-            JOIN funcionalidades f2 ON f2.id_funcionalidad=pp.id_funcionalidad
-           WHERE f2.codigo IN ('ordenes_pago_pagar','ordenes_pago_emitir') AND u.estado='activo'`);
-        if (tes.length) notificar(tes.map(x => x.id_usuario), {
-          tipo: 'TESORERIA', prioridad: 'alta', sonar: true,
-          titulo: `ODP ${odp || ''} por pagar: finiquito de ${b.trabajador}`,
-          mensaje: `${CLP(total)} — pagar tras la ratificación y marcar la ODP pagada`,
-          href: '/ordenes-pago/', clave: `finiq_odp_${r.insertId}` });
-      } catch (e) { console.error('[finiquito ODP]', e.message); }
-    }
-    ok(res, { id: r.insertId, total, odp });
+    ok(res, { id: r.insertId, total, odp: null });
   } catch (e) { fail(res, e.message); }
 };
 
@@ -597,18 +562,17 @@ exports.finiquitoActualizar = async (req, res) => {
       detalle: `Finiquito ${fq.trabajador} recalculado: ${CLP(Number(fq.total))} → ${CLP(total)} (v${(fq.version || 1) + 1})` });
     let odp = null, aviso = null;
     if (Number(fq.total) !== total) {
-      // ODP: sigue al nuevo total mientras no esté pagada
+      // Finiquitos del flujo anterior (ODP y asiento creados al guardar): siguen al nuevo total
+      // mientras la ODP no esté pagada. Los nuevos no tienen nada hasta que se cierran.
       try {
-        const [ro] = await pool.query(`UPDATE ordenes_pago SET monto=? WHERE categoria='REMUNERACIONES' AND estado='EMITIDA' AND observaciones LIKE ?`,
-          [total, `%finiquito #${id}.%`]);
-        if (ro.affectedRows) { const [[o]] = await pool.query(`SELECT numero FROM ordenes_pago WHERE observaciones LIKE ? ORDER BY id DESC LIMIT 1`, [`%finiquito #${id}.%`]); odp = o?.numero || null; }
-        else aviso = 'La ODP del finiquito ya está pagada o no existe: ajústala a mano en Órdenes de Pago.';
+        const [[existe]] = await pool.query(`SELECT id, estado, numero FROM ordenes_pago WHERE categoria='REMUNERACIONES' AND observaciones LIKE ? ORDER BY id DESC LIMIT 1`, [`%finiquito #${id}.%`]);
+        if (existe && existe.estado === 'EMITIDA') { await pool.query(`UPDATE ordenes_pago SET monto=? WHERE id=?`, [total, existe.id]); odp = existe.numero || null; }
+        else if (existe) aviso = 'La ODP del finiquito ya está pagada: ajústala a mano en Órdenes de Pago.';
       } catch (e) { console.error('[finiquito upd ODP]', e.message); }
-      // Contabilidad: se anula el comprobante anterior y se centraliza el nuevo total
       try {
-        await pool.query(`UPDATE ctb_comprobantes SET estado='ANULADO', anulado_por=?, anulado_motivo=? WHERE origen='FINIQUITO_EMITIDO' AND origen_ref LIKE ? AND estado='CONTABILIZADO'`,
+        const [rc] = await pool.query(`UPDATE ctb_comprobantes SET estado='ANULADO', anulado_por=?, anulado_motivo=? WHERE origen='FINIQUITO_EMITIDO' AND origen_ref LIKE ? AND estado='CONTABILIZADO'`,
           [String(req.usuario?.nombre || req.usuario?.id_usuario || 'sistema'), `Finiquito #${id} recalculado (nuevo total ${CLP(total)})`, `FINIQ-${id}%`]);
-        if (total > 0) await require('../../../contabilidad/src/motor-asientos').contabilizar({
+        if (rc.affectedRows && total > 0) await require('../../../contabilidad/src/motor-asientos').contabilizar({
           evento: 'FINIQUITO_EMITIDO', fecha: b.fecha_termino,
           glosa: `Finiquito ${fq.trabajador} (art. ${b.causal}) v${(fq.version || 1) + 1}`, ref: `FINIQ-${id}-v${(fq.version || 1) + 1}`,
           montos: { total },
@@ -619,18 +583,62 @@ exports.finiquitoActualizar = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* Efectos de PAGO del finiquito, al CERRAR (Pato, 15-09-2026): asiento FINIQUITO_EMITIDO
+   (gasto → Finiquitos por Pagar) y ODP con correlativo central + campana a Tesorería.
+   Idempotente: si el finiquito venía del flujo anterior (ODP/asiento creados al guardar)
+   no se duplican. Devuelve el número de la ODP. */
+async function efectosDeCierre(req, fq, nombreUsuario) {
+  const total = Number(fq.total) || 0, id = fq.id;
+  if (!(total > 0)) return null;
+  try {
+    const [[ya]] = await pool.query(`SELECT 1 x FROM ctb_comprobantes WHERE origen='FINIQUITO_EMITIDO' AND origen_ref LIKE ? AND estado='CONTABILIZADO' LIMIT 1`, [`FINIQ-${id}%`]);
+    if (!ya) await require('../../../contabilidad/src/motor-asientos').contabilizar({
+      evento: 'FINIQUITO_EMITIDO', fecha: fq.fecha_termino,
+      glosa: `Finiquito ${fq.trabajador} (art. ${fq.causal})`, ref: `FINIQ-${id}`,
+      montos: { total },
+    });
+  } catch (e) { console.error('[finiquito asiento]', e.message); }
+  let odp = null;
+  try {
+    const [[existe]] = await pool.query(`SELECT numero FROM ordenes_pago WHERE categoria='REMUNERACIONES' AND observaciones LIKE ? ORDER BY id DESC LIMIT 1`, [`%finiquito #${id}.%`]);
+    if (existe) return existe.numero || null;
+    const concepto = `Finiquito — ${fq.trabajador} (art. ${fq.causal})`;
+    const [ro] = await pool.query(`INSERT INTO ordenes_pago (proveedor_nombre, proveedor_rut, concepto, categoria, monto, fecha_emision, estado, id_usuario, usuario_nombre, observaciones)
+      VALUES (?,?,?,?,?,CURDATE(),'EMITIDA',?,?,?)`,
+      [fq.trabajador, fq.rut || null, concepto, 'REMUNERACIONES', total, req.usuario.id_usuario, nombreUsuario,
+       `Generada automáticamente al cerrar el finiquito #${id}. Pagar tras la ratificación (art. 177 CT).`]);
+    try {
+      const num = (await require('../../../../shared/ordenes-pago').emitirCorrelativo({ origen: 'GENERAL', origen_id: ro.insertId,
+        concepto, monto: total, id_usuario: req.usuario.id_usuario, usuario_nombre: nombreUsuario }))?.numero || null;
+      if (num) { await pool.query(`UPDATE ordenes_pago SET numero=? WHERE id=?`, [num, ro.insertId]); odp = num; }
+    } catch (e) { console.error('[finiquito correlativo ODP]', e.message); }
+    const [tes] = await pool.query(
+      `SELECT DISTINCT u.id_usuario FROM usuarios u
+        JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+        JOIN funcionalidades f2 ON f2.id_funcionalidad=pp.id_funcionalidad
+       WHERE f2.codigo IN ('ordenes_pago_pagar','ordenes_pago_emitir') AND u.estado='activo'`);
+    if (tes.length) notificar(tes.map(x => x.id_usuario), {
+      tipo: 'TESORERIA', prioridad: 'alta', sonar: true,
+      titulo: `ODP ${odp || ''} por pagar: finiquito de ${fq.trabajador}`,
+      mensaje: `${CLP(total)} — pagar tras la ratificación y marcar la ODP pagada`,
+      href: '/ordenes-pago/', clave: `finiq_odp_${id}` });
+  } catch (e) { console.error('[finiquito ODP]', e.message); }
+  return odp;
+}
+
 /* POST /finiquitos/:id/cerrar — "Imprimir y cerrar": queda inmutable (no se recalcula ni edita) */
 exports.finiquitoCerrar = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [[fq]] = await pool.query(`SELECT id, trabajador, total, cerrado_at FROM rh_finiquitos WHERE id=?`, [id]);
+    const [[fq]] = await pool.query(`SELECT id, id_usuario, trabajador, rut, DATE_FORMAT(fecha_termino,'%Y-%m-%d') fecha_termino, causal, total, cerrado_at FROM rh_finiquitos WHERE id=?`, [id]);
     if (!fq) return fail(res, 'Finiquito no existe', 404);
     if (fq.cerrado_at) return ok(res, { id, ya_cerrado: true });
     const [[ap]] = await pool.query(`SELECT CONCAT_WS(' ', nombre, apellido) nombre FROM usuarios WHERE id_usuario=?`, [req.usuario.id_usuario]);
     await pool.query(`UPDATE rh_finiquitos SET cerrado_at=NOW(), cerrado_por=? WHERE id=?`, [ap?.nombre || String(req.usuario.id_usuario), id]);
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_finiquito', entidad_id: id,
       detalle: `Finiquito ${fq.trabajador} CERRADO (impreso) por ${CLP(Number(fq.total))} — ya no se recalcula` });
-    ok(res, { id, cerrado: true });
+    const odp = await efectosDeCierre(req, fq, ap?.nombre || '');
+    ok(res, { id, cerrado: true, odp });
   } catch (e) { fail(res, e.message); }
 };
 
