@@ -240,16 +240,34 @@ function hashMovs(idConexion, movs) {
   });
 }
 
+/* ── La cuenta la determina el ARCHIVO (Pato, 15-09-2026) — motor único ─────────
+   Resuelve en qué conexión va la cartola: la seleccionada si coincide; si el Nº del
+   archivo es de OTRA cuenta registrada, esa (redirigida=true, la pantalla avisa y se
+   cambia); si no corresponde a ninguna, error (caso real 27-08-2026: la cartola de la
+   7486599-2 se cargó sobre la 7045074-7 y hubo que separar los movimientos a mano).
+   Devuelve { cx, parsed, redirigida } o { error }. Usado por Conciliación (preview e
+   importar) y por Cuentas Corrientes. */
+async function resolverCuentaCartola(idSel, file) {
+  const [[cxSel]] = await pool.query('SELECT id, banco, numero FROM banco_conexiones WHERE id=? LIMIT 1', [idSel]);
+  if (!cxSel) return { error: 'Cuenta no encontrada', code: 404 };
+  const parsed = parsearCartola(file.buffer);
+  const errCta = cuentaNoCoincide(parsed.cuenta_archivo, cxSel.numero, file.originalname);
+  if (!errCta) return { cx: cxSel, parsed, redirigida: false };
+  const ctaArch = normCta(parsed.cuenta_archivo) || normCta((String(file.originalname || '').match(/(\d{8,})/) || [])[1]);
+  const [todas] = await pool.query('SELECT id, banco, numero FROM banco_conexiones');
+  const otra = todas.find(t => normCta(t.numero) === ctaArch);
+  if (!otra) return { error: errCta, code: 400 };
+  return { cx: otra, parsed, redirigida: true };
+}
+
 /* ── Carga de cartola (preview + importar) ──────────────────────────────────── */
 const previewCartola = async (req, res) => {
   try {
     if (!req.file) return fail(res, 'Adjunta el archivo Excel de la cartola', 400);
-    const idConexion = parseInt(req.params.id, 10);
-    const [[cx]] = await pool.query('SELECT id, numero FROM banco_conexiones WHERE id=? LIMIT 1', [idConexion]);
-    if (!cx) return fail(res, 'Cuenta no encontrada', 404);
-    const parsed = parsearCartola(req.file.buffer);
-    const errCta = cuentaNoCoincide(parsed.cuenta_archivo, cx.numero, req.file.originalname);
-    if (errCta) return fail(res, errCta, 400);
+    const r = await resolverCuentaCartola(parseInt(req.params.id, 10), req.file);
+    if (r.error) return fail(res, r.error, r.code);
+    const { cx, parsed, redirigida } = r;
+    const idConexion = cx.id;
     const movs = hashMovs(idConexion, parsed);
     if (!movs.length) return fail(res, 'El archivo no contiene movimientos reconocibles.', 400);
 
@@ -263,6 +281,7 @@ const previewCartola = async (req, res) => {
       desde: movs.reduce((a, m) => m.fecha < a ? m.fecha : a, movs[0].fecha),
       hasta: movs.reduce((a, m) => m.fecha > a ? m.fecha : a, movs[0].fecha),
       muestra: movs.slice(0, 15).map(m => ({ ...m, duplicado: dupSet.has(m.fintoc_id) })),
+      cuenta: { id: cx.id, banco: cx.banco, numero: cx.numero }, redirigida,
     });
   } catch (e) { fail(res, e.message, 400); }
 };
@@ -270,12 +289,10 @@ const previewCartola = async (req, res) => {
 const importarCartola = async (req, res) => {
   try {
     if (!req.file) return fail(res, 'Adjunta el archivo Excel de la cartola', 400);
-    const idConexion = parseInt(req.params.id, 10);
-    const [[cx]] = await pool.query('SELECT id, banco, numero FROM banco_conexiones WHERE id=? LIMIT 1', [idConexion]);
-    if (!cx) return fail(res, 'Cuenta no encontrada', 404);
-    const parsed = parsearCartola(req.file.buffer);
-    const errCta = cuentaNoCoincide(parsed.cuenta_archivo, cx.numero, req.file.originalname);
-    if (errCta) return fail(res, errCta, 400);
+    const rc = await resolverCuentaCartola(parseInt(req.params.id, 10), req.file);
+    if (rc.error) return fail(res, rc.error, rc.code);
+    const { cx, parsed, redirigida } = rc;
+    const idConexion = cx.id;
     const movs = hashMovs(idConexion, parsed);
     if (!movs.length) return fail(res, 'El archivo no contiene movimientos reconocibles.', 400);
 
@@ -293,7 +310,7 @@ const importarCartola = async (req, res) => {
       [idConexion, req.file.originalname || null, movs.length, nuevas, movs.length - nuevas, req.user && (req.user.nombre || req.user.email) || null]);
     auditar({ req, accion: 'IMPORTAR', modulo: 'tesoreria', entidad: 'banco_cartola', entidad_id: idConexion,
       detalle: `Cargó cartola ${cx.banco} ${cx.numero || ''}: ${movs.length} filas, ${nuevas} nuevas (${req.file.originalname || 'archivo'})` });
-    ok(res, { filas: movs.length, nuevas, duplicadas: movs.length - nuevas });
+    ok(res, { filas: movs.length, nuevas, duplicadas: movs.length - nuevas, cuenta: { id: cx.id, banco: cx.banco, numero: cx.numero }, redirigida });
   } catch (e) { fail(res, e.message, 400); }
 };
 
@@ -612,4 +629,4 @@ const resumen = async (req, res) => {
 module.exports = { cuentas, crearCuentaManual, previewCartola, importarCartola, pendientes, conciliados, conciliar, conciliarAuto, desconciliar, resumen,
   reglasListar, reglaCrear, reglaToggle, reglaEliminar,
   // motor único de cartolas — reusado por Cuentas Corrientes (nunca un segundo parser)
-  parsearCartola, hashMovs, cuentaNoCoincide, normCta };
+  parsearCartola, hashMovs, cuentaNoCoincide, normCta, resolverCuentaCartola };

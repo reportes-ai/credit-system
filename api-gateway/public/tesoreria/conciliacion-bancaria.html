@@ -7,7 +7,7 @@
   <title>Conciliación Bancaria — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.7 — navbar migrada al componente topnav -->
+  <!-- v1.8 — la cuenta la determina el archivo de la cartola: si es de otra cuenta registrada se importa ahí y se avisa (motor único resolverCuentaCartola). v1.7 — navbar migrada al componente topnav -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -403,6 +403,7 @@ async function previewCartola(input){
   const d = j.data;
   $('btnImportar').disabled = !d.nuevas;
   $('prevBody').innerHTML = `
+    ${d.cuenta ? `<div style="font-size:.86rem;margin-bottom:10px;${d.redirigida?'background:#fef3c7;border-radius:6px;padding:6px 10px':''}"><i class="bi bi-bank me-1"></i>Se importará en <b>${d.cuenta.banco} ${d.cuenta.numero||''}</b>${d.redirigida?' — la cuenta la determina el archivo, no la que tenías seleccionada':''}</div>` : ''}
     <div style="font-size:.86rem;margin-bottom:12px;">
       <b>${archivoSel.name}</b> · ${fFecha(d.desde)} → ${fFecha(d.hasta)}<br>
       ${d.filas} movimientos (${d.abonos} abonos, ${d.cargos} cargos) ·
@@ -422,8 +423,9 @@ async function importarCartola(){
   const j = await (await fetch(`/api/conciliacion/cuentas/${cuentaId()}/cartola/importar`, { method:'POST', headers: H, body: fd })).json();
   dlgPrev.close();
   if (!j.success) return alert(j.error);
-  alert(`Cartola importada: ${j.data.nuevas} movimientos nuevos (${j.data.duplicadas} ya existían).`);
+  alert(`Cartola importada en ${j.data.cuenta ? j.data.cuenta.banco + ' ' + (j.data.cuenta.numero||'') : 'la cuenta'}: ${j.data.nuevas} movimientos nuevos (${j.data.duplicadas} ya existían).`);
   await cargarCuentas();
+  if (j.data.cuenta && cuentaId() !== String(j.data.cuenta.id)) $('selCuenta').value = String(j.data.cuenta.id);
   cargarTodo();
 }
 </script>
