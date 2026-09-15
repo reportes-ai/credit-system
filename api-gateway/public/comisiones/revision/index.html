@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Revisión Comisiones — AutoFácil</title><!-- v5.39 — Ingresar descuento: mes a elegir + confirmación "se descontará $X a EJECUTIVO en MES"; el saldo que la comisión no cubre pasa solo al mes siguiente al aprobar (aviso). v5.38 —el botón Ingresar descuento también para el Administrador (saltaba el fetch de permisos). v5.37 —Ingresar descuento por N° de operación (anulación 100% · prepago 100%/50% según cuotas pagadas) con la comisión pagada por esa op y glosa; se puede anular con motivo. v5.36 —ejecutivos EXTERNOS (nombre de la carga que no es usuario) fuera de las tarjetas, en un aviso ámbar. v5.35 — aviso Renta fija (no comisiona) desde la ficha RRHH. v5.34 — sello Valores firmes: aprobada por Operaciones = foto congelada, no se recalcula. v5.33 — Aprobar/Rechazar por permiso comisiones_aprobar (Analista de Operaciones), no solo Administrador. v5.32 — aviso de nómina generada (montos congelados) y filtro ?mes&ej desde la Nómina. v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
+  <title>Revisión Comisiones — AutoFácil</title><!-- v5.40 — Ingresar descuento: monto editable hacia abajo (nunca sobre lo que da la regla); botón Guardar atenuado cuando no se puede. v5.39 —Ingresar descuento: mes a elegir + confirmación "se descontará $X a EJECUTIVO en MES"; el saldo que la comisión no cubre pasa solo al mes siguiente al aprobar (aviso). v5.38 —el botón Ingresar descuento también para el Administrador (saltaba el fetch de permisos). v5.37 —Ingresar descuento por N° de operación (anulación 100% · prepago 100%/50% según cuotas pagadas) con la comisión pagada por esa op y glosa; se puede anular con motivo. v5.36 —ejecutivos EXTERNOS (nombre de la carga que no es usuario) fuera de las tarjetas, en un aviso ámbar. v5.35 — aviso Renta fija (no comisiona) desde la ficha RRHH. v5.34 — sello Valores firmes: aprobada por Operaciones = foto congelada, no se recalcula. v5.33 — Aprobar/Rechazar por permiso comisiones_aprobar (Analista de Operaciones), no solo Administrador. v5.32 — aviso de nómina generada (montos congelados) y filtro ?mes&ej desde la Nómina. v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -773,7 +773,7 @@ function abrirDcto(){
   document.getElementById('dcComentario').value = '';
   document.getElementById('dcPreview').innerHTML = '';
   document.getElementById('dcErr').style.display = 'none';
-  document.getElementById('dcGuardar').disabled = true;
+  document.getElementById('dcGuardar').disabled = true; document.getElementById('dcGuardar').style.opacity = '.45';
   dcTipoCambio();
   document.getElementById('dlgDcto').showModal();
   setTimeout(() => document.getElementById('dcOp').focus(), 50);
@@ -781,7 +781,7 @@ function abrirDcto(){
 function dcTipo(){ return document.querySelector('input[name="dcTipo"]:checked').value; }
 function dcTipoCambio(){
   document.getElementById('dcCuotasWrap').style.display = dcTipo() === 'PREPAGO' ? '' : 'none';
-  document.getElementById('dcPreview').innerHTML = ''; document.getElementById('dcConfirma').style.display = 'none'; document.getElementById('dcGuardar').disabled = true; _dctoPreview = null;
+  document.getElementById('dcPreview').innerHTML = ''; document.getElementById('dcConfirma').style.display = 'none'; document.getElementById('dcGuardar').disabled = true; document.getElementById('dcGuardar').style.opacity = '.45'; _dctoPreview = null;
 }
 function dcMes(){ return document.getElementById('dcMesSel').value || document.getElementById('filtroMes').value; }
 async function buscarDcto(){
@@ -814,22 +814,35 @@ async function buscarDcto(){
         ${fila('Comisión pagada por esta op', `${fmt(d.comision_pagada)} <span style="font-weight:400;color:#64748b">(${d.fuente==='APROBADA'?'aprobación firme':'calculada por el motor'})</span>`)}
         ${tipo==='PREPAGO' ? fila('Tramo', `hasta ${d.limite_t1} cuotas → 100% · hasta ${d.limite_t2} → 50% · más → sin descuento`) : ''}
         ${fila('% a descontar', sinDcto ? '<span style="color:#92400e">no corresponde</span>' : pct(d.pct))}
-        ${fila('Descuento', `<span style="color:#dc2626;font-weight:800">−${fmt(d.descuento||0)}</span>`)}
+        ${fila('Descuento según regla', `<span style="color:#dc2626;font-weight:800">−${fmt(d.descuento||0)}</span>`)}
+        ${sinDcto ? '' : fila('Monto a descontar <span style="font-weight:400">(puedes bajarlo, no subirlo)</span>', `<input id="dcMonto" type="text" inputmode="numeric" value="${(d.descuento||0).toLocaleString('es-CL')}" oninput="dcMontoCambio()" style="width:130px;text-align:right;border:1.5px solid #dc2626;border-radius:6px;padding:4px 8px;font-weight:700;color:#dc2626">`)}
         ${fila('Glosa', `<i>${escHtml(d.glosa||'')}</i>`)}
         ${fila('Se imputa a', nombreMes(mes))}
       </div>
       ${avisos.length ? `<div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:8px 12px;font-size:.8rem">${avisos.map(a=>'<div><i class="bi bi-exclamation-triangle me-1"></i>'+a+'</div>').join('')}</div>` : ''}`;
-    const puede = !(d.ya_descontada || d.aprobada || sinDcto || !(d.comision_pagada > 0));
-    const conf = document.getElementById('dcConfirma');
-    conf.innerHTML = `<i class="bi bi-person-fill me-1"></i>Se descontará <b>${fmt(d.descuento||0)}</b> a <b>${escHtml(d.ejecutivo)}</b> en la comisión de <b>${nombreMes(mes)}</b>.<div style="font-size:.78rem;margin-top:4px;color:#991b1b">Si la comisión de ese mes no alcanza, el saldo pasa solo al mes siguiente al aprobar (queda avisado en la tarjeta).</div>`;
-    conf.style.display = puede ? '' : 'none';
-    document.getElementById('dcGuardar').disabled = !puede;
+    _dctoPreview._puede = !(d.ya_descontada || d.aprobada || sinDcto || !(d.comision_pagada > 0));
+    _dctoPreview._mes = mes;
+    dcMontoCambio();
   } catch(e) { err.textContent = 'Error: ' + e.message; err.style.display = 'block'; }
+}
+function dcMontoNum(){ const el = document.getElementById('dcMonto'); return el ? parseInt(String(el.value).replace(/\D/g,''))||0 : (_dctoPreview ? _dctoPreview.descuento||0 : 0); }
+function dcMontoCambio(){
+  const d = _dctoPreview; if (!d) return;
+  const el = document.getElementById('dcMonto'); const monto = dcMontoNum();
+  const max = d.descuento||0, ok = monto > 0 && monto <= max;
+  if (el) { el.style.borderColor = ok ? '#dc2626' : '#f59e0b'; el.style.background = ok ? '' : '#fffbeb'; }
+  const conf = document.getElementById('dcConfirma'), btn = document.getElementById('dcGuardar');
+  const puede = d._puede && ok;
+  conf.innerHTML = ok
+    ? `<i class="bi bi-person-fill me-1"></i>Se descontará <b>${fmt(monto)}</b>${monto<max?` <span style="font-weight:400">(rebajado desde ${fmt(max)})</span>`:''} a <b>${escHtml(d.ejecutivo)}</b> en la comisión de <b>${nombreMes(d._mes)}</b>.<div style="font-size:.78rem;margin-top:4px;color:#991b1b">Si la comisión de ese mes no alcanza, el saldo pasa solo al mes siguiente al aprobar (queda avisado en la tarjeta).</div>`
+    : `<i class="bi bi-exclamation-triangle me-1"></i>El monto debe ser mayor a $0 y no superar ${fmt(max)} (lo pagado × ${pct(d.pct)}).`;
+  conf.style.display = (d._puede || !ok) ? '' : 'none';
+  btn.disabled = !puede; btn.style.opacity = puede ? '1' : '.45';
 }
 async function guardarDcto(){
   if (!_dctoPreview) return;
   const mes = dcMes();
-  const body = { mes, num_op: _dctoPreview.num_op, tipo: dcTipo(), cuotas_pagadas: document.getElementById('dcCuotas').value, comentario: document.getElementById('dcComentario').value.trim() };
+  const body = { mes, num_op: _dctoPreview.num_op, tipo: dcTipo(), cuotas_pagadas: document.getElementById('dcCuotas').value, monto: dcMontoNum(), comentario: document.getElementById('dcComentario').value.trim() };
   const btn = document.getElementById('dcGuardar'); btn.disabled = true;
   try {
     const r = await fetch('/api/comisiones/descuentos', { method:'POST', headers:H, body: JSON.stringify(body) });

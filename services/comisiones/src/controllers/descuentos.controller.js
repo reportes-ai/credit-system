@@ -198,15 +198,24 @@ const crear = async (req, res) => {
     if (!(t.pct > 0)) return res.status(400).json({ success: false, data: null, error: `Con ${t.cuotas} cuotas pagadas no corresponde descuento (el tramo llega hasta ${t.limite_t2} cuotas)` });
     if (!(r.comision_pagada > 0)) return res.status(400).json({ success: false, data: null, error: `No se pagó comisión por la operación ${num_op} (${r.detalle && r.detalle.motivo ? r.detalle.motivo : 'comisión $0 en ' + r.credito.mes_origen})` });
 
-    const descuento = R(r.comision_pagada * t.pct), glosa = t.glosa(num_op);
+    // Monto: por defecto lo que da la regla; se puede REBAJAR a mano (nunca subir).
+    const regla = R(r.comision_pagada * t.pct);
+    let descuento = regla, rebajado = null;
+    if (b.monto != null && String(b.monto) !== '') {
+      const m = R(String(b.monto).replace(/\D/g, ''));
+      if (!(m > 0)) return res.status(400).json({ success: false, data: null, error: 'El monto a descontar debe ser mayor a $0' });
+      if (m > regla) return res.status(400).json({ success: false, data: null, error: `El monto no puede superar lo que da la regla (${clp(regla)})` });
+      if (m < regla) { descuento = m; rebajado = regla; }
+    }
+    const glosa = t.glosa(num_op);
     const nombre = req.usuario.nombre || req.usuario.email;
     const [ins] = await pool.query(
       `INSERT INTO comisiones_descuentos_op (mes, num_op, ejecutivo, tipo, cuotas_pagadas, mes_origen, comision_pagada, fuente, pct, descuento, glosa, comentario, creado_por_id, creado_por)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [mes, num_op, r.credito.ejecutivo, tipo, tipo === 'PREPAGO' ? t.cuotas : null, r.credito.mes_origen, R(r.comision_pagada), r.fuente, t.pct, descuento, glosa,
-       String(b.comentario || '').trim() || null, req.usuario.id_usuario, nombre]);
+       [String(b.comentario || '').trim(), rebajado ? `Monto rebajado a mano desde ${clp(rebajado)}` : ''].filter(Boolean).join(' · ') || null, req.usuario.id_usuario, nombre]);
     auditar({ req, accion: 'CREAR', modulo: 'comisiones', entidad: 'descuento_comision_op', entidad_id: String(ins.insertId),
-      detalle: `${glosa} — ${r.credito.ejecutivo}, imputado a ${mes}: comisión pagada ${clp(r.comision_pagada)} (${r.fuente}, ${r.credito.mes_origen}) × ${Math.round(t.pct * 100)}% = ${clp(descuento)}` });
+      detalle: `${glosa} — ${r.credito.ejecutivo}, imputado a ${mes}: comisión pagada ${clp(r.comision_pagada)} (${r.fuente}, ${r.credito.mes_origen}) × ${Math.round(t.pct * 100)}% = ${clp(regla)}${rebajado ? ` · rebajado a mano a ${clp(descuento)}` : ''}` });
     res.json({ success: true, data: { id: ins.insertId, descuento, glosa, ejecutivo: r.credito.ejecutivo }, error: null });
   } catch (e) { console.error('[descuentos crear]', e.message); res.status(500).json({ success: false, data: null, error: e.message }); }
 };
