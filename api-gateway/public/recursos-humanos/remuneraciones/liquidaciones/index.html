@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v2.10 — nombre del colaborador en mayúsculas (como el resto de la cabecera) y mes de comisiones a la chilena (08-2026). v2.9 — cabecera con Fecha de contrato (en vez de AFP/Salud), descuentos "Salud <isapre>" y "Adicional <isapre>", total descuentos en negro. v2.8 — al emitir avisa la ODP a la Caja Los Andes generada. v2.7 — cuenta de depósito con prefijo "Banco" cuando el nombre no lo trae. v2.6 — la vista previa también muestra la cuenta de depósito (solo salía en las emitidas). v2.5 — liquidación más ancha (1000px, montos sin cortar), haberes sin paréntesis, más espacio para las firmas. v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
+  <!-- v2.11 — botón PDF borrador: todas las liquidaciones del mes en un PDF con marca de agua BORRADOR (no emite). v2.10 — nombre del colaborador en mayúsculas (como el resto de la cabecera) y mes de comisiones a la chilena (08-2026). v2.9 — cabecera con Fecha de contrato (en vez de AFP/Salud), descuentos "Salud <isapre>" y "Adicional <isapre>", total descuentos en negro. v2.8 — al emitir avisa la ODP a la Caja Los Andes generada. v2.7 — cuenta de depósito con prefijo "Banco" cuando el nombre no lo trae. v2.6 — la vista previa también muestra la cuenta de depósito (solo salía en las emitidas). v2.5 — liquidación más ancha (1000px, montos sin cortar), haberes sin paréntesis, más espacio para las firmas. v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -64,6 +64,7 @@
     <button class="btn-ghost" onclick="archivoPrevired()" title="Archivo oficial 105 campos para pagar las cotizaciones en previred.com"><i class="bi bi-bank me-1"></i>Archivo Previred</button>
     <button class="btn-ghost" onclick="nominaBanco()" title="Archivo de transferencias en lote para pagar todos los sueldos del mes desde el portal del banco"><i class="bi bi-cash-coin me-1"></i>Nómina Banco</button>
     <button class="btn-ghost" onclick="configPrevired()" title="CCAF y mutualidad de la empresa (archivo Previred)"><i class="bi bi-gear"></i></button>
+    <button class="btn-ghost" id="btnPdfBorrador" onclick="pdfBorrador()" title="Un PDF con todas las liquidaciones del mes tal como están hoy, cada una con la marca de agua BORRADOR (no emite nada)"><i class="bi bi-file-earmark-pdf me-1"></i>PDF borrador</button>
     <button class="btn-navy" onclick="guardar()"><i class="bi bi-save me-1"></i>Guardar borrador</button>
     <button class="btn-verde" onclick="emitir()"><i class="bi bi-patch-check me-1"></i>Emitir mes</button>
   </div>
@@ -307,6 +308,48 @@ function pintarLiq(l, d){
     </div>
     <div style="margin-top:10px;font-size:.68rem;color:#94a3b8">Estado: ${esc(l.estado)}${l.emitido_at?' · emitida el '+new Date(l.emitido_at).toLocaleDateString('es-CL')+' por '+esc(l.emitido_por||''):''}</div>`;
   dlgLiq.showModal();
+}
+/* PDF BORRADOR (Pato, 15-09-2026): todas las liquidaciones del mes en un solo PDF, una por
+   página, con marca de agua diagonal BORRADOR. No emite ni guarda nada: es para revisar y
+   compartir antes de Emitir mes. Mismo motor que el PDF de comprobantes de Órdenes de Pago
+   (html2pdf; el contenedor va en flujo normal, con position:absolute salía en blanco). */
+async function pdfBorrador(){
+  const rows = (DATA?.filas||[]).filter(r => Number(r.liquido) || Number(r.total_haberes));
+  if (!rows.length) return toast('No hay liquidaciones en el mes');
+  const btn = document.getElementById('btnPdfBorrador'); const orig = btn.innerHTML; btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Armando…';
+  const mes = document.getElementById('mes').value;
+  const liqBody = document.getElementById('liqBody'), guardado = liqBody.innerHTML;
+  try {
+    if (!window.html2pdf) await new Promise((ok,bad)=>{ const s=document.createElement('script'); s.src='/js/html2pdf.bundle.min.js'; s.onload=ok; s.onerror=bad; document.head.appendChild(s); });
+    const paginas = [];
+    for (const r of rows) {
+      pintarLiq({ mes, nombre: r.nombre, rut: r.rut, cargo: r.cargo, banco_pago: r.banco_pago, tipo_cuenta_pago: r.tipo_cuenta_pago,
+        num_cuenta_pago: r.num_cuenta_pago, fecha_ingreso: r.fecha_ingreso, estado: 'BORRADOR — aún no emitida' }, r);
+      dlgLiq.close();
+      paginas.push(liqBody.innerHTML);
+    }
+    const marca = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden">
+      <div style="transform:rotate(-32deg);font-size:118px;font-weight:900;letter-spacing:10px;color:rgba(220,38,38,.16);border:8px solid rgba(220,38,38,.16);border-radius:22px;padding:6px 34px;white-space:nowrap">BORRADOR</div></div>`;
+    const cont = document.createElement('div');
+    cont.style.cssText = 'width:760px;background:#fff;margin:0 auto';
+    cont.innerHTML = paginas.map((h, i) => `<div class="${i < paginas.length-1 ? 'html2pdf__page-break' : ''}" style="position:relative;padding:8px 6px;${i < paginas.length-1 ? 'page-break-after:always;' : ''}">${h}${marca}</div>`).join('');
+    const velo = document.createElement('div');
+    velo.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(6px);z-index:5000;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1rem';
+    velo.innerHTML = `<div style="background:#0141A2;padding:16px 26px;border-radius:12px"><i class="bi bi-hourglass-split me-2"></i>Generando PDF borrador con ${rows.length} liquidación${rows.length===1?'':'es'}…</div>`;
+    document.body.appendChild(velo); document.body.appendChild(cont);
+    try {
+      await html2pdf().set({
+        filename: `liquidaciones-BORRADOR-${mes}.pdf`,
+        margin: 8, image: { type:'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit:'mm', format:'letter', orientation:'portrait' },
+        pagebreak: { mode: ['css', 'legacy'], after: '.html2pdf__page-break' },
+      }).from(cont).save();
+    } finally { cont.remove(); velo.remove(); }
+    toast(`✓ PDF borrador con ${rows.length} liquidaciones`);
+  } catch(e) { alert('No se pudo generar el PDF: ' + e.message); }
+  finally { liqBody.innerHTML = guardado; btn.disabled = false; btn.innerHTML = orig; }
 }
 function exportCSV(){
   const rows = DATA?.filas||[]; if (!rows.length) return;
