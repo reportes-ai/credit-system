@@ -698,8 +698,7 @@ async function cargarCupoTEF(){
     if (!j.success) { if (bd) bd.textContent = 'cupo n/d'; return; }
     const c = j.data;
     if (bd) { bd.textContent = `${c.restantes}/${c.gratis} gratis`; bd.style.background = c.restantes <= 10 ? '#fee2e2' : '#eff6ff'; bd.style.color = c.restantes <= 10 ? '#991b1b' : '#1e40af'; }
-    const NOM = { SALDOS:'Saldos Precio', COMISIONES:'Comisiones Dealer', PARQUES:'Comisiones Parques' };
-    if (el) { el.textContent = `Usadas ${c.usados} de ${c.gratis} en ${c.mes}` + (Object.keys(c.por_plataforma||{}).length ? ' (' + Object.entries(c.por_plataforma).map(([k,v])=>`${v} de ${NOM[k]||k}`).join(', ') + ')' : ''); }
+    if (el) { el.textContent = ''; el.style.display = 'none'; }   // el badge del botón ya dice cuántas quedan; el detalle por plataforma no aporta
   } catch(e){ const bd = document.getElementById('tefCupoBadge'); if (bd) bd.textContent = 'cupo n/d'; }
 }
 function filasTEF(){ return nominaRows().map(r => ({ id:r.id, ref:'OP '+(r.num_op||''), rut:r.rut_dealer, nombre:r.nombre_dealer, banco:r.banco, tipo_cuenta:r.tipo_cuenta||'', num_cuenta:r.num_cuenta, correo:r.correo||'', monto:Math.round(montoP(r)), motivo:`Pago saldo precio OP${r.num_op||''}` })); }
