@@ -1901,20 +1901,25 @@ async function datosSaldosAPagar() {
     // Respaldo por RUT: créditos sin id_dealer enlazado quedaban sin cuenta/banco/
     // categoría aunque la ficha del dealer exista (mismo RUT en otra operación sí
     // los traía). Una sola fuente: la ficha; aquí solo se busca por otra llave.
-    const sinDatos = rows.filter(r => r.rut_dealer && (!r.num_cuenta || !r.banco || !r.categoria || !r.correo));
+    /* SIN filtro por `activo` (15-09-2026): activo solo dice si cursó en los últimos
+       3 meses, no si se le puede pagar. Con el filtro, la OP 26090202 (AUTOMOTORA MYS,
+       activo=0) llegó sin cuenta ni banco, quedó FUERA del archivo TEF y siguió
+       "enviada a pago" sin pagarse. Si un RUT tiene varias fichas, gana la que tiene cuenta y, entre esas, la activa. */
+    const sinDatos = rows.filter(r => r.rut_dealer && (!r.num_cuenta || !r.banco || !r.categoria || !r.correo || !r.tipo_cuenta));
     if (sinDatos.length) {
-      const ruts = [...new Set(sinDatos.map(r => normRutSaldo(r.rut_dealer)))];
       const [ds] = await pool.query(
-        `SELECT rut, num_cuenta, banco, COALESCE(NULLIF(correo,''), NULLIF(cf_email,'')) AS correo,
+        `SELECT rut, num_cuenta, banco, COALESCE(tipo_cuenta, cuenta_tipo) AS tipo_cuenta,
+                COALESCE(NULLIF(correo,''), NULLIF(cf_email,'')) AS correo,
                 COALESCE(NULLIF(categoria_asignada,''), NULLIF(categoria_propuesta,''), '') AS categoria,
                 COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre
-           FROM dealers WHERE activo=1 OR activo IS NULL`);
+           FROM dealers ORDER BY (num_cuenta IS NOT NULL AND num_cuenta<>'') DESC, COALESCE(activo,1) DESC, id_dealer DESC`);
       const mapa = new Map();
       ds.forEach(d => { const k = normRutSaldo(d.rut); if (k && !mapa.has(k)) mapa.set(k, d); });
       sinDatos.forEach(r => {
         const d = mapa.get(normRutSaldo(r.rut_dealer)); if (!d) return;
         if (!r.num_cuenta) r.num_cuenta = d.num_cuenta;
         if (!r.banco) r.banco = d.banco;
+        if (!r.tipo_cuenta) r.tipo_cuenta = d.tipo_cuenta;
         if (!r.correo) r.correo = d.correo;
         if (!r.categoria) r.categoria = d.categoria;
         if (!r.nombre_dealer) r.nombre_dealer = d.nombre;
