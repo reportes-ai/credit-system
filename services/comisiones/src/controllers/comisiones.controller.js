@@ -713,6 +713,13 @@ async function calcularMes(mes, varsOverride) {
     // Un ejecutivo puede tener descuentos aunque no haya colocado nada en el mes,
     // por eso se agregan al mapa: si no, su descuento se perdería.
     const dctos = await descuentosDelMes(mes, vars);
+    // Descuentos ingresados A MANO por N° de operación (Revisión → Ingresar descuento):
+    // misma forma que los automáticos; si la misma op ya viene del motor, manda el manual.
+    const manuales = await require('./descuentos.controller').manualesDelMes(mes);
+    for (const [ej, lista] of Object.entries(manuales)) {
+      const ops = new Set(lista.map(d => String(d.num_op)));
+      dctos[ej] = (dctos[ej] || []).filter(d => !ops.has(String(d.num_op))).concat(lista);
+    }
     Object.keys(dctos).forEach(ej => { if (!map[ej]) map[ej] = []; });
 
     // Ajustes de comisión por operación APROBADOS (Modificar Comisión Ejecutivo):
@@ -1112,4 +1119,5 @@ const marcarIndependiente = async (req, res) => {
 };
 
 module.exports = { getVariables, putVariables, getVariablesBitacora, getVariablesBitacoraDetalle, getModelos, postModelo, deleteModelo, aplicarModelo, getVigenciaMeses, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos, getResumenConfig, enviarResumen, marcarIndependiente,
-  calcularMes };  // motor único: lo reusa Remuneraciones (RRHH) para las comisiones imponibles
+  calcularMes,    // motor único: lo reusa Remuneraciones (RRHH) para las comisiones imponibles
+  getVars, fabricaFactorOrigen };  // los usa descuentos.controller para valorizar la comisión pagada por una op

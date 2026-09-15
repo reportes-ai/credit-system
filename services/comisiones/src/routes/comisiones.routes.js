@@ -37,6 +37,13 @@ router.get ('/ajustes/historia',     verifyToken, requireFunc('com_ejec_mod'),  
 router.post('/ajustes',              verifyToken, requireFunc('com_ejec_mod_solicitar'), aj.solicitar);
 router.post('/ajustes/:id/resolver', verifyToken, requireFunc('com_ejec_mod_aprobar'),   aj.resolver);
 
+// Descuentos por prepago / anulación ingresados a mano por N° de operación (15-09-2026)
+const dc = require('../controllers/descuentos.controller');
+router.get   ('/descuentos',           verifyToken, requireFunc('comisión_ejecutivos_ver'), dc.listar);
+router.get   ('/descuentos/buscar-op', verifyToken, requireFunc('com_dcto_ingresar'),      dc.buscarOp);
+router.post  ('/descuentos',           verifyToken, requireFunc('com_dcto_ingresar'),      dc.crear);
+router.delete('/descuentos/:id',       verifyToken, requireFunc('com_dcto_ingresar'),      dc.anular);
+
 // Nómina de comisiones: foto de lo que se paga, se manda a RRHH y congela el libro (08-09-2026)
 const nom = require('../controllers/nomina.controller');
 router.get ('/nomina',               verifyToken, requireFunc('comisiones_nomina', 'comisiones_revision'), nom.getNomina);
