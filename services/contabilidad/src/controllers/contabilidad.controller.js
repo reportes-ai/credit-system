@@ -1475,10 +1475,20 @@ const crearComprobanteDoc = async ({ fecha, glosa, movimientos, origen, origen_r
    Lo usan la digitación manual y el importador del RCV: la única diferencia entre
    ambos es de dónde vienen los datos y qué marca queda en `origen`. Lanza Error
    con .http cuando el dato no sirve — el llamador decide si corta o acumula. */
+/* IVA no recuperable (Pato, 15-09-2026): el SII lo informa aparte (documentos "No
+   corresponde incluir", uso común sin derecho a crédito). No es crédito fiscal, así que
+   NO va a `iva` (lo que suma el F29): es mayor costo → al gasto, y sí forma parte de lo
+   que se le debe al proveedor. Antes se perdía y el total y la cuenta por pagar quedaban cortos. */
+require('../../../../shared/migrate').enFila('ctb-compras-iva-no-rec', async () => {
+  try { await pool.query('ALTER TABLE ctb_compras_aux ADD COLUMN iva_no_rec DECIMAL(14,0) NOT NULL DEFAULT 0'); }
+  catch (e) { if (e.errno !== 1060) throw e; }
+});
+
 async function ingresarCompraAux(b, { origen = 'DIGITADO', req } = {}) {
   const { tipo_doc, num_doc, rut, razon_social, fecha_doc, fecha_vcto, cuenta_gasto, cuenta_iva, cuenta_cxp } = b;
   const neto = Math.round(Math.abs(Number(b.neto) || 0)), exento = Math.round(Math.abs(Number(b.exento) || 0)), iva = Math.round(Math.abs(Number(b.iva) || 0));
-  const total = neto + exento + iva;
+  const ivaNoRec = Math.round(Math.abs(Number(b.iva_no_rec) || 0));
+  const total = neto + exento + iva + ivaNoRec;
   const err = (m, http) => { throw Object.assign(new Error(m), { http: http || 400 }); };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_doc || '')) err('Fecha del documento inválida');
   if (!num_doc || !rut || !razon_social) err('Folio, RUT y razón social son obligatorios');
@@ -1511,7 +1521,7 @@ async function ingresarCompraAux(b, { origen = 'DIGITADO', req } = {}) {
     const pre = esNC ? 'NC' : 'FC';
     const lado = (cuenta, monto, glosa, alDebe) => ({ cuenta, debe: alDebe ? monto : 0, haber: alDebe ? 0 : monto, glosa, rut });
     const movimientos = [
-      lado(cuenta_gasto, neto + exento, `${pre} ${num_doc} ${razon_social}`.slice(0, 200), !esNC),
+      lado(cuenta_gasto, neto + exento + ivaNoRec, `${pre} ${num_doc} ${razon_social}`.slice(0, 200), !esNC),
       ...(iva > 0 ? [lado(cuenta_iva, iva, `IVA ${pre} ${num_doc}`, !esNC)] : []),
       lado(cuenta_cxp, total, `${pre} ${num_doc} ${razon_social}`.slice(0, 200), esNC),
     ];
@@ -1522,10 +1532,10 @@ async function ingresarCompraAux(b, { origen = 'DIGITADO', req } = {}) {
     });
   }
   const [r] = await pool.query(
-    `INSERT INTO ctb_compras_aux (mes, tipo_doc, num_doc, fecha_doc, fecha_vcto, estado, rut, razon_social, cuenta_cxp, cuenta_gasto, neto, exento, iva, total, origen, id_comprobante)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO ctb_compras_aux (mes, tipo_doc, num_doc, fecha_doc, fecha_vcto, estado, rut, razon_social, cuenta_cxp, cuenta_gasto, neto, exento, iva, iva_no_rec, total, origen, id_comprobante)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [mes, tipo_doc || '33', String(num_doc), fecha_doc, fecha_vcto || null, 'Vigente', rut, String(razon_social).slice(0, 200),
-     cuenta_cxp || null, cuenta_gasto, neto, exento, iva, total, origen, comp?.id || null]);
+     cuenta_cxp || null, cuenta_gasto, neto, exento, iva, ivaNoRec, total, origen, comp?.id || null]);
   if (req) auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: origen === 'RCV' ? 'compra_rcv' : 'compra_digitada', entidad_id: r.insertId, detalle: `FC ${num_doc} ${razon_social} $${total.toLocaleString('es-CL')}${comp ? ' → ' + comp.numero : ''}` });
   return { id: r.insertId, total, comprobante: comp };
 }
@@ -2318,9 +2328,9 @@ exports.listaComprasAux = async (req, res) => {
     const where = w.length ? 'WHERE ' + w.join(' AND ') : '';
     const [docs] = await pool.query(`SELECT * FROM ctb_compras_aux ${where} ORDER BY mes DESC, total DESC LIMIT 1000`, p);
     const [meses] = await pool.query(
-      `SELECT mes, COUNT(*) docs, SUM(neto) neto, SUM(exento) exento, SUM(iva) iva, SUM(total) total
+      `SELECT mes, COUNT(*) docs, SUM(neto) neto, SUM(exento) exento, SUM(iva) iva, SUM(iva_no_rec) iva_no_rec, SUM(total) total
          FROM ctb_compras_aux ${where} GROUP BY mes ORDER BY mes DESC`, p);
-    const [[tot]] = await pool.query(`SELECT COUNT(*) docs, COALESCE(SUM(neto),0) neto, COALESCE(SUM(iva),0) iva, COALESCE(SUM(total),0) total FROM ctb_compras_aux ${where}`, p);
+    const [[tot]] = await pool.query(`SELECT COUNT(*) docs, COALESCE(SUM(neto),0) neto, COALESCE(SUM(iva),0) iva, COALESCE(SUM(iva_no_rec),0) iva_no_rec, COALESCE(SUM(total),0) total FROM ctb_compras_aux ${where}`, p);
     ok(res, { documentos: docs, meses, total: tot, truncado: docs.length === 1000 });
   } catch (e) { fail(res, e.message); }
 };
@@ -3229,7 +3239,7 @@ exports.rcvPendientes = async (req, res) => {
         rut: d.rut_proveedor, razon_social: d.razon_social,
         fecha_doc: isoDeBD(d.fecha_emision), fecha_recepcion: isoDeBD(d.fecha_recepcion),   // DATE de la BD
         neto: Number(d.monto_neto || 0), exento: Number(d.monto_exento || 0),
-        iva: Number(d.iva_recuperable || 0), total: Number(d.monto_total || 0),
+        iva: Number(d.iva_recuperable || 0), iva_no_rec: Number(d.iva_no_recuperable || 0), total: Number(d.monto_total || 0),
         cuenta_sugerida: sug?.cuenta_gasto || null, veces_cuenta: sug?.n || 0,
         nota_credito: Number(d.tipo_dte) === 61,
       });
@@ -3256,18 +3266,19 @@ exports.rcvImportar = async (req, res) => {
 
     // Período de cada documento: lo dice el SII (espejo del RCV), nunca el navegador.
     const [rcvRows] = await pool.query(
-      'SELECT mes, tipo_dte, folio, rut_proveedor FROM ctb_rcv_compras WHERE folio IN (?)',
+      'SELECT mes, tipo_dte, folio, rut_proveedor, iva_no_recuperable FROM ctb_rcv_compras WHERE folio IN (?)',
       [[...new Set(lista.map(d => Number(d.num_doc)).filter(Boolean))].concat(0)]);
-    const periodoDe = new Map(rcvRows.map(x => [`${rutNorm(x.rut_proveedor)}|${x.tipo_dte}|${x.folio}`, x.mes]));
+    const rcvDe = new Map(rcvRows.map(x => [`${rutNorm(x.rut_proveedor)}|${x.tipo_dte}|${x.folio}`, x]));
     const okDocs = [], errores = [];
     for (const d of lista) {
       try {
-        const periodo = periodoDe.get(`${rutNorm(d.rut)}|${Number(d.tipo_doc)}|${Number(d.num_doc)}`);
-        if (!periodo) throw new Error('El documento no está en el RCV sincronizado del SII');
+        const sii = rcvDe.get(`${rutNorm(d.rut)}|${Number(d.tipo_doc)}|${Number(d.num_doc)}`);
+        if (!sii) throw new Error('El documento no está en el RCV sincronizado del SII');
+        const periodo = sii.mes;
         const r = await ingresarCompraAux({
           tipo_doc: String(d.tipo_doc || '33'), num_doc: String(d.num_doc), rut: d.rut, razon_social: d.razon_social,
           fecha_doc: d.fecha_doc, fecha_vcto: d.fecha_vcto || null, periodo,
-          neto: d.neto, exento: d.exento, iva: d.iva,
+          neto: d.neto, exento: d.exento, iva: d.iva, iva_no_rec: Number(sii.iva_no_recuperable || 0),
           cuenta_gasto: d.cuenta_gasto, generar_asiento: !!b.generar_asiento,
           cuenta_iva: b.cuenta_iva, cuenta_cxp: b.cuenta_cxp,
         }, { origen: 'RCV', req });
