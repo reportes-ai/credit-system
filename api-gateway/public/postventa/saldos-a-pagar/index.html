@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v5.7 — fix: el bloque TEF quedó dentro de <script src=timbre-pagado.js> y el navegador lo ignoraba (descargarTEF is not defined). v5.6 — TEF: generar el archivo registra el pago (y sus correos). v5.5 — botón TEF B.Internacional (archivo de transferencias masivas) con el cupo gratis del mes. v5.4 — "Vencen hoy/mañana" con letra chica (clase venc, como "Nada enviado a pago todavía"). v5.3 — cuadro Pendientes de pago: líneas "Vencen hoy" y "Vencen mañana" (ops X monto, según SLA). v5.2 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v5.8 — TEF: cupo gratis del mes como badge dentro del botón. v5.7 — fix: el bloque TEF quedó dentro de <script src=timbre-pagado.js> y el navegador lo ignoraba (descargarTEF is not defined). v5.6 — TEF: generar el archivo registra el pago (y sus correos). v5.5 — botón TEF B.Internacional (archivo de transferencias masivas) con el cupo gratis del mes. v5.4 — "Vencen hoy/mañana" con letra chica (clase venc, como "Nada enviado a pago todavía"). v5.3 — cuadro Pendientes de pago: líneas "Vencen hoy" y "Vencen mañana" (ops X monto, según SLA). v5.2 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -123,7 +123,7 @@
       <button class="btn-sec" id="btnNomina" onclick="copiarNomina()" disabled><i class="bi bi-clipboard me-1"></i>Nómina</button>
       <button class="btn-sec" id="btnCSV" onclick="descargarCSV()" disabled><i class="bi bi-download me-1"></i>CSV</button>
       <span style="display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle">
-        <button class="btn-sec" id="btnTEF" onclick="descargarTEF()" disabled title="Archivo de transferencias masivas para el Internet Banking del Banco Internacional"><i class="bi bi-bank me-1"></i>TEF B.Internacional</button>
+        <button class="btn-sec" id="btnTEF" onclick="descargarTEF()" disabled title="Archivo de transferencias masivas para el Internet Banking del Banco Internacional"><i class="bi bi-bank me-1"></i>TEF B.Internacional <span id="tefCupoBadge" style="background:#eff6ff;color:#1e40af;border-radius:10px;padding:1px 8px;font-size:.7rem;font-weight:700;margin-left:6px">cupo…</span></button>
         <span id="tefCupo" style="font-size:.68rem;color:#64748b;margin-top:2px;white-space:nowrap"></span>
       </span>
       <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarPago()" disabled><i class="bi bi-check2-all me-1"></i>Confirmar pago</button>
@@ -694,11 +694,12 @@ const TEF_PLATAFORMA = 'SALDOS';
 async function cargarCupoTEF(){
   try {
     const j = await fetch('/api/tef/cupo', { headers:H }).then(r=>r.json());
-    const el = document.getElementById('tefCupo'); if (!el || !j.success) return;
-    const c = j.data; el.textContent = `te quedan ${c.restantes}/${c.gratis} gratis este mes`;
-    el.style.color = c.restantes <= 10 ? '#b91c1c' : '#64748b';
-    el.title = `Cargos enviados en ${c.mes}: ` + Object.entries(c.por_plataforma||{}).map(([k,v])=>`${k} ${v}`).join(' · ');
-  } catch(e){}
+    const el = document.getElementById('tefCupo'), bd = document.getElementById('tefCupoBadge');
+    if (!j.success) { if (bd) bd.textContent = 'cupo n/d'; return; }
+    const c = j.data;
+    if (bd) { bd.textContent = `${c.restantes}/${c.gratis} gratis`; bd.style.background = c.restantes <= 10 ? '#fee2e2' : '#eff6ff'; bd.style.color = c.restantes <= 10 ? '#991b1b' : '#1e40af'; }
+    if (el) { el.textContent = `${c.usados} transferencias enviadas en ${c.mes}` + (Object.keys(c.por_plataforma||{}).length ? ' · ' + Object.entries(c.por_plataforma).map(([k,v])=>`${k.toLowerCase()} ${v}`).join(' · ') : ''); }
+  } catch(e){ const bd = document.getElementById('tefCupoBadge'); if (bd) bd.textContent = 'cupo n/d'; }
 }
 function filasTEF(){ return nominaRows().map(r => ({ id:r.id, ref:'OP '+(r.num_op||''), rut:r.rut_dealer, nombre:r.nombre_dealer, banco:r.banco, tipo_cuenta:r.tipo_cuenta||'', num_cuenta:r.num_cuenta, correo:r.correo||'', monto:Math.round(montoP(r)), motivo:`Pago saldo precio OP${r.num_op||''}` })); }
 async function descargarTEF(){

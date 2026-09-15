@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Parques a Pagar — AutoFácil</title>
-  <!-- v1.9 — ODP con popup de la orden (motor odp-documento.js), factura adjunta con click, operaciones como link. v1.8 — TEF: generar el archivo registra el pago (y sus correos). v1.7 — botón TEF B.Internacional (parques con ODP emitida) con el cupo gratis del mes. v1.6 — login conserva el destino (?next=). v1.5 — full width + fecha de emision bajo la Orden de Pago · v1.4 — popup de revisión pre-emisión (factura adjunta + totales) · v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
+  <!-- v2.0 — TEF: botón a la derecha con el cupo gratis del mes como badge (antes el texto no se veía y el bloque se iba a la izquierda). v1.9 — ODP con popup de la orden (motor odp-documento.js), factura adjunta con click, operaciones como link. v1.8 — TEF: generar el archivo registra el pago (y sus correos). v1.7 — botón TEF B.Internacional (parques con ODP emitida) con el cupo gratis del mes. v1.6 — login conserva el destino (?next=). v1.5 — full width + fecha de emision bajo la Orden de Pago · v1.4 — popup de revisión pre-emisión (factura adjunta + totales) · v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -68,16 +68,16 @@
 
 <div class="wrap">
   <div class="head-row">
-    <div>
+    <div style="flex:1 1 480px;min-width:0">
       <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-signpost-2 me-2"></i>Comisiones Parques a Pagar</h5>
       <span style="font-size:.82rem;color:#64748b">Pago mensual a cada parque: <b>arriendo</b> + <b>comisión por créditos</b> (según el mantenedor <a href="/mantenedores/parques/">Arriendos y Comisiones Parque y Calle</a>). Pincha un parque para ver sus operaciones. Flujo: <b>Aprobar → Emitir Orden de Pago (correo a Contabilidad) → Confirmar Pago</b> (avisa a los ejecutivos del parque).</span>
     </div>
-    <div style="display:flex;align-items:flex-start;gap:10px">
+    <div style="display:flex;align-items:flex-start;gap:10px;margin-left:auto;flex:0 0 auto">
+      <input type="month" id="mes">
       <span style="display:inline-flex;flex-direction:column;align-items:center">
-        <button class="btn-a" id="btnTEF" style="background:#fff;color:#0141A2;border:1px solid #bfdbfe" onclick="descargarTEF()" disabled title="Archivo de transferencias masivas (parques con ODP emitida) para el Internet Banking del Banco Internacional"><i class="bi bi-bank me-1"></i>TEF B.Internacional</button>
+        <button class="btn-a" id="btnTEF" style="background:#fff;color:#0141A2;border:1px solid #bfdbfe;white-space:nowrap" onclick="descargarTEF()" disabled title="Archivo de transferencias masivas (parques con ODP emitida) para el Internet Banking del Banco Internacional"><i class="bi bi-bank me-1"></i>TEF B.Internacional <span id="tefCupoBadge" style="background:#eff6ff;color:#1e40af;border-radius:10px;padding:1px 8px;font-size:.7rem;font-weight:700;margin-left:6px">cupo…</span></button>
         <span id="tefCupo" style="font-size:.68rem;color:#64748b;margin-top:2px;white-space:nowrap"></span>
       </span>
-      <input type="month" id="mes">
     </div>
   </div>
 
@@ -354,11 +354,12 @@ const TEF_PLATAFORMA = 'PARQUES';
 async function cargarCupoTEF(){
   try {
     const j = await fetch('/api/tef/cupo', { headers:H }).then(r=>r.json());
-    const el = document.getElementById('tefCupo'); if (!el || !j.success) return;
-    const c = j.data; el.textContent = `te quedan ${c.restantes}/${c.gratis} gratis este mes`;
-    el.style.color = c.restantes <= 10 ? '#b91c1c' : '#64748b';
-    el.title = `Cargos enviados en ${c.mes}: ` + Object.entries(c.por_plataforma||{}).map(([k,v])=>`${k} ${v}`).join(' · ');
-  } catch(e){}
+    const el = document.getElementById('tefCupo'), bd = document.getElementById('tefCupoBadge');
+    if (!j.success) { if (bd) bd.textContent = 'cupo n/d'; return; }
+    const c = j.data;
+    if (bd) { bd.textContent = `${c.restantes}/${c.gratis} gratis`; bd.style.background = c.restantes <= 10 ? '#fee2e2' : '#eff6ff'; bd.style.color = c.restantes <= 10 ? '#991b1b' : '#1e40af'; }
+    if (el) { el.textContent = `${c.usados} transferencias enviadas en ${c.mes}` + (Object.keys(c.por_plataforma||{}).length ? ' · ' + Object.entries(c.por_plataforma).map(([k,v])=>`${k.toLowerCase()} ${v}`).join(' · ') : ''); }
+  } catch(e){ const bd = document.getElementById('tefCupoBadge'); if (bd) bd.textContent = 'cupo n/d'; }
 }
 function filasTEF(){ return ROWS.filter(r => r.etapa === 'OP_EMITIDA' && r.odp_numero).map(r => ({ parque: r.parque, odp_numero: r.odp_numero })); }
 async function descargarTEF(){
