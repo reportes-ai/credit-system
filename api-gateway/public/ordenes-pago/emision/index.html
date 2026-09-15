@@ -52,6 +52,7 @@
       <div class="fld full"><label>Proveedor *</label>
         <select id="fProv" onchange="onProvChange()"><option value="">Cargando…</option></select>
         <div id="provCuentaInfo" style="display:none;margin-top:6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 12px;font-size:.82rem;color:#1e40af"></div>
+        <div id="nominaInfo" style="display:none;margin-top:6px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:7px 12px;font-size:.82rem;color:#9a3412"><i class="bi bi-paperclip me-1"></i>El beneficiario es la <b>nómina adjunta</b>: adjunta el archivo con las personas y montos (obligatorio). Sin RUT ni datos de transferencia.</div>
         <!-- COLABORADORES (Pato, 15-09-2026): selección múltiple → una orden por persona, mismo concepto y monto -->
         <div id="boxColab" style="display:none;margin-top:8px;border:1.5px solid #c7d2fe;border-radius:10px;background:#f8faff;padding:10px 12px">
           <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-size:.8rem">
@@ -84,8 +85,7 @@
         </div>
       </div>
 
-      <div class="fld full"><label>Concepto *</label><input id="fConcepto" maxlength="300" list="conceptosSug" placeholder="Ej: Arriendo oficina junio 2026">
-        <datalist id="conceptosSug"><option value="De acuerdo a nómina adjunta"></option></datalist></div>
+      <div class="fld full"><label>Concepto *</label><input id="fConcepto" maxlength="300" placeholder="Ej: Arriendo oficina junio 2026"></div>
 
       <div class="fld"><label>Categoría</label>
         <select id="fCategoria">
@@ -265,7 +265,7 @@ async function cargarProv(){
     const opts = (j.data||[]).map(op).join('');
     const grp = (t, arr) => arr.length ? `<optgroup label="${t}">${arr.map(op).join('')}</optgroup>` : '';
     document.getElementById('fProv').innerHTML =
-      '<option value="">— Seleccionar proveedor —</option>' + opts + '<option value="__otro">+ Proveedor no registrado…</option>'
+      '<option value="">— Seleccionar proveedor —</option><option value="__nomina">DE ACUERDO A NÓMINA ADJUNTA</option>' + opts + '<option value="__otro">+ Proveedor no registrado…</option>'
       + grp('Dealers', dealers) + grp('Parques automotrices', parques)
       + (COLABS.length ? `<optgroup label="Colaboradores"><option value="__colab">Colaboradores — elegir uno o varios (una orden por persona)…</option></optgroup>` : '');
     pintarColabs();
@@ -279,8 +279,8 @@ function onProvChange(){
   document.getElementById('boxProvNombre').style.display = otro?'':'none';
   document.getElementById('boxProvRut').style.display = otro?'':'none';
   document.getElementById('boxColab').style.display = v==='__colab' ? '' : 'none';
-  // Colaboradores: el concepto típico es la nómina que se adjunta (se puede cambiar)
-  if (v==='__colab' && !document.getElementById('fConcepto').value.trim()) document.getElementById('fConcepto').value = 'De acuerdo a nómina adjunta';
+  // "De acuerdo a nómina adjunta": el beneficiario es la nómina que se adjunta (sin RUT ni banco); exige el adjunto
+  const nomInfo = document.getElementById('nominaInfo'); if (nomInfo) nomInfo.style.display = v==='__nomina' ? '' : 'none';
   // Proveedor registrado sin banco/cuenta → ofrecer completar los datos acá mismo
   // (solo si el pago es por Transferencia: cheque/efectivo/tarjeta no los necesitan)
   const met = document.getElementById('fMetodo').value;
@@ -333,19 +333,21 @@ function emitir(){
   if (monto<=0) return fail('Ingresa el monto (bruto o neto).');
   if (provSel==='__colab') return emitirColabs(concepto, monto);
 
-  const otro = provSel==='__otro';
+  const otro = provSel==='__otro', nomina = provSel==='__nomina';
   const prov = otro ? { nombre: document.getElementById('fProvNombre').value.trim(), rut: document.getElementById('fProvRut').value.trim() }
-                    : (PROVS.find(p=>String(p.id)===String(provSel)) || {});
+             : nomina ? { nombre: 'DE ACUERDO A NÓMINA ADJUNTA', rut: '' }
+                      : (PROVS.find(p=>String(p.id)===String(provSel)) || {});
   if (otro && !prov.nombre) return fail('Indica el nombre del proveedor.');
   const fDoc = document.getElementById('fDoc').files && document.getElementById('fDoc').files[0];
+  if (nomina && !fDoc) return fail('Adjunta la nómina: es el respaldo de a quién se paga.');
   const tipoDoc = document.getElementById('fTipoDoc').value;
   const m = calcDoc(tipoDoc, lastBase, monto);
   // Banco/cuenta del proveedor solo son CRÍTICOS si se paga por TRANSFERENCIA:
   // con cheque, efectivo o tarjeta no se necesitan datos de transferencia.
   const esTransf = document.getElementById('fMetodo').value === 'Transferencia' || !document.getElementById('fMetodo').value;
   const faltas = AF_ODP_PRE.check([
-    { etiqueta:'RUT del proveedor', valor: prov.rut },
-    ...(esTransf ? [
+    ...(nomina ? [] : [{ etiqueta:'RUT del proveedor', valor: prov.rut }]),
+    ...(esTransf && !nomina ? [
       { etiqueta:'Banco del proveedor (dato de transferencia)', valor: prov.banco, critico:true },
       { etiqueta:'N° de cuenta del proveedor (dato de transferencia)', valor: prov.numero_cuenta, critico:true },
     ] : []),
@@ -428,6 +430,8 @@ async function emitirDefinitivo(){
     body.proveedor_rut = document.getElementById('fProvRut').value.trim();
   } else if (provSel==='__colab') {
     body.tercero_tipo = 'COLABORADOR';   // tercero_id se fija por persona más abajo
+  } else if (provSel==='__nomina') {
+    body.proveedor_nombre = 'DE ACUERDO A NÓMINA ADJUNTA';   // beneficiario genérico: el detalle va en el adjunto
   } else {
     const p = PROVS.find(x=>String(x.id)===String(provSel));
     if (p && p.tercero_tipo) { body.tercero_tipo = p.tercero_tipo; body.tercero_id = p.tercero_id; }
