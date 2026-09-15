@@ -454,7 +454,9 @@ exports.finiquitoCalcular = async (req, res) => {
     // factor 1,4 aproximado (Fernando: 5,92 hábiles → 8,3; en el calendario real son 9,92).
     const proy = require('../../../../shared/feriados').diasCorridosDeHabiles(fechaT, vacHabiles);
     const vacCorridos = proy.corridos, vacInhabiles = proy.inhabiles, vacHasta = proy.hasta;
-    const vacMonto = Math.max(0, Math.round(vacCorridos * base / 30));
+    // Base del FERIADO sin gratificación mensual (dictamen DT 836/046; ORD. 5457/316)
+    const baseFeriado = bd.base_feriado != null ? bd.base_feriado : base;
+    const vacMonto = Math.max(0, Math.round(vacCorridos * baseFeriado / 30));
 
     // Saldo pendiente de anticipos/préstamos: se descuenta del finiquito
     // (cláusula del convenio firmado). Cuotas cobradas = meses transcurridos
@@ -476,7 +478,7 @@ exports.finiquitoCalcular = async (req, res) => {
 
     ok(res, {
       descuentos_prestamos: saldoPrestamos, prestamos_detalle: prestamosDetalle,
-      colaborador: u, causal: cau, uf, base, base_topada: baseTopada,
+      colaborador: u, causal: cau, uf, base, base_topada: baseTopada, base_feriado: baseFeriado,
       // Trazabilidad para el anexo "cómo se calculó" del documento impreso
       base_fuente: bd.fuente, base_meses: bd.detalle || [], sueldo_base: Number(u.sueldo_base) || 0,
       tope_anos: topeAnos, tope_uf_n: topeUFn, tope_uf: topeUF, avisado,
