@@ -521,10 +521,15 @@ exports.finiquitoGuardar = async (req, res) => {
       if (rd.affectedRows) auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_descuentos', entidad_id: idU,
         detalle: `${rd.affectedRows} descuento(s) interno(s) dado(s) de baja por finiquito #${r.insertId} (saldo cobrado en el finiquito)` });
     } catch (e) { console.error('[finiquito baja descuentos]', e.message); }
-    // Seguridad: si la persona sigue activa en Usuarios, se da de baja con la fecha de término
+    // La fecha de término del finiquito MANDA sobre la fecha de baja del usuario (fuente única):
+    // si lo dieron de baja a mano antes con otra fecha, el libro contaba días de más (Fernando:
+    // baja manual 15-09, finiquito 12-09 → 15/30 días en vez de 12). Y si seguía activo, se suspende.
     try {
-      const [ru] = await pool.query(`UPDATE usuarios SET estado='inactivo', fecha_baja=COALESCE(fecha_baja, ?)
-        WHERE id_usuario=? AND estado='activo' AND COALESCE(protegido,0)=0`, [b.fecha_termino, idU]);
+      const [rf] = await pool.query(`UPDATE usuarios SET fecha_baja=? WHERE id_usuario=? AND (fecha_baja IS NULL OR fecha_baja <> ?)`, [b.fecha_termino, idU, b.fecha_termino]);
+      if (rf.affectedRows) auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: String(idU),
+        detalle: `Fecha de baja fijada al ${b.fecha_termino} por el finiquito #${r.insertId} (fecha de término)` });
+      const [ru] = await pool.query(`UPDATE usuarios SET estado='inactivo'
+        WHERE id_usuario=? AND estado='activo' AND COALESCE(protegido,0)=0`, [idU]);
       // Queda en auditoría: si no, la cuenta aparece suspendida sin que nadie sepa por qué
       // (se confundió con un bloqueo por intentos fallidos de clave, que NO suspende).
       if (ru.affectedRows) {
@@ -558,6 +563,12 @@ exports.finiquitoActualizar = async (req, res) => {
     await pool.query(
       `UPDATE rh_finiquitos SET fecha_termino=?, causal=?, causal_glosa=?, detalle=?, total=?, version=version+1, updated_at=NOW() WHERE id=?`,
       [b.fecha_termino, String(b.causal).slice(0, 20), String(b.causal_glosa || '').slice(0, 200), JSON.stringify(detalle), total, id]);
+    // La fecha de término sigue mandando sobre la fecha de baja del usuario
+    try {
+      const [rf] = await pool.query(`UPDATE usuarios SET fecha_baja=? WHERE id_usuario=? AND (fecha_baja IS NULL OR fecha_baja <> ?)`, [b.fecha_termino, fq.id_usuario, b.fecha_termino]);
+      if (rf.affectedRows) auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: String(fq.id_usuario),
+        detalle: `Fecha de baja fijada al ${b.fecha_termino} por el finiquito #${id} recalculado` });
+    } catch (e) { console.error('[finiquito upd fecha_baja]', e.message); }
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_finiquito', entidad_id: id,
       detalle: `Finiquito ${fq.trabajador} recalculado: ${CLP(Number(fq.total))} → ${CLP(total)} (v${(fq.version || 1) + 1})` });
     let odp = null, aviso = null;
