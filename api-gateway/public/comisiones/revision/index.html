@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Revisión Comisiones — AutoFácil</title><!-- v5.38 — el botón Ingresar descuento también para el Administrador (saltaba el fetch de permisos). v5.37 —Ingresar descuento por N° de operación (anulación 100% · prepago 100%/50% según cuotas pagadas) con la comisión pagada por esa op y glosa; se puede anular con motivo. v5.36 —ejecutivos EXTERNOS (nombre de la carga que no es usuario) fuera de las tarjetas, en un aviso ámbar. v5.35 — aviso Renta fija (no comisiona) desde la ficha RRHH. v5.34 — sello Valores firmes: aprobada por Operaciones = foto congelada, no se recalcula. v5.33 — Aprobar/Rechazar por permiso comisiones_aprobar (Analista de Operaciones), no solo Administrador. v5.32 — aviso de nómina generada (montos congelados) y filtro ?mes&ej desde la Nómina. v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
+  <title>Revisión Comisiones — AutoFácil</title><!-- v5.39 — Ingresar descuento: mes a elegir + confirmación "se descontará $X a EJECUTIVO en MES"; el saldo que la comisión no cubre pasa solo al mes siguiente al aprobar (aviso). v5.38 —el botón Ingresar descuento también para el Administrador (saltaba el fetch de permisos). v5.37 —Ingresar descuento por N° de operación (anulación 100% · prepago 100%/50% según cuotas pagadas) con la comisión pagada por esa op y glosa; se puede anular con motivo. v5.36 —ejecutivos EXTERNOS (nombre de la carga que no es usuario) fuera de las tarjetas, en un aviso ámbar. v5.35 — aviso Renta fija (no comisiona) desde la ficha RRHH. v5.34 — sello Valores firmes: aprobada por Operaciones = foto congelada, no se recalcula. v5.33 — Aprobar/Rechazar por permiso comisiones_aprobar (Analista de Operaciones), no solo Administrador. v5.32 — aviso de nómina generada (montos congelados) y filtro ?mes&ej desde la Nómina. v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -401,7 +401,7 @@ function dctosHtml(d) {
     </table>
     <div class="desglose-row" style="margin-top:6px"><span>Total revertido en esta liquidación</span><span style="color:#dc2626;font-weight:700">−${fmt(d.descuento_aplicado)}</span></div>
     ${saldo > 0 ? `<div style="margin-top:6px;font-size:.78rem;color:#92400e;background:#fffbeb;padding:7px 10px;border-radius:7px">
-      <i class="bi bi-exclamation-triangle me-1"></i>Quedan <b>${fmt(saldo)}</b> sin descontar: el descuento supera la comisión del mes. La comisión no se deja en negativo; Operaciones debe definir cómo se recupera el saldo.</div>` : ''}
+      <i class="bi bi-exclamation-triangle me-1"></i>Quedan <b>${fmt(saldo)}</b> sin descontar: la comisión del mes no alcanza y no se deja en negativo. ${hayManual ? `Al <b>Aprobar</b>, ese saldo pasa solo a la comisión de <b>${nombreMes(mesSiguiente(d.mes))}</b> (aparece ahí como "(saldo de ${d.mes})").` : 'Operaciones debe definir cómo se recupera el saldo.'}</div>` : ''}
   </div>`;
 }
 
@@ -749,7 +749,12 @@ async function cambiarEstado(ejecutivo, mes, estado, incentivo_final, con_semana
       body:JSON.stringify({ejecutivo, mes, estado, incentivo_final, con_semana_corrida}),
     });
     const json = await res.json();
-    if (json.success) { toast(`${estado === 'aprobado' ? '✓ Aprobado' : '✗ Rechazado'}: ${ejecutivo}`, estado==='aprobado'); cargar(); }
+    if (json.success) {
+      const tr = json.data && json.data.traslado;
+      toast(`${estado === 'aprobado' ? '✓ Aprobado' : '✗ Rechazado'}: ${ejecutivo}${tr ? ` · saldo de descuentos ${fmt(tr.monto)} trasladado a ${nombreMes(tr.mes)}` : ''}`, estado==='aprobado');
+      if (tr) alert(`La comisión de ${ejecutivo} en ${nombreMes(mes)} no alcanzó para todo el descuento.\nSaldo ${fmt(tr.monto)} trasladado a la comisión de ${nombreMes(tr.mes)}.`);
+      cargar();
+    }
     else toast('Error: ' + json.error, false);
   } catch(e) { toast('Error: ' + e.message, false); }
 }
@@ -762,7 +767,7 @@ function abrirDcto(){
   const mes = document.getElementById('filtroMes').value;
   if (!mes) { toast('Elige el mes primero', false); return; }
   _dctoPreview = null;
-  document.getElementById('dcMes').textContent = nombreMes(mes);
+  document.getElementById('dcMesSel').value = mes;
   document.getElementById('dcOp').value = '';
   document.getElementById('dcCuotas').value = '';
   document.getElementById('dcComentario').value = '';
@@ -776,10 +781,11 @@ function abrirDcto(){
 function dcTipo(){ return document.querySelector('input[name="dcTipo"]:checked').value; }
 function dcTipoCambio(){
   document.getElementById('dcCuotasWrap').style.display = dcTipo() === 'PREPAGO' ? '' : 'none';
-  document.getElementById('dcPreview').innerHTML = ''; document.getElementById('dcGuardar').disabled = true; _dctoPreview = null;
+  document.getElementById('dcPreview').innerHTML = ''; document.getElementById('dcConfirma').style.display = 'none'; document.getElementById('dcGuardar').disabled = true; _dctoPreview = null;
 }
+function dcMes(){ return document.getElementById('dcMesSel').value || document.getElementById('filtroMes').value; }
 async function buscarDcto(){
-  const mes = document.getElementById('filtroMes').value;
+  const mes = dcMes();
   const op = document.getElementById('dcOp').value.replace(/\D/g,'');
   const tipo = dcTipo(), cuotas = document.getElementById('dcCuotas').value;
   const err = document.getElementById('dcErr'); err.style.display = 'none';
@@ -813,12 +819,16 @@ async function buscarDcto(){
         ${fila('Se imputa a', nombreMes(mes))}
       </div>
       ${avisos.length ? `<div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:8px 12px;font-size:.8rem">${avisos.map(a=>'<div><i class="bi bi-exclamation-triangle me-1"></i>'+a+'</div>').join('')}</div>` : ''}`;
-    document.getElementById('dcGuardar').disabled = !!(d.ya_descontada || d.aprobada || sinDcto || !(d.comision_pagada > 0));
+    const puede = !(d.ya_descontada || d.aprobada || sinDcto || !(d.comision_pagada > 0));
+    const conf = document.getElementById('dcConfirma');
+    conf.innerHTML = `<i class="bi bi-person-fill me-1"></i>Se descontará <b>${fmt(d.descuento||0)}</b> a <b>${escHtml(d.ejecutivo)}</b> en la comisión de <b>${nombreMes(mes)}</b>.<div style="font-size:.78rem;margin-top:4px;color:#991b1b">Si la comisión de ese mes no alcanza, el saldo pasa solo al mes siguiente al aprobar (queda avisado en la tarjeta).</div>`;
+    conf.style.display = puede ? '' : 'none';
+    document.getElementById('dcGuardar').disabled = !puede;
   } catch(e) { err.textContent = 'Error: ' + e.message; err.style.display = 'block'; }
 }
 async function guardarDcto(){
   if (!_dctoPreview) return;
-  const mes = document.getElementById('filtroMes').value;
+  const mes = dcMes();
   const body = { mes, num_op: _dctoPreview.num_op, tipo: dcTipo(), cuotas_pagadas: document.getElementById('dcCuotas').value, comentario: document.getElementById('dcComentario').value.trim() };
   const btn = document.getElementById('dcGuardar'); btn.disabled = true;
   try {
@@ -826,7 +836,8 @@ async function guardarDcto(){
     const j = await r.json();
     if (!j.success) { const err = document.getElementById('dcErr'); err.textContent = j.error || 'No se pudo guardar'; err.style.display = 'block'; btn.disabled = false; return; }
     document.getElementById('dlgDcto').close();
-    toast(`✓ ${j.data.glosa}: −${fmt(j.data.descuento)} a ${j.data.ejecutivo}`, true);
+    toast(`✓ ${j.data.glosa}: −${fmt(j.data.descuento)} a ${j.data.ejecutivo} en ${nombreMes(mes)}`, true);
+    if (mes !== document.getElementById('filtroMes').value) document.getElementById('filtroMes').value = mes;
     cargar();
   } catch(e) { toast('Error: ' + e.message, false); btn.disabled = false; }
 }
@@ -1358,13 +1369,17 @@ cargarPermisos().then(cargar);
   <div style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:#fff;padding:15px 20px;display:flex;align-items:center;gap:10px">
     <i class="bi bi-dash-circle" style="font-size:1.25rem"></i>
     <div><h6 style="margin:0;font-weight:700;font-size:1rem">Ingresar descuento por prepago o anulación</h6>
-    <div style="font-size:.76rem;opacity:.85">Se descuenta de la comisión de <b id="dcMes"></b></div></div>
+    <div style="font-size:.76rem;opacity:.85">El ejecutivo sale de la operación; el mes lo eliges abajo</div></div>
   </div>
   <div style="padding:18px 20px">
     <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
       <div style="flex:1;min-width:150px">
         <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:4px">N° de operación</label>
         <input id="dcOp" type="text" inputmode="numeric" placeholder="Ej: 26080532" onkeydown="if(event.key==='Enter'){event.preventDefault();buscarDcto();}" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.9rem;box-sizing:border-box">
+      </div>
+      <div style="min-width:160px">
+        <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:4px">Descontar en la comisión de</label>
+        <input id="dcMesSel" type="month" onchange="dcTipoCambio()" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:7px 10px;font-size:.9rem;box-sizing:border-box">
       </div>
       <div>
         <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:4px">Motivo</label>
@@ -1378,6 +1393,7 @@ cargarPermisos().then(cargar);
       <button onclick="buscarDcto()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer"><i class="bi bi-search me-1"></i>Buscar</button>
     </div>
     <div id="dcPreview" style="margin-top:14px"></div>
+    <div id="dcConfirma" style="display:none;margin-top:12px;background:#fef2f2;border:2px solid #dc2626;border-radius:10px;padding:10px 14px;font-size:.9rem;color:#7f1d1d"></div>
     <div style="margin-top:12px">
       <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:4px">Comentario <span style="font-weight:400;color:#94a3b8">(opcional; obligatorio si el estado en Créditos no coincide)</span></label>
       <input id="dcComentario" type="text" maxlength="400" placeholder="Ej: prepago informado por AutoFin el 12-09-2026" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.86rem;box-sizing:border-box">

@@ -955,11 +955,12 @@ const aprobar = async (req, res) => {
     if (!ejecutivo || !mes || !estado) return res.status(400).json({ success: false, data: null, error: 'Faltan campos requeridos' });
     // FOTO FIRME al aprobar: se toma del motor único en ese instante (con descuentos y
     // ajustes incluidos) y queda en la misma fila de la aprobación (un solo hogar).
-    let fotoJson = null;
+    let fotoJson = null, traslado = null, filaAprobada = null;
     if (estado === 'aprobado') {
       await pool.query("UPDATE comisiones_aprobaciones SET foto_json=NULL WHERE ejecutivo=? AND mes=?", [ejecutivo, mes]);   // recalcular en vivo antes de fotografiar
       const fila = (await calcularMes(mes)).find(f => f.ejecutivo === ejecutivo);
       if (!fila) return res.status(404).json({ success: false, data: null, error: 'El ejecutivo no tiene cálculo en ' + mes });
+      filaAprobada = fila;
       const { creditos, estado: _e, notas: _n, aprobado_at: _a, congelado: _c, ejec_estado: _s, ejec_comentario: _k, ejec_at: _t, ejec_por: _p, ejecutivo: _ej, mes: _m, ...foto } = fila;
       foto._creditos = {};
       for (const c of (creditos || [])) {
@@ -986,14 +987,17 @@ const aprobar = async (req, res) => {
         `UPDATE comisiones_aprobaciones SET ejec_estado='pendiente', ejec_comentario=NULL, ejec_por=NULL, ejec_at=NULL
          WHERE ejecutivo=? AND mes=?`, [ejecutivo, mes]);
       await notificarComisionRev('com_rev_aprobada_ops', { ejecutivo, mes });
+      // Saldo de descuentos manuales que la comisión del mes no alcanzó a cubrir → mes siguiente
+      traslado = await require('./descuentos.controller').trasladarSaldo(ejecutivo, mes, filaAprobada, req).catch(e => { console.error('[traslado saldo]', e.message); return null; });
     }
+    if (estado === 'rechazado') await require('./descuentos.controller').deshacerTraslado(ejecutivo, mes).catch(() => {});
     auditar({ req, accion: estado === 'aprobado' ? 'APROBAR' : (estado === 'rechazado' ? 'RECHAZAR' : 'EDITAR'),
       modulo: 'comisiones', entidad: 'comision', entidad_id: `${ejecutivo}|${mes}`,
       detalle: `Comisión de ${ejecutivo} (${mes}) → ${estado}`
         + (incentivo_final ? ` · $${Math.round(incentivo_final).toLocaleString('es-CL')}` : '')
         + (notas ? ` · "${notas}"` : ''),
       meta: { incentivo_final: incentivo_final || 0, con_semana_corrida: con_semana_corrida || 0 } });
-    res.json({ success: true, data: null, error: null });
+    res.json({ success: true, data: { traslado }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
   }

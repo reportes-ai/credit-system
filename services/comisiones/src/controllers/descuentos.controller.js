@@ -52,6 +52,9 @@ require('../../../../shared/migrate').enFila('comisiones-descuentos', async () =
         INDEX idx_cdo_mes (mes, estado),
         INDEX idx_cdo_op (num_op, estado)
       )`);
+    // Saldo trasladado: origen_id apunta al descuento del mes anterior que la comisión no alcanzó a cubrir
+    await pool.query('ALTER TABLE comisiones_descuentos_op ADD COLUMN origen_id INT NULL').catch(() => {});
+    await pool.query('ALTER TABLE comisiones_descuentos_op ADD COLUMN aplicado DECIMAL(15,2) NULL').catch(() => {});
     // Tramos por CUOTAS PAGADAS (el ingreso manual se mide en cuotas, no en meses)
     for (const [clave, valor, etiqueta, descripcion, tipo] of [
       ['dcto_cuotas_t1', 3, 'Prepago manual — cuotas tramo 1', 'Prepago ingresado a mano con hasta este N° de cuotas pagadas descuenta el % del tramo 1', 'factor'],
@@ -236,9 +239,50 @@ async function manualesDelMes(mes) {
     id: d.id, manual: true, num_op: String(d.num_op), tipo: d.tipo === 'ANULACION' ? 'ANULADA' : 'PREPAGADA',
     glosa: d.glosa, mes_origen: d.mes_origen, cuotas_pagadas: d.cuotas_pagadas, fuente: d.fuente,
     pct_descuento: Number(d.pct), comision_original: Number(d.comision_pagada), descuento: Number(d.descuento),
-    comentario: d.comentario, creado_por: d.creado_por, revisar: null,
+    comentario: d.comentario, creado_por: d.creado_por, revisar: null, origen_id: d.origen_id || null,
   });
   return por;
 }
 
-module.exports = { buscarOp, listar, crear, anular, manualesDelMes, comisionPagadaOp };
+const mesSiguiente = ym => { let [y, m] = String(ym).split('-').map(Number); m++; if (m > 12) { m = 1; y++; } return `${y}-${String(m).padStart(2, '0')}`; };
+
+/* Al APROBAR: lo que la comisión del mes no alcanzó a cubrir (saldo_descuento) de los
+   descuentos manuales pasa al mes siguiente como fila hija (origen_id). Idempotente:
+   si la hija ya existe no se duplica. Devuelve {monto, mes} o null. */
+async function trasladarSaldo(ejecutivo, mes, fila, req) {
+  let pendiente = R(fila && fila.saldo_descuento);
+  const manuales = ((fila && fila.descuentos) || []).filter(d => d.manual && d.id).reverse();
+  if (!(pendiente > 0) || !manuales.length) return null;
+  const destino = mesSiguiente(mes);
+  let total = 0;
+  for (const d of manuales) {
+    if (pendiente <= 0) break;
+    const take = Math.min(R(d.descuento), pendiente); pendiente -= take;
+    const [[ya]] = await pool.query("SELECT id FROM comisiones_descuentos_op WHERE origen_id = ? AND estado = 'ACTIVO' LIMIT 1", [d.id]);
+    if (ya) { total += take; continue; }
+    await pool.query(
+      `INSERT INTO comisiones_descuentos_op (mes, num_op, ejecutivo, tipo, cuotas_pagadas, mes_origen, comision_pagada, fuente, pct, descuento, glosa, comentario, origen_id, creado_por)
+       SELECT ?, num_op, ejecutivo, tipo, cuotas_pagadas, mes_origen, comision_pagada, fuente, pct, ?, CONCAT(glosa, ' (saldo de ', ?, ')'), ?, id, 'Sistema'
+       FROM comisiones_descuentos_op WHERE id = ?`,
+      [destino, take, mes, `La comisión de ${mes} no alcanzó: saldo trasladado al aprobar`, d.id]);
+    await pool.query('UPDATE comisiones_descuentos_op SET aplicado = ? WHERE id = ?', [R(d.descuento) - take, d.id]);
+    total += take;
+  }
+  if (total > 0) auditar({ req, accion: 'CREAR', modulo: 'comisiones', entidad: 'descuento_comision_op', entidad_id: `${ejecutivo}|${mes}`,
+    detalle: `Saldo de descuentos de ${ejecutivo} (${mes}) trasladado a ${destino}: ${clp(total)} (la comisión del mes no alcanzó)` });
+  return total > 0 ? { monto: total, mes: destino } : null;
+}
+
+/* Al RECHAZAR: se retiran las hijas trasladadas desde ese mes (si su mes aún no está aprobado). */
+async function deshacerTraslado(ejecutivo, mes) {
+  const [hijas] = await pool.query(
+    `SELECT h.id, h.mes FROM comisiones_descuentos_op h JOIN comisiones_descuentos_op p ON p.id = h.origen_id
+     WHERE p.ejecutivo = ? AND p.mes = ? AND h.estado = 'ACTIVO'`, [ejecutivo, mes]);
+  for (const h of hijas) {
+    if (await comisionAprobada(h.mes, ejecutivo)) continue;
+    await pool.query('DELETE FROM comisiones_descuentos_op WHERE id = ?', [h.id]);
+  }
+  await pool.query('UPDATE comisiones_descuentos_op SET aplicado = NULL WHERE ejecutivo = ? AND mes = ?', [ejecutivo, mes]);
+}
+
+module.exports = { buscarOp, listar, crear, anular, manualesDelMes, comisionPagadaOp, trasladarSaldo, deshacerTraslado };
