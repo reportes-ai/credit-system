@@ -376,13 +376,23 @@ async function candidatos(desde, hasta) {
     WHERE c.estado<>'ANULADO' AND m.cuenta LIKE '1101%'   -- VIGENTE (importados AVSOFT) y CONTABILIZADO (motor propio): antes solo veía los de AVSOFT
       AND c.fecha BETWEEN ? AND ? AND (m.debe > 0 OR m.haber > 0)`, [d1, d2]);
 
+  // 5) Traspasos entre cuentas propias (Pato, 15-09-2026): el movimiento espejo en OTRA
+  //    cuenta registrada (mismo monto con signo contrario, ±TOL_DIAS_TRASPASO). Al conciliar
+  //    se marcan los dos lados con match_ref cruzado.
+  const [traspasos] = await pool.query(`
+    SELECT b.id ref, b.id_conexion, b.fecha, b.monto, b.descripcion, bc.banco, bc.numero
+    FROM banco_movimientos b JOIN banco_conexiones bc ON bc.id = b.id_conexion
+    WHERE b.fecha BETWEEN ? AND ? AND COALESCE(b.conciliado,0)=0`, [d1, d2]);
+
   return {
     trx:    trx.filter(t => !usada.has('TRX:' + t.ref)),
     cuotas: cuotas.filter(c => !usada.has('CUOTA:' + c.ref)),
     odps:   odps.filter(o => !usada.has('ODP:' + o.ref)),
     ctb:    ctb.filter(x => !usada.has('CTB:' + x.ref)),
+    traspasos,
   };
 }
+const TOL_DIAS_TRASPASO = 2;
 
 const TOL_DIAS_CTB = 5;
 function sugerirPara(mov, cand) {
@@ -411,6 +421,14 @@ function sugerirPara(mov, cand) {
         sug.push({ tipo: 'ODP', ref: o.ref, fecha: o.fecha, rut_ok: mismoRut(movRut, o.proveedor_rut),
           detalle: `${o.ref} · ${o.proveedor_nombre || ''} · ${(o.concepto || '').slice(0, 60)}` });
   }
+  // Traspaso entre cuentas propias: espejo exacto en otra cuenta (ambos sentidos)
+  for (const t of (cand.traspasos || []))
+    if (t.id_conexion !== mov.id_conexion && Math.abs(Number(t.monto) + monto) < 1 && difDias(mov.fecha, t.fecha) <= TOL_DIAS_TRASPASO)
+      sug.push({ tipo: 'TRASPASO', ref: String(t.ref), fecha: t.fecha,
+        // rut_ok: la glosa de los dos lados trae el mismo RUT (el propio) — sin esto el auto no lo toma
+        // (caso real: salida de $7.000.000 a AUTOFACIL cruzaba por monto con una transferencia a AUTOFIN)
+        rut_ok: mismoRut(rutEnGlosa(mov.descripcion), rutEnGlosa(t.descripcion)),
+        detalle: `${t.banco} ${t.numero || ''} · ${(t.descripcion || '').slice(0, 50)}` });
   // RUT coincidente primero, luego fecha más cercana; máximo 5 por movimiento
   sug.sort((a, b) => (b.rut_ok ? 1 : 0) - (a.rut_ok ? 1 : 0) || difDias(mov.fecha, a.fecha) - difDias(mov.fecha, b.fecha));
   return sug.slice(0, 5);
@@ -425,7 +443,7 @@ const pendientes = async (req, res) => {
     if (desde) { cond.push('fecha>=?'); args.push(desde); }
     if (hasta) { cond.push('fecha<=?'); args.push(hasta); }
     const [movs] = await pool.query(
-      `SELECT id, fecha, monto, descripcion, tipo, origen FROM banco_movimientos
+      `SELECT id, id_conexion, fecha, monto, descripcion, tipo, origen FROM banco_movimientos
        WHERE ${cond.join(' AND ')} ORDER BY fecha, id LIMIT 500`, args);
     if (!movs.length) return ok(res, { movimientos: [] });
 
@@ -452,7 +470,7 @@ const conciliados = async (req, res) => {
 const conciliar = async (req, res) => {
   try {
     const { id_mov, match_tipo, match_ref, detalle } = req.body || {};
-    const tipos = ['TRX', 'CUOTA', 'ODP', 'CTB', 'MANUAL'];
+    const tipos = ['TRX', 'CUOTA', 'ODP', 'CTB', 'TRASPASO', 'MANUAL'];
     if (!id_mov || !tipos.includes(match_tipo)) return fail(res, 'id_mov y match_tipo válido son obligatorios', 400);
     if (match_tipo !== 'MANUAL' && !match_ref) return fail(res, 'match_ref es obligatorio para conciliación automática', 400);
     if (match_tipo === 'MANUAL' && !String(detalle || '').trim()) return fail(res, 'La conciliación manual requiere una glosa que la justifique', 400);
@@ -466,6 +484,19 @@ const conciliar = async (req, res) => {
       if (dup) return fail(res, `Esa referencia ya está conciliada con otro movimiento (id ${dup.id})`, 409);
     }
     const usuario = req.user && (req.user.nombre || req.user.email) || null;
+    if (match_tipo === 'TRASPASO') {
+      // El espejo: otra cuenta propia, mismo monto con signo contrario, sin conciliar. Se marcan los dos lados.
+      const [[otro]] = await pool.query('SELECT b.*, bc.banco, bc.numero FROM banco_movimientos b JOIN banco_conexiones bc ON bc.id=b.id_conexion WHERE b.id=? LIMIT 1', [match_ref]);
+      if (!otro) return fail(res, 'Movimiento espejo no encontrado', 404);
+      if (otro.conciliado) return fail(res, 'El movimiento espejo ya está conciliado', 409);
+      if (otro.id_conexion === mov.id_conexion || Math.abs(Number(otro.monto) + Number(mov.monto)) >= 1)
+        return fail(res, 'El espejo debe estar en otra cuenta propia con el mismo monto y signo contrario', 400);
+      const [[cta]] = await pool.query('SELECT banco, numero FROM banco_conexiones WHERE id=?', [mov.id_conexion]);
+      await pool.query(`UPDATE banco_movimientos SET conciliado=1, match_tipo='TRASPASO', match_ref=?, match_detalle=?, conciliado_por=?, fecha_conciliacion=NOW() WHERE id=?`,
+        [String(mov.id), `Traspaso con ${cta.banco} ${cta.numero || ''} · ${(mov.descripcion || '').slice(0, 60)}`.slice(0, 300), usuario, otro.id]);
+      auditar({ req, accion: 'CONCILIAR', modulo: 'tesoreria', entidad: 'banco_movimientos', entidad_id: otro.id,
+        detalle: `Concilió mov $${otro.monto} ← TRASPASO espejo de mov ${mov.id}` });
+    }
     await pool.query(
       `UPDATE banco_movimientos SET conciliado=1, match_tipo=?, match_ref=?, match_detalle=?, conciliado_por=?, fecha_conciliacion=NOW() WHERE id=?`,
       [match_tipo, match_ref || null, String(detalle || '').slice(0, 300) || null, usuario, id_mov]);
@@ -490,7 +521,7 @@ const conciliarAuto = async (req, res) => {
     if (desde) { cond.push('fecha>=?'); args.push(desde); }
     if (hasta) { cond.push('fecha<=?'); args.push(hasta); }
     const [movs] = await pool.query(
-      `SELECT id, fecha, monto, descripcion FROM banco_movimientos
+      `SELECT id, id_conexion, fecha, monto, descripcion FROM banco_movimientos
        WHERE ${cond.join(' AND ')} ORDER BY fecha, id LIMIT 1000`, args);
     if (!movs.length) return ok(res, { revisados: 0, conciliados: 0, ambiguos: 0, sin_match: 0 });
 
@@ -534,13 +565,18 @@ const conciliarAuto = async (req, res) => {
       // mismo pago también aparezca como asiento CTB; (b) sugerencia única.
       const conRut = sug.filter(s => s.rut_ok);
       const s = (conRut.length === 1) ? conRut[0] : (sug.length === 1 ? sug[0] : null);
-      const confiable = s && veces[s.tipo + ':' + s.ref] === 1 && (s.tipo !== 'ODP' || s.rut_ok);
+      const confiable = s && veces[s.tipo + ':' + s.ref] === 1 && ((s.tipo !== 'ODP' && s.tipo !== 'TRASPASO') || s.rut_ok);
       if (!confiable) { ambiguos++; continue; }
       const [r] = await pool.query(
         `UPDATE banco_movimientos SET conciliado=1, match_tipo=?, match_ref=?, match_detalle=?, conciliado_por=?, fecha_conciliacion=NOW()
          WHERE id=? AND COALESCE(conciliado,0)=0`,
         [s.tipo, String(s.ref), ('AUTO · ' + s.detalle).slice(0, 300), usuario, m.id]);
-      if (r.affectedRows === 1) conciliados++;
+      if (r.affectedRows === 1) {
+        conciliados++;
+        if (s.tipo === 'TRASPASO')   // el espejo en la otra cuenta queda conciliado con referencia cruzada
+          await pool.query(`UPDATE banco_movimientos SET conciliado=1, match_tipo='TRASPASO', match_ref=?, match_detalle=?, conciliado_por=?, fecha_conciliacion=NOW()
+                            WHERE id=? AND COALESCE(conciliado,0)=0`, [String(m.id), ('AUTO · traspaso espejo de mov ' + m.id).slice(0, 300), usuario, s.ref]);
+      }
     }
     auditar({ req, accion: 'CONCILIAR', modulo: 'tesoreria', entidad: 'banco_movimientos', entidad_id: idConexion,
       detalle: `Conciliación automática: ${porRegla} por regla + ${conciliados} por match, ${ambiguos} ambiguos, ${sinMatch} sin match (de ${movs.length} pendientes)` });
@@ -599,6 +635,10 @@ const desconciliar = async (req, res) => {
     await pool.query(
       `UPDATE banco_movimientos SET conciliado=0, match_tipo=NULL, match_ref=NULL, match_detalle=NULL, conciliado_por=NULL, fecha_conciliacion=NULL WHERE id=?`,
       [id_mov]);
+    if (mov.match_tipo === 'TRASPASO' && mov.match_ref)   // un traspaso se desconcilia por los dos lados
+      await pool.query(
+        `UPDATE banco_movimientos SET conciliado=0, match_tipo=NULL, match_ref=NULL, match_detalle=NULL, conciliado_por=NULL, fecha_conciliacion=NULL WHERE id=? AND match_tipo='TRASPASO'`,
+        [mov.match_ref]);
     auditar({ req, accion: 'DESCONCILIAR', modulo: 'tesoreria', entidad: 'banco_movimientos', entidad_id: id_mov,
       detalle: `Desconcilió mov $${mov.monto} (era ${mov.match_tipo} ${mov.match_ref || ''})` });
     ok(res, { desconciliado: true });

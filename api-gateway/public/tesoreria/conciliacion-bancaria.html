@@ -7,7 +7,7 @@
   <title>Conciliación Bancaria — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.8 — la cuenta la determina el archivo de la cartola: si es de otra cuenta registrada se importa ahí y se avisa (motor único resolverCuentaCartola). v1.7 — navbar migrada al componente topnav -->
+  <!-- v1.9 — tipo TRASPASO entre cuentas propias (espejo en otra cuenta, dos lados). v1.8 — la cuenta la determina el archivo de la cartola: si es de otra cuenta registrada se importa ahí y se avisa (motor único resolverCuentaCartola). v1.7 — navbar migrada al componente topnav -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -54,6 +54,7 @@
     .t-ODP { background:#fce7f3; color:#be185d; } .t-MANUAL { background:#f3f4f6; color:#374151; }
     .t-CTB { background:#fef9c3; color:#854d0e; }
     .t-REGLA { background:#ede9fe; color:#6d28d9; }
+    .t-TRASPASO { background:#e0f2fe; color:#075985; }
     .tabs { display:flex; gap:6px; }
     .tab-btn { border:none; background:#e5e7eb; color:#374151; border-radius:8px 8px 0 0; padding:8px 18px; font-size:.83rem; font-weight:700; cursor:pointer; }
     .tab-btn.act { background:#fff; color:var(--navy); }
@@ -131,6 +132,7 @@
     <h6><i class="bi bi-diagram-3"></i> Qué afecta este módulo</h6>
     <ul style="margin:0;">
       <li><b>Conciliar / desconciliar</b> → solo marca el movimiento bancario; nunca modifica los <a href="/cobranza/">pagos de cuotas</a>, las <a href="/ordenes-pago/">órdenes de pago</a> ni los asientos de <a href="/contabilidad/">Contabilidad</a> (fuente CTB).</li>
+      <li><b>Traspasos entre cuentas propias</b> (TRASPASO) → el espejo es el movimiento con el mismo monto y signo contrario en otra cuenta registrada (±2 días); al conciliar o desconciliar se marcan <b>los dos lados</b>. La otra cuenta debe tener su cartola cargada.</li>
       <li><b>Cuentas manuales</b> → viven en la misma tabla que las <a href="/tesoreria/banco-conexiones">Conexiones Bancarias (Fintoc)</a>; al contratar Fintoc los movimientos llegan solos.</li>
       <li><b>Cargas de cartola</b> → quedan registradas en <a href="/auditoria/">Auditoría</a> (acciones IMPORTAR / CONCILIAR / DESCONCILIAR).</li>
     </ul>
