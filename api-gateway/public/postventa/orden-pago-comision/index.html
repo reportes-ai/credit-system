@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.21 — buscador por el motor único busqueda-core: + ID financiera y ejecutivo; RUT sin puntos/guion. v2.20 — adicionales/descuentos de cartola aprobados: línea con glosa en la orden y suman al cuadre contra la factura · v2.19 — los montos de la factura se toman de la op que TRAE el desglose (titular), sin depender del orden de carga · v2.18 — la vista previa ya NO reserva el N° de ODP (POR ASIGNAR hasta emitir; el correo sale con el real) · v2.17 — resumen narrado desde el neto (+IVA / −retención / emisor retiene) con referencia bruta · v2.16 — cuadratura de boleta repone el IVA (bruto boleta = neto factura) antes de comparar contra las comisiones brutas · v2.15 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
+  <!-- v2.22 — si la orden no cuadra con factura y cartola, emitir exige una justificación de la diferencia (va en el correo a Contabilidad y queda en la orden para Tesorería). v2.21 — buscador por el motor único busqueda-core: + ID financiera y ejecutivo; RUT sin puntos/guion. v2.20 — adicionales/descuentos de cartola aprobados: línea con glosa en la orden y suman al cuadre contra la factura · v2.19 — los montos de la factura se toman de la op que TRAE el desglose (titular), sin depender del orden de carga · v2.18 — la vista previa ya NO reserva el N° de ODP (POR ASIGNAR hasta emitir; el correo sale con el real) · v2.17 — resumen narrado desde el neto (+IVA / −retención / emisor retiene) con referencia bruta · v2.16 — cuadratura de boleta repone el IVA (bruto boleta = neto factura) antes de comparar contra las comisiones brutas · v2.15 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -80,6 +80,21 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<dialog id="dlgJustif" style="border:none;border-radius:14px;padding:0;max-width:560px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div style="background:#b91c1c;color:#fff;padding:13px 18px;font-weight:700"><i class="bi bi-exclamation-triangle me-1"></i>La orden no cuadra con la factura y la cartola</div>
+  <div style="padding:16px 18px;font-size:.88rem;color:#334155">
+    <p id="justifDif" style="margin:0 0 10px"></p>
+    <label for="justifTxt" style="font-weight:700;font-size:.82rem">Justifica la diferencia para poder emitir</label>
+    <textarea id="justifTxt" rows="4" maxlength="500" style="width:100%;box-sizing:border-box;margin-top:5px;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.88rem"
+      placeholder="Ej.: la factura viene por el neto de la cartola: incluye un descuento por prepago de otra operación que la orden no lista."></textarea>
+    <div style="font-size:.76rem;color:#64748b;margin-top:4px">Irá en el correo a Contabilidad y quedará en la orden para Tesorería.</div>
+    <div id="justifErr" style="color:#b91c1c;font-size:.8rem;font-weight:600;margin-top:4px"></div>
+  </div>
+  <div style="padding:12px 18px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:10px">
+    <button class="btn-cerrar" id="justifCancelar">Cancelar</button>
+    <button class="btn-emitir" id="justifOk"><i class="bi bi-send-check me-1"></i>Emitir con justificación</button>
+  </div>
+</dialog>
 
 <script src="/js/desglose-impuesto.js"></script>
 <script src="/js/busqueda-core.js"></script>
@@ -259,6 +274,8 @@ function docHTML(ops){
   const sumAjustes = ajustes.reduce((s,a)=>s + (a.movimiento==='DESCUENTO' ? -1 : 1) * (Number(a.monto)||0), 0);
   const sumComision = ops.reduce((s,o)=>s+(Number(o.comision)||0),0) + sumAjustes;
   const cuadra = Math.abs(sumComision - facturaBruto) <= 1;   // tolerancia de redondeo
+  // emitir() lee este mismo cálculo (no lo repite) para exigir la justificación si no cuadra
+  ops._cuadre = { cuadra, sumComision, facturaBruto, diferencia: Math.abs(sumComision - facturaBruto) };
   const fechaPago = fechaCL(new Date().toISOString());
   const nums = ops.map(o=>o.num_op).join(', ');
   const conceptoDet = `Comisión OP${ops.length>1?'s':''} ${nums} - ${f0.financiera||''}`;
@@ -286,7 +303,9 @@ function docHTML(ops){
       <td style="${Snum}">${a.movimiento==='DESCUENTO'?'− ':'+ '}${fmt(Number(a.monto)||0)}</td>
     </tr>`).join('');
   const aviso = cuadra ? '' : `<div style="margin:10px 0;padding:9px 12px;border:1.5px solid #fca5a5;background:#fef2f2;color:#b91c1c;border-radius:7px;font-size:11px;font-weight:800;line-height:1.45">
-      ⚠ ORDEN DE PAGO NO CUADRA CON FACTURA Y CARTOLA. La comisión de las operaciones cargadas suman ${fmt(sumComision)}, y la factura es por ${fmt(facturaBruto)} (diferencia ${fmt(Math.abs(sumComision-facturaBruto))}). Cargue todas las operaciones de la cartola antes de emitir.</div>`;
+      ⚠ ORDEN DE PAGO NO CUADRA CON FACTURA Y CARTOLA. La comisión de las operaciones cargadas suman ${fmt(sumComision)}, y la factura es por ${fmt(facturaBruto)} (diferencia ${fmt(Math.abs(sumComision-facturaBruto))}).${ops._justificacion
+        ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #fca5a5;color:#7f1d1d;font-weight:600">Justificación de la diferencia: ${escH(ops._justificacion)}</div>`
+        : ' Cargue todas las operaciones de la cartola antes de emitir.'}</div>`;
   return `<div style="${Sdoc}">
     <table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tbody><tr>
       <td style="vertical-align:top">
@@ -372,16 +391,46 @@ function cerrar(){ document.getElementById('ov').classList.remove('open'); actua
 
 /* El botón "Enviar Correo" se eliminó (v2.13): emitir() ya manda el correo
    automáticamente a Contabilidad — dos botones confundían y duplicaban envíos. */
+/* Si la orden NO cuadra, antes de emitir se exige un comentario que justifique la
+   diferencia (Pato, 15-09-2026). Viaja en el correo a Contabilidad, queda guardado en
+   la orden y lo ve Tesorería en el documento al pagar. Resuelve con el texto o null. */
+const MIN_JUSTIF = 15;
+function pedirJustificacion(c){
+  return new Promise(resolve => {
+    const dlg = document.getElementById('dlgJustif');
+    const ta = document.getElementById('justifTxt'), err = document.getElementById('justifErr');
+    document.getElementById('justifDif').innerHTML =
+      `Las comisiones cargadas suman <b>${fmt(c.sumComision)}</b> y la factura es por <b>${fmt(c.facturaBruto)}</b>: diferencia de <b>${fmt(c.diferencia)}</b>.`;
+    ta.value = ''; err.textContent = '';
+    const cerrarCon = v => { dlg.close(); resolve(v); };
+    document.getElementById('justifCancelar').onclick = () => cerrarCon(null);
+    document.getElementById('justifOk').onclick = () => {
+      const t = ta.value.trim();
+      if (t.length < MIN_JUSTIF) { err.textContent = `Explica la diferencia (mínimo ${MIN_JUSTIF} caracteres).`; ta.focus(); return; }
+      cerrarCon(t);
+    };
+    dlg.oncancel = e => { e.preventDefault(); cerrarCon(null); };
+    dlg.showModal(); ta.focus();
+  });
+}
+
 async function emitir(){
   if (!actual || !actual.length) return;
   const ids = actual.map(o => o.id);
   const nums = actual.map(o => o.num_op).join(', ');
-  if (!confirm(`¿Emitir la orden de pago de comisión de la${ids.length>1?'s':''} OP ${nums}? Pasará${ids.length>1?'n':''} a Comisiones a Pagar y el correo saldrá a Contabilidad.`)) return;
+  let justificacion = null;
+  if (actual._cuadre && !actual._cuadre.cuadra) {
+    justificacion = await pedirJustificacion(actual._cuadre);
+    if (!justificacion) return;
+    // El correo lleva la justificación en lugar de la instrucción de cargar más operaciones
+    actual._justificacion = justificacion;
+    document.getElementById('docWrap').innerHTML = emailHTML(actual);
+  } else if (!confirm(`¿Emitir la orden de pago de comisión de la${ids.length>1?'s':''} OP ${nums}? Pasará${ids.length>1?'n':''} a Comisiones a Pagar y el correo saldrá a Contabilidad.`)) return;
   // Correo AUTOMÁTICO con la emisión (mismo fix que la orden de saldo: eran dos
   // botones y las órdenes salían emitidas sin que Contabilidad se enterara).
   let htmlDoc = document.getElementById('docWrap').innerHTML, asu = asuntoDe(actual);
   try {
-    const r = await fetch('/api/postventa/orden-pago-comision/emitir', { method:'POST', headers:hdr(), body:JSON.stringify({ ids }) });
+    const r = await fetch('/api/postventa/orden-pago-comision/emitir', { method:'POST', headers:hdr(), body:JSON.stringify({ ids, justificacion }) });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     // El N° real nace al emitir: reemplazar el borrador en el correo

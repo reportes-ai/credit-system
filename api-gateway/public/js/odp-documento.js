@@ -119,6 +119,8 @@ function docHTML(o){
       <thead><tr><th style="${Sth}">Ajuste de cartola</th><th style="${Sth}">Glosa</th><th style="${Sth}">Monto</th></tr></thead>
       <tbody>${o.ajustes.map(a=>`<tr><td style="${Std}">${escH(a.movimiento||'')}</td><td style="${Std}">${escH(a.glosa||'')}</td><td style="${Snum}">${a.movimiento==='DESCUENTO'?'− ':'+ '}${fmtMon(a.monto)}</td></tr>`).join('')}</tbody>
     </table>`:''}
+    ${o.justificacion_descuadre?`<div style="margin:10px 0;padding:9px 12px;border:1.5px solid #fcd34d;background:#fffbeb;color:#92400e;border-radius:7px;font-size:11px;line-height:1.45">
+      <b>⚠ Emitida sin cuadrar con la cartola — justificación de la diferencia:</b> ${escH(o.justificacion_descuadre)}</div>`:''}
     <table style="${Sres}"><tbody>
       <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${escH(o.proveedor_nombre||'')}</td></tr>
       <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${escH(o.concepto||'')}</td></tr>

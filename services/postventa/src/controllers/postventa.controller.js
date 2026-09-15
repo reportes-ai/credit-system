@@ -2516,6 +2516,16 @@ const getOrdenPagoComision = async (req, res) => {
   }
 };
 
+/* Justificación del descuadre (Pato, 15-09-2026): cuando la factura no cuadra con las
+   comisiones + ajustes de la cartola (p. ej. una reversa por prepago que la orden no
+   lista), la orden igual se emite, pero con un comentario obligatorio que explica la
+   diferencia. Vive en la orden (una sola fuente) y lo muestran el correo a
+   Contabilidad y el documento que ve Tesorería al pagar. */
+require('../../../../shared/migrate').enFila('pv-odp-com-justificacion', async () => {
+  try { await pool.query('ALTER TABLE postventa_ordenes_comision ADD COLUMN justificacion_descuadre VARCHAR(500) NULL'); }
+  catch (e) { if (e.errno !== 1060) throw e; }
+});
+
 /* ── Asegura la Orden de Pago de COMISIÓN (postventa_ordenes_comision + correlativo).
  *    Idempotente. Devuelve num_orden o null. ── */
 async function asegurarOrdenComision(idPedido, reqUsuario) {
@@ -2622,12 +2632,17 @@ const emitirOrdenPagoComision = async (req, res) => {
       }
     }
     await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    const justificacion = String(req.body.justificacion || '').trim().slice(0, 500);
+    if (justificacion && numOrden) {
+      const [uj] = await pool.query('UPDATE postventa_ordenes_comision SET justificacion_descuadre=? WHERE num_orden=?', [justificacion, numOrden]);
+      if (!uj.affectedRows) console.error('[postventa emitirOrdenPagoComision] justificación no guardada en', numOrden);
+    }
     for (const id of ids) {
       const c = await ctxSeguimiento(id);
       await notificarEventoSaldo('com_orden_emitida', { op: c.num_op, id_seguimiento: id });
     }
     auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'orden_pago_comision', entidad_id: ids[0],
-      detalle: `Emitió Orden de Pago de comisión — op ${await opsTxt(ids)}` });
+      detalle: `Emitió Orden de Pago de comisión — op ${await opsTxt(ids)}${justificacion ? ` · NO CUADRA, justificación: ${justificacion}` : ''}` });
     res.json({ success: true, data: { emitidas: ids.length, num_orden: numOrden }, error: null });
   } catch (e) {
     console.error('[postventa emitirOrdenPagoComision]', e.message);

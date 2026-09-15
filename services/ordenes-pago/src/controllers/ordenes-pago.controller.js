@@ -711,7 +711,7 @@ async function construirDocumento(oc) {
               d.cuenta_tipo, d.tipo_cuenta, d.nombre_cuenta, d.rut_pago,
               fc.numero_factura, fc.es_boleta, fc.emisor_retiene AS fc_emisor_ret, fc.fecha_factura,
               fc.monto_bruto AS fc_base, fc.impuesto_pct AS fc_pct, fc.impuesto_monto AS fc_imp, fc.monto_liquido AS fc_liquido,
-              s.comision AS comision_bruta,
+              s.comision AS comision_bruta, poc.justificacion_descuadre,
               (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='COMISION' AND pe.etapa='COMISION PAGADA' LIMIT 1) AS pagado
          FROM postventa_ordenes_comision poc
          JOIN postventa_seguimiento s ON s.id = poc.id_seguimiento
@@ -839,6 +839,7 @@ async function construirDocumento(oc) {
     fecha_documento: esCom ? soloFecha(row.fecha_factura) : null,
     tratamiento, monto_bruto: bruto, monto_neto: neto, impuesto_pct: pct, impuesto_monto: imp, monto, desglose,
     ajustes: ajustes.length ? ajustes : undefined,
+    justificacion_descuadre: row.justificacion_descuadre || undefined,   // comentario obligatorio si al emitir no cuadraba
     destino, deposito, sin_datos_banco: !deposito && !destino,
     fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
     metodo_pago: oc.metodo_pago, cuenta_pago: cuentaPago, estado, usuario_nombre: oc.usuario_nombre,
