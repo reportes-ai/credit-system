@@ -458,7 +458,7 @@ exports.finiquitoCalcular = async (req, res) => {
     // desde mes_inicio hasta el mes del término, tope el total de cuotas.
     const [descs] = await pool.query(
       `SELECT id, tipo, cuotas, valor_cuota, mes_inicio FROM rh_descuentos
-        WHERE id_usuario=? AND estado='VIGENTE' AND tipo IN ('ANTICIPO','PRESTAMO','PAGO_EXCESO')`, [idU]);
+        WHERE id_usuario=? AND estado='VIGENTE' AND tipo IN ('ANTICIPO','PRESTAMO','PAGO_EXCESO','VARIOS')`, [idU]);
     const mesFin = fechaT.slice(0, 7);
     const difM = (a, b) => (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + (Number(b.slice(5, 7)) - Number(a.slice(5, 7)));
     let saldoPrestamos = 0;

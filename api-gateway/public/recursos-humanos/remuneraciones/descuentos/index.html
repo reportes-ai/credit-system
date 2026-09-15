@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.11 — la nómina Caja muestra CUOTA 49 de 60 (no PERMANENTE) · v1.10 — numeración REAL de la cuota (cuota_desde/cuotas_total): un plan que venía andando muestra "cuota 3 de 4" y no "2 de 3"; la nómina Caja la toma de "17/27" · v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
+  <!-- v1.12 — tipo Descuentos varios (glosa libre obligatoria, N cuotas). v1.11 — la nómina Caja muestra CUOTA 49 de 60 (no PERMANENTE) · v1.10 — numeración REAL de la cuota (cuota_desde/cuotas_total): un plan que venía andando muestra "cuota 3 de 4" y no "2 de 3"; la nómina Caja la toma de "17/27" · v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -22,7 +22,7 @@
     .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
     .pill { border-radius:9px; padding:2px 8px; font-size:.66rem; font-weight:700; }
     .pill.ANTICIPO { background:#dbeafe; color:#1e40af; } .pill.PRESTAMO { background:#fef3c7; color:#92400e; }
-    .pill.PAGO_EXCESO { background:#fce7f3; color:#9d174d; } .pill.PERMANENTE { background:#f1f5f9; color:#475569; }
+    .pill.PAGO_EXCESO { background:#fce7f3; color:#9d174d; } .pill.VARIOS { background:#fef3c7; color:#92400e; } .pill.PERMANENTE { background:#f1f5f9; color:#475569; }
     .pill.ANULADO { background:#fee2e2; color:#991b1b; }
     .card-kpi { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:12px 20px; }
     .card-kpi .v { font-family:Consolas,monospace; font-weight:800; font-size:1.1rem; color:var(--navy); }
@@ -59,6 +59,7 @@
           <option value="ANTICIPO">Anticipo de sueldo</option>
           <option value="PRESTAMO">Préstamo al personal</option>
           <option value="PAGO_EXCESO">Pago en exceso</option>
+          <option value="VARIOS">Descuentos varios (glosa libre)</option>
           <option value="PERMANENTE">Descuento permanente</option>
         </select></div>
       <div style="flex:0 0 96px"><label class="form-label small fw-semibold mb-1">Moneda</label>
@@ -79,7 +80,7 @@
         </select></div>
       <!-- Texto libre (Pato 08-09-2026): siempre visible; obligatorio solo en Permanente / TEXTO LIBRE -->
       <div style="flex:1.4 1 180px;min-width:150px" id="wOtro"><label class="form-label small fw-semibold mb-1" id="lblOtro">Detalle (texto libre)</label>
-        <input id="fOtro" class="form-control form-control-sm" maxlength="200" placeholder="opcional: sale en la liquidación"></div>
+        <input id="fOtro" class="form-control form-control-sm" maxlength="200" placeholder="opcional: sale en la liquidación" oninput="if(fTipo.value==='VARIOS')preview()"></div>
       <div style="flex:0 0 auto;padding-bottom:6px;white-space:nowrap">
         <div class="form-check"><input type="checkbox" class="form-check-input" id="fPermD" onchange="permUI()">
           <label class="form-check-label small fw-semibold" for="fPermD" title="Monto mensual todos los meses hasta desmarcarlo">Permanente</label></div>
@@ -129,7 +130,7 @@
 
   <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.8rem">
     <div class="fw-bold mb-1"><i class="bi bi-diagram-3 me-1"></i>Cómo funcionan</div>
-    <b>Anticipo</b>: capital ÷ N meses, sin interés. <b>Préstamo al personal</b>: cuota francesa solo capital + interés; la tasa mensual <b>no puede superar la TMC vigente</b> (se valida contra la tabla de tasas sincronizada con la CMF). <b>Pago en exceso</b>: referencia al mes pagado de más, en 1 o más cuotas. <b>Permanente</b> (tribunal, TGR, APV, <b>TEXTO LIBRE</b> para cualquier concepto nuevo): monto mensual indefinido hasta que se anule. El campo <b>Detalle (texto libre)</b> es opcional en todos los tipos y sale en la liquidación. <b>★ TODO EL PERSONAL</b> en Colaborador aplica el mismo descuento (anticipo, pago en exceso o permanente; préstamos no) a todos los activos con ficha, saltando a quien ya tenga uno igual vigente. <b>Moneda</b>: el monto puede ingresarse en Pesos, UF, UTM o Dólares; en moneda distinta de pesos el descuento se guarda en su moneda y <b>cada mes se convierte a pesos con el indicador del mes</b> (UF del motor único; UTM y dólar del mantenedor de indicadores), por lo que la cuota en pesos varía mes a mes. Todas las cuotas parten en la <b>próxima remuneración</b> y caen solas en "Otros Dcto." del <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> (si editas la celda a mano, tu valor manda). Anular un descuento detiene las cuotas futuras; lo ya descontado en meses emitidos no se toca.
+    <b>Anticipo</b>: capital ÷ N meses, sin interés. <b>Préstamo al personal</b>: cuota francesa solo capital + interés; la tasa mensual <b>no puede superar la TMC vigente</b> (se valida contra la tabla de tasas sincronizada con la CMF). <b>Pago en exceso</b>: referencia al mes pagado de más, en 1 o más cuotas. <b>Descuentos varios</b>: cualquier otro descuento puntual con <b>glosa libre obligatoria</b> (sale tal cual en la liquidación), en 1 o más cuotas. <b>Permanente</b> (tribunal, TGR, APV, <b>TEXTO LIBRE</b> para cualquier concepto nuevo): monto mensual indefinido hasta que se anule. El campo <b>Detalle (texto libre)</b> es opcional en todos los tipos y sale en la liquidación. <b>★ TODO EL PERSONAL</b> en Colaborador aplica el mismo descuento (anticipo, pago en exceso o permanente; préstamos no) a todos los activos con ficha, saltando a quien ya tenga uno igual vigente. <b>Moneda</b>: el monto puede ingresarse en Pesos, UF, UTM o Dólares; en moneda distinta de pesos el descuento se guarda en su moneda y <b>cada mes se convierte a pesos con el indicador del mes</b> (UF del motor único; UTM y dólar del mantenedor de indicadores), por lo que la cuota en pesos varía mes a mes. Todas las cuotas parten en la <b>próxima remuneración</b> y caen solas en "Otros Dcto." del <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> (si editas la celda a mano, tu valor manda). Anular un descuento detiene las cuotas futuras; lo ya descontado en meses emitidos no se toca.
   </div>
 </div>
 
@@ -186,9 +187,10 @@ function tipoUI(){
   wTasa.style.display = t==='PRESTAMO' ? '' : 'none';
   wMesRef.style.display = t==='PAGO_EXCESO' ? '' : 'none';
   wSubtipo.style.display = t==='PERMANENTE' ? '' : 'none';
-  const libre = t==='PERMANENTE' && sub==='OTRO';
-  document.getElementById('lblOtro').textContent = libre ? 'Concepto (texto libre) *' : 'Detalle (texto libre)';
+  const libre = (t==='PERMANENTE' && sub==='OTRO') || t==='VARIOS';
+  document.getElementById('lblOtro').textContent = libre ? (t==='VARIOS' ? 'Glosa del descuento *' : 'Concepto (texto libre) *') : 'Detalle (texto libre)';
   document.getElementById('fOtro').placeholder = libre ? 'escribe el concepto tal como debe salir en la liquidación' : 'opcional: sale en la liquidación';
+  if (t==='VARIOS') setTimeout(()=>document.getElementById('fOtro').focus(), 0);
   document.getElementById('lblMonto').textContent = (t==='PERMANENTE' ? 'Monto mensual ' : 'Monto ') + SIM[moneda()];
   preview();
 }
@@ -209,6 +211,7 @@ function preview(){
     el.innerHTML = `<i class="bi bi-calculator me-1"></i>Préstamo de ${montoTxt} al <b>${String(i).replace('.',',')}% mensual</b> en <b>${n}</b> cuota(s): ${cuotaTxt(cO)} c/u (total $${fmt(c*n)}, interés $${fmt(c*n-MC)}). Solo capital + interés. Desde la próxima remuneración.${D&&D.tmc!=null?` <span class="text-muted">TMC vigente: ${String(D.tmc).replace('.',',')}% mensual.</span>`:''}${nota}`;
   }
   else if (t==='PAGO_EXCESO') el.innerHTML = `<i class="bi bi-calculator me-1"></i>Devolución de pago en exceso de ${montoTxt} en <b>${n}</b> cuota(s) de ${cuotaTxt(M/n)}, desde la próxima remuneración.${nota}`;
+  else if (t==='VARIOS') { const g = document.getElementById('fOtro').value.trim(); el.innerHTML = `<i class="bi bi-calculator me-1"></i>Descuento "<b>${g ? esc(g) : '…escribe la glosa'}</b>" de ${montoTxt} en <b>${n}</b> cuota(s) de ${cuotaTxt(M/n)}, desde la próxima remuneración. En la liquidación sale con esa glosa.${nota}`; }
   else el.innerHTML = `<i class="bi bi-calculator me-1"></i>Descuento permanente de ${cuotaTxt(M)} mensuales, desde la próxima remuneración y hasta que se anule.${nota}`;
 }
 // Etiqueta de origen para las listas: "UF 2,5" cuando el descuento no es en pesos
@@ -267,7 +270,7 @@ async function cargar(){
   render(); preview();
 }
 
-const tipoTxt = d => d.tipo==='PAGO_EXCESO' ? `Pago en exceso ${d.mes_referencia||''}` : d.tipo==='PERMANENTE' ? `Permanente · ${d.subtipo||''}` : d.tipo==='ANTICIPO' ? 'Anticipo' : 'Préstamo';
+const tipoTxt = d => d.tipo==='PAGO_EXCESO' ? `Pago en exceso ${d.mes_referencia||''}` : d.tipo==='VARIOS' ? 'Varios' : d.tipo==='PERMANENTE' ? `Permanente · ${d.subtipo||''}` : d.tipo==='ANTICIPO' ? 'Anticipo' : 'Préstamo';
 const MESES_TX=['','ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 const mesTxt = m => (MESES_TX[Number(String(m).slice(5,7))]||m);
 /* Bajo el formulario: los descuentos YA CONSIDERADOS en el mes elegido —

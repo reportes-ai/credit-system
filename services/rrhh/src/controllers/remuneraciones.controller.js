@@ -665,7 +665,7 @@ const crearDescuento = async (req, res) => {
        tenga un descuento VIGENTE del mismo tipo/subtipo/detalle, así no se duplica. */
     const todos = String(b.id_usuario) === 'TODOS';
     if (!(todos || idU) || !(montoOrigen > 0)) return fail(res, 'Colaborador y monto son obligatorios', 400);
-    if (!['ANTICIPO', 'PRESTAMO', 'PAGO_EXCESO', 'PERMANENTE'].includes(tipo)) return fail(res, 'Tipo inválido', 400);
+    if (!['ANTICIPO', 'PRESTAMO', 'PAGO_EXCESO', 'VARIOS', 'PERMANENTE'].includes(tipo)) return fail(res, 'Tipo inválido', 400);
     if (todos && tipo === 'PRESTAMO') return fail(res, 'Un préstamo se ingresa por persona (lleva convenio firmado)', 400);
     let destinos;
     if (todos) {
@@ -702,6 +702,12 @@ const crearDescuento = async (req, res) => {
       if (!/^\d{4}-\d{2}$/.test(b.mes_referencia || '')) return fail(res, 'Indica el mes del pago en exceso', 400);
       mesRef = b.mes_referencia;
       cuotas = Math.max(1, Math.min(12, Number(b.cuotas) || 1));
+      valorCuota = Math.round(monto / cuotas);
+      cuotaOrigen = montoOrigen / cuotas;
+    } else if (tipo === 'VARIOS') {
+      // Descuentos varios (Pato 15-09-2026): glosa libre obligatoria, es lo que sale en la liquidación
+      if (!String(b.detalle_texto || '').trim()) return fail(res, 'Escribe la glosa del descuento', 400);
+      cuotas = Math.max(1, Math.min(24, Number(b.cuotas) || 1));
       valorCuota = Math.round(monto / cuotas);
       cuotaOrigen = montoOrigen / cuotas;
     } else { // PERMANENTE
@@ -859,7 +865,8 @@ async function descuentosDelMes(mes) {
     if (d.tipo === 'PERMANENTE' && /\bAPV\b/i.test(d.subtipo || '')) apv[d.id_usuario] = (apv[d.id_usuario] || 0) + c;
     const total = Number(d.cuotas_total) || (Number(d.cuotas) > 0 ? Number(d.cuotas) : 0);
     const nCuota = total > 0 ? (Number(d.cuota_desde) || 1) + difMeses(d.mes_inicio, mes) : null;
-    const base = d.tipo === 'PERMANENTE' ? cap(d.subtipo || 'Descuento') : TIPO_TXT[d.tipo] || cap(d.tipo);
+    // VARIOS: la glosa libre ES el concepto (no lleva prefijo "Varios")
+    const base = d.tipo === 'PERMANENTE' ? cap(d.subtipo || 'Descuento') : d.tipo === 'VARIOS' ? (String(d.detalle_texto || '').trim() || 'Descuentos varios') : TIPO_TXT[d.tipo] || cap(d.tipo);
     // El detalle solo si agrega información (en la Caja trae producto y código; "cuota N/M" ya va en la glosa)
     const det = String(d.detalle_texto || '').replace(/\s*·\s*cuota\s+\d+\s*\/\s*\d+/i, '').replace(/\s*·\s*obs\s+.*$/i, '').trim();
     const partes = [base, det && !det.toUpperCase().startsWith(base.toUpperCase()) ? det : null, nCuota && total > 1 ? `cuota ${nCuota} de ${total}` : null,
