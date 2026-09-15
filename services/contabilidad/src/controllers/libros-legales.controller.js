@@ -35,7 +35,8 @@ const LIBROS = [
     descripcion: 'Ya existe en Libros Contables (Excel).' },
   { codigo: 'MAYOR', nombre: 'Libro Mayor', fiscalizador: 'SII · Auditoría', periodo: 'rango', disponible: 1, href: '/contabilidad/libros/',
     descripcion: 'Ya existe en Libros Contables (Excel).' },
-  { codigo: 'BALANCE_8', nombre: 'Balance de 8 columnas', fiscalizador: 'SII · Auditoría', periodo: 'año', disponible: 0 },
+  { codigo: 'BALANCE_8', nombre: 'Balance de 8 columnas', fiscalizador: 'SII · Auditoría', periodo: 'año', disponible: 1, motor: 'balance8',
+    descripcion: 'Por cuenta: débitos, créditos, saldo deudor/acreedor, activo, pasivo, pérdida y ganancia del ejercicio. Mismo motor que la pantalla Balance.' },
   { codigo: 'EERR', nombre: 'Balance general y Estado de Resultados', fiscalizador: 'SII · Auditoría', periodo: 'año', disponible: 1, href: '/contabilidad/estados/',
     descripcion: 'Ya existe en Estados Financieros.' },
   { codigo: 'HONORARIOS', nombre: 'Libro de Honorarios', fiscalizador: 'SII', periodo: 'mes', disponible: 1, href: '/contabilidad/libros-auxiliares/',
@@ -43,12 +44,131 @@ const LIBROS = [
   { codigo: 'F29', nombre: 'Borrador F29', fiscalizador: 'SII', periodo: 'mes', disponible: 1, href: '/contabilidad/f29/', descripcion: 'Ya existe.' },
   { codigo: 'DJ', nombre: 'Declaraciones Juradas 1879 / 1887', fiscalizador: 'SII', periodo: 'año', disponible: 1, href: '/declaraciones-juradas/', descripcion: 'Ya existe.' },
   { codigo: 'PREVIRED', nombre: 'Archivo Previred', fiscalizador: 'Previred · AFP', periodo: 'mes', disponible: 1, href: '/recursos-humanos/remuneraciones/liquidaciones/', descripcion: 'Ya existe en Remuneraciones.' },
-  { codigo: 'VACACIONES', nombre: 'Registro de feriados por trabajador', fiscalizador: 'Dirección del Trabajo', periodo: 'año', disponible: 0 },
-  { codigo: 'ASISTENCIA', nombre: 'Registro de asistencia (Workera)', fiscalizador: 'Dirección del Trabajo', periodo: 'mes', disponible: 0 },
-  { codigo: 'CARTERA_TMC', nombre: 'Cartera vigente con tasas vs TMC', fiscalizador: 'CMF · SERNAC', periodo: 'mes', disponible: 0 },
-  { codigo: 'COBRANZA', nombre: 'Mora y gastos de cobranza por operación', fiscalizador: 'SERNAC', periodo: 'mes', disponible: 0 },
-  { codigo: 'CARPETA', nombre: 'Carpeta de auditoría (ZIP del ejercicio)', fiscalizador: 'Auditoría externa', periodo: 'año', disponible: 0 },
+  { codigo: 'VACACIONES', nombre: 'Registro de feriados por trabajador', fiscalizador: 'Dirección del Trabajo', periodo: 'año', disponible: 1, motor: 'vacaciones',
+    descripcion: 'Por trabajador: saldo inicial, devengado, progresivo, ajustes, días tomados y saldo al cierre (cuenta corriente de vacaciones). Segunda hoja: cada período tomado con desde/hasta y código de verificación.' },
+  { codigo: 'ASISTENCIA', nombre: 'Registro de asistencia (Workera)', fiscalizador: 'Dirección del Trabajo', periodo: 'mes', disponible: 1, motor: 'asistencia',
+    descripcion: 'Por colaborador: días hábiles, marcados, cubiertos (vacaciones/ausencias), sin marca y atrasos. Segunda hoja: entrada, salida y estado de cada día. Fuente: marcaciones Workera.' },
+  { codigo: 'CARTERA_TMC', nombre: 'Cartera vigente con tasas vs TMC', fiscalizador: 'CMF · SERNAC', periodo: 'mes', disponible: 1, motor: 'carteraTmc',
+    descripcion: 'Cartera propia (AutoFácil/AFA) vigente al cierre del mes: monto, tramo UF, tasa pactada vs TMC vigente al otorgar (mantenedor Tasas), holgura y si cumple.' },
+  { codigo: 'COBRANZA', nombre: 'Mora y gastos de cobranza por operación', fiscalizador: 'SERNAC', periodo: 'mes', disponible: 1, motor: 'cobranza',
+    descripcion: 'Hoja 1: pagos del mes con interés por mora y gastos de cobranza efectivamente cobrados. Hoja 2: stock de operaciones en mora (cuotas, días, monto, saldo) según el motor de Cobranza.' },
+  { codigo: 'CARPETA', nombre: 'Carpeta de auditoría (ZIP del ejercicio)', fiscalizador: 'Auditoría externa', periodo: 'año', disponible: 1, motor: 'carpeta',
+    descripcion: 'Un ZIP con todo el ejercicio: balance de 8 columnas, libro diario, libro mayor, remuneraciones de cada mes, feriados, cartera vs TMC, mora y cobranza mensual y asistencia; con INDICE.txt y el SHA-256 de cada archivo.' },
 ];
+const motores = require('../libros-legales-motores');
+
+/* ── Excel genérico: cabecera de empresa + una hoja por cada hoja del motor ── */
+async function cabeceraEmpresa() {
+  const [[emp]] = await pool.query('SELECT organizacion FROM credenciales_empresa WHERE id=1').catch(() => [[{}]]);
+  const [[cfg]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_empresa'").catch(() => [[{}]]);
+  const [[cfgR]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_rut_empresa'").catch(() => [[{}]]);
+  return { nombre: cfg?.valor || emp?.organizacion || 'AUTOFÁCIL SpA', rut: cfgR?.valor || '' };
+}
+function libroAWorkbook(lib, out, periodo, quien, emp) {
+  const wb = XLSX.utils.book_new();
+  const generado = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+  for (const h of out.hojas) {
+    const cab = [[lib.nombre.toUpperCase()], [emp.nombre, 'RUT', emp.rut], ['Período', periodo, 'Fuente', out.fuente || ''], ['Generado', generado, 'por', quien], [], h.columnas.map(c => c[1])];
+    const cuerpo = h.filas.map(f => h.columnas.map(c => f[c[0]] == null ? '' : f[c[0]]));
+    const tot = h.totales ? [h.columnas.map(c => h.totales[c[0]] == null ? '' : h.totales[c[0]])] : [];
+    const ws = XLSX.utils.aoa_to_sheet([...cab, ...cuerpo, ...tot]);
+    ws['!cols'] = h.columnas.map(c => ({ wch: /nombre|glosa|cliente/i.test(c[0]) ? 32 : 14 }));
+    XLSX.utils.book_append_sheet(wb, ws, String(h.nombre).slice(0, 31));
+  }
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+const quienDe = req => (req.usuario?.nombre ? (req.usuario.nombre + ' ' + (req.usuario.apellido || '')).trim() : req.usuario?.email) || 'Sistema';
+function periodoDe(lib, q) {
+  const p = String(q.periodo || q.mes || q.anio || '');
+  if (lib.periodo === 'año') return /^\d{4}$/.test(p) ? p : null;
+  return /^\d{4}-\d{2}$/.test(p) ? p : null;
+}
+function libroDe(req) {
+  const lib = LIBROS.find(l => l.codigo === String(req.params.codigo || '').toUpperCase());
+  return lib && lib.motor && lib.motor !== 'carpeta' ? lib : null;
+}
+
+/* GET /libros-legales/:codigo?periodo= → vista previa (hojas, filas, totales, resumen) */
+exports.libro = async (req, res) => {
+  try {
+    const lib = libroDe(req); if (!lib) return fail(res, 'Libro no disponible', 404);
+    const periodo = periodoDe(lib, req.query); if (!periodo) return fail(res, `Período obligatorio (${lib.periodo === 'año' ? 'YYYY' : 'YYYY-MM'})`, 400);
+    const out = await motores[lib.motor](periodo);
+    ok(res, { codigo: lib.codigo, nombre: lib.nombre, periodo, ...out });
+  } catch (e) { console.error('[libros legales]', req.params.codigo, e.message); fail(res, e.message); }
+};
+
+/* GET /libros-legales/:codigo.xlsx?periodo= → Excel + registro con hash */
+exports.libroXlsx = async (req, res) => {
+  try {
+    const lib = libroDe(req); if (!lib) return fail(res, 'Libro no disponible', 404);
+    const periodo = periodoDe(lib, req.query); if (!periodo) return fail(res, 'Período obligatorio', 400);
+    const out = await motores[lib.motor](periodo);
+    const quien = quienDe(req);
+    const buffer = libroAWorkbook(lib, out, periodo, quien, await cabeceraEmpresa());
+    const sha = crypto.createHash('sha256').update(buffer).digest('hex');
+    const archivo = `${lib.codigo}-${periodo}.xlsx`;
+    const filas = out.hojas.reduce((a, h) => a + h.filas.length, 0);
+    await pool.query('INSERT INTO libros_legales_log (libro, periodo, fuente, archivo, filas, total_1, total_2, sha256, generado_por) VALUES (?,?,?,?,?,?,?,?,?)',
+      [lib.codigo, periodo, out.fuente || null, archivo, filas, out.total_1 ?? null, out.total_2 ?? null, sha, quien]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'libro_legal', detalle: `${lib.nombre} ${periodo} · ${filas} filas · SHA-256 ${sha.slice(0, 12)}…` });
+    res.setHeader('X-SHA256', sha);
+    res.setHeader('Content-Disposition', `attachment; filename="${archivo}"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
+  } catch (e) { console.error('[libros legales xlsx]', req.params.codigo, e.message); fail(res, e.message); }
+};
+
+/* GET /libros-legales/carpeta.zip?anio= → ZIP del ejercicio con INDICE.txt (SHA-256 por archivo).
+   Cada libro se genera con su motor; si uno falla (ej. Workera no configurado) queda anotado en
+   el índice y la carpeta sale igual — el auditor ve qué falta y por qué. */
+exports.carpetaZip = async (req, res) => {
+  try {
+    const anio = String(req.query.anio || req.query.periodo || '');
+    if (!/^\d{4}$/.test(anio)) return fail(res, 'anio obligatorio (YYYY)', 400);
+    const JSZip = require('jszip');
+    const zip = new JSZip();
+    const quien = quienDe(req), emp = await cabeceraEmpresa();
+    const hoy = require('../../../../shared/fecha-chile').hoyISO();
+    const meses = []; for (let m = 1; m <= 12; m++) { const p = `${anio}-${String(m).padStart(2, '0')}`; if (p <= hoy.slice(0, 7)) meses.push(p); }
+    const indice = [`CARPETA DE AUDITORÍA — ${emp.nombre} ${emp.rut ? 'RUT ' + emp.rut : ''}`, `Ejercicio ${anio} · generada ${new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' })} por ${quien}`, '', 'Archivo | filas | SHA-256 | observación'];
+    const agregar = async (carpeta, lib, periodo, fn) => {
+      try {
+        const out = await fn();
+        const filas = out.hojas.reduce((a, h) => a + h.filas.length, 0);
+        if (!filas) { indice.push(`${carpeta}/${lib.codigo}-${periodo}.xlsx | 0 | — | sin datos en el período`); return; }
+        const buf = libroAWorkbook(lib, out, periodo, quien, emp);
+        const sha = crypto.createHash('sha256').update(buf).digest('hex');
+        zip.file(`${carpeta}/${lib.codigo}-${periodo}.xlsx`, buf);
+        indice.push(`${carpeta}/${lib.codigo}-${periodo}.xlsx | ${filas} | ${sha} | ${out.resumen?.nota || ''}`);
+      } catch (e) { indice.push(`${carpeta}/${lib.codigo}-${periodo}.xlsx | — | — | NO GENERADO: ${e.message}`); }
+    };
+    const L = c => LIBROS.find(l => l.codigo === c);
+    await agregar('01-Contabilidad', L('BALANCE_8'), anio, () => motores.balance8(anio));
+    await agregar('01-Contabilidad', { codigo: 'DIARIO', nombre: 'Libro Diario' }, anio, () => motores.diario(anio));
+    await agregar('01-Contabilidad', { codigo: 'MAYOR', nombre: 'Libro Mayor' }, anio, () => motores.mayor(anio));
+    for (const mes of meses) await agregar('02-Remuneraciones', L('REMUNERACIONES'), mes, async () => {
+      const { fuente, filas } = await filasRemuneraciones(mes);
+      return { fuente, hojas: [{ nombre: `Remuneraciones ${mes}`, columnas: COLS_REM, filas, totales: { nombre: 'TOTALES', ...totalesDe(filas) } }] };
+    });
+    await agregar('03-Personal', L('VACACIONES'), anio, () => motores.vacaciones(anio));
+    for (const mes of meses) await agregar('03-Personal', L('ASISTENCIA'), mes, () => motores.asistencia(mes));
+    await agregar('04-Cartera', L('CARTERA_TMC'), meses[meses.length - 1], () => motores.carteraTmc(meses[meses.length - 1]));
+    for (const mes of meses) await agregar('05-Cobranza', L('COBRANZA'), mes, () => motores.cobranza(mes));
+    zip.file('INDICE.txt', indice.join('\n'));
+    const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const sha = crypto.createHash('sha256').update(buffer).digest('hex');
+    const archivo = `Carpeta-Auditoria-${anio}.zip`;
+    const nArch = indice.filter(l => / \| \d+ \| [0-9a-f]{64}/.test(l)).length;
+    await pool.query('INSERT INTO libros_legales_log (libro, periodo, fuente, archivo, filas, total_1, total_2, sha256, generado_por) VALUES (?,?,?,?,?,?,?,?,?)',
+      ['CARPETA', anio, 'ZIP', archivo, nArch, null, null, sha, quien]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'libro_legal', detalle: `Carpeta de auditoría ${anio} · ${nArch} archivos · SHA-256 ${sha.slice(0, 12)}…` });
+    res.setHeader('X-SHA256', sha);
+    res.setHeader('Content-Disposition', `attachment; filename="${archivo}"`);
+    res.setHeader('Content-Type', 'application/zip');
+    res.send(buffer);
+  } catch (e) { console.error('[libros legales carpeta]', e.message); fail(res, e.message); }
+};
 
 require('../../../../shared/migrate').enFila('contabilidad-libros-legales', async () => {
   try {

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Legales y Exportables — AutoFácil</title>
-  <!-- v1.0 — catálogo de libros para auditoría y fiscalizadores; Libro de Remuneraciones por persona (MOTOR o AVSOFT) con Excel firmado (SHA-256) y registro de generaciones -->
+  <!-- v1.1 — los 6 libros que faltaban: balance 8 columnas, feriados, asistencia Workera, cartera vs TMC, mora y cobranza, carpeta ZIP del ejercicio (vista previa con hojas + Excel/ZIP con hash). v1.0 — catálogo de libros para auditoría y fiscalizadores; Libro de Remuneraciones por persona (MOTOR o AVSOFT) con Excel firmado (SHA-256) y registro de generaciones -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -52,9 +52,32 @@
     </div>
   </div>
 
+  <div id="secGen" style="display:none">
+    <div class="d-flex gap-2 align-items-end mb-2 flex-wrap">
+      <div><label class="form-label small fw-semibold mb-1" id="lblPer">Período</label><input type="month" id="gPer" class="form-control form-control-sm" onchange="cargarGen()"></div>
+      <div id="gTabs" class="d-flex gap-1"></div>
+      <span class="flex-grow-1"></span>
+      <button class="btn btn-sm btn-success" id="btnGen" onclick="descargarGen()" disabled><i class="bi bi-file-earmark-excel me-1"></i>Generar Excel (queda registrado)</button>
+    </div>
+    <div id="gResumen" class="small text-muted mb-2"></div>
+    <div class="panel" style="max-height:60vh"><table><thead id="gThead"></thead><tbody id="gTbody"><tr><td class="text-muted p-3 l">Elige un período</td></tr></tbody><tfoot id="gTfoot"></tfoot></table></div>
+    <div class="p-3 mb-3" id="gNota" style="background:#fff7ed;border-left:4px solid #f59e0b;border-radius:8px;font-size:.8rem"></div>
+  </div>
+
+  <div id="secZip" style="display:none">
+    <div class="d-flex gap-2 align-items-end mb-2 flex-wrap">
+      <div><label class="form-label small fw-semibold mb-1">Ejercicio</label><input type="number" id="zAnio" class="form-control form-control-sm" style="width:110px" min="2020" max="2100"></div>
+      <span class="flex-grow-1"></span>
+      <button class="btn btn-sm btn-primary" id="btnZip" onclick="descargarZip()"><i class="bi bi-file-earmark-zip me-1"></i>Generar carpeta ZIP (queda registrada)</button>
+    </div>
+    <div class="p-3 mb-3" style="background:#eff6ff;border-left:4px solid var(--navy);border-radius:8px;font-size:.8rem">
+      <b>Qué contiene:</b> <code>01-Contabilidad</code> balance de 8 columnas, libro diario y libro mayor del año · <code>02-Remuneraciones</code> un libro por mes (motor o AVSOFT) · <code>03-Personal</code> registro de feriados del año y asistencia Workera de cada mes · <code>04-Cartera</code> cartera vigente vs TMC al último mes · <code>05-Cobranza</code> mora y gastos de cada mes · <code>INDICE.txt</code> con filas y SHA-256 de cada archivo. Si un libro no se puede generar (por ejemplo, Workera sin configurar) queda anotado en el índice y la carpeta sale igual. Tarda entre 1 y 3 minutos: no cierres la pestaña.
+    </div>
+  </div>
+
   <h6 class="fw-bold mt-2" style="color:var(--navy-dark)"><i class="bi bi-clock-history me-1"></i>Libros generados (registro de auditoría)</h6>
   <div class="panel" style="max-height:32vh"><table>
-    <thead><tr><th class="l">Fecha</th><th class="l">Libro</th><th class="l">Período</th><th class="l">Fuente</th><th>Filas</th><th>Total haberes</th><th>Líquido</th><th class="l">Generado por</th><th class="l">SHA-256</th></tr></thead>
+    <thead><tr><th class="l">Fecha</th><th class="l">Libro</th><th class="l">Período</th><th class="l">Fuente</th><th>Filas</th><th>Total 1</th><th>Total 2</th><th class="l">Generado por</th><th class="l">SHA-256</th></tr></thead>
     <tbody id="tbLog"><tr><td class="text-muted p-3 l" colspan="9">Sin libros generados aún.</td></tr></tbody>
   </table></div>
 </div>
@@ -83,10 +106,68 @@ function abrir(cod){
   if (l.href) { location.href = l.href; return; }
   document.querySelectorAll('.card-l').forEach(c=>c.classList.remove('activa'));
   [...document.querySelectorAll('.card-l')].find(c=>c.querySelector('b').textContent===l.nombre)?.classList.add('activa');
-  if (cod==='REMUNERACIONES') { secRem.style.display=''; cargarRem(); }
+  secRem.style.display = secGen.style.display = secZip.style.display = 'none';
+  if (cod==='REMUNERACIONES') { secRem.style.display=''; cargarRem(); return; }
+  if (cod==='CARPETA') { secZip.style.display=''; zAnio.value = zAnio.value || new Date().getFullYear(); return; }
+  LIB = l; G = null; secGen.style.display='';
+  const esAnio = l.periodo==='año';
+  gPer.type = esAnio ? 'number' : 'month'; lblPer.textContent = esAnio ? 'Ejercicio' : 'Mes';
+  if (esAnio) { gPer.min=2020; gPer.max=2100; gPer.style.width='110px'; if (!/^\d{4}$/.test(gPer.value)) gPer.value = new Date().getFullYear(); }
+  else { gPer.style.width=''; if (!/^\d{4}-\d{2}$/.test(gPer.value)) gPer.value = fMes.value; }
+  gNota.innerHTML = '<b><i class="bi bi-info-circle me-1"></i>'+esc(l.nombre)+':</b> '+esc(l.descripcion||'');
+  cargarGen();
+}
+let LIB = null, G = null, HOJA = 0;
+// Solo estas columnas son pesos; el resto se muestra tal cual (fechas, textos, días, tasas, UF)
+const DIN = /^(debe|haber|deudor|acreedor|activo|pasivo|perdida|ganancia|monto_financiado|monto_cuota|monto_mora|saldo_insoluto|saldo|cuota|interes_mora|gastos_cobranza|total_pagado)$/;
+const esTexto = k => !DIN.test(k);
+const fmtCel = (k, v) => v==null||v==='' ? '' : (esTexto(k) ? esc(typeof v==='number' ? v.toLocaleString('es-CL') : v) : CLP(v));
+async function cargarGen(){
+  if (!LIB) return;
+  gThead.innerHTML=''; gTfoot.innerHTML=''; gTabs.innerHTML=''; gResumen.textContent='';
+  gTbody.innerHTML='<tr><td class="text-muted p-3 l"><span class="spinner-border spinner-border-sm me-2"></span>Generando…</td></tr>';
+  btnGen.disabled = true; G = null;
+  const j = await (await fetch(`/api/contabilidad/libros-legales/${LIB.codigo}?periodo=${encodeURIComponent(gPer.value)}`,{headers:H})).json();
+  if (!j.success){ gTbody.innerHTML=`<tr><td class="text-muted p-3 l">${esc(j.error)}</td></tr>`; return; }
+  G = j.data; HOJA = 0; btnGen.disabled = false;
+  gResumen.innerHTML = '<span class="pill" style="background:#e0f2fe;color:#075985">FUENTE: '+esc(G.fuente||'')+'</span> ' +
+    Object.entries(G.resumen||{}).map(([k,v])=>`<b>${esc(k.replace(/_/g,' '))}:</b> ${esc(typeof v==='number'?v.toLocaleString('es-CL'):v)}`).join(' · ');
+  gTabs.innerHTML = G.hojas.length>1 ? G.hojas.map((h,i)=>`<button class="btn btn-sm ${i===HOJA?'btn-primary':'btn-outline-primary'}" onclick="HOJA=${i};pintarHoja()">${esc(h.nombre)} (${h.filas.length})</button>`).join('') : '';
+  pintarHoja();
+}
+function pintarHoja(){
+  const h = G.hojas[HOJA]; if (!h) return;
+  [...gTabs.children].forEach((b,i)=>b.className='btn btn-sm '+(i===HOJA?'btn-primary':'btn-outline-primary'));
+  gThead.innerHTML = '<tr>' + h.columnas.map(c=>`<th class="${esTexto(c[0])?'l':''}">${esc(c[1])}</th>`).join('') + '</tr>';
+  const filas = h.filas.slice(0, 1500);
+  gTbody.innerHTML = filas.map(f=>'<tr>' + h.columnas.map(c=>`<td class="${esTexto(c[0])?'l':''}">${fmtCel(c[0], f[c[0]])}</td>`).join('') + '</tr>').join('')
+    + (h.filas.length>1500 ? `<tr><td class="l text-muted p-2" colspan="${h.columnas.length}">… ${(h.filas.length-1500).toLocaleString('es-CL')} filas más en el Excel</td></tr>` : '')
+    || '<tr><td class="text-muted p-3 l">Sin datos en el período</td></tr>';
+  gTfoot.innerHTML = h.totales ? '<tr>' + h.columnas.map(c=>`<td>${h.totales[c[0]]==null?'':(typeof h.totales[c[0]]==='number'?(esTexto(c[0])?h.totales[c[0]].toLocaleString('es-CL'):CLP(h.totales[c[0]])):esc(h.totales[c[0]]))}</td>`).join('') + '</tr>' : '';
+}
+async function descargarGen(){
+  if (!LIB || !G) return;
+  await bajar(`/api/contabilidad/libros-legales/${LIB.codigo}.xlsx?periodo=${encodeURIComponent(gPer.value)}`, `${LIB.codigo}-${gPer.value}.xlsx`, btnGen);
+}
+async function descargarZip(){
+  if (!/^\d{4}$/.test(zAnio.value)) return alert('Indica el ejercicio (año)');
+  btnZip.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generando carpeta… (1 a 3 minutos)';
+  try { await bajar(`/api/contabilidad/libros-legales/carpeta.zip?anio=${zAnio.value}`, `Carpeta-Auditoria-${zAnio.value}.zip`, btnZip); }
+  finally { btnZip.innerHTML = '<i class="bi bi-file-earmark-zip me-1"></i>Generar carpeta ZIP (queda registrada)'; }
+}
+async function bajar(url, nombre, btn){
+  btn.disabled = true;
+  try {
+    const r = await fetch(url,{headers:H});
+    if (!r.ok) { const j = await r.json().catch(()=>({})); return alert(j.error||'No se pudo generar'); }
+    const blob = await r.blob(); const sha = r.headers.get('X-SHA256')||'';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; a.click(); URL.revokeObjectURL(a.href);
+    const j = await (await fetch('/api/contabilidad/libros-legales',{headers:H})).json(); if (j.success) pintarLog(j.data.log);
+    if (sha) alert('Generado y registrado.\nSHA-256: '+sha);
+  } finally { btn.disabled = false; }
 }
 function pintarLog(log){
-  tbLog.innerHTML = (log||[]).map(r=>`<tr><td class="l">${esc(String(r.created_at).replace('T',' ').slice(0,16))}</td><td class="l">${esc(r.libro)}</td><td class="l">${esc(r.periodo)}</td><td class="l">${esc(r.fuente||'')}</td><td>${r.filas}</td><td>${CLP(r.total_1)}</td><td>${CLP(r.total_2)}</td><td class="l">${esc(r.generado_por||'')}</td><td class="l hash" title="${esc(r.sha256)}">${esc(r.sha256).slice(0,16)}…</td></tr>`).join('')
+  tbLog.innerHTML = (log||[]).map(r=>`<tr><td class="l">${esc(String(r.created_at).replace('T',' ').slice(0,16))}</td><td class="l">${esc(r.libro)}</td><td class="l">${esc(r.periodo)}</td><td class="l">${esc(r.fuente||'')}</td><td>${r.filas}</td><td>${r.total_1==null?'':CLP(r.total_1)}</td><td>${r.total_2==null?'':CLP(r.total_2)}</td><td class="l">${esc(r.generado_por||'')}</td><td class="l hash" title="${esc(r.sha256)}">${esc(r.sha256).slice(0,16)}…</td></tr>`).join('')
     || '<tr><td class="text-muted p-3 l" colspan="9">Sin libros generados aún.</td></tr>';
 }
 async function cargarRem(){
