@@ -612,4 +612,4 @@ const resumen = async (req, res) => {
 module.exports = { cuentas, crearCuentaManual, previewCartola, importarCartola, pendientes, conciliados, conciliar, conciliarAuto, desconciliar, resumen,
   reglasListar, reglaCrear, reglaToggle, reglaEliminar,
   // motor único de cartolas — reusado por Cuentas Corrientes (nunca un segundo parser)
-  parsearCartola, hashMovs, cuentaNoCoincide };
+  parsearCartola, hashMovs, cuentaNoCoincide, normCta };

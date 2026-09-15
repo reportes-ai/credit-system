@@ -13,7 +13,7 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
-const { parsearCartola, hashMovs, cuentaNoCoincide } = require('./conciliacion.controller');
+const { parsearCartola, hashMovs, cuentaNoCoincide, normCta } = require('./conciliacion.controller');
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
@@ -141,15 +141,24 @@ const resumenTipos = async (req, res) => {
 const cargarCartola = async (req, res) => {
   try {
     if (!req.file) return fail(res, 'Adjunta el archivo Excel de la cartola', 400);
-    const idConexion = parseInt(req.params.id, 10);
-    const [[cx]] = await pool.query('SELECT id, banco, numero FROM banco_conexiones WHERE id=? LIMIT 1', [idConexion]);
+    let idConexion = parseInt(req.params.id, 10);
+    let [[cx]] = await pool.query('SELECT id, banco, numero FROM banco_conexiones WHERE id=? LIMIT 1', [idConexion]);
     if (!cx) return fail(res, 'Cuenta no encontrada', 404);
 
-    // Cartola de OTRA cuenta → se rechaza (caso real 27-08-2026: la cartola de la
-    // 7486599-2 se cargó sobre la 7045074-7 y hubo que separar los movimientos a mano)
+    // La cuenta la manda el ARCHIVO (Pato, 15-09-2026): si la cartola es de otra cuenta
+    // registrada, se carga en esa y se avisa; solo se rechaza si el Nº del archivo no
+    // corresponde a ninguna cuenta (caso real 27-08-2026: la cartola de la 7486599-2 se
+    // cargó sobre la 7045074-7 y hubo que separar los movimientos a mano).
     const parsed = parsearCartola(req.file.buffer);
+    let redirigida = false;
     const errCta = cuentaNoCoincide(parsed.cuenta_archivo, cx.numero, req.file.originalname);
-    if (errCta) return fail(res, errCta, 400);
+    if (errCta) {
+      const ctaArch = normCta(parsed.cuenta_archivo) || normCta((String(req.file.originalname || '').match(/(\d{8,})/) || [])[1]);
+      const [todas] = await pool.query('SELECT id, banco, numero FROM banco_conexiones');
+      const otra = todas.find(t => normCta(t.numero) === ctaArch);
+      if (!otra) return fail(res, errCta, 400);
+      cx = otra; idConexion = otra.id; redirigida = true;
+    }
     const movs = hashMovs(idConexion, parsed);
     if (!movs.length) return fail(res, 'El archivo no contiene movimientos reconocibles.', 400);
 
@@ -175,7 +184,7 @@ const cargarCartola = async (req, res) => {
       [idConexion, req.file.originalname || null, movs.length, nuevas, movs.length - nuevas, req.user && (req.user.nombre || req.user.email) || null]);
     auditar({ req, accion: 'IMPORTAR', modulo: 'tesoreria', entidad: 'banco_cartola', entidad_id: idConexion,
       detalle: `Cargó cartola en Cuentas Corrientes ${cx.banco} ${cx.numero || ''}: ${movs.length} filas, ${nuevas} nuevas (${req.file.originalname || 'archivo'})` });
-    ok(res, { filas: movs.length, nuevas, duplicadas: movs.length - nuevas });
+    ok(res, { filas: movs.length, nuevas, duplicadas: movs.length - nuevas, cuenta: { id: cx.id, banco: cx.banco, numero: cx.numero }, redirigida });
   } catch (e) { fail(res, e.message, 400); }
 };
 
