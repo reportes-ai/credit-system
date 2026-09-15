@@ -373,7 +373,7 @@ async function candidatos(desde, hasta) {
            COALESCE(c.origen_ref, CONCAT('#', c.id)) comprobante
     FROM ctb_movimientos m
     JOIN ctb_comprobantes c ON c.id = m.id_comprobante
-    WHERE c.estado='VIGENTE' AND m.cuenta LIKE '1101%'
+    WHERE c.estado<>'ANULADO' AND m.cuenta LIKE '1101%'   -- VIGENTE (importados AVSOFT) y CONTABILIZADO (motor propio): antes solo veía los de AVSOFT
       AND c.fecha BETWEEN ? AND ? AND (m.debe > 0 OR m.haber > 0)`, [d1, d2]);
 
   return {
