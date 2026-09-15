@@ -7,7 +7,7 @@
   <title>Provisiones + Castigos — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.9 — navbar migrada al componente topnav -->
+  <!-- v2.0 — asiento de provisión clickeable: variación crédito a crédito (entra/sube/baja/sale/castigada); la liberación se muestra como asiento inverso con montos positivos. v1.9 — navbar migrada al componente topnav -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -186,19 +186,24 @@ async function cargarContable() {
     card('Total cuentas', P.saldo_final + C.saldo_final, 'res');
   // Movimientos como libro diario: cada LÍNEA es UNA cuenta (Debe o Haber, nunca ambos)
   const filas = [];
-  const asiento = (glosa, detalle, lineas, bg) => {
+  const asiento = (glosa, detalle, lineas, bg, onclick) => {
     lineas.forEach((l, i) => filas.push(
-      `<tr${bg ? ` style="background:${bg}"` : ''}>
-        <td>${i === 0 ? `<b>${glosa}</b>` : ''}<div style="color:#64748b;font-size:.78rem;padding-left:${i ? 18 : 0}px">${l.cuenta}</div></td>
+      `<tr${bg ? ` style="background:${bg}"` : ''}${onclick ? ` onclick="${onclick}" style="cursor:pointer;background:${bg}" title="Ver qué operaciones explican este movimiento"` : ''}>
+        <td>${i === 0 ? `<b>${glosa}</b>${onclick ? ' <i class="bi bi-box-arrow-up-right" style="font-size:.75rem;color:#0141A2"></i>' : ''}` : ''}<div style="color:#64748b;font-size:.78rem;padding-left:${i ? 18 : 0}px">${l.cuenta}</div></td>
         <td>${i === 0 ? detalle : ''}</td>
         <td class="text-right">${l.debe != null ? fmtP(l.debe) : ''}</td>
         <td class="text-right">${l.haber != null ? fmtP(l.haber) : ''}</td>
       </tr>`));
   };
-  asiento('Constitución de provisión del período', '—', [
+  // Liberación (la provisión requerida BAJÓ) se muestra como asiento inverso con montos positivos
+  if (P.haber >= 0) asiento('Constitución de provisión del período', 'clic para ver el detalle', [
     { cuenta: 'Gasto por deterioro de deudores (Resultado)', debe: P.haber },
     { cuenta: 'Provisión deudores incobrables (compl. de activo)', haber: P.haber },
-  ], '#f0fdf4');
+  ], '#f0fdf4', 'verVariacionProv()');
+  else asiento('Liberación de provisión del período (mejora de mora)', 'clic para ver el detalle', [
+    { cuenta: 'Provisión deudores incobrables (compl. de activo)', debe: -P.haber },
+    { cuenta: 'Gasto por deterioro de deudores (Resultado)', haber: -P.haber },
+  ], '#eff6ff', 'verVariacionProv()');
   (d.movimientos||[]).forEach(m => {
     asiento('Castigo de saldo',
       `<b>${esc(m.num_op)}</b> · ${esc(m.cliente||'')}<br><span style="color:#94a3b8;font-size:.75rem">${esc(m.motivo)} · ${fmtDT(m.aplicado_at)}</span>`, [
@@ -241,6 +246,39 @@ async function verDetalleProv() {
       <td class="r">$${Math.round(r.saldo_insoluto).toLocaleString('es-CL')}</td><td class="r">${Number(r.pct).toLocaleString('es-CL')}%</td>
       <td class="r"><b>$${Math.round(r.provision).toLocaleString('es-CL')}</b></td></tr>`).join('')}
     </tbody></table></body></html>`);
+  w.document.close();
+}
+
+/* ── Variación crédito a crédito: qué explica la constitución / liberación del mes ── */
+async function verVariacionProv() {
+  const mes = document.getElementById('cMes').value || new Date().toISOString().slice(0,7);
+  const j = await fetch('/api/castigos/contable/variacion?mes='+mes, { headers: H }).then(r=>r.json());
+  if (!j.success) return alert(j.error || 'Error');
+  const d = j.data, $ = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CL');
+  const sg = n => (n > 0 ? '+' : '') + $(n);
+  const TIPO = { ENTRA:['Entra a mora','#fee2e2;color:#991b1b'], SUBE:['Sube de tramo','#ffedd5;color:#9a3412'], BAJA:['Baja de tramo','#dcfce7;color:#166534'], SALE:['Sale de mora (pagó / normalizó)','#dcfce7;color:#166534'], CASTIGADA:['Castigada','#e0e7ff;color:#3730a3'], IGUAL:['Sin cambio','#f3f4f6;color:#374151'] };
+  const w = window.open('', '_blank');
+  w.document.write(`<html><head><title>Variación provisión ${mes}</title><style>
+    body{font-family:'Segoe UI',sans-serif;padding:24px;color:#111827}
+    h2{font-size:1.1rem} .sub{color:#6b7280;font-size:.85rem;margin-bottom:10px}
+    .res{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px} .res div{background:#f8fafc;border-radius:8px;padding:8px 12px;font-size:.8rem} .res b{display:block;font-size:.95rem}
+    table{border-collapse:collapse;width:100%;font-size:.8rem}
+    th{background:#f8fafc;text-align:left;padding:7px 8px;border-bottom:2px solid #e5e7eb;white-space:nowrap}
+    td{padding:5px 8px;border-bottom:1px solid #f1f5f9} .r{text-align:right} .tag{border-radius:5px;padding:1px 7px;font-size:.7rem;font-weight:700;white-space:nowrap}
+    .neg{color:#166534} .pos{color:#991b1b}
+    </style></head><body>
+    <h2>Variación de la provisión — ${mes}</h2>
+    <div class="sub">Inicial: cierre de ${d.mes_anterior}${d.sin_cierre_anterior ? ' <b style="color:#b45309">(sin cierre guardado: todo aparece como "Entra")</b>' : ''} · Final: ${d.fuente_final === 'HOY' ? 'cálculo de hoy' : 'cierre del mes'} · ${d.filas.length} operaciones con cambio o en mora</div>
+    <div class="res"><div>Provisión inicial<b>${$(d.prov_ini)}</b></div><div>Provisión final<b>${$(d.prov_fin)}</b></div><div>Variación<b class="${d.delta<0?'neg':'pos'}">${sg(d.delta)}</b></div>
+      ${Object.entries(d.por_tipo).filter(([t])=>t!=='IGUAL').map(([t,v])=>`<div>${TIPO[t]?TIPO[t][0]:t} (${v.n})<b class="${v.delta<0?'neg':'pos'}">${sg(v.delta)}</b></div>`).join('')}</div>
+    <table><thead><tr><th>Tipo</th><th>N° Op</th><th>Cliente</th><th class="r">Días ini</th><th>Tramo ini</th><th class="r">Prov. inicial</th><th class="r">Días fin</th><th>Tramo fin</th><th class="r">Saldo insoluto</th><th class="r">Prov. final</th><th class="r">Variación</th></tr></thead><tbody>
+    ${d.filas.filter(f=>f.tipo!=='IGUAL').map(f=>`<tr><td><span class="tag" style="background:${(TIPO[f.tipo]||['',''])[1]}">${(TIPO[f.tipo]||[f.tipo])[0]}</span></td><td>${f.num_op||''}</td><td>${f.cliente||''}</td>
+      <td class="r">${f.dias_ini??''}</td><td>${f.tramo_ini?f.tramo_ini+' · '+f.pct_ini+'%':''}</td><td class="r">${$(f.prov_ini)}</td>
+      <td class="r">${f.dias_fin??''}</td><td>${f.tramo_fin?f.tramo_fin+' · '+f.pct_fin+'%':''}</td><td class="r">${f.saldo_fin!=null?$(f.saldo_fin):''}</td><td class="r">${$(f.prov_fin)}</td>
+      <td class="r ${f.delta<0?'neg':'pos'}"><b>${sg(f.delta)}</b></td></tr>`).join('')}
+    </tbody></table>
+    <div class="sub" style="margin-top:10px">${(d.por_tipo.IGUAL||{n:0}).n} operaciones siguen en el mismo tramo sin variación (no se listan).</div>
+    </body></html>`);
   w.document.close();
 }
 

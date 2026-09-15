@@ -415,14 +415,16 @@ async function ejecutarCierreMes(mes, usuario) {
 
 /* Snapshot del detalle por crédito (auditable): con qué mora, tramo y % se
    provisionó cada operación en el cierre del mes. */
-async function guardarDetalleProvision(mes) {
+/* Motor único del detalle: la provisión de HOY crédito a crédito (mora del motor de
+   cobranza × tramos del mantenedor). Lo usan el snapshot del cierre y la variación. */
+async function calcularDetalleProvision() {
   const cob = require('../../../cobranza/src/controllers/cobranza.controller')._motor;
   const [rows] = await pool.query(
     `SELECT id_credito, num_op, nombre_cliente, dias_mora, saldo_insoluto FROM ( ${cob.MORA_SQL()} ) _m`);
   const cfg = await cob.getCobranzaConfig();
   let tp = [];
   try { tp = JSON.parse(cfg.tramos_provision); } catch (_) {}
-  if (!Array.isArray(tp) || !tp.length) return;
+  if (!Array.isArray(tp) || !tp.length) return [];
   let prev = 0;
   const tramos = tp.map(t => {
     const max = (t.hasta_dias == null || t.hasta_dias === '') ? Infinity : Number(t.hasta_dias);
@@ -430,17 +432,64 @@ async function guardarDetalleProvision(mes) {
     prev = max;
     return r;
   });
-  await pool.query('DELETE FROM provisiones_detalle WHERE mes=?', [mes]);
+  const out = [];
   for (const r of rows) {
     const t = tramos.find(x => Number(r.dias_mora) >= x.min && Number(r.dias_mora) <= x.max);
     if (!t) continue;
     const cap = Number(r.saldo_insoluto) || 0;
+    out.push({ id_credito: r.id_credito, num_op: r.num_op || null, cliente: r.nombre_cliente || null, dias_mora: r.dias_mora, tramo: t.label, saldo_insoluto: cap, pct: t.pct, provision: Math.round(cap * t.pct / 100) });
+  }
+  return out;
+}
+async function guardarDetalleProvision(mes) {
+  const rows = await calcularDetalleProvision();
+  if (!rows.length) return;
+  await pool.query('DELETE FROM provisiones_detalle WHERE mes=?', [mes]);
+  for (const r of rows)
     await pool.query(
       `INSERT INTO provisiones_detalle (mes, id_credito, num_op, cliente, dias_mora, tramo, saldo_insoluto, pct, provision)
        VALUES (?,?,?,?,?,?,?,?,?)`,
-      [mes, r.id_credito, r.num_op || null, r.nombre_cliente || null, r.dias_mora, t.label, cap, t.pct, Math.round(cap * t.pct / 100)]);
-  }
+      [mes, r.id_credito, r.num_op, r.cliente, r.dias_mora, r.tramo, r.saldo_insoluto, r.pct, r.provision]);
 }
+
+/* Variación de la provisión crédito a crédito: GET /contable/variacion?mes=YYYY-MM
+   Explica el asiento de constitución/liberación: qué operaciones entraron a mora,
+   cuáles salieron (pagaron, castigadas), cuáles subieron o bajaron de tramo.
+   Inicial = snapshot del cierre del mes pasado; final = snapshot del mes (cerrado)
+   o el cálculo de hoy (mes en curso). Pedido por Pato 15-09-2026. */
+const variacionProvision = async (req, res) => {
+  try {
+    const hoyISO = require('../../../../shared/fecha-chile').hoyISO();
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : hoyISO.slice(0, 7);
+    const mesAnt = mesAnterior(mes);
+    const [ini] = await pool.query('SELECT id_credito, num_op, cliente, dias_mora, tramo, saldo_insoluto, pct, provision FROM provisiones_detalle WHERE mes=?', [mesAnt]);
+    let [fin] = await pool.query('SELECT id_credito, num_op, cliente, dias_mora, tramo, saldo_insoluto, pct, provision FROM provisiones_detalle WHERE mes=?', [mes]);
+    let fuente_final = 'CIERRE';
+    if (!fin.length) { fin = await calcularDetalleProvision(); fuente_final = 'HOY'; }
+    const mapI = new Map(ini.map(r => [r.id_credito, r])), mapF = new Map(fin.map(r => [r.id_credito, r]));
+    const filas = [];
+    for (const [id, f] of mapF) {
+      const i = mapI.get(id);
+      const pi = i ? Math.round(Number(i.provision)) : 0, pf = Math.round(Number(f.provision));
+      const tipo = !i ? 'ENTRA' : pf > pi ? 'SUBE' : pf < pi ? 'BAJA' : 'IGUAL';
+      filas.push({ id_credito: id, num_op: f.num_op, cliente: f.cliente, tipo, dias_ini: i ? i.dias_mora : null, tramo_ini: i ? i.tramo : null, pct_ini: i ? Number(i.pct) : null, prov_ini: pi,
+        dias_fin: f.dias_mora, tramo_fin: f.tramo, pct_fin: Number(f.pct), saldo_fin: Math.round(Number(f.saldo_insoluto)), prov_fin: pf, delta: pf - pi });
+    }
+    // Los que estaban provisionados y ya no están en mora (pagaron, se castigaron o se normalizaron)
+    const salen = [...mapI.values()].filter(i => !mapF.has(i.id_credito));
+    const [cast] = salen.length ? await pool.query("SELECT id_credito FROM castigos_contables WHERE estado='APROBADO' AND id_credito IN (?)", [salen.map(s => s.id_credito)]) : [[]];
+    const castSet = new Set(cast.map(c => c.id_credito));
+    for (const i of salen) {
+      const pi = Math.round(Number(i.provision));
+      filas.push({ id_credito: i.id_credito, num_op: i.num_op, cliente: i.cliente, tipo: castSet.has(i.id_credito) ? 'CASTIGADA' : 'SALE', dias_ini: i.dias_mora, tramo_ini: i.tramo, pct_ini: Number(i.pct), prov_ini: pi,
+        dias_fin: null, tramo_fin: null, pct_fin: null, saldo_fin: null, prov_fin: 0, delta: -pi });
+    }
+    filas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+    const tot = { prov_ini: filas.reduce((s, f) => s + f.prov_ini, 0), prov_fin: filas.reduce((s, f) => s + f.prov_fin, 0) };
+    const porTipo = {}; for (const f of filas) { porTipo[f.tipo] = porTipo[f.tipo] || { n: 0, delta: 0 }; porTipo[f.tipo].n++; porTipo[f.tipo].delta += f.delta; }
+    ok(res, { mes, mes_anterior: mesAnt, sin_cierre_anterior: !ini.length, fuente_final, prov_ini: tot.prov_ini, prov_fin: tot.prov_fin, delta: tot.prov_fin - tot.prov_ini, por_tipo: porTipo, filas });
+  } catch (e) { fail(res, e.message); }
+};
 
 // Guarda el snapshot de saldos finales del mes (para que el mes siguiente tenga saldo inicial).
 const cerrarMesContable = async (req, res) => {
@@ -501,4 +550,4 @@ function nombreUsuario(req) {
   return `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.email || ('Usuario ' + u.id_usuario);
 }
 
-module.exports = { solicitar, aprobar, anular, porOperacion, historial, resolver, contable, cerrarMesContable, detalleProvision };
+module.exports = { solicitar, aprobar, anular, porOperacion, historial, resolver, contable, cerrarMesContable, detalleProvision, variacionProvision };

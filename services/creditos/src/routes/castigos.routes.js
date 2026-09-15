@@ -10,6 +10,7 @@ router.get('/',                 verifyToken, ctrl.historial);
 router.get('/contable',         verifyToken, ctrl.contable);
 router.post('/contable/cierre', verifyToken, requireFunc('castigos_historial'), ctrl.cerrarMesContable);
 router.get('/contable/detalle', verifyToken, ctrl.detalleProvision);
+router.get('/contable/variacion', verifyToken, ctrl.variacionProvision);
 
 // Escritura
 router.post('/',            verifyToken, requireFunc('castigo_solicitar'), ctrl.solicitar);
