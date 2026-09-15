@@ -1477,14 +1477,30 @@ const crearComprobanteDoc = async ({ fecha, glosa, movimientos, origen, origen_r
    con .http cuando el dato no sirve — el llamador decide si corta o acumula. */
 async function ingresarCompraAux(b, { origen = 'DIGITADO', req } = {}) {
   const { tipo_doc, num_doc, rut, razon_social, fecha_doc, fecha_vcto, cuenta_gasto, cuenta_iva, cuenta_cxp } = b;
-  const neto = Math.round(Number(b.neto) || 0), exento = Math.round(Number(b.exento) || 0), iva = Math.round(Number(b.iva) || 0);
+  const neto = Math.round(Math.abs(Number(b.neto) || 0)), exento = Math.round(Math.abs(Number(b.exento) || 0)), iva = Math.round(Math.abs(Number(b.iva) || 0));
   const total = neto + exento + iva;
   const err = (m, http) => { throw Object.assign(new Error(m), { http: http || 400 }); };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_doc || '')) err('Fecha del documento inválida');
   if (!num_doc || !rut || !razon_social) err('Folio, RUT y razón social son obligatorios');
   if (total <= 0) err('Montos en cero');
   if (!cuenta_gasto) err('Cuenta de gasto obligatoria');
-  const mes = fecha_doc.slice(0, 7);
+  /* Nota de crédito (61): en el auxiliar de COMPRAS va con montos POSITIVOS y se
+     distingue por el tipo (así la guardó siempre AVSOFT y así la separa el F29,
+     códigos 527/528); el asiento es el inverso de la factura. */
+  const esNC = String(tipo_doc) === '61';
+  /* Período tributario (Pato, 15-09-2026): el documento va al mes en que el SII lo
+     registra en el RCV, no al de su emisión — una factura emitida el 31-08 y
+     recibida el 01-09 es crédito fiscal de SEPTIEMBRE. Sin esto el libro nunca
+     cuadraba con el F29 (37 documentos de septiembre quedaron en agosto). La fecha
+     del asiento es la de emisión, acotada a ese período. */
+  const periodo = /^\d{4}-\d{2}$/.test(b.periodo || '') ? b.periodo : null;
+  const mes = periodo || fecha_doc.slice(0, 7);
+  let fechaAsiento = fecha_doc;
+  if (periodo && fecha_doc.slice(0, 7) !== periodo) {
+    const [a, m] = periodo.split('-').map(Number);
+    fechaAsiento = fecha_doc < periodo + '-01' ? periodo + '-01'
+      : `${periodo}-${String(new Date(Date.UTC(a, m, 0)).getUTCDate()).padStart(2, '0')}`;
+  }
   const [[dup]] = await pool.query('SELECT id FROM ctb_compras_aux WHERE rut=? AND tipo_doc=? AND num_doc=? LIMIT 1', [rut, tipo_doc || '33', String(num_doc)]);
   if (dup) err(`Ya existe la factura ${num_doc} de ${rut} en el auxiliar (id ${dup.id})`, 409);
 
@@ -1492,13 +1508,15 @@ async function ingresarCompraAux(b, { origen = 'DIGITADO', req } = {}) {
   if (b.generar_asiento) {
     if (iva > 0 && !cuenta_iva) err('Cuenta IVA crédito obligatoria para el asiento');
     if (!cuenta_cxp) err('Cuenta por pagar obligatoria para el asiento');
+    const pre = esNC ? 'NC' : 'FC';
+    const lado = (cuenta, monto, glosa, alDebe) => ({ cuenta, debe: alDebe ? monto : 0, haber: alDebe ? 0 : monto, glosa, rut });
     const movimientos = [
-      { cuenta: cuenta_gasto, debe: neto + exento, haber: 0, glosa: `FC ${num_doc} ${razon_social}`.slice(0, 200), rut },
-      ...(iva > 0 ? [{ cuenta: cuenta_iva, debe: iva, haber: 0, glosa: `IVA FC ${num_doc}`, rut }] : []),
-      { cuenta: cuenta_cxp, debe: 0, haber: total, glosa: `FC ${num_doc} ${razon_social}`.slice(0, 200), rut },
+      lado(cuenta_gasto, neto + exento, `${pre} ${num_doc} ${razon_social}`.slice(0, 200), !esNC),
+      ...(iva > 0 ? [lado(cuenta_iva, iva, `IVA ${pre} ${num_doc}`, !esNC)] : []),
+      lado(cuenta_cxp, total, `${pre} ${num_doc} ${razon_social}`.slice(0, 200), esNC),
     ];
     comp = await crearComprobanteDoc({
-      fecha: fecha_doc, glosa: `Compra ${tipo_doc || '33'}-${num_doc} ${razon_social}`.slice(0, 250),
+      fecha: fechaAsiento, glosa: `${esNC ? 'Nota de crédito compra' : 'Compra'} ${tipo_doc || '33'}-${num_doc} ${razon_social}`.slice(0, 250),
       movimientos, origen: origen === 'RCV' ? 'COMPRA_RCV' : 'COMPRA_DIG',
       origen_ref: `${rut}|${tipo_doc || '33'}|${num_doc}`, usuario: nombreDe(req?.user),
     });
@@ -3173,8 +3191,8 @@ exports.rcvSincronizar = async (req, res) => {
    el RCV trae RUT, folio, fechas y montos; lo único que el SII no sabe es la
    CUENTA DE GASTO, que se propone desde el historial del propio proveedor y
    siempre pasa por revisión humana antes de confirmar.
-   Las notas de crédito (61) quedan fuera: en el auxiliar entran con signo
-   negativo y el motor de ingreso exige total > 0 — se digitan aparte. */
+   Las notas de crédito (61) también se importan (montos positivos, asiento
+   inverso); el mes del libro es el PERÍODO del RCV, que se lee de ctb_rcv_compras. */
 const rutNorm = r => String(r || '').replace(/\./g, '').replace(/\s/g, '').toUpperCase();
 
 exports.rcvPendientes = async (req, res) => {
@@ -3236,13 +3254,19 @@ exports.rcvImportar = async (req, res) => {
     if (!lista.length) return fail(res, 'No se recibió ningún documento para importar', 400);
     if (lista.length > 300) return fail(res, 'Máximo 300 documentos por importación', 400);
 
+    // Período de cada documento: lo dice el SII (espejo del RCV), nunca el navegador.
+    const [rcvRows] = await pool.query(
+      'SELECT mes, tipo_dte, folio, rut_proveedor FROM ctb_rcv_compras WHERE folio IN (?)',
+      [[...new Set(lista.map(d => Number(d.num_doc)).filter(Boolean))].concat(0)]);
+    const periodoDe = new Map(rcvRows.map(x => [`${rutNorm(x.rut_proveedor)}|${x.tipo_dte}|${x.folio}`, x.mes]));
     const okDocs = [], errores = [];
     for (const d of lista) {
       try {
-        if (Number(d.tipo_doc) === 61) throw new Error('Las notas de crédito se digitan aparte (van con signo negativo)');
+        const periodo = periodoDe.get(`${rutNorm(d.rut)}|${Number(d.tipo_doc)}|${Number(d.num_doc)}`);
+        if (!periodo) throw new Error('El documento no está en el RCV sincronizado del SII');
         const r = await ingresarCompraAux({
           tipo_doc: String(d.tipo_doc || '33'), num_doc: String(d.num_doc), rut: d.rut, razon_social: d.razon_social,
-          fecha_doc: d.fecha_doc, fecha_vcto: d.fecha_vcto || null,
+          fecha_doc: d.fecha_doc, fecha_vcto: d.fecha_vcto || null, periodo,
           neto: d.neto, exento: d.exento, iva: d.iva,
           cuenta_gasto: d.cuenta_gasto, generar_asiento: !!b.generar_asiento,
           cuenta_iva: b.cuenta_iva, cuenta_cxp: b.cuenta_cxp,
