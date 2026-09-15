@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Parques a Pagar — AutoFácil</title>
-  <!-- v2.0 — TEF: botón a la derecha con el cupo gratis del mes como badge (antes el texto no se veía y el bloque se iba a la izquierda). v1.9 — ODP con popup de la orden (motor odp-documento.js), factura adjunta con click, operaciones como link. v1.8 — TEF: generar el archivo registra el pago (y sus correos). v1.7 — botón TEF B.Internacional (parques con ODP emitida) con el cupo gratis del mes. v1.6 — login conserva el destino (?next=). v1.5 — full width + fecha de emision bajo la Orden de Pago · v1.4 — popup de revisión pre-emisión (factura adjunta + totales) · v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
+  <!-- v3.0 — Comisiones Parques a Pagar rehecha como espejo de Comisiones Dealer a Pagar (Pato, 15-09-2026): ODP de parque emitidas de cualquier mes, fondos del día, selección y propuestas, Enviar a Pago, Nómina/CSV/TEF y Confirmar pago con segregación; aprobación, factura y emisión pasan a Emisión Orden de Pago Comisión Parque. -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -17,49 +17,86 @@
     .wrap { max-width:none; margin:0 auto; padding:20px 24px; }
     .head-row { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
     .resumen { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
-    .stat { flex:1 1 200px; background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; border-left:5px solid #cbd5e1; box-sizing:border-box; }
+    .stat { flex:1 1 220px; background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; border-left:5px solid #cbd5e1; box-sizing:border-box; }
     .stat .lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; font-weight:700; }
-    .stat .val { font-size:1.4rem; font-weight:800; color:var(--navy); margin-top:2px; }
-    .stat.arr  { border-left-color:#0ea5e9; }
-    .stat.com  { border-left-color:#7c3aed; }
-    .stat.tot  { border-left-color:#0141A2; }
-    .stat.pag  { border-left-color:#16a34a; } .stat.pag .val { color:#15803d; }
-    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; }
-    table { width:100%; border-collapse:collapse; font-size:.84rem; }
-    thead th { position:sticky; top:0; z-index:2; background:#0f2a52; color:#fff; font-size:.68rem; text-transform:uppercase; letter-spacing:.3px; padding:9px 12px; text-align:left; white-space:nowrap; }
+    .stat .val { font-size:1.5rem; font-weight:800; color:var(--navy); margin-top:2px; }
+    .stat .sub { font-size:.82rem; color:#475569; margin-top:1px; }
+    .stat.pend { border-left-color:#0141A2; }
+    .stat.pag  { border-left-color:#16a34a; }
+    .stat.pag .val { color:#15803d; }
+    .stat.pend .sub { font-size:1.5rem; font-weight:800; color:var(--navy); }
+    .stat.pag  .sub { font-size:1.5rem; font-weight:800; color:#15803d; }
+    .stat.selb { border-left-color:#0d9488; }
+    .stat.selb .val { color:#0f766e; }
+    /* La selección no cabe en los fondos disponibles: se pinta en rojo para que
+       nadie mande a pago más plata de la que hay cargada para el día. */
+    .stat.selb.excede { border-left-color:#b91c1c; background:#fef2f2; }
+    .stat.selb.excede .val { color:#b91c1c; }
+    .stat.selb .sub { font-size:.72rem; margin-top:2px; color:#64748b; }
+    .stat.selb.excede .sub { color:#b91c1c; font-weight:700; }
+    .stat.fondos { border-left-color:#0ea5e9; }
+    .stat.fondos input { width:100%; box-sizing:border-box; margin-top:4px; border:1.5px solid #d1d5db; border-radius:8px; padding:7px 11px; font-size:1.15rem; font-weight:800; color:var(--navy); }
+    .stat.fondos input:focus { outline:none; border-color:#0ea5e9; }
+    .stat.prop { cursor:default; border-left-color:#7c3aed; display:flex; flex-direction:column; }
+    .stat.prop.ant { border-left-color:#d97706; }
+    .stat.prop .val { color:var(--navy); }
+    .stat.prop .prop-line { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .btn-marcar { border:none; color:#fff; background:#7c3aed; border-radius:8px; padding:6px 16px; font-size:.8rem; font-weight:700; cursor:pointer; white-space:nowrap; transition:.15s; }
+    .stat.prop.ant .btn-marcar { background:#d97706; }
+    .btn-marcar.on { box-shadow:inset 0 0 0 2px rgba(255,255,255,.75); filter:brightness(.9); }
+    .btn-marcar:disabled { opacity:.45; cursor:default; }
+    tbody tr.row-prop td { box-shadow:inset 0 0 0 9999px rgba(124,58,237,.08); }
+    tbody tr.row-prop-ant td { box-shadow:inset 0 0 0 9999px rgba(217,119,6,.10); }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:6px 0 0; overflow:hidden; }
+    .tbl-scroll { max-height:calc(100vh - 320px); overflow:auto; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    thead th { position:sticky; top:0; z-index:2; background:#0f2a52; color:#fff; font-size:.68rem; text-transform:uppercase; letter-spacing:.3px; padding:9px 10px; text-align:left; white-space:nowrap; }
     thead th.num { text-align:right; }
-    tbody td { padding:9px 12px; border-bottom:1px solid #f1f5f9; white-space:nowrap; vertical-align:middle; }
+    tbody td { padding:7px 10px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
     tbody td.num { text-align:right; font-variant-numeric:tabular-nums; }
-    tbody tr.rowp { cursor:pointer; }
-    tbody tr.rowp:hover { background:#f8fafc; }
-    tfoot td { background:#f1f5f9; font-weight:800; color:var(--navy); padding:10px 12px; border-top:2px solid #cbd5e1; }
+    tbody tr:hover { background:#f8fafc; }
+    tbody tr.sel { background:#ecfdf3; }
+    .chk { width:18px; height:18px; cursor:pointer; accent-color:#16a34a; }
+    .chk:disabled { cursor:not-allowed; opacity:.45; }
+    tfoot td { position:sticky; bottom:0; background:#f1f5f9; font-weight:800; color:var(--navy); padding:10px; border-top:2px solid #cbd5e1; font-size:.85rem; }
     tfoot td.num { text-align:right; font-variant-numeric:tabular-nums; }
-    .etapa { display:inline-block; border-radius:9px; padding:3px 11px; font-size:.73rem; font-weight:800; letter-spacing:.2px; }
-    .et-apro { background:#f1f5f9; color:#475569; }
-    .et-ok   { background:#dbeafe; color:#1d4ed8; }
-    .et-op   { background:#ffedd5; color:#c2410c; }
-    .et-pag  { background:#dcfce7; color:#15803d; }
-    .btn-a { border:none; border-radius:8px; padding:6px 13px; font-weight:800; font-size:.78rem; cursor:pointer; color:#fff; }
-    .btn-a:disabled { opacity:.4; cursor:default; }
-    .b-aprobar { background:#0141A2; }
-    .b-emitir  { background:#c2410c; }
-    .b-pagar   { background:#16a34a; }
-    .odp-tag { font-weight:800; color:#c2410c; font-size:.8rem; }
-    .odp-link { font-weight:800; color:#0141A2; font-size:.8rem; text-decoration:none; }
-    .fac-link { font-weight:700; color:#0141A2; font-size:.78rem; text-decoration:none; }
-    .ops-link { cursor:pointer; color:#0141A2; font-weight:800; text-decoration:underline dotted; }
-    #dlgODP::backdrop { background:rgba(15,23,42,.55); }
-    .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
-    .hito { display:block; font-size:.68rem; color:#94a3b8; }
-    .det-row td { background:#f8fafc; padding:0 12px 14px; }
-    .det-box { background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-top:8px; overflow:hidden; }
-    .det-box table { font-size:.79rem; }
-    .det-box thead th { background:#e2e8f0; color:#334155; position:static; }
     .vacio { text-align:center; color:#94a3b8; padding:40px; font-size:.9rem; }
-    #mes { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.9rem; font-weight:700; color:var(--navy); }
+    .dias-pill { display:inline-block; min-width:42px; text-align:center; border-radius:8px; padding:2px 8px; font-weight:800; font-size:.78rem; }
+    .d-red { background:#fee2e2; color:#b91c1c; }
+    .d-yel { background:#fef9c3; color:#a16207; }
+    .d-grn { background:#dcfce7; color:#15803d; }
+    .d-wht { background:transparent; color:#64748b; font-weight:600; }
+    .pagado-tag { color:#15803d; font-weight:700; font-size:.78rem; }
+    .selchk { width:18px; height:18px; cursor:pointer; accent-color:#16a34a; }
+    .pagar-cell { display:inline-flex; align-items:center; gap:5px; }
+    .indbox { display:inline-block; width:18px; height:18px; border-radius:4px; background:#f1f5f9; border:1px solid #e2e8f0; }
+    .indbox.on-max { background:#7c3aed; border-color:#7c3aed; }
+    .indbox.on-ant { background:#d97706; border-color:#d97706; }
+    .btn-revertir { display:block; margin:3px auto 0; background:#fff1f2; color:#b91c1c; border:1px solid #fecaca; border-radius:7px; padding:2px 9px; font-size:.72rem; font-weight:700; cursor:pointer; }
+    .search-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+    .accionbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .btn-confirmar { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:7px 16px; font-weight:800; cursor:pointer; font-size:.85rem; }
+    .btn-confirmar:disabled { opacity:.45; cursor:default; }
+    .btn-enviar { background:#7c3aed; color:#fff; border:none; border-radius:8px; padding:7px 16px; font-weight:800; cursor:pointer; font-size:.85rem; }
+    .btn-enviar:disabled { opacity:.45; cursor:default; }
+    .accionbar .sep { width:1px; height:24px; background:#cbd5e1; margin:0 2px; }
+    .enviado-tag { color:#6d28d9; font-weight:700; font-size:.78rem; display:block; }
+    .btn-deshacer { display:block; margin:3px auto 0; background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; border-radius:7px; padding:2px 9px; font-size:.72rem; font-weight:700; cursor:pointer; }
+    .btn-sec { background:#eef2f7; color:#0141A2; border:none; border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer; font-size:.82rem; }
+    .btn-sec:disabled { opacity:.45; cursor:default; }
+    tbody tr.row-sel { background:#ecfdf3; }
+    tbody tr.row-enviado { background:#f5f3ff; }
+    #buscar { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.85rem; width:260px; }
     .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
     .toast.err { background:#dc2626; }
-    .foot-note { background:#f8fafc; border-left:4px solid #0141A2; border-radius:10px; padding:14px 18px; margin-top:18px; font-size:.82rem; color:#475569; }
+    /* Vista por Orden de Pago: fila = ODP + factura; el detalle de sus OP se despliega al click */
+    .ops-link { cursor:pointer; color:#0141A2; font-weight:800; text-decoration:underline dotted; white-space:nowrap; }
+    tr.det td { background:#f8fafc; padding:6px 14px 10px; border-bottom:1px solid #e2e8f0; }
+    .det table { width:auto; min-width:520px; font-size:.78rem; }
+    .det th { background:#eef2f7; font-size:.66rem; }
+    .det td { padding:4px 10px; background:#fff; }
+    #dlgODP::backdrop { background:rgba(15,23,42,.55); }
+    .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
   </style>
 </head>
 <body>
@@ -68,251 +105,543 @@
 
 <div class="wrap">
   <div class="head-row">
-    <div style="flex:1 1 480px;min-width:0">
+    <div>
       <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-signpost-2 me-2"></i>Comisiones Parques a Pagar</h5>
-      <span style="font-size:.82rem;color:#64748b">Pago mensual a cada parque: <b>arriendo</b> + <b>comisión por créditos</b> (según el mantenedor <a href="/mantenedores/parques/">Arriendos y Comisiones Parque y Calle</a>). Pincha un parque para ver sus operaciones. Flujo: <b>Aprobar → Emitir Orden de Pago (correo a Contabilidad) → Confirmar Pago</b> (avisa a los ejecutivos del parque).</span>
+      <span style="font-size:.82rem;color:#64748b">Órdenes de pago de parque emitidas (una por parque y mes: arriendo + comisión por créditos), ordenadas por antigüedad. Se emiten en <a href="/postventa/orden-pago-parque/">Emisión Orden de Pago Comisión Parque</a>. Click en el N° de operaciones para ver el detalle. <b>Selecciona</b> las que se pagarán (o usa una propuesta) y presiona <b>Enviar a Pago</b> para fijarlas. Luego Tesorería genera la <b>nómina</b> y <b>Confirma el pago</b>. Las marcas se pueden revertir dentro del mismo día.</span>
     </div>
-    <div style="display:flex;align-items:flex-start;gap:10px;margin-left:auto;flex:0 0 auto">
-      <input type="month" id="mes">
-      <span style="display:inline-flex;flex-direction:column;align-items:center">
-        <button class="btn-a" id="btnTEF" style="background:#fff;color:#0141A2;border:1px solid #bfdbfe;white-space:nowrap" onclick="descargarTEF()" disabled title="Archivo de transferencias masivas (parques con ODP emitida) para el Internet Banking del Banco Internacional"><i class="bi bi-bank me-1"></i>TEF B.Internacional <span id="tefCupoBadge" style="background:#eff6ff;color:#1e40af;border-radius:10px;padding:1px 8px;font-size:.7rem;font-weight:700;margin-left:6px">cupo…</span></button>
+  </div>
+
+  <div class="search-row">
+    <input id="buscar" placeholder="Buscar ODP, parque, RUT, OP…" oninput="render()">
+    <div class="accionbar" id="accionBar" style="display:none">
+      <button class="btn-enviar" id="btnEnviar" onclick="enviarSeleccion()" disabled><i class="bi bi-send-check me-1"></i>Enviar a Pago</button>
+      <span class="sep"></span>
+      <button class="btn-sec" id="btnNomina" onclick="copiarNomina()" disabled><i class="bi bi-clipboard me-1"></i>Nómina</button>
+      <button class="btn-sec" id="btnCSV" onclick="descargarCSV()" disabled><i class="bi bi-download me-1"></i>CSV</button>
+      <span style="display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle">
+        <button class="btn-sec" id="btnTEF" onclick="descargarTEF()" disabled title="Archivo de transferencias masivas para el Internet Banking del Banco Internacional"><i class="bi bi-bank me-1"></i>TEF B.Internacional <span id="tefCupoBadge" style="background:#eff6ff;color:#1e40af;border-radius:10px;padding:1px 8px;font-size:.7rem;font-weight:700;margin-left:6px">cupo…</span></button>
         <span id="tefCupo" style="font-size:.68rem;color:#64748b;margin-top:2px;white-space:nowrap"></span>
       </span>
+      <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarPago()" disabled><i class="bi bi-check2-all me-1"></i>Confirmar pago</button>
     </div>
   </div>
 
   <div class="resumen">
-    <div class="stat arr"><div class="lbl">Arriendos del mes</div><div class="val" id="stArr">—</div></div>
-    <div class="stat com"><div class="lbl">Comisión por créditos</div><div class="val" id="stCom">—</div></div>
-    <div class="stat tot"><div class="lbl">Total a pagar</div><div class="val" id="stTot">—</div></div>
-    <div class="stat pag"><div class="lbl">Pagado</div><div class="val" id="stPag">—</div></div>
+    <div class="stat pend">
+      <div class="lbl">Pendientes de pago</div>
+      <div class="val"><span id="cntPend">0</span> ODP X <span id="montoPend">$0</span></div>
+    </div>
+    <div class="stat pag">
+      <div class="lbl">Pagadas hoy</div>
+      <div class="val"><span id="cntPag">0</span> ODP X <span id="montoPag">$0</span></div>
+    </div>
+    <div class="stat selb">
+      <div class="lbl">Seleccionadas</div>
+      <div class="val"><span id="selN">0</span> ODP X <span id="selM">$0</span></div>
+      <div class="sub" id="selSub"></div>
+    </div>
+    <div class="stat fondos">
+      <div class="lbl">Fondos disponibles</div>
+      <input id="fondos" inputmode="numeric" placeholder="$0" oninput="onFondos(this)">
+      <div class="sub" id="fondosSub">Disponible para asignar: $0</div>
+      <div class="sub" id="fondosMeta" style="font-size:.72rem;color:#94a3b8">Sin monto cargado hoy</div>
+    </div>
+  </div>
+
+  <div class="resumen" id="propBox" style="display:none">
+    <div class="stat prop max" id="propMax" onmouseenter="hl('max')" onmouseleave="hl(null)">
+      <div class="lbl">Propuesta · Máximo de operaciones</div>
+      <div class="prop-line"><div class="val" id="propMaxN">0 ODP X $0</div>
+        <button class="btn-marcar" id="propMaxBtn" onclick="aplicarPropuesta('max')">Marcar</button></div>
+      <div class="sub" id="propMaxM">Queda disponible $0</div>
+    </div>
+    <div class="stat prop ant" id="propAnt" onmouseenter="hl('ant')" onmouseleave="hl(null)">
+      <div class="lbl">Propuesta · Prioriza antigüedad</div>
+      <div class="prop-line"><div class="val" id="propAntN">0 ODP X $0</div>
+        <button class="btn-marcar" id="propAntBtn" onclick="aplicarPropuesta('ant')">Marcar</button></div>
+      <div class="sub" id="propAntM">Queda disponible $0</div>
+    </div>
   </div>
 
   <div class="card-af">
-    <table>
-      <thead><tr>
-        <th></th><th>Parque</th><th class="num">Ops</th><th class="num">Arriendo</th><th class="num">Comisión créditos</th><th class="num">Total</th><th>Etapa</th><th>Orden de Pago / Factura</th><th style="text-align:center">Acciones</th>
-      </tr></thead>
-      <tbody id="tb"><tr><td colspan="9" class="vacio">Selecciona un mes…</td></tr></tbody>
-      <tfoot id="tf" style="display:none"><tr>
-        <td colspan="2">TOTAL</td><td class="num" id="fOps"></td><td class="num" id="fArr"></td><td class="num" id="fCom"></td><td class="num" id="fTot"></td><td colspan="3"></td>
-      </tr></tfoot>
-    </table>
-  </div>
-
-  <div class="foot-note">
-    <b><i class="bi bi-diagram-3 me-1"></i>Cómo se calcula:</b> el arriendo y el % de comisión salen del mantenedor
-    <a href="/mantenedores/parques/">Arriendos y Comisiones Parque y Calle</a>; la comisión por créditos es la suma de
-    <code>com_parque</code> de cada operación OTORGADA del mes (motor único de comisión dealer). Al <b>aprobar</b>, los montos
-    quedan congelados. La Orden de Pago queda visible para Contabilidad en <a href="/ordenes-pago/">Órdenes de Pago</a>.
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Orden de Pago</th>
+            <th>Factura</th>
+            <th>Rut Parque</th>
+            <th>Parque / Razón social</th>
+            <th>Cuenta Corriente</th>
+            <th>Banco</th>
+            <th style="text-align:center">Operaciones</th>
+            <th style="text-align:center">Días</th>
+            <th class="num">Monto a pagar</th>
+            <th style="text-align:center">Pagar</th>
+          </tr>
+        </thead>
+        <tbody id="body"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="8" style="text-align:right">TOTAL A PAGAR (visible)</td>
+            <td class="num" id="totSaldo">$0</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="vacio" id="vacio" style="display:none"><i class="bi bi-inbox" style="font-size:1.6rem"></i><br>No hay comisiones de parque pendientes de pago.</div>
   </div>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
 const token = sessionStorage.getItem('token');
-if (!token) location.href='/login.html?next='+encodeURIComponent(location.pathname+location.search);
-const yo = JSON.parse(sessionStorage.getItem('usuario') || '{}');
+const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+if (!token || !yo) location.href='/login.html?next='+encodeURIComponent(location.pathname+location.search);
 
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
-const CLP = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CL');
-const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none', 3500); }
+const fmt = n => '$'+Number(n||0).toLocaleString('es-CL');
+const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fechaCL = f => { if(!f) return '—'; const d=new Date(f); return isNaN(d)?'—':d.toLocaleDateString('es-CL',{timeZone:'UTC'}); };
+function toast(m, err){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
+let DATA = [], fondosVal = 0, lastProp = { max:{set:[],monto:0}, ant:{set:[],monto:0} }, propActiva = null;
 
-let FUNCS = new Set();
-const puede = c => yo.perfil==='Administrador' || FUNCS.has(c);
+const HOY_CL = () => new Date().toLocaleDateString('en-CA', { timeZone:'America/Santiago' });
+let diaCargado = HOY_CL();
 
-const ETAPAS = {
-  EN_APROBACION:  ['En Aprobación','et-apro'],
-  APROBADA:       ['Aprobada','et-ok'],
-  OP_EMITIDA:     ['Orden de Pago emitida','et-op'],
-  PAGO_REALIZADO: ['Pago realizado','et-pag'],
-};
-
-const elMes = document.getElementById('mes');
-(function initMes(){
-  const d = new Date(); d.setMonth(d.getMonth()-1);          // por defecto: mes anterior cerrado
-  elMes.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-})();
-elMes.addEventListener('change', cargar);
-
-let ROWS = [];
-async function cargar(){
-  const mes = elMes.value; if(!mes) return;
-  document.getElementById('tb').innerHTML = '<tr><td colspan="9" class="vacio">Cargando…</td></tr>';
+/* ── Atribuciones del flujo Comisión: cada acción es un permiso independiente ── */
+let CAN = { fondos:false, seleccionar:false, nomina:false, pagar:false, revertir:false };
+let QUIEN = {};
+const MAP_COD = { fondos:'pv_parques_fondos_definir', seleccionar:'pv_parques_seleccionar', nomina:'pv_parques_nomina_generar', pagar:'pv_parques_pagar', revertir:'pv_parques_revertir' };
+async function cargarPermisos(){
   try {
-    const r = await fetch('/api/comisiones-parques?mes='+mes, { headers:H });
-    const j = await r.json();
-    if(!j.success) throw new Error(j.error||'Error');
-    ROWS = j.data.rows||[];
-    pintar();
-    const bt = document.getElementById('btnTEF'); if (bt) bt.disabled = !ROWS.some(r => r.etapa === 'OP_EMITIDA' && r.odp_numero);
-  } catch(e){ document.getElementById('tb').innerHTML = '<tr><td colspan="9" class="vacio">'+esc(e.message)+'</td></tr>'; }
-}
-
-function pintar(){
-  const tb = document.getElementById('tb');
-  if(!ROWS.length){ tb.innerHTML='<tr><td colspan="9" class="vacio">Sin parques activos en el mantenedor</td></tr>'; document.getElementById('tf').style.display='none'; return; }
-  let tArr=0,tCom=0,tOps=0,tPag=0;
-  tb.innerHTML = ROWS.map((r,i)=>{
-    tArr+=r.arriendo; tCom+=r.comision_creditos; tOps+=r.ops;
-    if(r.etapa==='PAGO_REALIZADO') tPag+=r.total;
-    const [etTxt,etCls] = ETAPAS[r.etapa]||ETAPAS.EN_APROBACION;
-    const hitos = r.hitos ? ['aprobada','emitida','pagada'].map(k=>{
-      const h=r.hitos[k]; return h? `<span class="hito">${k}: ${esc(h.por||'')} ${new Date(h.fecha).toLocaleDateString('es-CL')}</span>`:'' ;
-    }).join('') : '';
-    let btn='';
-    if(r.etapa==='EN_APROBACION' && puede('pv_parques_aprobar'))
-      btn = `<button class="btn-a b-aprobar" onclick="accion(event,'aprobar','${esc(r.parque)}')"><i class="bi bi-check-lg me-1"></i>Aprobar</button>`;
-    else if(r.etapa==='APROBADA' && puede('pv_parques_emitir'))
-      btn = `<button class="btn-a b-emitir" onclick="accion(event,'emitir','${esc(r.parque)}')"><i class="bi bi-receipt me-1"></i>Emitir Orden de Pago</button>`;
-    else if(r.etapa==='OP_EMITIDA' && puede('pv_parques_pagar'))
-      btn = `<button class="btn-a b-pagar" onclick="accion(event,'pagar','${esc(r.parque)}')"><i class="bi bi-cash-coin me-1"></i>Confirmar Pago</button>`;
-    // Factura del parque: se sube ANTES de emitir para que viaje adjunta a Contabilidad (y queda de respaldo)
-    if (r.pago_id && puede('pv_parques_emitir'))
-      btn += ` <button class="btn-a" style="background:#fff;color:#0141A2;border:1px solid #bfdbfe" onclick="subirFacturaParque(event,${r.pago_id},'${esc(r.parque)}')" title="Adjuntar la factura del parque: viaja en el correo de la ODP a Contabilidad y queda de respaldo"><i class="bi bi-paperclip"></i> Factura<span id="facN${r.pago_id}"></span></button>`;
-    return `<tr class="rowp" onclick="toggleDet(${i})">
-      <td><i class="bi bi-chevron-right" id="chev${i}"></i></td>
-      <td style="font-weight:700;color:var(--navy)">${esc(r.parque)}</td>
-      <td class="num"><span class="ops-link" title="Ver las operaciones del parque">${r.ops.toLocaleString('es-CL')} OP</span></td>
-      <td class="num">${CLP(r.arriendo)}</td>
-      <td class="num">${CLP(r.comision_creditos)}</td>
-      <td class="num" style="font-weight:800">${CLP(r.total)}</td>
-      <td><span class="etapa ${etCls}">${etTxt}</span>${hitos}</td>
-      <td onclick="event.stopPropagation()">${r.odp_numero? (r.odp_id ? '<a href="javascript:void 0" class="odp-link" onclick="verODP('+r.odp_id+')" title="Ver la Orden de Pago"><i class="bi bi-file-earmark-text me-1"></i>'+esc(r.odp_numero)+'</a>' : '<span class="odp-tag">'+esc(r.odp_numero)+'</span>')+(r.factura_doc_id ? '<div><a href="javascript:void 0" class="fac-link" onclick="verFactura('+r.factura_doc_id+')" title="Ver la factura adjunta del parque"><i class="bi bi-paperclip me-1"></i>Factura adjunta</a></div>' : '')+(r.hitos&&r.hitos.emitida&&r.hitos.emitida.fecha?'<div style="font-size:.72rem;color:#94a3b8">'+new Date(r.hitos.emitida.fecha).toLocaleDateString('es-CL')+'</div>':''):'—'}</td>
-      <td style="text-align:center" onclick="event.stopPropagation()">${btn||'—'}</td>
-    </tr>
-    <tr class="det-row" id="det${i}" style="display:none"><td colspan="9"><div class="det-box" id="detbox${i}">Cargando…</div></td></tr>`;
-  }).join('');
-  document.getElementById('stArr').textContent = CLP(tArr);
-  document.getElementById('stCom').textContent = CLP(tCom);
-  document.getElementById('stTot').textContent = CLP(tArr+tCom);
-  document.getElementById('stPag').textContent = CLP(tPag);
-  document.getElementById('fOps').textContent = tOps.toLocaleString('es-CL');
-  document.getElementById('fArr').textContent = CLP(tArr);
-  document.getElementById('fCom').textContent = CLP(tCom);
-  document.getElementById('fTot').textContent = CLP(tArr+tCom);
-  document.getElementById('tf').style.display='';
-}
-
-async function toggleDet(i){
-  const row = document.getElementById('det'+i), chev = document.getElementById('chev'+i);
-  const abierto = row.style.display !== 'none';
-  row.style.display = abierto? 'none':'';
-  chev.className = 'bi ' + (abierto? 'bi-chevron-right':'bi-chevron-down');
-  if(abierto) return;
-  const box = document.getElementById('detbox'+i);
-  try {
-    const r = await fetch('/api/comisiones-parques/detalle?mes='+elMes.value+'&parque='+encodeURIComponent(ROWS[i].parque), { headers:H });
-    const j = await r.json();
-    if(!j.success) throw new Error(j.error||'Error');
-    const ops = j.data.ops||[];
-    box.innerHTML = ops.length? `<table>
-      <thead><tr><th>N° Operación</th><th>Dealer</th><th>Ejecutivo</th><th class="num">Saldo Precio</th><th class="num">Comisión Parque</th></tr></thead>
-      <tbody>${ops.map(o=>`<tr>
-        <td style="font-weight:700">${esc(o.num_op)}</td><td>${esc(o.dealer)}</td><td>${esc(o.ejecutivo)}</td>
-        <td class="num">${CLP(o.saldo_precio)}</td><td class="num" style="font-weight:700">${CLP(o.com_parque)}</td></tr>`).join('')}
-      </tbody>
-      <tfoot><tr><td colspan="4">TOTAL COMISIÓN (${ops.length} ops)</td><td class="num">${CLP(j.data.comision_creditos)}</td></tr></tfoot>
-    </table>` : '<div class="vacio">Sin operaciones otorgadas este mes</div>';
-  } catch(e){ box.innerHTML = '<div class="vacio">'+esc(e.message)+'</div>'; }
-}
-
-/* ── Factura del parque: subir/listar (respaldo + adjunto del correo de la ODP) ── */
-async function subirFacturaParque(ev, pagoId, parque){
-  ev.stopPropagation();
-  // Mostrar lo ya subido y ofrecer agregar
-  try {
-    const r = await fetch('/api/postventa/factura-doc?origen=PARQUE&ref_id='+pagoId, { headers:H });
-    const j = await r.json();
-    const ya = (j.success && j.data && j.data.length) ? '\n\nYa adjuntas:\n' + j.data.map(d=>'· '+d.nombre).join('\n') : '';
-    if (!confirm('Adjuntar factura del parque '+parque+'.'+ya+'\n\n¿Elegir archivo?')) return;
-  } catch(_){}
-  const inp = document.createElement('input');
-  inp.type='file'; inp.accept='.pdf,.jpg,.jpeg,.png,.xml';
-  inp.onchange = async () => {
-    const f = inp.files && inp.files[0]; if (!f) return;
-    if (f.size > 7*1024*1024) return alert("Máximo 7 MB");
-    const b64 = await new Promise((ok,ko)=>{ const fr=new FileReader(); fr.onload=()=>ok(String(fr.result).split(',')[1]); fr.onerror=ko; fr.readAsDataURL(f); });
-    try {
-      const r = await fetch('/api/postventa/factura-doc', { method:'POST', headers:H,
-        body: JSON.stringify({ origen:'PARQUE', ref_id:pagoId, nombre:f.name, mime:f.type, base64:b64 }) });
-      const j = await r.json();
-      if (!j.success) return alert(j.error||'Error al subir');
-      const n = document.getElementById('facN'+pagoId); if (n) n.textContent=' ✓';
-      alert('Factura "'+f.name+'" adjuntada: viajará en el correo de la ODP a Contabilidad y queda de respaldo.');
-    } catch(_){ alert('Error de conexión'); }
-  };
-  inp.click();
-}
-
-const CONFIRM = {
-  aprobar: p => `¿Aprobar la comisión del parque ${p}? Los montos quedarán congelados.`,
-  emitir:  p => `¿Emitir la Orden de Pago del parque ${p}? Se asignará correlativo y se enviará correo y alerta a Contabilidad.`,
-  pagar:   p => `¿Confirmar el PAGO del parque ${p}? Se avisará a los ejecutivos del parque.`,
-};
-async function accion(ev, acc, parque){
-  ev.stopPropagation();
-  // PRE-EMISIÓN: popup con la orden y los datos que faltan (motor AF_ODP_PRE)
-  if (acc === 'emitir') {
-    const r0 = ROWS.find(x => x.parque === parque) || {};
-    let facturaAdj = '';
-    if (r0.pago_id) {
-      try {
-        const rd = await fetch('/api/postventa/factura-doc?origen=PARQUE&ref_id='+r0.pago_id, { headers:H });
-        const jd = await rd.json();
-        if (jd.success && jd.data && jd.data.length) facturaAdj = jd.data.map(d=>d.nombre).join(', ');
-      } catch(_){}
-    }
-    const faltas = AF_ODP_PRE.check([
-      { etiqueta:'Factura del parque adjunta (obligatoria: la ODP nace de la factura)', valor: facturaAdj, critico:true },
-      { etiqueta:'Total a pagar mayor a $0', valor: (Number(r0.total)>0 ? r0.total : null), critico:true },
+    const admin = (yo.perfil||'') === 'Administrador';
+    const [rp, ra] = await Promise.all([
+      fetch('/api/auth/mis-permisos', { headers:H }).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/comisiones-parques/atribuciones', { headers:H }).then(r=>r.json()).catch(()=>({})),
     ]);
-    const F=(k,v)=>`<tr><td style="padding:3px 12px 3px 0;color:#64748b;white-space:nowrap">${k}</td><td style="font-weight:600">${esc(v==null?'—':v)}</td></tr>`;
-    let dlg = document.getElementById('dlgPreParque');
-    if(!dlg){ dlg=document.createElement('dialog'); dlg.id='dlgPreParque'; dlg.style.cssText='border:none;border-radius:14px;max-width:520px;width:94%;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3)'; document.body.appendChild(dlg); }
-    dlg.innerHTML = `
-      <div style="background:linear-gradient(135deg,#001345,#0141A2);color:#fff;padding:13px 20px;font-weight:800">Revisión antes de emitir — ${esc(parque)}</div>
-      <div style="padding:16px 20px;font-size:.88rem">
-        ${AF_ODP_PRE.render(faltas)}
-        <table style="width:100%;border-collapse:collapse">
-          ${F('Período', elMes.value)}${F('Operaciones', r0.ops)}
-          ${F('Arriendo', CLP(r0.arriendo))}${F('Comisión por créditos', CLP(r0.comision_creditos))}
-          ${F('TOTAL A PAGAR', CLP(r0.total))}${F('Factura adjunta', facturaAdj||null)}
-        </table>
-      </div>
-      <div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end">
-        <button onclick="document.getElementById('dlgPreParque').close()" style="background:#f1f5f9;border:none;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer">Volver</button>
-        <button onclick="document.getElementById('dlgPreParque').close();ejecutarAccion('emitir','${esc(parque)}')" style="background:#c2410c;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer"><i class="bi bi-receipt me-1"></i>Emitir definitivo</button>
-      </div>`;
-    dlg.showModal();
+    const fx = rp.funcionalidades || [];
+    const has = c => admin || fx.includes(c);
+    Object.keys(MAP_COD).forEach(k => CAN[k] = has(MAP_COD[k]));
+    QUIEN = (ra && ra.data) || {};
+  } catch(e){}
+}
+function quienTxt(accion){
+  const lista = (QUIEN[MAP_COD[accion]] || []).filter(p => p !== 'Administrador');
+  const todos = [...new Set([...lista, 'Administrador'])];
+  return 'Solo pueden: ' + todos.join(', ');
+}
+
+(async function init(){
+  await cargarPermisos();
+  await cargarFondos();
+  try {
+    const r = await fetch('/api/comisiones-parques/a-pagar', { headers:H });
+    const j = await r.json();
+    DATA = (j.data || []).map(x => ({ ...x, pagado: !!Number(x.pagado_hoy), enviado: !!Number(x.enviado) }));
+    colorearDias();
+    render();
+  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="10" class="vacio">Error: ${e.message}</td></tr>`; }
+})();
+
+setInterval(async () => {
+  if (HOY_CL() !== diaCargado){
+    diaCargado = HOY_CL();
+    fondosVal = 0;
+    document.getElementById('fondos').value = '';
+    pintarMetaFondos(null);
+    recalcPropuestas();
     return;
   }
-  if(!confirm(CONFIRM[acc](parque))) return;
-  return ejecutarAccion(acc, parque);
+  if (document.activeElement !== document.getElementById('fondos')){
+    await cargarFondos();
+    recalcPropuestas();
+  }
+}, 60000);
+
+function colorearDias(){
+  const vals = DATA.filter(r => r.dias > 2).map(r => r.dias).sort((a,b)=>a-b);
+  const q = p => { if (!vals.length) return Infinity; const i=(vals.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i); return vals[lo]+(vals[hi]-vals[lo])*(i-lo); };
+  const Q1=q(.25), Q2=q(.5), Q3=q(.75);
+  DATA.forEach(r => {
+    if (r.dias == null || r.dias <= 2) r.dcls = 'd-wht';
+    else if (r.dias > Q3) r.dcls = 'd-red';
+    else if (r.dias > Q2) r.dcls = 'd-yel';
+    else if (r.dias > Q1) r.dcls = 'd-grn';
+    else r.dcls = 'd-wht';
+  });
 }
-async function ejecutarAccion(acc, parque){
+
+function visibles(){
+  const q = document.getElementById('buscar').value||'';
+  // Motor único de búsqueda (busqueda-core): + ejecutivo; mayúsculas y RUT sin puntos/guion
+  return DATA.filter(r => AF_BUSCA.coincide([r.num_orden,r.parque,r.nombre_parque,r.rut_parque,r.mes,r.numero_factura,...(r.ops||[]).flatMap(o=>[o.num_op,o.dealer,o.ejecutivo])], q));
+}
+
+function celdaAccion(r){
+  if (r.pagado){
+    const rev = CAN.revertir ? `<button class="btn-revertir" onclick="revertir(${r.id})">Revertir</button>` : '';
+    return `<span class="pagado-tag">Pagado hoy</span>${rev}`;
+  }
+  if (r.enviado){
+    const undo = CAN.revertir ? `<button class="btn-deshacer" onclick="revertirEnvio(${r.id})">Deshacer envío</button>` : '';
+    return `<span class="enviado-tag" title="Enviado por ${escH(r.enviado_por||'')}">✓ Enviado a pago</span>${undo}`;
+  }
+  const dis = CAN.seleccionar ? '' : 'disabled title="'+quienTxt('seleccionar')+'"';
+  return `<span class="pagar-cell">
+    <span class="indbox" id="indmax_${r.id}" title="En propuesta Máximo de operaciones"></span>
+    <span class="indbox" id="indant_${r.id}" title="En propuesta Prioriza antigüedad"></span>
+    <input type="checkbox" class="selchk" data-id="${r.id}" ${r.sel?'checked':''} ${dis} onchange="toggleSel(${r.id},this)">
+  </span>`;
+}
+
+function render(){
+  const tb = document.getElementById('body');
+  const rows = visibles();
+  if (!rows.length){ tb.innerHTML=''; document.getElementById('vacio').style.display=''; recalc(); return; }
+  document.getElementById('vacio').style.display='none';
+  tb.innerHTML = rows.map(r => `
+    <tr id="row_${r.id}" class="${r.pagado?'sel':(r.enviado?'row-enviado':(r.sel?'row-sel':''))}">
+      <td>${r.orden_id ? `<a href="javascript:void 0" onclick="verODP(${r.orden_id})" title="Ver la Orden de Pago" style="color:#0141A2;font-weight:800;text-decoration:none"><i class="bi bi-file-earmark-text me-1"></i>${escH(r.num_orden)}</a><div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_orden)}</div>` : (r.num_orden ? `<b>${escH(r.num_orden)}</b>` : '—')}</td>
+      <td>${r.numero_factura ? `${r.factura_doc_id ? `<a href="javascript:void 0" onclick="verFactura(${r.factura_doc_id})" title="Ver el documento adjunto" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-paperclip me-1"></i>` : '<b>'}${r.es_boleta?'Boleta':'Factura'} N° ${escH(r.numero_factura)}${r.factura_doc_id ? '</a>' : '</b>'}<div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_factura)}${r.monto_factura ? ' · ' + fmt(r.monto_factura) : ''}</div>` : fechaCL(r.fecha_factura)}</td>
+      <td>${escH(r.rut_parque||'—')}</td>
+      <td><b>${escH(r.parque||'—')}</b>${r.nombre_parque && r.nombre_parque!==r.parque ? `<div style="font-size:.72rem;color:#64748b">${escH(r.nombre_parque)}</div>` : ''}<div style="font-size:.72rem;color:#94a3b8">período ${escH(r.mes||'')}</div></td>
+      <td>${escH(r.num_cuenta||'—')}</td>
+      <td>${escH(r.banco||'—')}</td>
+      <td style="text-align:center"><span class="ops-link" onclick="toggleDet(${r.id})" title="Ver las operaciones de esta orden"><i class="bi bi-chevron-down me-1" id="chev_${r.id}"></i>${r.n_ops||1} OP</span></td>
+      <td style="text-align:center"><span class="dias-pill ${r.dcls}">${r.dias==null?'—':r.dias+' d'}</span></td>
+      <td class="num">${fmt(montoP(r))}</td>
+      <td style="text-align:center">${celdaAccion(r)}</td>
+    </tr>
+    <tr class="det" id="det_${r.id}" style="display:none"><td colspan="10">
+      <table><thead><tr><th>N° OP</th><th>Dealer</th><th>Ejecutivo</th><th class="num">Comisión parque</th></tr></thead>
+      <tbody>${(r.ops||[]).map(o => `<tr><td><b>${escH(o.num_op)}</b></td><td>${escH(o.dealer||'—')}</td><td>${escH(o.ejecutivo||'—')}</td><td class="num">${fmt(o.comision)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="3" style="text-align:right;position:static;font-size:.76rem">Comisión por créditos ${fmt(r.comision_creditos)}${r.arriendo ? ' + arriendo ' + fmt(r.arriendo) : ''} = Total ODP</td><td class="num" style="position:static">${fmt(montoP(r))}</td></tr></tfoot></table>
+    </td></tr>`).join('');
+  recalc();
+}
+
+function toggleDet(id){
+  const d = document.getElementById('det_'+id), c = document.getElementById('chev_'+id);
+  if (!d) return; const abierto = d.style.display !== 'none';
+  d.style.display = abierto ? 'none' : ''; if (c) c.className = 'bi me-1 ' + (abierto ? 'bi-chevron-down' : 'bi-chevron-up');
+}
+const montoP = r => Number(r.monto_odp) || 0;
+function toggleSel(id, chk){
+  const r = DATA.find(x => x.id===id); if (!r) return;
+  r.sel = chk.checked;
+  propActiva = null;
+  document.getElementById('row_'+id)?.classList.toggle('row-sel', r.sel);
+  recalc();
+}
+
+async function revertir(id){
+  const r = DATA.find(x => x.id===id); if (!r) return;
+  if (!confirm(`¿Revertir el pago de la ${r.num_orden||r.parque}?`)) return;
   try {
-    const r = await fetch('/api/comisiones-parques/'+acc, { method:'POST', headers:H, body: JSON.stringify({ mes: elMes.value, parque }) });
-    const j = await r.json();
-    if(!j.success) throw new Error(j.error||'Error');
-    toast(acc==='aprobar'? 'Comisión aprobada' : acc==='emitir'? ('Orden de Pago '+(j.data.odp_numero||'')+' emitida — correo y alerta enviados') : 'Pago confirmado — ejecutivos notificados');
-    cargar();
+    const resp = await fetch('/api/comisiones-parques/a-pagar/desmarcar', { method:'POST', headers:H, body: JSON.stringify({ ids:[id] }) });
+    const j = await resp.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    if (j.data && j.data.desmarcados === 0) throw new Error('No se puede revertir: el pago no es de hoy.');
+    r.pagado = false; r.sel = false; propActiva = null;
+    render(); toast(`${r.num_orden||r.parque} revertida`);
   } catch(e){ toast(e.message, true); }
 }
-(async () => {
+
+const sum = arr => arr.reduce((a,r)=>a+montoP(r),0);
+const seleccionadas = () => DATA.filter(r => !r.pagado && !r.enviado && r.sel);
+const enviadas      = () => DATA.filter(r => !r.pagado && r.enviado);
+
+function recalc(){
+  const rows = visibles();
+  document.getElementById('totSaldo').textContent = fmt(sum(rows));
+  const pend = DATA.filter(r => !r.pagado), pag = DATA.filter(r => r.pagado);
+  document.getElementById('cntPend').textContent   = pend.length;
+  document.getElementById('montoPend').textContent = fmt(sum(pend));
+  document.getElementById('cntPag').textContent    = pag.length;
+  document.getElementById('montoPag').textContent  = fmt(sum(pag));
+  const sel = seleccionadas(), env = enviadas();
+  document.getElementById('selN').textContent = sel.length;
+  document.getElementById('selM').textContent = fmt(sum(sel));
+  /* Aviso de sobregiro: lo seleccionado no puede pasar el "Disponible para asignar"
+     (fondos del día menos lo ya pagado y lo ya enviado a pago). */
+  const dispAsig = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado || r.enviado)));
+  const excede = sum(sel) - dispAsig;
+  const boxSel = document.querySelector('.stat.selb');
+  const subSel = document.getElementById('selSub');
+  if (boxSel) boxSel.classList.toggle('excede', excede > 0);
+  if (subSel) subSel.textContent = !sel.length ? ''
+    : excede > 0 ? ('Excede los fondos en ' + fmt(excede) + ' — no alcanza para pagarlas todas hoy')
+    : ('Queda disponible ' + fmt(dispAsig - sum(sel)));
+  const be = document.getElementById('btnEnviar');
+  be.disabled = sel.length===0 || !CAN.seleccionar;
+  be.title = CAN.seleccionar ? '' : quienTxt('seleccionar');
+  const bc = document.getElementById('btnConfirmar'), bn = document.getElementById('btnNomina'), bv = document.getElementById('btnCSV');
+  bc.disabled = env.length===0 || !CAN.pagar;
+  bn.disabled = env.length===0 || !CAN.nomina;
+  bv.disabled = env.length===0 || !CAN.nomina;
+  const bt = document.getElementById('btnTEF'); if (bt) bt.disabled = env.length===0 || !CAN.nomina;
+  bc.title = CAN.pagar ? '' : quienTxt('pagar');
+  bn.title = bv.title = CAN.nomina ? '' : quienTxt('nomina');
+  document.getElementById('accionBar').style.display = DATA.some(r => !r.pagado) ? 'flex' : 'none';
+  recalcPropuestas();
+}
+
+let fondosTimer = null;
+function onFondos(inp){
+  const digits = (inp.value||'').replace(/\D/g,'');
+  fondosVal = Number(digits||0);
+  inp.value = digits ? '$'+fondosVal.toLocaleString('es-CL') : '';
+  recalcPropuestas();
+  recalc();          // repinta el aviso rojo de "seleccionadas > disponible"
+  clearTimeout(fondosTimer);
+  fondosTimer = setTimeout(guardarFondos, 600);
+}
+
+function pintarMetaFondos(d){
+  const el = document.getElementById('fondosMeta');
+  if (!el) return;
+  let base;
+  if (d && d.fecha_iso){
+    const f = new Date(d.fecha_iso).toLocaleString('es-CL', { timeZone:'America/Santiago', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    base = `Cargado por ${d.usuario||'—'} · ${f}`;
+  } else { base = 'Sin monto cargado hoy'; }
+  el.textContent = CAN.fondos ? base : base + ' · ' + quienTxt('fondos');
+}
+
+function aplicarPermFondos(){
+  const inp = document.getElementById('fondos');
+  if (!inp) return;
+  inp.disabled = !CAN.fondos;
+  inp.style.background = CAN.fondos ? '' : '#f1f5f9';
+  inp.style.cursor = CAN.fondos ? '' : 'not-allowed';
+  if (!CAN.fondos) inp.title = quienTxt('fondos');
+}
+
+async function cargarFondos(){
+  aplicarPermFondos();
   try {
-    const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } });
+    const r = await fetch('/api/comisiones-parques/a-pagar/fondos', { headers:H });
     const j = await r.json();
-    (j.funcionalidades||[]).forEach(c=>FUNCS.add(c));
-  } catch(e) {}
-  cargar();
-})();
+    const d = j.data;
+    if (d && d.fecha_dia === HOY_CL()){
+      fondosVal = Number(d.monto)||0;
+      if (fondosVal) document.getElementById('fondos').value = '$'+fondosVal.toLocaleString('es-CL');
+      pintarMetaFondos(d);
+    } else { fondosVal = 0; pintarMetaFondos(null); }
+  } catch(e){ pintarMetaFondos(null); }
+}
+
+async function guardarFondos(){
+  if (!CAN.fondos) return;
+  const payload = { monto: fondosVal, fecha_iso: new Date().toISOString(), fecha_dia: HOY_CL() };
+  try {
+    const r = await fetch('/api/comisiones-parques/a-pagar/fondos', { method:'PUT', headers:H, body: JSON.stringify(payload) });
+    const j = await r.json();
+    pintarMetaFondos(j.data || { ...payload, usuario: (yo.nombre+' '+(yo.apellido||'')).trim() });
+  } catch(e){}
+}
+
+function recalcPropuestas(){
+  const D = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado || r.enviado)));
+  document.getElementById('fondosSub').textContent = 'Disponible para asignar: ' + fmt(D);
+  const cand = DATA.filter(r => !r.pagado && !r.enviado);
+
+  const llenar = lista => { const set=[]; let acc=0;
+    for (const r of lista){ const v=montoP(r); if (acc+v <= D){ set.push(r); acc+=v; } }
+    return { set, monto:acc };
+  };
+  lastProp.max = llenar(cand.slice().sort((a,b)=>montoP(a)-montoP(b)));
+  lastProp.ant = llenar(cand);
+
+  const pintar = (which, nEl, mEl, btn) => {
+    const p = lastProp[which];
+    document.getElementById(nEl).textContent = p.set.length + ' ODP X ' + fmt(p.monto);
+    document.getElementById(mEl).textContent = 'Queda disponible ' + fmt(D - p.monto);
+    const b = document.getElementById(btn);
+    const on = (propActiva === which);
+    b.classList.toggle('on', on);
+    b.textContent = on ? '✓ Seleccionada' : 'Marcar';
+    b.disabled = (p.set.length === 0 && !on) || !CAN.seleccionar;
+    b.title = CAN.seleccionar ? '' : quienTxt('seleccionar');
+  };
+  pintar('max','propMaxN','propMaxM','propMaxBtn');
+  pintar('ant','propAntN','propAntM','propAntBtn');
+  document.getElementById('propBox').style.display = fondosVal > 0 ? 'flex' : 'none';
+  pintarIndicadores();
+}
+
+function pintarIndicadores(){
+  const inMax = new Set(lastProp.max.set.map(r => r.id));
+  const inAnt = new Set(lastProp.ant.set.map(r => r.id));
+  DATA.forEach(r => {
+    if (r.pagado) return;
+    const em = document.getElementById('indmax_'+r.id);
+    const ea = document.getElementById('indant_'+r.id);
+    if (em) em.className = 'indbox' + (inMax.has(r.id) ? ' on-max' : '');
+    if (ea) ea.className = 'indbox' + (inAnt.has(r.id) ? ' on-ant' : '');
+  });
+}
+
+function hl(which){
+  document.querySelectorAll('tr.row-prop, tr.row-prop-ant').forEach(tr => tr.classList.remove('row-prop','row-prop-ant'));
+  if (!which) return;
+  const cls = which==='ant' ? 'row-prop-ant' : 'row-prop';
+  lastProp[which].set.forEach(r => document.getElementById('row_'+r.id)?.classList.add(cls));
+}
+
+function aplicarPropuesta(which){
+  if (propActiva === which){
+    propActiva = null;
+    DATA.forEach(r => { if (!r.pagado && !r.enviado) r.sel = false; });
+  } else {
+    propActiva = which;
+    const ids = new Set(lastProp[which].set.map(r => r.id));
+    DATA.forEach(r => { if (!r.pagado && !r.enviado) r.sel = ids.has(r.id); });
+  }
+  hl(null); render();
+}
+
+async function enviarSeleccion(){
+  const sel = seleccionadas();
+  if (!sel.length) return;
+  if (!confirm(`Vas a ENVIAR A PAGO ${sel.length} orden(es) de pago por ${fmt(sum(sel))}. Quedarán fijas para que Tesorería las pague. ¿Confirmas?`)) return;
+  const ids = sel.map(r => r.id);
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando…';
+  try {
+    const resp = await fetch('/api/comisiones-parques/a-pagar/enviar-a-pago', { method:'POST', headers:H, body: JSON.stringify({ ids }) });
+    const j = await resp.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    sel.forEach(r => { r.enviado = true; r.sel = false; r.enviado_por = (yo.nombre+' '+(yo.apellido||'')).trim(); });
+    propActiva = null;
+    render(); toast(`${ids.length} orden(es) de parque enviadas a pago`);
+  } catch(e){ toast(e.message, true); }
+  btn.innerHTML = '<i class="bi bi-send-check me-1"></i>Enviar a Pago';
+}
+
+async function revertirEnvio(id){
+  const r = DATA.find(x => x.id===id); if (!r) return;
+  if (!confirm(`¿Deshacer el envío a pago de la ${r.num_orden||r.parque}? Volverá a quedar seleccionable.`)) return;
+  try {
+    const resp = await fetch('/api/comisiones-parques/a-pagar/desmarcar', { method:'POST', headers:H, body: JSON.stringify({ ids:[id], etapa:'ENVIADO A PAGO' }) });
+    const j = await resp.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    if (j.data && j.data.desmarcados === 0) throw new Error('No se pudo deshacer (¿no es de hoy?).');
+    r.enviado = false; r.sel = false; propActiva = null;
+    render(); toast(`Envío de ${r.num_orden||r.parque} deshecho`);
+  } catch(e){ toast(e.message, true); }
+}
+
+async function confirmarPago(){
+  const env = enviadas();
+  if (!env.length) return;
+  if (!confirm(`Vas a registrar el PAGO de ${env.length} orden(es) de pago por ${fmt(sum(env))}. ¿Confirmas?`)) return;
+  const ids = env.map(r => r.id);
+  const btn = document.getElementById('btnConfirmar');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Procesando…';
+  try {
+    const resp = await fetch('/api/comisiones-parques/a-pagar/pagar', { method:'POST', headers:H, body: JSON.stringify({ ids }) });
+    const j = await resp.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    env.forEach(r => { r.pagado = true; r.sel = false; });
+    propActiva = null;
+    render(); toast(`${ids.length} parque(s) pagados — ejecutivos y parque avisados`);
+  } catch(e){ toast(e.message, true); }
+  btn.innerHTML = '<i class="bi bi-check2-all me-1"></i>Confirmar pago';
+}
+
+function nominaRows(){ return enviadas(); }
+const COLS = ['RUT Beneficiario','Nombre Beneficiario','Banco','N° Cuenta','Monto','Glosa'];
+function nominaMatriz(){
+  return nominaRows().map(r => [
+    r.rut_parque||'', r.nombre_parque||r.parque||'', r.banco||'', r.num_cuenta||'',
+    Math.round(montoP(r)), `Pago com parque ${r.num_orden||r.parque}`
+  ]);
+}
+async function copiarNomina(){
+  const m = nominaMatriz();
+  if (!m.length) return;
+  const tsv = [COLS.join('\t'), ...m.map(f => f.join('\t'))].join('\n');
+  const html = `<table border="1" cellpadding="4" style="border-collapse:collapse;font-family:Arial;font-size:12px">
+    <thead><tr>${COLS.map(c=>`<th style="background:#dbeafe">${c}</th>`).join('')}</tr></thead>
+    <tbody>${m.map(f=>`<tr>${f.map((v,i)=>`<td${i===4?' align="right"':''}>${escH(i===4?fmt(v):v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  try {
+    if (navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html],{type:'text/html'}),
+        'text/plain': new Blob([tsv],{type:'text/plain'}),
+      })]);
+    } else { await navigator.clipboard.writeText(tsv); }
+    toast(`Nómina de ${m.length} pago(s) copiada`);
+  } catch(e){ toast('No se pudo copiar: '+e.message, true); }
+}
+function descargarCSV(){
+  const m = nominaMatriz();
+  if (!m.length) return;
+  const esc = v => { const s=String(v); return /[;"\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const csv = [COLS.join(';'), ...m.map(f => f.map(esc).join(';'))].join('\r\n');
+  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `nomina-parques-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast(`CSV de ${m.length} pago(s) descargado`);
+}
+
+/* ── TEF masiva Banco Internacional (motor único shared/tef-internacional.js) ── */
+const TEF_PLATAFORMA = 'PARQUES';
+async function cargarCupoTEF(){
+  try {
+    const j = await fetch('/api/tef/cupo', { headers:H }).then(r=>r.json());
+    const el = document.getElementById('tefCupo'), bd = document.getElementById('tefCupoBadge');
+    if (!j.success) { if (bd) bd.textContent = 'cupo n/d'; return; }
+    const c = j.data;
+    if (bd) { bd.textContent = `${c.restantes}/${c.gratis} gratis`; bd.style.background = c.restantes <= 10 ? '#fee2e2' : '#eff6ff'; bd.style.color = c.restantes <= 10 ? '#991b1b' : '#1e40af'; }
+    if (el) { el.textContent = `${c.usados} transferencias enviadas en ${c.mes}` + (Object.keys(c.por_plataforma||{}).length ? ' · ' + Object.entries(c.por_plataforma).map(([k,v])=>`${k.toLowerCase()} ${v}`).join(' · ') : ''); }
+  } catch(e){ const bd = document.getElementById('tefCupoBadge'); if (bd) bd.textContent = 'cupo n/d'; }
+}
+function filasTEF(){ return nominaRows().map(r => ({ id:r.id, parque:r.parque, odp_numero:r.num_orden })); }   // el motor arma banco/cuenta desde la ficha del parque y el monto desde la ODP
+async function descargarTEF(){
+  const filas = filasTEF(); if (!filas.length) return;
+  if (!confirm(`Se generará el archivo TEF del Banco Internacional con ${filas.length} parque(s) y sus pagos quedarán CONFIRMADOS (con sus avisos). ¿Continuar?`)) return;
+  const btn = document.getElementById('btnTEF'); btn.disabled = true;
+  try {
+    const j = await fetch('/api/tef/internacional', { method:'POST', headers:H, body: JSON.stringify({ plataforma: TEF_PLATAFORMA, filas }) }).then(r=>r.json());
+    if (!j.success) return toast(j.error || 'No se pudo generar el archivo', true);
+    const d = j.data;
+    if (d.cargos) {
+      const bin = atob(d.archivo_base64), arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([arr], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      a.download = d.nombre_archivo; a.click(); URL.revokeObjectURL(a.href);
+    }
+    toast(`TEF: ${d.cargos} transferencia(s) por $${Number(d.monto_total).toLocaleString('es-CL')}` + (d.excluidas.length ? ` · ${d.excluidas.length} fuera del archivo` : ''), !d.cargos);
+    if ((d.divididas||[]).length) toast(`${d.divididas.length} pago(s) sobre el máximo del banco se dividieron en partes: ` + d.divididas.map(x => `${x.ref} en ${x.partes}`).join(', '));
+    if (d.excluidas.length) alert('Quedaron FUERA del archivo (pagar por transferencia individual o corregir la ficha):\n' + d.excluidas.map(x => `• ${x.ref} ${x.nombre}: ${x.motivo}`).join('\n'));
+    cargarCupoTEF();
+    /* Generado el archivo = pagado (Pato, 11-09-2026): las operaciones incluidas se registran como pagadas
+       por el mismo endpoint de «Confirmar pago» (contabiliza y manda los correos); las excluidas siguen pendientes. */
+    const incluidas = filas.filter(f => !(d.excluidas||[]).some(x => x.ref === f.parque)).map(f => f.id).filter(Boolean);
+    if (d.cargos && incluidas.length) await pagarTrasTEF(incluidas);
+  } catch(e){ toast('Error de red', true); }
+  finally { btn.disabled = false; }
+}
+async function pagarTrasTEF(ids){
+  try {
+    const j = await fetch('/api/comisiones-parques/a-pagar/pagar', { method:'POST', headers:H, body: JSON.stringify({ ids }) }).then(r=>r.json());
+    if (!j.success) throw new Error(j.error||'Error');
+    nominaRows().filter(r => ids.includes(r.id)).forEach(r => { r.pagado = true; r.sel = false; });
+    propActiva = null;
+    render(); toast(`${ids.length} parque(s) registrados como pagados`);
+  } catch(e){ toast('El archivo se generó, pero no se pudo registrar el pago: ' + e.message + '. Usa «Confirmar pago».', true); }
+}
+cargarCupoTEF();
 </script>
-<script src="/js/odp-preemision.js"></script>
 <script>
-/* Ver la Orden de Pago sin salir de la pantalla — motor único /js/odp-documento.js (igual que Saldos y Comisiones a Pagar) */
+/* Ver la Orden de Pago sin salir de la pantalla — motor único /js/odp-documento.js (igual que Saldos Precios a Pagar) */
 async function verODP(ordenId){
   const dlg = document.getElementById('dlgODP');
   document.getElementById('odpTitulo').textContent = 'Orden de Pago';
@@ -324,8 +653,9 @@ async function verODP(ordenId){
     if (!j.success || !j.data) throw new Error(j.error||'No se pudo cargar la orden');
     document.getElementById('odpTitulo').textContent = j.data.numero || 'Orden de Pago';
     document.getElementById('odpBody').innerHTML = AF_ODP_DOC.html(j.data);
-  } catch(e){ document.getElementById('odpBody').innerHTML = '<p style="color:#b91c1c;padding:20px 0;text-align:center">'+esc(e.message)+'</p>'; }
+  } catch(e){ document.getElementById('odpBody').innerHTML = '<p style="color:#b91c1c;padding:20px 0;text-align:center">'+escH(e.message)+'</p>'; }
 }
+/* La factura adjunta se sirve con token: se baja como blob y se abre en otra pestaña */
 async function verFactura(docId){
   try {
     const r = await fetch('/api/postventa/factura-doc/'+docId, { headers:H });
@@ -346,48 +676,9 @@ async function verFactura(docId){
   </div>
 </dialog>
 <script src="/js/timbre-pagado.js"></script>
-<script src="/js/odp-documento.js?v=232.5"></script>
+<script src="/js/odp-documento.js?v=232.4"></script>
+<script src="/js/busqueda-core.js"></script>
 <script src="/js/topnav.js"></script>
-<script src="/js/app-version.js">
-/* ── TEF masiva Banco Internacional (motor único shared/tef-internacional.js) ── */
-const TEF_PLATAFORMA = 'PARQUES';
-async function cargarCupoTEF(){
-  try {
-    const j = await fetch('/api/tef/cupo', { headers:H }).then(r=>r.json());
-    const el = document.getElementById('tefCupo'), bd = document.getElementById('tefCupoBadge');
-    if (!j.success) { if (bd) bd.textContent = 'cupo n/d'; return; }
-    const c = j.data;
-    if (bd) { bd.textContent = `${c.restantes}/${c.gratis} gratis`; bd.style.background = c.restantes <= 10 ? '#fee2e2' : '#eff6ff'; bd.style.color = c.restantes <= 10 ? '#991b1b' : '#1e40af'; }
-    if (el) { el.textContent = `${c.usados} transferencias enviadas en ${c.mes}` + (Object.keys(c.por_plataforma||{}).length ? ' · ' + Object.entries(c.por_plataforma).map(([k,v])=>`${k.toLowerCase()} ${v}`).join(' · ') : ''); }
-  } catch(e){ const bd = document.getElementById('tefCupoBadge'); if (bd) bd.textContent = 'cupo n/d'; }
-}
-function filasTEF(){ return ROWS.filter(r => r.etapa === 'OP_EMITIDA' && r.odp_numero).map(r => ({ parque: r.parque, odp_numero: r.odp_numero })); }
-async function descargarTEF(){
-  const filas = filasTEF(); if (!filas.length) return;
-  if (!confirm(`Se generará el archivo TEF del Banco Internacional con ${filas.length} parque(s) y sus pagos quedarán CONFIRMADOS (con sus avisos). ¿Continuar?`)) return;
-  const btn = document.getElementById('btnTEF'); btn.disabled = true;
-  try {
-    const j = await fetch('/api/tef/internacional', { method:'POST', headers:H, body: JSON.stringify({ plataforma: TEF_PLATAFORMA, filas }) }).then(r=>r.json());
-    if (!j.success) return toast(j.error || 'No se pudo generar el archivo', true);
-    const d = j.data;
-    if (d.cargos) {
-      const bin = atob(d.archivo_base64), arr = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([arr], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-      a.download = d.nombre_archivo; a.click(); URL.revokeObjectURL(a.href);
-    }
-    toast(`TEF: ${d.cargos} transferencia(s) por $${Number(d.monto_total).toLocaleString('es-CL')}` + (d.excluidas.length ? ` · ${d.excluidas.length} fuera del archivo` : ''), !d.cargos);
-    if ((d.divididas||[]).length) toast(`${d.divididas.length} pago(s) sobre el máximo del banco se dividieron en partes: ` + d.divididas.map(x => `${x.ref} en ${x.partes}`).join(', '));
-    if (d.excluidas.length) alert('Quedaron FUERA del archivo (pagar por transferencia individual o corregir la ficha):\n' + d.excluidas.map(x => `• ${x.ref} ${x.nombre}: ${x.motivo}`).join('\n'));
-    cargarCupoTEF();
-    // Generado el archivo = pagado: cada parque incluido pasa por la misma acción «Confirmar Pago»
-    const incluidos = filas.filter(f => !(d.excluidas||[]).some(x => x.ref === f.parque));
-    for (const f of incluidos) await ejecutarAccion('pagar', f.parque);
-  } catch(e){ toast('Error de red', true); }
-  finally { btn.disabled = false; }
-}
-cargarCupoTEF();
-</script>
+<script src="/js/app-version.js"></script>
 </body>
 </html>

@@ -24,6 +24,14 @@ router.get('/cartolas-enviadas',         verifyToken, cartola, c.cartolasEnviada
 router.delete('/cartolas-enviadas/:id',  verifyToken, requireFunc('pv_parques_aprobar'), c.cartolaReversarEnvio);
 
 // Reversas (con motivo, auditadas)
+// Comisiones Parques a Pagar — espejo de Comisiones Dealer a Pagar (15-09-2026)
+router.get ('/atribuciones',            verifyToken, c.getAtribucionesParques);
+router.get ('/a-pagar',                 verifyToken, ver, c.aPagar);
+router.get ('/a-pagar/fondos',          verifyToken, ver, c.getFondosParques);
+router.put ('/a-pagar/fondos',          verifyToken, requireFunc('pv_parques_fondos_definir'), c.setFondosParques);
+router.post('/a-pagar/enviar-a-pago',   verifyToken, requireFunc('pv_parques_seleccionar'),    c.enviarAPagoParques);
+router.post('/a-pagar/pagar',           verifyToken, requireFunc('pv_parques_pagar'),          c.pagarParques);
+router.post('/a-pagar/desmarcar',       verifyToken, requireFunc('pv_parques_revertir'),       c.desmarcarParques);
 router.post('/anular-odp',    verifyToken, requireFunc('pv_parques_emitir'), c.anularODP);
 router.post('/revertir-pago', verifyToken, requireFunc('pv_parques_pagar'),  c.revertirPago);
 

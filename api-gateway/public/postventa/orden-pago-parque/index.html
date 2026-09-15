@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emisión Orden de Pago Comisión Parque — AutoFácil</title>
+  <!-- v1.0 — Emisión Orden de Pago Comisión Parque (15-09-2026): nace de Comisiones Parques a Pagar; aquí se aprueba, se adjunta la factura y se emite la ODP. El pago se hace en Comisiones Parques a Pagar (espejo de dealers). -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .wrap { max-width:none; margin:0 auto; padding:20px 24px; }
+    .head-row { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+    .resumen { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+    .stat { flex:1 1 200px; background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; border-left:5px solid #cbd5e1; box-sizing:border-box; }
+    .stat .lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; font-weight:700; }
+    .stat .val { font-size:1.4rem; font-weight:800; color:var(--navy); margin-top:2px; }
+    .stat.arr  { border-left-color:#0ea5e9; }
+    .stat.com  { border-left-color:#7c3aed; }
+    .stat.tot  { border-left-color:#0141A2; }
+    .stat.pag  { border-left-color:#16a34a; } .stat.pag .val { color:#15803d; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; }
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    thead th { position:sticky; top:0; z-index:2; background:#0f2a52; color:#fff; font-size:.68rem; text-transform:uppercase; letter-spacing:.3px; padding:9px 12px; text-align:left; white-space:nowrap; }
+    thead th.num { text-align:right; }
+    tbody td { padding:9px 12px; border-bottom:1px solid #f1f5f9; white-space:nowrap; vertical-align:middle; }
+    tbody td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    tbody tr.rowp { cursor:pointer; }
+    tbody tr.rowp:hover { background:#f8fafc; }
+    tfoot td { background:#f1f5f9; font-weight:800; color:var(--navy); padding:10px 12px; border-top:2px solid #cbd5e1; }
+    tfoot td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    .etapa { display:inline-block; border-radius:9px; padding:3px 11px; font-size:.73rem; font-weight:800; letter-spacing:.2px; }
+    .et-apro { background:#f1f5f9; color:#475569; }
+    .et-ok   { background:#dbeafe; color:#1d4ed8; }
+    .et-op   { background:#ffedd5; color:#c2410c; }
+    .et-pag  { background:#dcfce7; color:#15803d; }
+    .btn-a { border:none; border-radius:8px; padding:6px 13px; font-weight:800; font-size:.78rem; cursor:pointer; color:#fff; }
+    .btn-a:disabled { opacity:.4; cursor:default; }
+    .b-aprobar { background:#0141A2; }
+    .b-emitir  { background:#c2410c; }
+    .b-pagar   { background:#16a34a; }
+    .odp-tag { font-weight:800; color:#c2410c; font-size:.8rem; }
+    .odp-link { font-weight:800; color:#0141A2; font-size:.8rem; text-decoration:none; }
+    .fac-link { font-weight:700; color:#0141A2; font-size:.78rem; text-decoration:none; }
+    .ops-link { cursor:pointer; color:#0141A2; font-weight:800; text-decoration:underline dotted; }
+    #dlgODP::backdrop { background:rgba(15,23,42,.55); }
+    .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
+    .hito { display:block; font-size:.68rem; color:#94a3b8; }
+    .det-row td { background:#f8fafc; padding:0 12px 14px; }
+    .det-box { background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-top:8px; overflow:hidden; }
+    .det-box table { font-size:.79rem; }
+    .det-box thead th { background:#e2e8f0; color:#334155; position:static; }
+    .vacio { text-align:center; color:#94a3b8; padding:40px; font-size:.9rem; }
+    #mes { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.9rem; font-weight:700; color:var(--navy); }
+    .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
+    .toast.err { background:#dc2626; }
+    .foot-note { background:#f8fafc; border-left:4px solid #0141A2; border-radius:10px; padding:14px 18px; margin-top:18px; font-size:.82rem; color:#475569; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Post Venta',href:'/postventa/'},{label:'Emisión Orden de Pago Comisión Parque',current:true}]};</script>
+
+<div class="wrap">
+  <div class="head-row">
+    <div style="flex:1 1 480px;min-width:0">
+      <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-receipt-cutoff me-2"></i>Emisión Orden de Pago — Comisión Parque</h5>
+      <span style="font-size:.82rem;color:#64748b">Pago mensual a cada parque: <b>arriendo</b> + <b>comisión por créditos</b> (según el mantenedor <a href="/mantenedores/parques/">Arriendos y Comisiones Parque y Calle</a>). Pincha un parque para ver sus operaciones. Flujo: <b>Aprobar → adjuntar Factura → Emitir Orden de Pago</b> (correo a Contabilidad). El pago se hace en <a href="/postventa/comisiones-parques/">Comisiones Parques a Pagar</a>.</span>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:10px;margin-left:auto;flex:0 0 auto">
+      <input type="month" id="mes">
+
+    </div>
+  </div>
+
+  <div class="resumen">
+    <div class="stat arr"><div class="lbl">Arriendos del mes</div><div class="val" id="stArr">—</div></div>
+    <div class="stat com"><div class="lbl">Comisión por créditos</div><div class="val" id="stCom">—</div></div>
+    <div class="stat tot"><div class="lbl">Total a pagar</div><div class="val" id="stTot">—</div></div>
+    <div class="stat pag"><div class="lbl">Pagado</div><div class="val" id="stPag">—</div></div>
+  </div>
+
+  <div class="card-af">
+    <table>
+      <thead><tr>
+        <th></th><th>Parque</th><th class="num">Ops</th><th class="num">Arriendo</th><th class="num">Comisión créditos</th><th class="num">Total</th><th>Etapa</th><th>Orden de Pago / Factura</th><th style="text-align:center">Acciones</th>
+      </tr></thead>
+      <tbody id="tb"><tr><td colspan="9" class="vacio">Selecciona un mes…</td></tr></tbody>
+      <tfoot id="tf" style="display:none"><tr>
+        <td colspan="2">TOTAL</td><td class="num" id="fOps"></td><td class="num" id="fArr"></td><td class="num" id="fCom"></td><td class="num" id="fTot"></td><td colspan="3"></td>
+      </tr></tfoot>
+    </table>
+  </div>
+
+  <div class="foot-note">
+    <b><i class="bi bi-diagram-3 me-1"></i>Cómo se calcula:</b> el arriendo y el % de comisión salen del mantenedor
+    <a href="/mantenedores/parques/">Arriendos y Comisiones Parque y Calle</a>; la comisión por créditos es la suma de
+    <code>com_parque</code> de cada operación OTORGADA del mes (motor único de comisión dealer). Al <b>aprobar</b>, los montos
+    quedan congelados. La Orden de Pago queda visible para Contabilidad en <a href="/ordenes-pago/">Órdenes de Pago</a>.
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href='/login.html?next='+encodeURIComponent(location.pathname+location.search);
+const yo = JSON.parse(sessionStorage.getItem('usuario') || '{}');
+
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const CLP = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CL');
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none', 3500); }
+
+let FUNCS = new Set();
+const puede = c => yo.perfil==='Administrador' || FUNCS.has(c);
+
+const ETAPAS = {
+  EN_APROBACION:  ['En Aprobación','et-apro'],
+  APROBADA:       ['Aprobada','et-ok'],
+  OP_EMITIDA:     ['Orden de Pago emitida','et-op'],
+  PAGO_REALIZADO: ['Pago realizado','et-pag'],
+};
+
+const elMes = document.getElementById('mes');
+(function initMes(){
+  const d = new Date(); d.setMonth(d.getMonth()-1);          // por defecto: mes anterior cerrado
+  elMes.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+})();
+elMes.addEventListener('change', cargar);
+
+let ROWS = [];
+async function cargar(){
+  const mes = elMes.value; if(!mes) return;
+  document.getElementById('tb').innerHTML = '<tr><td colspan="9" class="vacio">Cargando…</td></tr>';
+  try {
+    const r = await fetch('/api/comisiones-parques?mes='+mes, { headers:H });
+    const j = await r.json();
+    if(!j.success) throw new Error(j.error||'Error');
+    ROWS = j.data.rows||[];
+    pintar();
+  } catch(e){ document.getElementById('tb').innerHTML = '<tr><td colspan="9" class="vacio">'+esc(e.message)+'</td></tr>'; }
+}
+
+function pintar(){
+  const tb = document.getElementById('tb');
+  if(!ROWS.length){ tb.innerHTML='<tr><td colspan="9" class="vacio">Sin parques activos en el mantenedor</td></tr>'; document.getElementById('tf').style.display='none'; return; }
+  let tArr=0,tCom=0,tOps=0,tPag=0;
+  tb.innerHTML = ROWS.map((r,i)=>{
+    tArr+=r.arriendo; tCom+=r.comision_creditos; tOps+=r.ops;
+    if(r.etapa==='PAGO_REALIZADO') tPag+=r.total;
+    const [etTxt,etCls] = ETAPAS[r.etapa]||ETAPAS.EN_APROBACION;
+    const hitos = r.hitos ? ['aprobada','emitida','pagada'].map(k=>{
+      const h=r.hitos[k]; return h? `<span class="hito">${k}: ${esc(h.por||'')} ${new Date(h.fecha).toLocaleDateString('es-CL')}</span>`:'' ;
+    }).join('') : '';
+    let btn='';
+    if(r.etapa==='EN_APROBACION' && puede('pv_parques_aprobar'))
+      btn = `<button class="btn-a b-aprobar" onclick="accion(event,'aprobar','${esc(r.parque)}')"><i class="bi bi-check-lg me-1"></i>Aprobar</button>`;
+    else if(r.etapa==='APROBADA' && puede('pv_parques_emitir'))
+      btn = `<button class="btn-a b-emitir" onclick="accion(event,'emitir','${esc(r.parque)}')"><i class="bi bi-receipt me-1"></i>Emitir Orden de Pago</button>`;
+    else if(r.etapa==='OP_EMITIDA')
+      btn = `<a class="btn-a b-pagar" style="text-decoration:none" href="/postventa/comisiones-parques/" title="El pago se confirma en Comisiones Parques a Pagar"><i class="bi bi-cash-coin me-1"></i>Pagar en Parques a Pagar</a>`;
+    // Factura del parque: se sube ANTES de emitir para que viaje adjunta a Contabilidad (y queda de respaldo)
+    if (r.pago_id && puede('pv_parques_emitir'))
+      btn += ` <button class="btn-a" style="background:#fff;color:#0141A2;border:1px solid #bfdbfe" onclick="subirFacturaParque(event,${r.pago_id},'${esc(r.parque)}')" title="Adjuntar la factura del parque: viaja en el correo de la ODP a Contabilidad y queda de respaldo"><i class="bi bi-paperclip"></i> Factura<span id="facN${r.pago_id}"></span></button>`;
+    return `<tr class="rowp" onclick="toggleDet(${i})">
+      <td><i class="bi bi-chevron-right" id="chev${i}"></i></td>
+      <td style="font-weight:700;color:var(--navy)">${esc(r.parque)}</td>
+      <td class="num"><span class="ops-link" title="Ver las operaciones del parque">${r.ops.toLocaleString('es-CL')} OP</span></td>
+      <td class="num">${CLP(r.arriendo)}</td>
+      <td class="num">${CLP(r.comision_creditos)}</td>
+      <td class="num" style="font-weight:800">${CLP(r.total)}</td>
+      <td><span class="etapa ${etCls}">${etTxt}</span>${hitos}</td>
+      <td onclick="event.stopPropagation()">${r.odp_numero? (r.odp_id ? '<a href="javascript:void 0" class="odp-link" onclick="verODP('+r.odp_id+')" title="Ver la Orden de Pago"><i class="bi bi-file-earmark-text me-1"></i>'+esc(r.odp_numero)+'</a>' : '<span class="odp-tag">'+esc(r.odp_numero)+'</span>')+(r.factura_doc_id ? '<div><a href="javascript:void 0" class="fac-link" onclick="verFactura('+r.factura_doc_id+')" title="Ver la factura adjunta del parque"><i class="bi bi-paperclip me-1"></i>Factura adjunta</a></div>' : '')+(r.hitos&&r.hitos.emitida&&r.hitos.emitida.fecha?'<div style="font-size:.72rem;color:#94a3b8">'+new Date(r.hitos.emitida.fecha).toLocaleDateString('es-CL')+'</div>':''):'—'}</td>
+      <td style="text-align:center" onclick="event.stopPropagation()">${btn||'—'}</td>
+    </tr>
+    <tr class="det-row" id="det${i}" style="display:none"><td colspan="9"><div class="det-box" id="detbox${i}">Cargando…</div></td></tr>`;
+  }).join('');
+  document.getElementById('stArr').textContent = CLP(tArr);
+  document.getElementById('stCom').textContent = CLP(tCom);
+  document.getElementById('stTot').textContent = CLP(tArr+tCom);
+  document.getElementById('stPag').textContent = CLP(tPag);
+  document.getElementById('fOps').textContent = tOps.toLocaleString('es-CL');
+  document.getElementById('fArr').textContent = CLP(tArr);
+  document.getElementById('fCom').textContent = CLP(tCom);
+  document.getElementById('fTot').textContent = CLP(tArr+tCom);
+  document.getElementById('tf').style.display='';
+}
+
+async function toggleDet(i){
+  const row = document.getElementById('det'+i), chev = document.getElementById('chev'+i);
+  const abierto = row.style.display !== 'none';
+  row.style.display = abierto? 'none':'';
+  chev.className = 'bi ' + (abierto? 'bi-chevron-right':'bi-chevron-down');
+  if(abierto) return;
+  const box = document.getElementById('detbox'+i);
+  try {
+    const r = await fetch('/api/comisiones-parques/detalle?mes='+elMes.value+'&parque='+encodeURIComponent(ROWS[i].parque), { headers:H });
+    const j = await r.json();
+    if(!j.success) throw new Error(j.error||'Error');
+    const ops = j.data.ops||[];
+    box.innerHTML = ops.length? `<table>
+      <thead><tr><th>N° Operación</th><th>Dealer</th><th>Ejecutivo</th><th class="num">Saldo Precio</th><th class="num">Comisión Parque</th></tr></thead>
+      <tbody>${ops.map(o=>`<tr>
+        <td style="font-weight:700">${esc(o.num_op)}</td><td>${esc(o.dealer)}</td><td>${esc(o.ejecutivo)}</td>
+        <td class="num">${CLP(o.saldo_precio)}</td><td class="num" style="font-weight:700">${CLP(o.com_parque)}</td></tr>`).join('')}
+      </tbody>
+      <tfoot><tr><td colspan="4">TOTAL COMISIÓN (${ops.length} ops)</td><td class="num">${CLP(j.data.comision_creditos)}</td></tr></tfoot>
+    </table>` : '<div class="vacio">Sin operaciones otorgadas este mes</div>';
+  } catch(e){ box.innerHTML = '<div class="vacio">'+esc(e.message)+'</div>'; }
+}
+
+/* ── Factura del parque: subir/listar (respaldo + adjunto del correo de la ODP) ── */
+async function subirFacturaParque(ev, pagoId, parque){
+  ev.stopPropagation();
+  // Mostrar lo ya subido y ofrecer agregar
+  try {
+    const r = await fetch('/api/postventa/factura-doc?origen=PARQUE&ref_id='+pagoId, { headers:H });
+    const j = await r.json();
+    const ya = (j.success && j.data && j.data.length) ? '\n\nYa adjuntas:\n' + j.data.map(d=>'· '+d.nombre).join('\n') : '';
+    if (!confirm('Adjuntar factura del parque '+parque+'.'+ya+'\n\n¿Elegir archivo?')) return;
+  } catch(_){}
+  const inp = document.createElement('input');
+  inp.type='file'; inp.accept='.pdf,.jpg,.jpeg,.png,.xml';
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    if (f.size > 7*1024*1024) return alert("Máximo 7 MB");
+    const b64 = await new Promise((ok,ko)=>{ const fr=new FileReader(); fr.onload=()=>ok(String(fr.result).split(',')[1]); fr.onerror=ko; fr.readAsDataURL(f); });
+    try {
+      const r = await fetch('/api/postventa/factura-doc', { method:'POST', headers:H,
+        body: JSON.stringify({ origen:'PARQUE', ref_id:pagoId, nombre:f.name, mime:f.type, base64:b64 }) });
+      const j = await r.json();
+      if (!j.success) return alert(j.error||'Error al subir');
+      const n = document.getElementById('facN'+pagoId); if (n) n.textContent=' ✓';
+      alert('Factura "'+f.name+'" adjuntada: viajará en el correo de la ODP a Contabilidad y queda de respaldo.');
+    } catch(_){ alert('Error de conexión'); }
+  };
+  inp.click();
+}
+
+const CONFIRM = {
+  aprobar: p => `¿Aprobar la comisión del parque ${p}? Los montos quedarán congelados.`,
+  emitir:  p => `¿Emitir la Orden de Pago del parque ${p}? Se asignará correlativo y se enviará correo y alerta a Contabilidad.`,
+  pagar:   p => `¿Confirmar el PAGO del parque ${p}? Se avisará a los ejecutivos del parque.`,
+};
+async function accion(ev, acc, parque){
+  ev.stopPropagation();
+  // PRE-EMISIÓN: popup con la orden y los datos que faltan (motor AF_ODP_PRE)
+  if (acc === 'emitir') {
+    const r0 = ROWS.find(x => x.parque === parque) || {};
+    let facturaAdj = '';
+    if (r0.pago_id) {
+      try {
+        const rd = await fetch('/api/postventa/factura-doc?origen=PARQUE&ref_id='+r0.pago_id, { headers:H });
+        const jd = await rd.json();
+        if (jd.success && jd.data && jd.data.length) facturaAdj = jd.data.map(d=>d.nombre).join(', ');
+      } catch(_){}
+    }
+    const faltas = AF_ODP_PRE.check([
+      { etiqueta:'Factura del parque adjunta (obligatoria: la ODP nace de la factura)', valor: facturaAdj, critico:true },
+      { etiqueta:'Total a pagar mayor a $0', valor: (Number(r0.total)>0 ? r0.total : null), critico:true },
+    ]);
+    const F=(k,v)=>`<tr><td style="padding:3px 12px 3px 0;color:#64748b;white-space:nowrap">${k}</td><td style="font-weight:600">${esc(v==null?'—':v)}</td></tr>`;
+    let dlg = document.getElementById('dlgPreParque');
+    if(!dlg){ dlg=document.createElement('dialog'); dlg.id='dlgPreParque'; dlg.style.cssText='border:none;border-radius:14px;max-width:520px;width:94%;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3)'; document.body.appendChild(dlg); }
+    dlg.innerHTML = `
+      <div style="background:linear-gradient(135deg,#001345,#0141A2);color:#fff;padding:13px 20px;font-weight:800">Revisión antes de emitir — ${esc(parque)}</div>
+      <div style="padding:16px 20px;font-size:.88rem">
+        ${AF_ODP_PRE.render(faltas)}
+        <table style="width:100%;border-collapse:collapse">
+          ${F('Período', elMes.value)}${F('Operaciones', r0.ops)}
+          ${F('Arriendo', CLP(r0.arriendo))}${F('Comisión por créditos', CLP(r0.comision_creditos))}
+          ${F('TOTAL A PAGAR', CLP(r0.total))}${F('Factura adjunta', facturaAdj||null)}
+        </table>
+      </div>
+      <div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('dlgPreParque').close()" style="background:#f1f5f9;border:none;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer">Volver</button>
+        <button onclick="document.getElementById('dlgPreParque').close();ejecutarAccion('emitir','${esc(parque)}')" style="background:#c2410c;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer"><i class="bi bi-receipt me-1"></i>Emitir definitivo</button>
+      </div>`;
+    dlg.showModal();
+    return;
+  }
+  if(!confirm(CONFIRM[acc](parque))) return;
+  return ejecutarAccion(acc, parque);
+}
+async function ejecutarAccion(acc, parque){
+  try {
+    const r = await fetch('/api/comisiones-parques/'+acc, { method:'POST', headers:H, body: JSON.stringify({ mes: elMes.value, parque }) });
+    const j = await r.json();
+    if(!j.success) throw new Error(j.error||'Error');
+    toast(acc==='aprobar'? 'Comisión aprobada' : acc==='emitir'? ('Orden de Pago '+(j.data.odp_numero||'')+' emitida — correo y alerta enviados') : 'Pago confirmado — ejecutivos notificados');
+    cargar();
+  } catch(e){ toast(e.message, true); }
+}
+(async () => {
+  try {
+    const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } });
+    const j = await r.json();
+    (j.funcionalidades||[]).forEach(c=>FUNCS.add(c));
+  } catch(e) {}
+  cargar();
+})();
+</script>
+<script src="/js/odp-preemision.js"></script>
+<script>
+/* Ver la Orden de Pago sin salir de la pantalla — motor único /js/odp-documento.js (igual que Saldos y Comisiones a Pagar) */
+async function verODP(ordenId){
+  const dlg = document.getElementById('dlgODP');
+  document.getElementById('odpTitulo').textContent = 'Orden de Pago';
+  document.getElementById('odpBody').innerHTML = '<p style="color:#94a3b8;padding:20px 0;text-align:center">Cargando…</p>';
+  dlg.showModal();
+  try {
+    const r = await fetch('/api/ordenes-pago/ordenes/'+ordenId+'/documento', { headers:H });
+    const j = await r.json();
+    if (!j.success || !j.data) throw new Error(j.error||'No se pudo cargar la orden');
+    document.getElementById('odpTitulo').textContent = j.data.numero || 'Orden de Pago';
+    document.getElementById('odpBody').innerHTML = AF_ODP_DOC.html(j.data);
+  } catch(e){ document.getElementById('odpBody').innerHTML = '<p style="color:#b91c1c;padding:20px 0;text-align:center">'+esc(e.message)+'</p>'; }
+}
+async function verFactura(docId){
+  try {
+    const r = await fetch('/api/postventa/factura-doc/'+docId, { headers:H });
+    if (!r.ok) throw new Error('No se pudo abrir la factura');
+    const url = URL.createObjectURL(await r.blob()); window.open(url, '_blank'); setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  } catch(e){ toast(e.message, true); }
+}
+</script>
+<dialog id="dlgODP" style="border:none;border-radius:16px;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3);max-width:880px;width:96%">
+  <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:15px 20px;font-weight:700;display:flex;justify-content:space-between">
+    <span id="odpTitulo">Orden de Pago</span>
+    <i class="bi bi-x-lg" style="cursor:pointer" onclick="document.getElementById('dlgODP').close()"></i>
+  </div>
+  <div style="padding:18px 20px;font-size:.86rem;color:#334155" id="odpBody"></div>
+  <div style="padding:13px 20px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
+    <button class="btn-ghost" onclick="document.getElementById('dlgODP').close()">Cerrar</button>
+    <a class="btn-ghost" style="text-decoration:none;color:#334155" href="/ordenes-pago/historial/?origen=PARQUE" target="_blank"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir en Órdenes de Pago</a>
+  </div>
+</dialog>
+<script src="/js/timbre-pagado.js"></script>
+<script src="/js/odp-documento.js?v=232.5"></script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

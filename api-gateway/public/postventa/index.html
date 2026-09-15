@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Post Venta — AutoFácil</title>
-  <!-- v1.11 — cards "a Pagar" con el morado de Solo Dios · v1.10 — navbar migrada al componente topnav -->
+  <!-- v1.12 — card Emisión Orden de Pago Comisión Parque; Comisiones Parques a Pagar ahora es solo el pago · v1.11 — cards "a Pagar" con el morado de Solo Dios · v1.10 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -71,7 +71,7 @@
   <a href="/postventa/comisiones-parques/" class="module-card card-pago" id="cardComParques" style="display:none">
     <div class="card-icon"><i class="bi bi-signpost-2"></i></div>
     <h5>Comisiones Parques a Pagar</h5>
-    <p>Pago mensual a cada parque: arriendo + comisión por créditos, con aprobación, orden de pago y confirmación.</p>
+    <p>Órdenes de pago de parque emitidas: fondos del día, selección, envío a pago, nómina/TEF y confirmación (espejo de Comisiones Dealer).</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
   <a href="/postventa/seguimiento-parques/" class="module-card" id="cardSegParques" style="display:none">
@@ -84,6 +84,12 @@
     <div class="card-icon"><i class="bi bi-envelope-paper"></i></div>
     <h5>Emisión de Cartolas Parque</h5>
     <p>Cartola mensual de cada parque (comisiones + arriendo): emitir, aprobar, enviar por correo con el detalle y reversar si hace falta.</p>
+    <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+  </a>
+  <a href="/postventa/orden-pago-parque/" class="module-card" id="cardOrdenParque" style="display:none">
+    <div class="card-icon"><i class="bi bi-receipt-cutoff"></i></div>
+    <h5>Emisión Orden de Pago Comisión Parque</h5>
+    <p>Cartola del parque aprobada: adjunta la factura del parque y emite la orden de pago (correo a Contabilidad).</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
   <a href="/postventa/orden-pago-comision/" class="module-card" id="cardOrdenCom" style="display:none">
@@ -159,6 +165,7 @@ if (!token || !yo) location.href='/login.html';
   if (tiene('postventa_saldos_pagar'))      { document.getElementById('cardOrdenPago').style.display=''; alguna=true; }
   if (tiene('postventa_comisiones_pagar'))  { document.getElementById('cardComPagar').style.display='';  document.getElementById('cardOrdenCom').style.display=''; alguna=true; }
   if (tiene('postventa_comisiones_parques')){ document.getElementById('cardComParques').style.display=''; alguna=true; }
+  if (tiene('postventa_odp_parque') || tiene('pv_parques_emitir') || tiene('pv_parques_aprobar')) { document.getElementById('cardOrdenParque').style.display=''; alguna=true; }
   if (tiene('postventa_seg_parques'))       { document.getElementById('cardSegParques').style.display=''; alguna=true; }
   if (tiene('postventa_cartolas_parque'))   { document.getElementById('cardCartParques').style.display=''; alguna=true; }
   if (tiene('postventa_consulta_saldos'))   { document.getElementById('cardConsSaldo').style.display=''; alguna=true; }

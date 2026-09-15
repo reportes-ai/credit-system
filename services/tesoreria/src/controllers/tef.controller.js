@@ -21,7 +21,7 @@ async function filasParques(items) {
       `SELECT p.nombre, f.rut, f.razon_social, f.banco, f.cuenta_tipo, f.num_cuenta, f.rut_cuenta, f.nombre_cuenta, f.correo_confirmacion
          FROM parques_comisiones p LEFT JOIN parques_ficha f ON f.id_parque = p.id WHERE p.nombre = ? LIMIT 1`, [it.parque]);
     const [[odp]] = await pool.query('SELECT monto FROM op_correlativos WHERE numero = ? AND anulada = 0 LIMIT 1', [it.odp_numero || '']);
-    out.push({ ref: it.parque, rut: p?.rut_cuenta || p?.rut, nombre: p?.razon_social || p?.nombre_cuenta || it.parque, banco: p?.banco,
+    out.push({ id: it.id, ref: it.parque, rut: p?.rut_cuenta || p?.rut, nombre: p?.razon_social || p?.nombre_cuenta || it.parque, banco: p?.banco,
       tipo_cuenta: p?.cuenta_tipo, num_cuenta: p?.num_cuenta, correo: p?.correo_confirmacion, monto: odp?.monto || 0,
       motivo: `Pago com parque ${it.odp_numero || ''}` });   // cabe en los 30 del banco
   }
@@ -35,7 +35,17 @@ async function generar(req, res) {
     if (!PLATAFORMAS.includes(plataforma)) return res.status(400).json({ success: false, data: null, error: 'Plataforma inválida' });
     let filas = Array.isArray(req.body?.filas) ? req.body.filas : [];
     if (!filas.length) return res.status(400).json({ success: false, data: null, error: 'No hay pagos para incluir' });
-    if (plataforma === 'PARQUES') filas = await filasParques(filas);
+    if (plataforma === 'PARQUES') {
+      // Misma segregación que las otras plataformas: quien emitió o mandó a pago no genera el archivo
+      const cp = require('../../../postventa/src/controllers/comisiones-parques.controller');
+      const ids = filas.map(f => Number(f.id)).filter(Boolean);
+      const pv = require('../../../postventa/src/controllers/postventa.controller');
+      const choque = ids.length ? await cp.pagosParqueDe(ids, pv.loginDe(req.usuario)) : [];
+      if (choque.length)
+        return res.status(403).json({ success: false, data: null,
+          error: `No se puede generar el TEF: tú emitiste o mandaste a pago ${choque.join(', ')} y el archivo registra el pago. Debe generarlo otra persona (segregación de funciones).` });
+      filas = await filasParques(filas);
+    }
     /* Segregación de funciones ANTES de generar el archivo (Pato, 14-09-2026): generar el TEF
        registra el pago, así que quien mandó a pago las operaciones no puede generarlo. El 14-09
        JM mandó a pago 7 saldos y generó el TEF: el archivo salió pero el pago se rechazó y las
