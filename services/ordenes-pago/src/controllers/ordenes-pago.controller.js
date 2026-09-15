@@ -511,15 +511,18 @@ const listarOrdenes = async (req, res) => {
       where.push(`(${conds.join(' OR ')})`);
       args.push(...cargs);
     }
-    const [rows] = await pool.query(`
-      SELECT oc.id, oc.numero, oc.origen, oc.origen_id, oc.concepto, oc.monto, oc.created_at AS fecha_emision,
-             oc.usuario_nombre, oc.id_usuario, oc.anulada, oc.anulada_nombre, oc.fecha_anulada, oc.pagada, oc.fecha_pagada,
-             op.proveedor_nombre AS g_prov, op.tipo_documento AS g_tipodoc, op.numero_documento AS g_numdoc,
-             op.estado AS g_estado, op.fecha_pago AS g_fechapago, op.categoria AS g_categoria,
-             pfc.numero_factura AS c_factura,
-             spv.nombre_dealer AS s_dealer, cpv.nombre_dealer AS c_dealer,
-             (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=spo.id_seguimiento AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS saldo_pagado,
-             (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=poc.id_seguimiento AND pe.track='COMISION' AND pe.etapa='COMISION PAGADA' LIMIT 1) AS comision_pagada
+    /* Estado calculado en SQL (una sola regla): así el filtro por estado y el resumen
+       se aplican ANTES del corte. Antes el filtro corría en JS sobre las primeras
+       1.000 y el corte no avisaba: un rango con la migración del 25-06-2026 (10.670
+       órdenes) llegaba incompleto sin decirlo (API Suite Financiera, hilo 60001). */
+    /* oc.pagada manda igual que en el documento (construirDocumento): las 2.180 de saldo
+       migradas están pagadas en el libro central pero sin etapa viva, y salían EMITIDA. */
+    const ESTADO_SQL = `CASE WHEN oc.anulada THEN 'ANULADA'
+        WHEN oc.pagada THEN 'PAGADA'
+        WHEN oc.origen='GENERAL' THEN COALESCE(NULLIF(op.estado,''), 'EMITIDA')
+        WHEN oc.origen='SALDO' THEN IF(EXISTS(SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=spo.id_seguimiento AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO'), 'PAGADA', 'EMITIDA')
+        ELSE IF(EXISTS(SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=poc.id_seguimiento AND pe.track='COMISION' AND pe.etapa='COMISION PAGADA'), 'PAGADA', 'EMITIDA') END`;
+    const FROM_SQL = `
       FROM op_correlativos oc
       LEFT JOIN ordenes_pago op  ON oc.origen='GENERAL'  AND op.id  = oc.origen_id
       LEFT JOIN postventa_ordenes spo          ON oc.origen='SALDO'    AND spo.id = oc.origen_id
@@ -527,11 +530,33 @@ const listarOrdenes = async (req, res) => {
       LEFT JOIN postventa_ordenes_comision poc ON oc.origen='COMISION' AND poc.id = oc.origen_id
       LEFT JOIN postventa_seguimiento cpv      ON cpv.id = poc.id_seguimiento
       LEFT JOIN postventa_facturas_comision pfc ON oc.origen='COMISION' AND pfc.id_seguimiento = poc.id_seguimiento
-      WHERE ${where.join(' AND ')}
-      ORDER BY oc.created_at DESC, oc.id DESC LIMIT 1000`, args);
+      WHERE ${where.join(' AND ')}`;
+    const estFiltro = norm(req.query.estado).toUpperCase();
+    const filtraEstado = ESTADOS.includes(estFiltro);
+    const whereEstado = filtraEstado ? 'WHERE t.estado_calc = ?' : '';
+    const argsEstado = filtraEstado ? [...args, estFiltro] : args;
+    // Paginación: limite (1–5.000, por omisión 1.000 como siempre) y offset.
+    const limite = Math.min(Math.max(parseInt(req.query.limite, 10) || 1000, 1), 5000);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const [rows] = await pool.query(`
+      SELECT * FROM (
+        SELECT oc.id, oc.numero, oc.origen, oc.origen_id, oc.concepto, oc.monto, oc.created_at AS fecha_emision,
+               oc.usuario_nombre, oc.id_usuario, oc.anulada, oc.anulada_nombre, oc.fecha_anulada, oc.pagada, oc.fecha_pagada,
+               op.proveedor_nombre AS g_prov, op.tipo_documento AS g_tipodoc, op.numero_documento AS g_numdoc,
+               op.fecha_pago AS g_fechapago, op.categoria AS g_categoria,
+               pfc.numero_factura AS c_factura,
+               spv.nombre_dealer AS s_dealer, cpv.nombre_dealer AS c_dealer,
+               ${ESTADO_SQL} AS estado_calc
+        ${FROM_SQL}
+      ) t ${whereEstado}
+      ORDER BY t.fecha_emision DESC, t.id DESC LIMIT ? OFFSET ?`, [...argsEstado, limite, offset]);
+    // Resumen y total sobre TODO el filtro (no solo la página): stats en query aparte sin LIMIT.
+    const [agg] = await pool.query(`
+      SELECT t.estado_calc, COUNT(*) n, COALESCE(SUM(t.monto), 0) monto FROM (
+        SELECT oc.monto, ${ESTADO_SQL} AS estado_calc ${FROM_SQL}
+      ) t ${whereEstado} GROUP BY t.estado_calc`, argsEstado);
 
     const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros', PARQUE: 'Parque' };
-    const estFiltro = norm(req.query.estado).toUpperCase();
     // Segregación de funciones: las que emitió el propio usuario no las puede pagar él.
     // Se marca acá para que el botón lo diga en pantalla y no falle recién al apretarlo.
     const yo = (req.usuario || {});
@@ -568,10 +593,7 @@ const listarOrdenes = async (req, res) => {
         const m = String(r.concepto || '').match(/OP\s+(\d+)/i);
         if (m && dealerPorOp.has(m[1])) proveedor = dealerPorOp.get(m[1]);
       }
-      let estado;
-      if (r.anulada) estado = 'ANULADA';
-      else if (esGen) estado = r.g_estado || 'EMITIDA';
-      else estado = (r.origen === 'SALDO' ? r.saldo_pagado : r.comision_pagada) ? 'PAGADA' : 'EMITIDA';
+      const estado = r.estado_calc;   // regla única: ESTADO_SQL
       const documento = esGen ? [r.g_tipodoc, r.g_numdoc].filter(Boolean).join(' ')
                               : (r.origen === 'COMISION' && r.c_factura ? 'Factura ' + r.c_factura : '');
       const emitidaPorMi = dobleP && (
@@ -594,14 +616,14 @@ const listarOrdenes = async (req, res) => {
         pagable: (estado === 'EMITIDA' && !r.anulada),   // se puede pagar desde el historial
       };
     });
-    if (ESTADOS.includes(estFiltro)) data = data.filter(o => o.estado === estFiltro);
-
     const resumen = { emitidas: 0, pagadas: 0, monto_emitido: 0, monto_pagado: 0 };
-    data.forEach(o => {
-      if (o.estado === 'EMITIDA') { resumen.emitidas++; resumen.monto_emitido += Number(o.monto || 0); }
-      if (o.estado === 'PAGADA')  { resumen.pagadas++;  resumen.monto_pagado  += Number(o.monto || 0); }
+    let total = 0;
+    agg.forEach(a => {
+      total += Number(a.n);
+      if (a.estado_calc === 'EMITIDA') { resumen.emitidas = Number(a.n); resumen.monto_emitido = Number(a.monto); }
+      if (a.estado_calc === 'PAGADA')  { resumen.pagadas  = Number(a.n); resumen.monto_pagado  = Number(a.monto); }
     });
-    res.json({ success: true, data, resumen, error: null });
+    res.json({ success: true, data, resumen, total, limite, offset, truncado: offset + rows.length < total, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
   }
