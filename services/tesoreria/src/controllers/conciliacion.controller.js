@@ -554,8 +554,14 @@ const conciliarAuto = async (req, res) => {
     const porMov = restantes.map(m => ({ m, sug: sugerirPara(m, cand) }));
 
     // Referencias reclamadas por más de un movimiento → ambiguas, no se auto-concilian
-    const veces = {};
-    for (const x of porMov) for (const s of x.sug) veces[s.tipo + ':' + s.ref] = (veces[s.tipo + ':' + s.ref] || 0) + 1;
+    const veces = {}, vecesRut = {};
+    for (const x of porMov) for (const s of x.sug) {
+      veces[s.tipo + ':' + s.ref] = (veces[s.tipo + ':' + s.ref] || 0) + 1;
+      if (s.rut_ok) vecesRut[s.tipo + ':' + s.ref] = (vecesRut[s.tipo + ':' + s.ref] || 0) + 1;
+    }
+    // Si varios movimientos reclaman la misma referencia pero solo UNO coincide en RUT, ese gana
+    // (caso real: dos transferencias de $250.000 el mismo día y una sola ODP; el RUT de la glosa decide).
+    const unicoPorRut = s => s.rut_ok && vecesRut[s.tipo + ':' + s.ref] === 1;
 
     const usuario = usuario0;
     let conciliados = 0, ambiguos = 0, sinMatch = 0;
@@ -565,7 +571,7 @@ const conciliarAuto = async (req, res) => {
       // mismo pago también aparezca como asiento CTB; (b) sugerencia única.
       const conRut = sug.filter(s => s.rut_ok);
       const s = (conRut.length === 1) ? conRut[0] : (sug.length === 1 ? sug[0] : null);
-      const confiable = s && veces[s.tipo + ':' + s.ref] === 1 && ((s.tipo !== 'ODP' && s.tipo !== 'TRASPASO') || s.rut_ok);
+      const confiable = s && (unicoPorRut(s) || (veces[s.tipo + ':' + s.ref] === 1 && ((s.tipo !== 'ODP' && s.tipo !== 'TRASPASO') || s.rut_ok)));
       if (!confiable) { ambiguos++; continue; }
       const [r] = await pool.query(
         `UPDATE banco_movimientos SET conciliado=1, match_tipo=?, match_ref=?, match_detalle=?, conciliado_por=?, fecha_conciliacion=NOW()
