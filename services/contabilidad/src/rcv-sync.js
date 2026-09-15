@@ -115,6 +115,18 @@ require('../../../shared/migrate').enFila('ctb-rcv-sii', async () => {
   console.log('✓ contabilidad: tablas RCV SII listas');
 });
 
+/* Otros impuestos (Pato, 15-09-2026): el RCV informa impuestos distintos del IVA
+   (específico, adicional, ILA…) en TotalOtrosImpuestos + detalle OtrosImpuestos
+   [{Codigo, Valor, Tasa}], y aparte ImpuestoSinDerechoCredito. No se guardaban, así
+   que el total del SII no calzaba con neto + exento + IVA (FC 2319383: $44.183). */
+require('../../../shared/migrate').enFila('ctb-rcv-otros-impuestos', async () => {
+  for (const ddl of [
+    'ALTER TABLE ctb_rcv_compras ADD COLUMN otros_impuestos BIGINT NOT NULL DEFAULT 0',
+    'ALTER TABLE ctb_rcv_compras ADD COLUMN otros_impuestos_det JSON NULL',
+    'ALTER TABLE ctb_rcv_compras ADD COLUMN imp_sin_derecho BIGINT NOT NULL DEFAULT 0',
+  ]) { try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) throw e; } }
+});
+
 // lector case-insensitive (la API puede responder PascalCase o camelCase)
 const g = (o, k) => { if (!o) return undefined; const lk = k.toLowerCase();
   for (const key of Object.keys(o)) if (key.toLowerCase() === lk) return o[key]; return undefined; };
@@ -168,18 +180,22 @@ async function sincronizarMes(anio, mes) {
     for (const d of det) {
       const ivaRec = Number(g(d, 'montoIvaRecuperable') || 0);
       iva += ivaRec;
+      const detOtros = (g(d, 'otrosImpuestos') || []).map(o => ({ codigo: g(o, 'codigo') ?? null, valor: Number(g(o, 'valor') || 0), tasa: g(o, 'tasa') ?? null }))
+        .filter(o => o.valor);
+      const otros = Number(g(d, 'totalOtrosImpuestos') || 0) || detOtros.reduce((s, o) => s + o.valor, 0);
       await pool.query(
         `INSERT IGNORE INTO ctb_rcv_compras
            (mes, tipo_dte, tipo_dte_nombre, tipo_compra, rut_proveedor, razon_social, folio,
             fecha_emision, fecha_recepcion, monto_exento, monto_neto, iva_recuperable,
-            iva_no_recuperable, monto_total, estado_acuse)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            iva_no_recuperable, monto_total, estado_acuse, otros_impuestos, otros_impuestos_det, imp_sin_derecho)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [per, Number(g(d, 'tipoDTE') || 0), g(d, 'tipoDTEString') || null, g(d, 'tipoCompra') || null,
          String(g(d, 'rutProveedor') || ''), g(d, 'razonSocial') || null, Number(g(d, 'folio') || 0),
          fechaYmd(g(d, 'fechaEmision')), fechaYmd(g(d, 'fechaRecepcion')),
          Number(g(d, 'montoExento') || 0), Number(g(d, 'montoNeto') || 0), ivaRec,
          Number(g(d, 'montoIvaNoRecuperable') || 0), Number(g(d, 'montoTotal') || 0),
-         g(d, 'acuseRecibo') || null]);
+         g(d, 'acuseRecibo') || null, otros, detOtros.length ? JSON.stringify(detOtros) : null,
+         Number(g(d, 'impuestoSinDerechoCredito') || 0)]);
     }
     await pool.query('INSERT INTO ctb_rcv_sync_log (mes, resultado, registros, iva_total) VALUES (?,?,?,?)',
       [per, 'OK', det.length, iva]);
