@@ -1393,7 +1393,12 @@ async function contabilizarPagoGeneral(oc, fechaPago, ctaBancaria) {
       ref: `ODP-${oc.numero || op.numero || oc.id}`,
       montos: { monto }, rut: op.proveedor_rut || null,
       reemplazos: Object.keys(reemplazos).length ? reemplazos : null,
-      detalle: [oc.numero || op.numero, ctaBancaria && ctaBancaria.nombre].filter(Boolean).join(' · ') || null,
+      detalle: oc.numero || op.numero || null,
+      // Glosa por línea: a quién se paga (debe) y de qué cuenta sale (haber: banco + N° de cuenta)
+      glosas: {
+        DEBE: op.proveedor_nombre ? `Pago a ${String(op.proveedor_nombre).trim()}` : null,
+        HABER: ctaBancaria ? ['Salida de banco', ctaBancaria.banco, ctaBancaria.numero_cuenta].filter(Boolean).join(' ') : null,
+      },
     });
   } catch (e) { console.error('[ordenes-pago contab general]', e.message); }
 }

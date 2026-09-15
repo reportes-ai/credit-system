@@ -238,7 +238,10 @@ const log = (evento, ref, estado, detalle, id_comprobante = null) =>
    (ej: pago en caja depositado al Banco de Chile → 1101040 en vez del 1101090
    de la regla). La cuenta destino debe existir en el plan; si no, se conserva la
    de la regla y queda anotado en el log — nunca un asiento a una cuenta fantasma. */
-async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = null, rut = null, detalle = null, reemplazos = null }) {
+/* `glosas` (opcional): { DEBE: texto, HABER: texto }. Reemplaza la glosa genérica de la
+   regla en las líneas de ese lado ("Pago a proveedor" → "Pago a INTERCARS SPA"; "Salida
+   de banco" → "Salida de banco Internacional 9574765"). El `detalle` se sigue anexando. */
+async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = null, rut = null, detalle = null, reemplazos = null, glosas = null }) {
   try {
     const [[regla]] = await pool.query('SELECT * FROM ctb_reglas WHERE evento=?', [evento]);
     if (!regla) { await log(evento, ref, 'SIN_REGLA', 'Evento sin regla configurada'); return null; }
@@ -272,7 +275,8 @@ async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = n
       const monto = Math.round(Number(montos[l.campo]) || 0);
       if (!monto) continue;
       if (monto < 0) { await log(evento, ref, 'ERROR', `Campo ${l.campo} negativo (${monto})`); return null; }
-      const glosaLinea = [l.glosa, detalle].filter(Boolean).join(' · ').slice(0, 300);   // ctb_movimientos.glosa = varchar(300)
+      const base = (glosas && glosas[l.lado]) ? String(glosas[l.lado]) : l.glosa;
+      const glosaLinea = [base, detalle].filter(Boolean).join(' · ').slice(0, 300);   // ctb_movimientos.glosa = varchar(300)
       movs.push({ cuenta: l.cuenta, glosa: glosaLinea, debe: l.lado === 'DEBE' ? monto : 0, haber: l.lado === 'HABER' ? monto : 0 });
       if (l.lado === 'DEBE') debe += monto; else haber += monto;
     }
