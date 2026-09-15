@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v2.7 — Banco del proveedor con lista del mantenedor Bancos de la Plaza. v2.6 — Proveedor: secciones Dealers y Parques automotrices al final de la lista (se enlazan a un proveedor por RUT con banco y cuenta de su ficha). v2.5 — hasta 4 documentos adjuntos, 7 MB en total (todos viajan al correo de Contabilidad). v2.4 — Categoría con lista fija (Administrativos/Arriendos/Otros/Comisión Dealer/Comisión Parque/Saldo Precio), reemplaza el texto libre · v2.3 — "Se paga a: banco · tipo · cuenta" visible bajo el proveedor al elegirlo · v2.2 — banco/cuenta del proveedor solo criticos con pago por Transferencia (cheque/efectivo/tarjeta no los exigen) · v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
+  <!-- v2.8 — Proveedor: grupo COLABORADORES con selección múltiple (todo el personal / indefinidos / plazo fijo / desmarcar), una orden por persona con banco y cuenta de la ficha RRHH. v2.7 —Banco del proveedor con lista del mantenedor Bancos de la Plaza. v2.6 — Proveedor: secciones Dealers y Parques automotrices al final de la lista (se enlazan a un proveedor por RUT con banco y cuenta de su ficha). v2.5 — hasta 4 documentos adjuntos, 7 MB en total (todos viajan al correo de Contabilidad). v2.4 — Categoría con lista fija (Administrativos/Arriendos/Otros/Comisión Dealer/Comisión Parque/Saldo Precio), reemplaza el texto libre · v2.3 — "Se paga a: banco · tipo · cuenta" visible bajo el proveedor al elegirlo · v2.2 — banco/cuenta del proveedor solo criticos con pago por Transferencia (cheque/efectivo/tarjeta no los exigen) · v2.1 — proveedor sin banco/cuenta: completar los datos de transferencia desde la emision (quedan en la ficha, auditado) · v2.0 — Centro de Costo al emitir (mantenedor Centros de Costo); queda en la orden para el reporte de gasto por área · v1.9 — Cuenta de cargo (contra la que se paga) junto a Metodo de pago; queda en la orden, el pago la hereda y el asiento acredita ese banco · v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -52,6 +52,19 @@
       <div class="fld full"><label>Proveedor *</label>
         <select id="fProv" onchange="onProvChange()"><option value="">Cargando…</option></select>
         <div id="provCuentaInfo" style="display:none;margin-top:6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 12px;font-size:.82rem;color:#1e40af"></div>
+        <!-- COLABORADORES (Pato, 15-09-2026): selección múltiple → una orden por persona, mismo concepto y monto -->
+        <div id="boxColab" style="display:none;margin-top:8px;border:1.5px solid #c7d2fe;border-radius:10px;background:#f8faff;padding:10px 12px">
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;font-size:.8rem">
+            <b style="margin-right:4px"><i class="bi bi-people-fill me-1"></i>Colaboradores</b>
+            <button type="button" onclick="colabMarcar('TODOS')" class="btn-ghost" style="padding:3px 10px;font-size:.76rem">Todo el personal</button>
+            <button type="button" onclick="colabMarcar('INDEFINIDO')" class="btn-ghost" style="padding:3px 10px;font-size:.76rem">Indefinidos</button>
+            <button type="button" onclick="colabMarcar('PLAZO FIJO')" class="btn-ghost" style="padding:3px 10px;font-size:.76rem">Plazo fijo</button>
+            <button type="button" onclick="colabMarcar('NINGUNO')" class="btn-ghost" style="padding:3px 10px;font-size:.76rem">Ninguno</button>
+            <span id="colabCnt" style="margin-left:auto;color:#1e40af;font-weight:700"></span>
+          </div>
+          <div id="colabLista" style="max-height:260px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:2px 12px;font-size:.82rem"></div>
+          <div style="margin-top:8px;font-size:.76rem;color:#64748b"><i class="bi bi-info-circle me-1"></i>Se emite <b>una orden por persona</b> con el mismo concepto y monto; banco y cuenta salen de la ficha RRHH (Previsión y Pago). Los que no tienen cuenta aparecen en ámbar.</div>
+        </div>
       </div>
       <div class="fld" id="boxProvNombre" style="display:none"><label>Nombre del proveedor (no registrado) *</label><input id="fProvNombre" maxlength="200"></div>
       <div class="fld" id="boxProvRut" style="display:none"><label>RUT (opcional)</label><input id="fProvRut" maxlength="20" placeholder="76.123.456-7" oninput="onRut()"></div>
@@ -217,7 +230,26 @@ function onTipo(){
   pintarMontos(calcDoc(tipo, base, numEl(base==='BRUTO'?'fBruto':'fNeto')));
 }
 
-let PROVS = [];
+let PROVS = [], COLABS = [];
+function pintarColabs(){
+  document.getElementById('colabLista').innerHTML = COLABS.map(c => {
+    const sinCta = !(c.banco||'').trim() || !String(c.numero_cuenta||'').trim();
+    return `<label style="display:flex;gap:6px;align-items:center;padding:3px 4px;border-radius:6px;${sinCta?'background:#fffbeb':''}" title="${sinCta?'Sin banco/cuenta en la ficha RRHH':escH([c.banco,c.numero_cuenta].filter(Boolean).join(' · '))}">
+      <input type="checkbox" class="colabChk" value="${c.id}" data-contrato="${escH(c.tipo_contrato||'')}" onchange="colabCuenta()">
+      <span style="flex:1">${escH(c.nombre)} <span style="color:#94a3b8;font-size:.74rem">${escH(c.tipo_contrato||'sin contrato')}${c.cargo?' · '+escH(c.cargo):''}</span></span>
+      ${sinCta?'<i class="bi bi-exclamation-triangle" style="color:#b45309" title="Sin cuenta en la ficha"></i>':''}</label>`;
+  }).join('');
+  colabCuenta();
+}
+function colabMarcar(modo){
+  document.querySelectorAll('.colabChk').forEach(ch => {
+    const ct = (ch.dataset.contrato||'').toUpperCase();
+    ch.checked = modo==='TODOS' ? true : modo==='NINGUNO' ? false : modo==='INDEFINIDO' ? ct==='INDEFINIDO' : (ct.includes('FIJO'));
+  });
+  colabCuenta();
+}
+function colabSel(){ return Array.from(document.querySelectorAll('.colabChk:checked')).map(ch => COLABS.find(c => c.id===ch.value)).filter(Boolean); }
+function colabCuenta(){ const n = colabSel().length; document.getElementById('colabCnt').textContent = n ? `${n} seleccionado${n>1?'s':''}` : 'nadie seleccionado'; }
 async function cargarProv(){
   try {
     const r = await fetch('/api/ordenes-pago/proveedores?con_terceros=1', { headers:H });
@@ -226,13 +258,16 @@ async function cargarProv(){
     // se guardan en PROVS con id string para que onProvChange/emitir muestren su banco y cuenta.
     const dealers = (j.dealers||[]).map(d => ({ ...d, id: 'D' + d.id, tercero_tipo: 'DEALER', tercero_id: d.id }));
     const parques = (j.parques||[]).map(p => ({ ...p, id: 'P' + p.id, tercero_tipo: 'PARQUE', tercero_id: p.id, nombre: p.parque && p.parque !== p.nombre ? `${p.parque} · ${p.nombre}` : p.nombre }));
-    PROVS = [...(j.data||[]), ...dealers, ...parques];
+    COLABS = (j.colaboradores||[]).map(c => ({ ...c, id: 'C' + c.id, tercero_tipo: 'COLABORADOR', tercero_id: c.id }));
+    PROVS = [...(j.data||[]), ...dealers, ...parques, ...COLABS];
     const op = p => `<option value="${p.id}">${escH(p.nombre)}${p.rut?' — '+escH(formatRUT(p.rut)):''}</option>`;
     const opts = (j.data||[]).map(op).join('');
     const grp = (t, arr) => arr.length ? `<optgroup label="${t}">${arr.map(op).join('')}</optgroup>` : '';
     document.getElementById('fProv').innerHTML =
       '<option value="">— Seleccionar proveedor —</option>' + opts + '<option value="__otro">+ Proveedor no registrado…</option>'
-      + grp('Dealers', dealers) + grp('Parques automotrices', parques);
+      + grp('Dealers', dealers) + grp('Parques automotrices', parques)
+      + (COLABS.length ? `<optgroup label="Colaboradores"><option value="__colab">Colaboradores — elegir uno o varios (una orden por persona)…</option></optgroup>` : '');
+    pintarColabs();
   } catch(e) {
     document.getElementById('fProv').innerHTML = '<option value="">Error al cargar</option><option value="__otro">+ Proveedor no registrado…</option>';
   }
@@ -242,6 +277,7 @@ function onProvChange(){
   const otro = v==='__otro';
   document.getElementById('boxProvNombre').style.display = otro?'':'none';
   document.getElementById('boxProvRut').style.display = otro?'':'none';
+  document.getElementById('boxColab').style.display = v==='__colab' ? '' : 'none';
   // Proveedor registrado sin banco/cuenta → ofrecer completar los datos acá mismo
   // (solo si el pago es por Transferencia: cheque/efectivo/tarjeta no los necesitan)
   const met = document.getElementById('fMetodo').value;
@@ -292,6 +328,7 @@ function emitir(){
   if (!provSel) { return fail('Selecciona un proveedor.'); }
   if (!concepto) return fail('El concepto es obligatorio.');
   if (monto<=0) return fail('Ingresa el monto (bruto o neto).');
+  if (provSel==='__colab') return emitirColabs(concepto, monto);
 
   const otro = provSel==='__otro';
   const prov = otro ? { nombre: document.getElementById('fProvNombre').value.trim(), rut: document.getElementById('fProvRut').value.trim() }
@@ -341,6 +378,33 @@ function emitir(){
   dlg.showModal();
 }
 
+/* COLABORADORES: pre-emisión con la lista y luego una orden por persona (mismo cuerpo, distinto tercero). */
+function emitirColabs(concepto, monto){
+  const sel = colabSel();
+  if (!sel.length) return fail('Marca al menos un colaborador.');
+  const esTransf = document.getElementById('fMetodo').value === 'Transferencia' || !document.getElementById('fMetodo').value;
+  const sinCta = sel.filter(c => !(c.banco||'').trim() || !String(c.numero_cuenta||'').trim());
+  const tipoDoc = document.getElementById('fTipoDoc').value;
+  const m = calcDoc(tipoDoc, lastBase, monto);
+  let dlg = document.getElementById('dlgPre');
+  if(!dlg){ dlg=document.createElement('dialog'); dlg.id='dlgPre'; dlg.style.cssText='border:none;border-radius:14px;max-width:620px;width:94%;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3)'; document.body.appendChild(dlg); }
+  dlg.innerHTML = `
+    <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:14px 20px;font-weight:800">Revisión antes de emitir — ${sel.length} orden${sel.length>1?'es':''} a colaboradores</div>
+    <div style="padding:16px 20px;font-size:.88rem">
+      ${sinCta.length && esTransf ? `<div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:8px;padding:8px 12px;margin-bottom:10px"><b>Sin banco/cuenta en la ficha RRHH</b> (crítico para transferencia): ${sinCta.map(c=>escH(c.nombre)).join(', ')}. Complétalos en Recursos Humanos → Colaboradores → Previsión y Pago, o desmárcalos.</div>` : ''}
+      <table style="width:100%;border-collapse:collapse"><tr><td style="padding:3px 12px 3px 0;color:#64748b">Concepto</td><td style="font-weight:600">${escH(concepto)}</td></tr>
+        <tr><td style="padding:3px 12px 3px 0;color:#64748b">A pagar por persona</td><td style="font-weight:600">${money(m.pagar)}</td></tr>
+        <tr><td style="padding:3px 12px 3px 0;color:#64748b">Total</td><td style="font-weight:800">${money(m.pagar*sel.length)}</td></tr></table>
+      <div style="max-height:220px;overflow:auto;margin-top:10px;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;font-size:.82rem">
+        ${sel.map(c=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0"><span>${escH(c.nombre)} <span style="color:#94a3b8">${escH(c.tipo_contrato||'')}</span></span><span style="color:#64748b">${[c.banco,c.numero_cuenta].filter(Boolean).map(escH).join(' · ')||'<i style="color:#b45309">sin cuenta</i>'}</span></div>`).join('')}
+      </div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="document.getElementById('dlgPre').close()" style="background:#f1f5f9;border:none;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer">Volver a corregir</button>
+      <button ${sinCta.length && esTransf ? 'disabled style="opacity:.45;' : 'style="'}background:#0141A2;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer" onclick="document.getElementById('dlgPre').close();emitirDefinitivo()"><i class="bi bi-send-check me-1"></i>Emitir ${sel.length} orden${sel.length>1?'es':''}</button>
+    </div>`;
+  dlg.showModal();
+}
 async function emitirDefinitivo(){
   const provSel = document.getElementById('fProv').value;
   const concepto = document.getElementById('fConcepto').value.trim();
@@ -359,6 +423,8 @@ async function emitirDefinitivo(){
   if (provSel==='__otro') {
     body.proveedor_nombre = document.getElementById('fProvNombre').value.trim();
     body.proveedor_rut = document.getElementById('fProvRut').value.trim();
+  } else if (provSel==='__colab') {
+    body.tercero_tipo = 'COLABORADOR';   // tercero_id se fija por persona más abajo
   } else {
     const p = PROVS.find(x=>String(x.id)===String(provSel));
     if (p && p.tercero_tipo) { body.tercero_tipo = p.tercero_tipo; body.tercero_id = p.tercero_id; }
@@ -378,6 +444,27 @@ async function emitirDefinitivo(){
         const b64 = await new Promise((ok,ko)=>{ const fr=new FileReader(); fr.onload=()=>ok(String(fr.result).split(',')[1]); fr.onerror=ko; fr.readAsDataURL(f); });
         body.adjuntos.push({ nombre: f.name, mime: f.type, base64: b64 });
       }
+    }
+    if (provSel==='__colab') {
+      // Una orden por colaborador, en serie (correlativo único). Si una falla, se informa y se sigue.
+      const sel = colabSel(), ok = [], errs = [];
+      for (const c of sel) {
+        btn.innerHTML = `<i class="bi bi-hourglass-split me-1"></i>Emitiendo ${ok.length+errs.length+1}/${sel.length}…`;
+        try {
+          const r = await fetch('/api/ordenes-pago/ordenes', { method:'POST', headers:H, body: JSON.stringify({ ...body, tercero_id: c.tercero_id }) });
+          const j = await r.json();
+          if (j.success) ok.push(`${j.data.numero} · ${c.nombre}`); else errs.push(`${c.nombre}: ${j.error||'error'}`);
+        } catch(e) { errs.push(`${c.nombre}: error de red`); }
+      }
+      if (ok.length) {
+        document.getElementById('formCard').style.display='none';
+        document.getElementById('okNum').innerHTML = `<div style="font-size:.95rem;font-weight:600;color:#15803d">${ok.length} orden${ok.length>1?'es':''} emitida${ok.length>1?'s':''}</div>` + ok.map(escH).join('<br>')
+          + (errs.length ? `<div style="margin-top:8px;color:#b91c1c;font-size:.85rem"><b>No emitidas:</b><br>${errs.map(escH).join('<br>')}</div>` : '');
+        document.getElementById('okBox').style.display='block';
+        window.scrollTo({top:0,behavior:'smooth'});
+      } else fail('No se emitió ninguna orden: ' + errs.join(' · '));
+      btn.disabled=false; btn.innerHTML='<i class="bi bi-send-check me-1"></i>Emitir orden';
+      return;
     }
     const r = await fetch('/api/ordenes-pago/ordenes', { method:'POST', headers:H, body: JSON.stringify(body) });
     const j = await r.json();
