@@ -315,8 +315,14 @@ exports.getDatos = async (req, res) => {
       // UF de la fecha de otorgamiento (o fecha_estado si no tiene otorgamiento)
       const fechaRef = r.fecha_otorgado || r.fecha_estado || null;
       const ufOt = getUF(fechaRef);
+      const comDealer = +(r.com_dealer) || 0, comSeg = +(r.com_seguros) || 0, comPar = +(r.com_parque) || 0, rentAfa = +(r.rentab_afa) || 0;
       return {
         ...r,
+        // Regla negocio (Detalle de Operaciones Otorgadas): motor ÚNICO, lo leen el
+        // dashboard y la API Suite Financiera. Total Com Broke = dealer + seguros + parque;
+        // Ingreso Bruto = Ing.AutoFácil + Com.Seguros.
+        total_com_broke:    comDealer + comSeg + comPar,
+        ingreso_bruto:      rentAfa + comSeg,
         institucion:        derInstitucion(r.financiera, r.producto),
         saldo_precio:       saldo,
         monto_financiado:   +(r.monto_financiado)   || 0,

@@ -59,11 +59,13 @@ const ordenesPago        = envolver((req, res) => odp().listarOrdenes(req, res))
 const saldoProcesoPago   = envolver((req, res) => teso().listar(req, res));
 
 /* Rentabilidad por operación: mismas filas que el Dashboard → Rentabilidades (getDatos.raw),
-   acotadas al mes pedido y a las columnas del detalle. */
-const COLS_RENT = ['num_op', 'id_financiera', 'mes', 'fecha_otorgado', 'financiera', 'producto', 'ejecutivo', 'automotora', 'rut_dealer', 'parque',
-  'nombre_cliente', 'rut_cliente', 'valor_vehiculo', 'pie', 'saldo_precio', 'monto_financiado', 'plazo', 'tasa_mensual', 'mayor_menor', 'institucion',
-  'ingreso_autofacil', 'ingreso_neto_total', 'comision_dealer', 'comdea_real', 'com_parque', 'seguro_rdh', 'seguro_cesantia', 'seguro_rep_menor', 'seguros',
-  'comision_seguros', 'ingreso_bruto', 'estado', 'estado_credito'];
+   acotadas al mes pedido y a las columnas del detalle.
+   Nombre publicado ← campo de getDatos.raw (antes se pedían nombres que raw no tiene
+   y num_op, ingreso AutoFácil, comisiones dealer/seguros e ingreso bruto no salían — hilo 60001). */
+const COLS_RENT = [['num_op', 'op'], 'id_financiera', 'mes', 'fecha_otorgado', 'financiera', 'producto', 'ejecutivo', 'automotora', 'rut_dealer', 'parque',
+  'nombre_cliente', 'rut_cliente', 'saldo_precio', 'monto_financiado', 'plazo', ['tasa_mensual', 'tasa_cli'], 'mayor_menor', 'institucion',
+  ['ingreso_autofacil', 'rentab_afa'], ['comision_dealer', 'com_dealer'], 'com_parque', ['comision_seguros', 'com_seguros'],
+  'total_com_broke', 'ingreso_bruto', 'ingreso_neto_total', 'estado_credito'].map(c => Array.isArray(c) ? c : [c, c]);
 const rentabilidad = envolver((req, res) => dash().getDatos(req, res), {
   transformar(cuerpo, req) {
     if (!cuerpo || !Array.isArray(cuerpo.raw)) return cuerpo;
@@ -71,7 +73,7 @@ const rentabilidad = envolver((req, res) => dash().getDatos(req, res), {
     const filas = cuerpo.raw
       .filter(r => String(r.estado || r.estado_credito || '').toUpperCase() === 'OTORGADO')
       .filter(r => !mes || String(r.mes || r.fecha_otorgado || '').slice(0, 7) === mes)
-      .map(r => { const o = {}; for (const k of COLS_RENT) if (k in r) o[k] = r[k]; return o; });
+      .map(r => { const o = {}; for (const [k, src] of COLS_RENT) if (src in r) o[k] = r[src]; return o; });
     return { success: true, data: { mes: mes || 'todos', total: filas.length, generado_en: cuerpo.generado_en, operaciones: filas }, error: null };
   },
 });

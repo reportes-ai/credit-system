@@ -1903,9 +1903,9 @@ window.RAW_DATA = [];
       const fin2 = r.monto_financiado || 1;
       const pct_a = +(r.rentab_afa/fin2*100).toFixed(1);
       const pct_d = +(r.com_dealer/fin2*100).toFixed(1);
-      const tcb = r.com_dealer + r.com_seguros + r.com_parque;
+      const tcb = r.total_com_broke;   // motor único: dashboard.controller getDatos
       const pct_t = +(tcb/fin2*100).toFixed(1);
-      const ib = r.rentab_afa + r.com_seguros;
+      const ib = r.ingreso_bruto;
       const pct_b = +(ib/fin2*100).toFixed(1);
       return {
         op: r.op, mm: r.mayor_menor.includes('MAYOR') ? '>' : '<',
