@@ -1151,9 +1151,15 @@ const getMes = async (req, res) => {
               u.rut, u.cargo, u.fecha_ingreso, u.fecha_baja, f.sueldo_base, f.afp, f.salud, f.tipo_contrato, f.pensionado, f.colacion, f.movilizacion, f.plan_isapre_uf,
               f.banco_pago, f.tipo_cuenta_pago, f.num_cuenta_pago
          FROM usuarios u JOIN rh_fichas f ON f.id_usuario = u.id_usuario
-        WHERE (u.estado='activo' OR DATE_FORMAT(u.fecha_baja,'%Y-%m') >= ?)
+        /* Una baja entra al libro del mes solo si trabajó algún día en él: la fecha de baja
+           es EXCLUSIVA en diasTrabajadosMes, así que baja el día 1 = 0 días. Sin esto,
+           Arteaga (baja 01-09-2026) salía en septiembre con 0 días y $10.000 (16-09-2026).
+           Si tiene liquidación guardada/emitida ese mes, se respeta igual. */
+        WHERE (u.estado='activo'
+               OR (DATE_FORMAT(u.fecha_baja,'%Y-%m') >= ? AND u.fecha_baja > CONCAT(?, '-01'))
+               OR EXISTS (SELECT 1 FROM rh_liquidaciones l WHERE l.id_usuario=u.id_usuario AND l.mes=?))
           AND COALESCE(f.sueldo_base,0) > 0
-        ORDER BY nombre`, [mes]);
+        ORDER BY nombre`, [mes, mes, mes]);
     const [guardadas] = await pool.query('SELECT * FROM rh_liquidaciones WHERE mes = ?', [mes]);
     const gMap = {}; guardadas.forEach(g => gMap[g.id_usuario] = g);
     const comis = await comisionesDelMes(mes);
