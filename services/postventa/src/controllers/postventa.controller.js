@@ -1097,6 +1097,10 @@ const sync = async (req, res) => {
 /* ── GET /api/postventa — seguimientos + etapas marcadas ─────────── */
 const getAll = async (req, res) => {
   try {
+    /* ?op=NNN → una operación puntual (N° de op o ID financiera) SIN la ventana de
+       abajo: el buscador la pide cuando no la tiene cargada (ops viejas ya pagadas,
+       ej. 78716 de abr-2025, 16-09-2026). */
+    const opBuscada = String(req.query.op || '').replace(/\D/g, '').slice(0, 20);
     const [rows] = await pool.query(`
       SELECT s.id, s.id_credito, s.num_op, s.financiera, s.ejecutivo,
              c.id_financiera, s.parque, s.com_parque,
@@ -1126,13 +1130,14 @@ const getAll = async (req, res) => {
          pidiendo etapas para siempre (10 casos al 07-08-2026). Se excluye solo
          ANULADO — un PREPAGADO sí sigue: su saldo precio puede estar pendiente. */
       WHERE (c.id IS NULL OR COALESCE(c.estado_credito, '') <> 'ANULADO')
+        ${opBuscada ? 'AND (s.num_op = ? OR c.id_financiera = ?)' : `
         /* Las 1.000 más recientes + TODA op con saldo precio o comisión sin pagar, sea
            de cuando sea: el tope dejaba fuera las viejas aún pendientes (78716, 79332,
            79348 de abr/may-2025 no aparecían y no se podían enviar a pago, 16-09-2026). */
         AND (s.fecha_otorgado >= COALESCE((SELECT x.fecha_otorgado FROM postventa_seguimiento x ORDER BY x.fecha_otorgado DESC, x.id DESC LIMIT 1 OFFSET 999), '1900-01-01')
              OR NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento = s.id AND e.track = 'SALDO' AND e.etapa = 'SALDO PRECIO PAGADO')
-             OR NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento = s.id AND e.track = 'COMISION' AND e.etapa = 'COMISION PAGADA'))
-      ORDER BY s.fecha_otorgado DESC, s.id DESC LIMIT 3000`);
+             OR NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento = s.id AND e.track = 'COMISION' AND e.etapa = 'COMISION PAGADA'))`}
+      ORDER BY s.fecha_otorgado DESC, s.id DESC LIMIT 3000`, opBuscada ? [opBuscada, opBuscada] : []);
     const [etapas] = await pool.query(
       `SELECT id_seguimiento, track, etapa, usuario, fecha FROM postventa_etapas
        WHERE id_seguimiento IN (SELECT id FROM postventa_seguimiento)`);

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v4.15 — buscador por el motor único busqueda-core: + ODP de saldo y comisión y N° de factura; RUT sin puntos/guion. v4.14 — solo lectura parametrico: sin postventa_seguimiento se ve todo pero no se marca nada (checkboxes bloqueados, sin Emitir/Revertir/editar factura) · v4.13 — N° de ODP visible bajo ORDEN DE PAGO EMITIDA (saldo y comision; en replicas muestra la orden de la titular) · v4.12 — popup Emitir ODP con la narrativa desde el neto (+IVA / −retencion / emisor retiene) · v4.11 — boleta con "el emisor retiene": retencion 0, se deposita el bruto completo · v4.10 — casilla delegable pv_marcar_cartola_enviada · v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v4.16 — buscar un N° de op no cargado lo pide al servidor (?op=). v4.15 — buscador por el motor único busqueda-core: + ODP de saldo y comisión y N° de factura; RUT sin puntos/guion. v4.14 — solo lectura parametrico: sin postventa_seguimiento se ve todo pero no se marca nada (checkboxes bloqueados, sin Emitir/Revertir/editar factura) · v4.13 — N° de ODP visible bajo ORDEN DE PAGO EMITIDA (saldo y comision; en replicas muestra la orden de la titular) · v4.12 — popup Emitir ODP con la narrativa desde el neto (+IVA / −retencion / emisor retiene) · v4.11 — boleta con "el emisor retiene": retencion 0, se deposita el bruto completo · v4.10 — casilla delegable pv_marcar_cartola_enviada · v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -56,7 +56,7 @@
 <div class="wrap">
   <div class="filtros">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-      <input type="text" id="fBuscar" placeholder="Buscar OP, ID financiera, RUT, dealer, ejecutivo, saldo…" oninput="render()"
+      <input type="text" id="fBuscar" placeholder="Buscar OP, ID financiera, RUT, dealer, ejecutivo, saldo…" oninput="render();buscarRemoto()"
         style="flex:1;max-width:520px;border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 11px;font-size:.8rem">
       <button onclick="limpiarFiltros()" style="border:1.5px solid #cbd5e1;background:#fff;color:#475569;border-radius:7px;padding:5px 14px;font-size:.74rem;font-weight:700;cursor:pointer;white-space:nowrap">
         <i class="bi bi-x-circle me-1"></i>Limpiar
@@ -144,6 +144,25 @@ async function init(){
   }
 }
 init();
+
+/* El servidor carga las ops recientes + las pendientes; una op vieja ya pagada no
+   viene. Si se busca un N° (op o ID financiera) que no está cargado, se pide puntual
+   con ?op= y se suma a DATA (una sola vez por número). */
+const BUSCADAS = new Set(); let tBuscar = null;
+function buscarRemoto(){
+  clearTimeout(tBuscar);
+  tBuscar = setTimeout(async () => {
+    const q = (document.getElementById('fBuscar').value||'').trim();
+    if (!/^\d{4,}$/.test(q) || BUSCADAS.has(q)) return;
+    if (DATA.some(r => String(r.num_op)===q || String(r.id_financiera||'')===q)) return;
+    BUSCADAS.add(q);
+    try {
+      const j = await (await fetch('/api/postventa?op='+encodeURIComponent(q), { headers:H })).json();
+      const nuevas = (j.data||[]).filter(n => !DATA.some(r => r.id===n.id));
+      if (nuevas.length) { DATA.push(...nuevas); renderFiltros(); render(); }
+    } catch(e){}
+  }, 350);
+}
 
 function esPagado(r){
   return estadoDe(etapaActual(r,'SALDO'),'SALDO') === 'PAGADO'
