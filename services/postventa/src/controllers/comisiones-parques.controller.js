@@ -519,20 +519,28 @@ const emitir = async (req, res) => {
       href: '/ordenes-pago/', clave: `parqueop:${odp.numero}`,
     });
 
-    // Correo a Contabilidad con el desglose — texto, destinatarios y CC salen del
-    // mantenedor Correos del Sistema (plantilla parque_odp_contabilidad).
+    // Correo a Contabilidad con el desglose. Destinatario y CC base: motor único
+    // correo-contabilidad (mantenedor «Correo de Orden de Pago a Contabilidad»),
+    // igual que las ODP de saldo precio, comisión dealer y proveedores; quien emite
+    // va en copia. Texto y CC fijo (Operaciones) salen de la plantilla
+    // parque_odp_contabilidad. Antes iba a los usuarios de la alerta in-app
+    // (admin@sistema.cl, admin@admin.cl, Tesorera) y Contabilidad nunca la recibía.
     // Factura(s) del parque subidas a este pago: viajan adjuntas a Contabilidad
     const adjuntos = await require('./postventa.controller').adjuntosFactura('PARQUE', [e.id]).catch(() => []);
-    await require('../../../../shared/plantillas-correo').enviar({
+    const { to: toCtb, cc: ccCtb } = await require('../../../../shared/correo-contabilidad')
+      .destinatariosContabilidad(req.user?.email || []);
+    const envio = await require('../../../../shared/plantillas-correo').enviar({
       codigo: 'parque_odp_contabilidad',
       adjuntos: adjuntos.length ? adjuntos : undefined,
-      to: destinatarios.map(u => u.email).filter(Boolean),
+      to: [toCtb], cc: ccCtb || [],
       datos: { ODP: odp.numero, PARQUE: parque, PERIODO: mes, ARRIENDO: CLP(arriendo),
                COMISION: CLP(comision), OPS: e.ops, TOTAL: CLP(total), QUIEN: quien },
     });
+    if (!envio.enviado) console.warn('[comisiones-parques emitir] correo no enviado:', envio.motivo);
 
     await marcarEtapaParqueOps(parque, mes, ['ORDEN DE PAGO EMITIDA'], quien);
-    auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'orden_pago_parque', entidad_id: odp.id, detalle: `Emitió ${odp.numero}: ${concepto}` });
+    auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'orden_pago_parque', entidad_id: odp.id,
+      detalle: `Emitió ${odp.numero}: ${concepto}` + (envio.enviado ? ` — correo a ${envio.to.join(', ')}${envio.cc?.length ? ' (CC ' + envio.cc.join(', ') + ')' : ''}` : ` — SIN correo: ${envio.motivo}`) });
     res.json({ success: true, data: { etapa: 'OP_EMITIDA', odp_numero: odp.numero }, error: null });
   } catch (e) { console.error('[comisiones-parques emitir]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

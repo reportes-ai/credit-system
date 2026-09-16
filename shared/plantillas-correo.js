@@ -37,9 +37,9 @@ Emitida por {QUIEN}. La orden queda por pagar en el módulo Órdenes de Pago.
 
 Saludos cordiales,
 Área de Operaciones`,
-    para_perfiles: 'Administrador,Tesorero',
-    cc: '',
-    destinatario: 'Los perfiles marcados aquí abajo (Contabilidad y Tesorería)',
+    para_perfiles: '',
+    cc: 'operaciones@autofacilchile.cl',
+    destinatario: 'El correo de Contabilidad del mantenedor «Correo de Orden de Pago a Contabilidad» (Post Venta); CC quien emite',
     variables: '{ODP} {PARQUE} {PERIODO} {ARRIENDO} {COMISION} {OPS} {TOTAL} {QUIEN}',
   },
   /* ── Cartolas y comisiones de DEALER ──────────────────────────────────────
@@ -450,6 +450,15 @@ require('./migrate').migrar('correos-parques-texto-plano', async () => {
       "UPDATE correos_plantillas SET cuerpo=? WHERE codigo=? AND cuerpo LIKE '<%'",
       [p.cuerpo, p.codigo]);
   }
+});
+
+/* La ODP de parque salía a los USUARIOS de perfil Administrador/Tesorero (admin@sistema.cl,
+   admin@admin.cl, Tesorera) y nunca a Contabilidad ni Operaciones (ODP2610969, 14-09-2026).
+   Desde ahora el destinatario lo pone el motor correo-contabilidad y la copia a Operaciones
+   va en el CC de la plantilla; se limpian los perfiles de la fila sembrada. */
+require('./migrate').migrar('correo-parque-odp-contabilidad-destinos', async () => {
+  await pool.query(
+    "UPDATE correos_plantillas SET para_perfiles='', cc=IF(cc='', 'operaciones@autofacilchile.cl', cc) WHERE codigo='parque_odp_contabilidad'");
 });
 
 const obtener = async codigo => {
