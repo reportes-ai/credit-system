@@ -423,7 +423,8 @@ async function crearUno(b, req, { silencioso = false } = {}) {
     if (b.pagado_anticipo && !permanente) {
       const pagado = Math.round(Number(b.monto_pagado) || (esLiquido ? monto : 0));
       if (!(pagado > 0)) return fail('Indica el monto que se pagó como anticipo (en un haber bruto no se puede deducir solo)', 400);
-      const glosa = `Anticipo ${causal === 'OTRO' ? String(b.causal_texto || '').trim() : causal}`.slice(0, 200);
+      // La liquidación antepone sola "Anticipo de sueldo ·": acá va solo la causal
+      const glosa = (causal === 'OTRO' ? String(b.causal_texto || '').trim() : causal).slice(0, 200);
       const [d] = await pool.query(
         `INSERT INTO rh_descuentos (id_usuario, tipo, detalle_texto, monto_total, cuotas, valor_cuota, mes_inicio, creado_por, moneda, id_adicional)
          VALUES (?,'ANTICIPO',?,?,1,?,?,?,'CLP',?)`, [idU, glosa, pagado, pagado, mes, nombreDe(u), r.insertId]);
