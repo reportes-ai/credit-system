@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v249.8';
+const APP_VERSION = 'v249.9';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -46,8 +46,12 @@ const APP_VERSION = 'v249.8';
         const url = (typeof args[0] === 'string' ? args[0] : args[0] && args[0].url) || '';
         if (!/\/api\/auth\/login/.test(url)) {
           const j = await res.clone().json().catch(() => null);
-          if (!j || /token/i.test(j.error || '')) {
-            sessionStorage.setItem('sesion_expirada', '1');
+          /* Además del token vencido: cuenta desactivada, sesión cerrada desde Usuarios
+             y tope de sesiones simultáneas (mensajes de shared/middleware/auth.js).
+             Sin esto el aviso salía dentro de cada tabla y se podía seguir navegando
+             (16-09-2026). "Contraseña actual incorrecta" también es 401 y NO cierra. */
+          if (!j || /token|sesión (fue|se) cerr|cuenta fue desactivada/i.test(j.error || '')) {
+            sessionStorage.setItem('sesion_expirada', /token/i.test((j && j.error) || '') || !j ? '1' : String(j.error));
             sessionStorage.removeItem('token');
             sessionStorage.removeItem('usuario');
             location.href = '/login.html';
