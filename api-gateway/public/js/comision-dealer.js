@@ -127,7 +127,14 @@
   /*   comisionCorregida = la comisión de la carta se cambió por Corrección de Cartas
    * (motivo obligatorio y auditado). Esa corrección ES la negociación autorizada:
    * manda en AMBOS sentidos, con el mismo % aplicado al saldo vigente (Pato, 14-09-2026:
-   * op 26080591 corregida al 6,5% seguía pagando el 5% de la tabla). */
+   * op 26080591 corregida al 6,5% seguía pagando el 5% de la tabla).
+   * Lo mismo vale para una carta aprobada CON la excepción PARTICIPACION_SOBRE_PIZARRA
+   * (Pato, 16-09-2026): una comisión sobre la tabla exige la excepción y la firma de un
+   * gerente al aprobar; aprobada, la carta manda. Caso VERA 26080720/26080295: cartas
+   * al 10% con excepción aprobada y el motor pagaba el 7,5% de la tabla. */
+  /* Expresión SQL única (1 = la carta manda en ambos sentidos) para los consumidores
+   * que leen cartas_aprobacion: recalcular-mes y calcular-operacion. */
+  var CARTA_MANDA_SQL = "(comision_corregida = 1 OR JSON_CONTAINS(COALESCE(excepciones, JSON_ARRAY()), '\"PARTICIPACION_SOBRE_PIZARRA\"'))";
   function comisionDealerEfectiva({ calculada, carta, saldo, saldoCarta, comisionCorregida }) {
     const calc = Math.round(parseFloat(calculada) || 0);
     const pc   = Math.round(parseFloat(carta) || 0);
@@ -141,5 +148,5 @@
     return calc;
   }
 
-  return { comisionDealer, comisionDealerEfectiva, dealerTablePct, tablaDeUbicacion, normRutD, pizarraParque, pizarraCalle };
+  return { comisionDealer, comisionDealerEfectiva, CARTA_MANDA_SQL, dealerTablePct, tablaDeUbicacion, normRutD, pizarraParque, pizarraCalle };
 });

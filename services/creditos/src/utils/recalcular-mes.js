@@ -19,7 +19,7 @@
 
 const pool = require('../../../../shared/config/database');
 const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
-const { comisionDealer, comisionDealerEfectiva } = require('../../../../api-gateway/public/js/comision-dealer');
+const { comisionDealer, comisionDealerEfectiva, CARTA_MANDA_SQL } = require('../../../../api-gateway/public/js/comision-dealer');
 const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { getUF } = require('../../../../shared/uf');
 const { aMes } = require('../../../../shared/utils/mes-cerrado');   // normaliza el mes venga como venga
@@ -212,10 +212,10 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
   if (idsFin.length) {
     try {
       const [cs] = await pool.query(
-        `SELECT id_financiera, part_bruto, saldo, comision_corregida FROM cartas_aprobacion
+        `SELECT id_financiera, part_bruto, saldo, ${CARTA_MANDA_SQL} AS manda FROM cartas_aprobacion
           WHERE status='APROBADA' AND COALESCE(part_bruto,0) > 0 AND id_financiera IN (?)
           ORDER BY id ASC`, [idsFin]);
-      cs.forEach(c => partCartaDe.set(String(c.id_financiera), { part_bruto: Number(c.part_bruto), saldo: Number(c.saldo) || 0, corregida: Number(c.comision_corregida) === 1 }));  // id mayor gana (vigente)
+      cs.forEach(c => partCartaDe.set(String(c.id_financiera), { part_bruto: Number(c.part_bruto), saldo: Number(c.saldo) || 0, corregida: Number(c.manda) === 1 }));  // id mayor gana (vigente)
     } catch (e) { /* sin tabla de cartas → se compara contra el cálculo */ }
   }
   for (const op of ops) {
@@ -303,10 +303,10 @@ async function recalcularMeses(meses, opciones = {}) {
     const partCartaDe = new Map();
     for (let i = 0; i < idsFin.length; i += 500) {
       const [cs] = await pool.query(
-        `SELECT id_financiera, part_bruto, saldo, comision_corregida FROM cartas_aprobacion
+        `SELECT id_financiera, part_bruto, saldo, ${CARTA_MANDA_SQL} AS manda FROM cartas_aprobacion
           WHERE status='APROBADA' AND COALESCE(part_bruto,0) > 0 AND id_financiera IN (?)
           ORDER BY id ASC`, [idsFin.slice(i, i + 500)]);
-      cs.forEach(c => partCartaDe.set(String(c.id_financiera), { part_bruto: Number(c.part_bruto), saldo: Number(c.saldo) || 0, corregida: Number(c.comision_corregida) === 1 }));  // id mayor gana (vigente)
+      cs.forEach(c => partCartaDe.set(String(c.id_financiera), { part_bruto: Number(c.part_bruto), saldo: Number(c.saldo) || 0, corregida: Number(c.manda) === 1 }));  // id mayor gana (vigente)
     }
 
     // ── Conteo UAC (penetración de seguros no se recalcula aquí) ────
