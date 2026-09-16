@@ -369,7 +369,7 @@ Comprobante {trx} · {fecha}.`,
     ambito: 'Recursos Humanos — Anticipos',
     nombre: 'Aguinaldo de Fiestas Patrias → colaborador',
     descripcion: 'Se manda a cada colaborador al generar el lote TEF de Fiestas Patrias en Remuneraciones → Anticipos.',
-    asunto: '¡Feliz 18! Aguinaldo de Fiestas Patrias {GLOSA}',
+    asunto: '¡Feliz 18! {GLOSA}',
     cuerpo: `Hola {NOMBRE}:
 
 Con motivo de las Fiestas Patrias, AutoFácil te transfirió hoy {FECHA} un aguinaldo de {MONTO} a tu cuenta {CUENTA} del {BANCO}.
@@ -390,7 +390,7 @@ Recursos Humanos — AutoFácil`,
     ambito: 'Recursos Humanos — Anticipos',
     nombre: 'Aguinaldo de Navidad → colaborador',
     descripcion: 'Se manda a cada colaborador al generar el lote TEF de Navidad en Remuneraciones → Anticipos.',
-    asunto: '¡Feliz Navidad! Aguinaldo {GLOSA}',
+    asunto: '¡Feliz Navidad! {GLOSA}',
     cuerpo: `Hola {NOMBRE}:
 
 AutoFácil te transfirió hoy {FECHA} tu aguinaldo de Navidad por {MONTO} a tu cuenta {CUENTA} del {BANCO}.
@@ -558,6 +558,12 @@ require('./migrate').migrar('correos-parques-texto-plano', async () => {
 require('./migrate').migrar('correo-parque-odp-contabilidad-destinos', async () => {
   await pool.query(
     "UPDATE correos_plantillas SET para_perfiles='', cc=IF(cc='', 'operaciones@autofacilchile.cl', cc) WHERE codigo='parque_odp_contabilidad'");
+});
+
+// Asunto del aguinaldo repetía el concepto ("...Fiestas Patrias Aguinaldo fiestas patrias 2026"); se corrige solo si nadie lo editó
+require('./migrate').migrar('correo-anticipo-asuntos', async () => {
+  await pool.query("UPDATE correos_plantillas SET asunto='¡Feliz 18! {GLOSA}' WHERE codigo='anticipo_fiestas_patrias' AND asunto='¡Feliz 18! Aguinaldo de Fiestas Patrias {GLOSA}'");
+  await pool.query("UPDATE correos_plantillas SET asunto='¡Feliz Navidad! {GLOSA}' WHERE codigo='anticipo_navidad' AND asunto='¡Feliz Navidad! Aguinaldo {GLOSA}'");
 });
 
 const obtener = async codigo => {
