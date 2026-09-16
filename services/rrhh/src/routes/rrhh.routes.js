@@ -185,6 +185,15 @@ router.put('/remuneraciones/adicionales/:id',    verifyToken, requireFunc('rh_re
 router.delete('/remuneraciones/adicionales/:id', verifyToken, requireFunc('rh_remuneraciones'), rem.eliminarAdicional);
 router.put('/remuneraciones/adicionales/:id/permanente', verifyToken, requireFunc('rh_remuneraciones'), rem.permanenteAdicional);
 router.post('/remuneraciones/adicionales/conceptos', verifyToken, requireFunc('rh_remuneraciones'), rem.crearConceptoAdic);
+// ANTICIPOS al personal: TEF Santander + ODP nómina adjunta + correo — Pato 16-09-2026
+const anticipos = require('../controllers/anticipos.controller');
+router.get('/remuneraciones/anticipos',                verifyToken, requireFunc('rh_remuneraciones'), anticipos.getAll);
+router.put('/remuneraciones/anticipos/config',         verifyToken, requireFunc('rh_remuneraciones'), anticipos.putConfig);
+router.post('/remuneraciones/anticipos/generar',       verifyToken, requireFunc('rh_remuneraciones'), anticipos.generar);
+router.get('/remuneraciones/anticipos/:id',            verifyToken, requireFunc('rh_remuneraciones'), anticipos.getLote);
+router.get('/remuneraciones/anticipos/:id/tef.xlsx',   verifyToken, requireFunc('rh_remuneraciones'), anticipos.descargar);
+router.post('/remuneraciones/anticipos/:id/correos',   verifyToken, requireFunc('rh_remuneraciones'), anticipos.reenviarCorreos);
+router.post('/remuneraciones/anticipos/:id/anular',    verifyToken, requireFunc('rh_remuneraciones'), anticipos.anular);
 // Nómina EDENRED (tarjeta alimentación, por día hábil; no va en la liquidación) — Pato 16-09-2026
 const edenred = require('../controllers/edenred.controller');
 router.get('/remuneraciones/edenred',            verifyToken, requireFunc('rh_remuneraciones'), edenred.getMes);

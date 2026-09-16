@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anticipos y TEF — AutoFácil</title>
+  <!-- v1.0 — Anticipos al personal: pendientes cargados solos (aguinaldos pagados como anticipo, anticipos de sueldo, préstamos), lote TEF Santander (Nómina Masiva OfficeBanking), ODP "según nómina adjunta" con Excel adjunto o ODP existente, correo por tipo (plantillas anticipo_*), lotes con descarga/reenvío/anular, cuenta de origen paramétrica (Pato 16-09-2026) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:28px 36px; max-width:1240px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:18px; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 12px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:7px 12px; border-bottom:1px solid #f1f5f9; }
+    .text-right { text-align:right; } .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .pill { border-radius:9px; padding:2px 8px; font-size:.68rem; font-weight:700; }
+    .t-FIESTAS_PATRIAS { background:#fee2e2; color:#991b1b } .t-NAVIDAD { background:#dcfce7; color:#166534 } .t-ANTICIPO { background:#dbeafe; color:#1e40af } .t-PRESTAMO { background:#fef3c7; color:#92400e } .t-OTRO { background:#f1f5f9; color:#475569 }
+    .foot { background:#f7f9fc; border-left:4px solid #0255c5; border-radius:10px; padding:12px 18px; font-size:.76rem; color:#475569; line-height:1.8; }
+    .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Recursos Humanos', href:'/recursos-humanos/' }, { label:'Remuneraciones', href:'/recursos-humanos/remuneraciones/' }, { label:'Anticipos y TEF', icon:'bi-send-check', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-send-check"></i><div><h2>Anticipos y TEF</h2><p>Pagos al personal antes de la liquidación. Los pendientes se cargan solos desde Adicionales (pagado como anticipo) y Descuentos (anticipos y préstamos). Al generar: archivo TEF Santander, ODP "según nómina adjunta" si son varias personas, y correo a cada beneficiario con el texto de su tipo.</p></div></div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" id="tabP" onclick="tab('P');return false"><i class="bi bi-hourglass-split me-1"></i>Pendientes de pago</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabL" onclick="tab('L');return false"><i class="bi bi-collection me-1"></i>Lotes generados</a></li>
+  </ul>
+
+  <div id="secP">
+    <div class="panel">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Tipo del lote</label>
+          <select id="fTipo" class="form-select form-select-sm" onchange="tipoUI()">
+            <option value="FIESTAS_PATRIAS">Aguinaldo Fiestas Patrias</option><option value="NAVIDAD">Aguinaldo Navidad</option>
+            <option value="ANTICIPO">Anticipo de sueldo</option><option value="PRESTAMO">Préstamo / crédito corporativo</option><option value="OTRO">Otro pago anticipado</option>
+          </select></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Glosa TEF (portal banco)</label><input id="fGlosaTef" class="form-control form-control-sm" maxlength="100"></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Glosa correo / cartola</label><input id="fGlosaCorreo" class="form-control form-control-sm" maxlength="100"></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1" title="Si Tesorería ya emitió la ODP a mano, se ata a esa en vez de crear otra">ODP existente (opcional)</label><input id="fOdp" class="form-control form-control-sm" placeholder="ODP26xxxxx"></div>
+        <div class="col-md-2 d-flex flex-column gap-1">
+          <div class="form-check"><input type="checkbox" class="form-check-input" id="fCorreo" checked><label class="form-check-label small fw-semibold" for="fCorreo">Enviar correos</label></div>
+          <button class="btn btn-sm btn-primary" onclick="generar()"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Generar TEF</button>
+        </div>
+      </div>
+      <div class="small text-muted mt-2"><i class="bi bi-bank me-1"></i>Cuenta de origen: <b id="lblCta">—</b> <a href="#" onclick="cambiarCta();return false" class="ms-1">cambiar</a> · Formato: Nómina Masiva OfficeBanking Santander (13 columnas) · El correo de cada tipo se edita en <a href="/mantenedores/correos/">Correos del Sistema</a> (plantillas anticipo_*).</div>
+    </div>
+    <div class="d-flex gap-3 align-items-center mb-2 small">
+      <a href="#" onclick="marcar(true);return false">Marcar todos</a><a href="#" onclick="marcar(false);return false">Ninguno</a>
+      <span id="selTxt" class="text-muted ms-auto"></span>
+    </div>
+    <div class="panel" style="padding:0;overflow:auto">
+      <table><thead><tr><th></th><th>Tipo</th><th>Colaborador</th><th>Concepto</th><th>Mes</th><th>Banco / cuenta</th><th>Correo</th><th class="text-right">Monto</th><th>Aviso</th></tr></thead>
+      <tbody id="tbP"><tr><td colspan="9" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div id="secL" style="display:none">
+    <div class="panel" style="padding:0;overflow:auto">
+      <table><thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Glosa</th><th class="text-right">Personas</th><th class="text-right">Total</th><th>ODP</th><th>Correos</th><th>Generó</th><th></th></tr></thead>
+      <tbody id="tbL"></tbody></table>
+    </div>
+    <div id="detLote"></div>
+  </div>
+
+  <div class="foot mt-3"><b><i class="bi bi-diagram-3 me-1"></i>Qué afecta</b>
+    <ul class="mb-0">
+      <li><b>Pendientes</b> vienen de <a href="/recursos-humanos/remuneraciones/adicionales/">Adicionales</a> (casilla "Pagado como anticipo") y <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a> (tipos Anticipo y Préstamo). Generar el lote los marca como pagados por TEF.</li>
+      <li><b>Cuenta de origen</b> → columna Cta_origen del archivo Santander (rh_config tef_cta_origen).</li>
+      <li><b>Datos bancarios y correo</b> → salen de la <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a>; sin cuenta o banco sin código no se puede generar.</li>
+      <li><b>ODP</b> → <a href="/ordenes-pago/">Órdenes de Pago</a>: se crea "DE ACUERDO A NÓMINA ADJUNTA" con el Excel adjunto cuando hay más de una persona, o se ata a la ODP existente que indiques.</li>
+      <li><b>Correos</b> → plantillas anticipo_fiestas_patrias, anticipo_navidad, anticipo_sueldo, anticipo_prestamo, anticipo_otro en <a href="/mantenedores/correos/">Correos del Sistema</a>.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const H = { Authorization:'Bearer '+sessionStorage.getItem('token'), 'Content-Type':'application/json' };
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const fmt = v => Math.round(Number(v)||0).toLocaleString('es-CL');
+const MESES=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const mesTxt = m => m ? (MESES[Number(String(m).slice(5,7))]||'')+'-'+String(m).slice(0,4) : '';
+const TIPO_TXT = { FIESTAS_PATRIAS:'Fiestas Patrias', NAVIDAD:'Navidad', ANTICIPO:'Anticipo sueldo', PRESTAMO:'Préstamo', OTRO:'Otro' };
+let D = null;
+
+function tab(t){ ['P','L'].forEach(x=>{ document.getElementById('sec'+x).style.display = x===t?'':'none'; document.getElementById('tab'+x).classList.toggle('active', x===t); }); }
+async function cargar(){
+  const j = await (await fetch('/api/rrhh/remuneraciones/anticipos',{headers:H})).json();
+  if (!j.success) return alert(j.error);
+  D = j.data; render();
+}
+function tipoUI(){
+  const t = document.getElementById('fTipo').value;
+  const y = new Date().getFullYear(), m = new Date();
+  document.getElementById('fGlosaCorreo').value = (D?.tipos||{})[t] || '';
+  document.getElementById('fGlosaTef').value = `Remuneraciones ${MESES[m.getMonth()+1]}-${y}`;
+  // Preselecciona los pendientes del tipo elegido
+  document.querySelectorAll('#tbP .sel').forEach(c => c.checked = c.dataset.tipo===t);
+  selTxt();
+}
+function render(){
+  document.getElementById('lblCta').textContent = D.cta_origen || '—';
+  const ps = D.pendientes||[];
+  document.getElementById('tbP').innerHTML = ps.map((p,i)=>`<tr>
+    <td><input type="checkbox" class="sel" data-i="${i}" data-tipo="${p.tipo}" onchange="selTxt()" ${p.aviso?'disabled title="corrige la ficha"':''}></td>
+    <td><span class="pill t-${p.tipo}">${TIPO_TXT[p.tipo]||p.tipo}</span></td>
+    <td>${esc(p.nombre)}<div class="small text-muted">${esc(p.rut||'')}</div></td>
+    <td>${esc(p.concepto)}${p.cuotas?`<div class="small text-muted">${p.cuotas} cuota(s) de $${fmt(p.valor_cuota)} desde ${mesTxt(p.mes)}</div>`:''}</td>
+    <td>${mesTxt(p.mes)}</td>
+    <td class="small">${esc(p.banco||'—')} <span class="text-muted">(${p.cod_banco??'?'})</span><br>${esc(p.tipo_cuenta||'')} ${esc(p.cuenta||'')}</td>
+    <td class="small">${esc(p.email||'—')}</td>
+    <td class="text-right num">$${fmt(p.monto)}</td>
+    <td class="small text-danger">${esc(p.aviso||'')}</td></tr>`).join('') || '<tr><td colspan="9" class="text-center text-muted py-3">No hay anticipos pendientes de pago</td></tr>';
+  tipoUI();
+  document.getElementById('tbL').innerHTML = (D.lotes||[]).map(l=>`<tr style="${l.anulado_at?'opacity:.5':''}">
+    <td>${l.id}</td><td>${String(l.created_at).slice(0,10)}</td><td><span class="pill t-${l.tipo}">${TIPO_TXT[l.tipo]||l.tipo}</span></td>
+    <td>${esc(l.glosa_correo)}<div class="small text-muted">${esc(l.glosa_tef)}</div></td>
+    <td class="text-right">${l.personas}</td><td class="text-right num">$${fmt(l.total)}</td>
+    <td>${l.odp_numero?`<a href="/ordenes-pago/">${esc(l.odp_numero)}</a>`:'—'}</td>
+    <td>${l.correos_enviados}/${l.personas}</td><td class="small">${esc(l.generado_por||'')}</td>
+    <td style="white-space:nowrap">${l.anulado_at?'<span class="pill" style="background:#fee2e2;color:#991b1b">ANULADO</span>':`
+      <a href="#" onclick="descargar(${l.id});return false" title="Descargar TEF"><i class="bi bi-download"></i></a>
+      <a href="#" class="ms-2" onclick="verLote(${l.id});return false" title="Detalle"><i class="bi bi-list-ul"></i></a>
+      <a href="#" class="ms-2" onclick="reenviar(${l.id});return false" title="Reenviar correos a quienes no lo recibieron"><i class="bi bi-envelope"></i></a>
+      <a href="#" class="ms-2 text-danger" onclick="anular(${l.id});return false" title="Anular lote"><i class="bi bi-x-circle"></i></a>`}</td></tr>`).join('') || '<tr><td colspan="10" class="text-center text-muted py-3">Sin lotes</td></tr>';
+}
+function marcar(v){ document.querySelectorAll('#tbP .sel:not(:disabled)').forEach(c=>c.checked=v); selTxt(); }
+function seleccion(){ return [...document.querySelectorAll('#tbP .sel:checked')].map(c=>D.pendientes[Number(c.dataset.i)]); }
+function selTxt(){ const s = seleccion(); document.getElementById('selTxt').textContent = s.length ? `${s.length} seleccionado(s) · $${fmt(s.reduce((a,p)=>a+p.monto,0))}` : ''; }
+async function generar(){
+  const s = seleccion(); if (!s.length) return alert('Marca al menos un anticipo');
+  const body = { items: s.map(p=>({origen:p.origen, origen_id:p.origen_id})), tipo: document.getElementById('fTipo').value,
+    glosa_tef: document.getElementById('fGlosaTef').value.trim(), glosa_correo: document.getElementById('fGlosaCorreo').value.trim(),
+    enviar_correos: document.getElementById('fCorreo').checked, odp_existente: document.getElementById('fOdp').value.trim() || undefined };
+  if (!body.glosa_tef || !body.glosa_correo) return alert('Completa las glosas');
+  const total = s.reduce((a,p)=>a+p.monto,0);
+  if (!confirm(`¿Generar TEF "${body.glosa_correo}" para ${s.length} persona(s) por $${fmt(total)}?\n\n${s.length>1 ? (body.odp_existente ? 'Se ata a la ODP '+body.odp_existente : 'Se crea la ODP "DE ACUERDO A NÓMINA ADJUNTA" con el Excel adjunto') : 'Una persona: sin ODP masiva'}.\n${body.enviar_correos ? 'Se envía correo a cada beneficiario.' : 'Sin correos.'}`)) return;
+  const j = await (await fetch('/api/rrhh/remuneraciones/anticipos/generar',{method:'POST',headers:H,body:JSON.stringify(body)})).json();
+  if (!j.success) return alert(j.error);
+  alert(`Lote #${j.data.id} generado: ${j.data.personas} personas, $${fmt(j.data.total)}${j.data.odp?' · ODP '+j.data.odp:''} · ${j.data.correos} correo(s) enviados.\n\nDescarga el archivo y cárgalo en el portal Santander.`);
+  document.getElementById('fOdp').value='';
+  await cargar(); descargar(j.data.id); tab('L');
+}
+async function descargar(id){
+  const r = await fetch(`/api/rrhh/remuneraciones/anticipos/${id}/tef.xlsx`,{headers:H});
+  if (!r.ok) { const j = await r.json().catch(()=>({})); return alert(j.error||'No se pudo descargar'); }
+  const b = await r.blob(); const a = document.createElement('a'); a.href = URL.createObjectURL(b);
+  a.download = (r.headers.get('Content-Disposition')||'').match(/filename="([^"]+)"/)?.[1] || `TEF-lote${id}.xlsx`; a.click();
+}
+async function verLote(id){
+  const j = await (await fetch(`/api/rrhh/remuneraciones/anticipos/${id}`,{headers:H})).json(); if (!j.success) return alert(j.error);
+  const it = j.data.items;
+  document.getElementById('detLote').innerHTML = `<div class="panel"><div class="fw-bold mb-2">Lote #${id} — ${esc(j.data.lote.glosa_correo)}</div>
+    <table><thead><tr><th>Colaborador</th><th>RUT</th><th>Concepto</th><th>Banco (cód.)</th><th>Cuenta</th><th>Correo</th><th class="text-right">Monto</th><th>Aviso enviado</th></tr></thead><tbody>
+    ${it.map(x=>`<tr><td>${esc(x.nombre)}</td><td>${esc(x.rut||'')}</td><td>${esc(x.concepto||'')}</td><td>${esc(x.banco||'')} (${x.cod_banco??''})</td><td>${esc(x.cuenta||'')}</td><td class="small">${esc(x.email||'')}</td><td class="text-right num">$${fmt(x.monto)}</td><td>${x.correo_ok?'<i class="bi bi-check-circle text-success"></i>':'<i class="bi bi-dash text-muted"></i>'}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+async function reenviar(id){
+  if (!confirm('¿Reenviar el correo a quienes aún no lo recibieron? (Aceptar) — Cancelar para no enviar.')) return;
+  const j = await (await fetch(`/api/rrhh/remuneraciones/anticipos/${id}/correos`,{method:'POST',headers:H,body:'{}'})).json();
+  if (!j.success) return alert(j.error);
+  alert(`Enviados ${j.data.enviados} de ${j.data.intentados}.`); cargar();
+}
+async function anular(id){
+  const motivo = prompt('Motivo para anular el lote (los anticipos vuelven a Pendientes; la ODP se anula aparte en Órdenes de Pago):'); if (motivo==null) return;
+  const j = await (await fetch(`/api/rrhh/remuneraciones/anticipos/${id}/anular`,{method:'POST',headers:H,body:JSON.stringify({motivo})})).json();
+  if (!j.success) return alert(j.error);
+  cargar();
+}
+async function cambiarCta(){
+  const v = prompt('Cuenta corriente de ORIGEN en Santander (solo números):', D.cta_origen||''); if (v==null) return;
+  const j = await (await fetch('/api/rrhh/remuneraciones/anticipos/config',{method:'PUT',headers:H,body:JSON.stringify({cta_origen:v})})).json();
+  if (!j.success) return alert(j.error);
+  cargar();
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

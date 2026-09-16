@@ -364,6 +364,105 @@ Comprobante {trx} · {fecha}.`,
     destinatario: 'El correo del CLIENTE (de su ficha en Clientes); BCC a quien solicitó la ODP',
     variables: '{cliente} {num_credito} {trx} {fecha} {total} {origen} {n_cuotas}',
   },
+  {
+    codigo: 'anticipo_fiestas_patrias',
+    ambito: 'Recursos Humanos — Anticipos',
+    nombre: 'Aguinaldo de Fiestas Patrias → colaborador',
+    descripcion: 'Se manda a cada colaborador al generar el lote TEF de Fiestas Patrias en Remuneraciones → Anticipos.',
+    asunto: '¡Feliz 18! Aguinaldo de Fiestas Patrias {GLOSA}',
+    cuerpo: `Hola {NOMBRE}:
+
+Con motivo de las Fiestas Patrias, AutoFácil te transfirió hoy {FECHA} un aguinaldo de {MONTO} a tu cuenta {CUENTA} del {BANCO}.
+
+El monto aparecerá en tu liquidación de sueldo como haber y como anticipo ya pagado, así que no afecta tu líquido.
+
+¡Que disfrutes estas fiestas en familia!
+
+Saludos cordiales,
+Recursos Humanos — AutoFácil`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'El colaborador (correo personal de su ficha; si no tiene, el corporativo)',
+    variables: '{NOMBRE} {NOMBRE_COMPLETO} {MONTO} {CONCEPTO} {GLOSA} {FECHA} {MES_DESCUENTO} {CUOTAS} {CUOTA} {BANCO} {CUENTA}',
+  },
+  {
+    codigo: 'anticipo_navidad',
+    ambito: 'Recursos Humanos — Anticipos',
+    nombre: 'Aguinaldo de Navidad → colaborador',
+    descripcion: 'Se manda a cada colaborador al generar el lote TEF de Navidad en Remuneraciones → Anticipos.',
+    asunto: '¡Feliz Navidad! Aguinaldo {GLOSA}',
+    cuerpo: `Hola {NOMBRE}:
+
+AutoFácil te transfirió hoy {FECHA} tu aguinaldo de Navidad por {MONTO} a tu cuenta {CUENTA} del {BANCO}.
+
+Aparecerá en tu liquidación como haber y como anticipo ya pagado, sin afectar tu líquido.
+
+¡Felices fiestas para ti y los tuyos!
+
+Saludos cordiales,
+Recursos Humanos — AutoFácil`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'El colaborador (correo personal de su ficha; si no tiene, el corporativo)',
+    variables: '{NOMBRE} {NOMBRE_COMPLETO} {MONTO} {CONCEPTO} {GLOSA} {FECHA} {MES_DESCUENTO} {CUOTAS} {CUOTA} {BANCO} {CUENTA}',
+  },
+  {
+    codigo: 'anticipo_sueldo',
+    ambito: 'Recursos Humanos — Anticipos',
+    nombre: 'Anticipo de sueldo → colaborador',
+    descripcion: 'Se manda al colaborador al generar el lote TEF de un anticipo de sueldo (Descuentos → ANTICIPO).',
+    asunto: 'Anticipo de sueldo transferido — {MONTO}',
+    cuerpo: `Hola {NOMBRE}:
+
+Te transferimos hoy {FECHA} el anticipo de sueldo solicitado por {MONTO} a tu cuenta {CUENTA} del {BANCO}.
+
+Se descontará en {CUOTAS} cuota(s) de {CUOTA} a partir de la liquidación de {MES_DESCUENTO}.
+
+Saludos cordiales,
+Recursos Humanos — AutoFácil`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'El colaborador (correo personal de su ficha; si no tiene, el corporativo)',
+    variables: '{NOMBRE} {NOMBRE_COMPLETO} {MONTO} {CONCEPTO} {GLOSA} {FECHA} {MES_DESCUENTO} {CUOTAS} {CUOTA} {BANCO} {CUENTA}',
+  },
+  {
+    codigo: 'anticipo_prestamo',
+    ambito: 'Recursos Humanos — Anticipos',
+    nombre: 'Préstamo / crédito corporativo → colaborador',
+    descripcion: 'Se manda al colaborador al generar el lote TEF de un préstamo (Descuentos → PRESTAMO).',
+    asunto: 'Préstamo al personal transferido — {MONTO}',
+    cuerpo: `Hola {NOMBRE}:
+
+Te transferimos hoy {FECHA} el préstamo aprobado por {MONTO} a tu cuenta {CUENTA} del {BANCO}.
+
+Se descontará de tu liquidación en {CUOTAS} cuota(s) de {CUOTA}; la primera en la liquidación de {MES_DESCUENTO}, según el convenio firmado.
+
+Saludos cordiales,
+Recursos Humanos — AutoFácil`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'El colaborador (correo personal de su ficha; si no tiene, el corporativo)',
+    variables: '{NOMBRE} {NOMBRE_COMPLETO} {MONTO} {CONCEPTO} {GLOSA} {FECHA} {MES_DESCUENTO} {CUOTAS} {CUOTA} {BANCO} {CUENTA}',
+  },
+  {
+    codigo: 'anticipo_otro',
+    ambito: 'Recursos Humanos — Anticipos',
+    nombre: 'Pago anticipado (otro haber) → colaborador',
+    descripcion: 'Se manda al colaborador al generar un lote TEF de un haber pagado por anticipado que no es aguinaldo ni anticipo de sueldo (ej. bono).',
+    asunto: 'Pago transferido — {CONCEPTO}',
+    cuerpo: `Hola {NOMBRE}:
+
+Te transferimos hoy {FECHA} {MONTO} por concepto de {CONCEPTO} a tu cuenta {CUENTA} del {BANCO}.
+
+Aparecerá en tu liquidación como haber y como anticipo ya pagado, sin afectar tu líquido.
+
+Saludos cordiales,
+Recursos Humanos — AutoFácil`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'El colaborador (correo personal de su ficha; si no tiene, el corporativo)',
+    variables: '{NOMBRE} {NOMBRE_COMPLETO} {MONTO} {CONCEPTO} {GLOSA} {FECHA} {MES_DESCUENTO} {CUOTAS} {CUOTA} {BANCO} {CUENTA}',
+  },
 ];
 
 require('./migrate').enFila('correos-plantillas', async () => {
