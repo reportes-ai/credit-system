@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
+  <!-- v2.5 — colación y movilización mensuales en Previsión y pago (fuente única de la liquidación). v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -187,6 +187,8 @@ async function abrir(id){
       ${sel('f_salud','Salud (Fonasa / Isapre)',f.salud,opsCat(C.salud,f.salud),1)}
       ${inp('f_plan_isapre_uf','Plan Isapre pactado (UF, vacío si Fonasa)',f.plan_isapre_uf,'number')}
       ${inp('f_sueldo_base','Sueldo base ($)',f.sueldo_base,'number',1)}
+      ${inp('f_colacion','Colación mensual ($, no imponible, 30avos)',f.colacion,'number')}
+      ${inp('f_movilizacion','Movilización mensual ($, no imponible, 30avos)',f.movilizacion,'number')}
       ${sel('f_banco_pago','Banco (depósito de sueldo)',f.banco_pago,opsCat(C.banco,f.banco_pago))}
       ${sel('f_tipo_cuenta_pago','Tipo de cuenta',f.tipo_cuenta_pago,['CUENTA CORRIENTE','CUENTA VISTA','CUENTA RUT','CHEQUERA ELECTRONICA'])}
       ${inp('f_num_cuenta_pago','N° de cuenta',f.num_cuenta_pago)}
@@ -265,7 +267,7 @@ async function guardarFicha(){
     conyuge_misma_dir: document.getElementById('f_conyuge_misma_dir')?.checked ? 1 : 0,
     conyuge_direccion: document.getElementById('f_conyuge_misma_dir')?.checked ? '' : g('f_conyuge_direccion'),
     hijos: leerHijos(),
-    afp:g('f_afp'), salud:g('f_salud'), plan_isapre_uf:g('f_plan_isapre_uf'), sueldo_base:g('f_sueldo_base'),
+    afp:g('f_afp'), salud:g('f_salud'), plan_isapre_uf:g('f_plan_isapre_uf'), sueldo_base:g('f_sueldo_base'), colacion:g('f_colacion'), movilizacion:g('f_movilizacion'),
     tramo_asignacion:g('f_tramo_asignacion'), cargas_otras:g('f_cargas_otras'), cargas_maternales:g('f_cargas_maternales'), cargas_invalidas:g('f_cargas_invalidas'), anos_trabajados_previos:g('f_anos_trabajados_previos'),
     banco_pago:g('f_banco_pago'), tipo_cuenta_pago:g('f_tipo_cuenta_pago'), num_cuenta_pago:g('f_num_cuenta_pago'),
     observaciones:g('f_observaciones'),
