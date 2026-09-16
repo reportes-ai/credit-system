@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adicionales de Remuneración — AutoFácil</title>
-  <!-- v1.9 — COMISIÓN MÍNIMA GARANTIZADA: por persona, mes de inicio y término con un mínimo por cada mes; en la liquidación se paga solo la diferencia si las comisiones del mes no alcanzan el mínimo. v1.8 — Colaborador "SOLO CONTRATO INDEFINIDO" / "SOLO PLAZO FIJO" (aguinaldo 70.000 / 35.000) + atajos por contrato en el grupo; pestaña Comisiones del mes (variable que entra en la liquidación, mes vencido, con estado de aprobación). v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <!-- v1.10 — "Pagado como anticipo": además del haber se crea un descuento ANTICIPO de 1 cuota por lo pagado (mismo mes, atado al adicional); etiqueta en la lista. v1.9 — COMISIÓN MÍNIMA GARANTIZADA: por persona, mes de inicio y término con un mínimo por cada mes; en la liquidación se paga solo la diferencia si las comisiones del mes no alcanzan el mínimo. v1.8 — Colaborador "SOLO CONTRATO INDEFINIDO" / "SOLO PLAZO FIJO" (aguinaldo 70.000 / 35.000) + atajos por contrato en el grupo; pestaña Comisiones del mes (variable que entra en la liquidación, mes vencido, con estado de aprobación). v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -74,6 +74,14 @@
           <label class="form-check-label small fw-semibold" for="fLiq" title="El colaborador recibe exactamente este monto. Si la causal es imponible, el sistema calcula el BRUTO de cada persona (AFP, salud, AFC e impuesto) al armar la liquidación">Líquido</label></div>
         <div class="form-check"><input type="checkbox" class="form-check-input" id="fNoImp">
           <label class="form-check-label small fw-semibold" for="fNoImp" title="Manda sobre el default de la causal: este monto no paga AFP, salud ni impuesto">No imponible</label></div>
+        <!-- PAGADO COMO ANTICIPO: el haber ya se transfirió por fuera (ej. aguinaldo el 16-09).
+             Se crea el haber Y un descuento ANTICIPO de 1 cuota por lo pagado, en el mismo mes. -->
+        <div class="form-check"><input type="checkbox" class="form-check-input" id="fAnt" onchange="antUI()">
+          <label class="form-check-label small fw-semibold" for="fAnt" title="Ya se pagó por transferencia antes de la liquidación: además del haber se registra un descuento ANTICIPO por lo pagado, así el líquido no lo repite">Pagado como anticipo</label></div>
+        <div id="wAntMonto" style="display:none" class="d-flex align-items-center gap-1">
+          <label class="small fw-semibold mb-0" for="fAntMonto">pagado $</label>
+          <input id="fAntMonto" class="form-control form-control-sm text-end" style="width:110px" inputmode="numeric" placeholder="0" oninput="fmtMonto(this)" title="Lo que efectivamente se transfirió (líquido). Si el haber es líquido, es el mismo monto">
+        </div>
         <div class="form-check"><input type="checkbox" class="form-check-input" id="fPerm">
           <label class="form-check-label small fw-semibold" for="fPerm" title="Se incluye TODOS los meses hasta que se desmarque o hasta el mes indicado">Permanente</label></div>
         <!-- Vigencia: el mes de arriba es el DESDE; "Hasta" (inclusive) fija el último mes
@@ -319,6 +327,7 @@ function render(){
         : `<span class="pill" style="background:#fef3c7;color:#92400e">SOLO ${mesTxt(a.mes)}</span>`}
       <span class="pill ${a.es_liquido?'liq':'noimp'}">${a.es_liquido?'LÍQUIDO':'BRUTO'}</span>
       <span class="pill ${a.imponible?'imp':'noimp'}">${a.imponible?'IMPONIBLE':'NO IMPONIBLE'}</span>
+      ${a.anticipo_pagado?`<span class="pill" style="background:#fee2e2;color:#991b1b" title="Ya se pagó por fuera: la liquidación lo descuenta como anticipo">PAGADO COMO ANTICIPO $${fmt(a.anticipo_pagado)}</span>`:''}
       <span style="margin-left:auto">
         ${a.permanente&&!a.permanente_fin?`<button class="btn btn-sm btn-outline-secondary py-0" onclick="desmarcarPerm(${a.id})" title="Deja de pagarse todos los meses">Desmarcar permanente</button>`:''}
         ${!a.heredado&&!D.bloqueado?`<i class="bi bi-trash text-danger ms-2" style="cursor:pointer" onclick="eliminar(${a.id})"></i>`:''}
@@ -346,6 +355,12 @@ async function nuevoConcepto(){
 }
 
 function grupoUI(){ document.getElementById('wGrupo').style.display = fColab.value==='GRUPO' ? '' : 'none'; grupoN(); }
+// Pagado como anticipo: pide el monto transferido (prellenado con el Monto $ cuando el haber es líquido)
+function antUI(){
+  const on = document.getElementById('fAnt').checked;
+  document.getElementById('wAntMonto').style.display = on ? '' : 'none';
+  if (on && !document.getElementById('fAntMonto').value && document.getElementById('fLiq').checked) document.getElementById('fAntMonto').value = document.getElementById('fMonto').value;
+}
 function grupoSel(){ return [...document.querySelectorAll('#grupoLista .gr:checked')].map(x=>Number(x.value)); }
 function grupoTodos(v){ document.querySelectorAll('#grupoLista .gr').forEach(x=>x.checked=v); grupoN(); }
 function grupoContrato(t){ document.querySelectorAll('#grupoLista .gr').forEach(x=>x.checked = String(x.dataset.contrato||'').toUpperCase()===t); grupoN(); }
@@ -359,8 +374,12 @@ async function guardar(){
     no_imponible: document.getElementById('fNoImp').checked,
     permanente: document.getElementById('fPerm').checked,
     hasta: document.getElementById('fPerm').checked ? (document.getElementById('fHasta').value || undefined) : undefined,
-    monto: montoVal(), horas: esHE() ? horas : undefined };
+    monto: montoVal(), horas: esHE() ? horas : undefined,
+    pagado_anticipo: document.getElementById('fAnt').checked,
+    monto_pagado: document.getElementById('fAnt').checked ? (parseInt(String(document.getElementById('fAntMonto').value).replace(/\D/g,''))||undefined) : undefined };
   if (!body.id_usuario) return alert('Elige el colaborador');
+  if (body.pagado_anticipo && body.permanente) return alert('Un haber permanente no puede marcarse como pagado por anticipo');
+  if (body.pagado_anticipo && !body.es_liquido && !body.monto_pagado) return alert('El haber es BRUTO: indica cuánto se pagó como anticipo (líquido transferido)');
   if (esCMG()) {
     if (!/^\d+$/.test(body.id_usuario)) return alert('La comisión mínima garantizada se ingresa por persona');
     body.garantia = cmgLista();
@@ -387,6 +406,7 @@ async function guardar(){
   fColab.value=''; grupoTodos(false); grupoUI(); document.getElementById('fMonto').value=''; fOtro.value=''; document.getElementById('fLiq').checked=false;
   document.getElementById('fNoImp').checked=false; document.getElementById('fPerm').checked=false;
   document.getElementById('fHasta').value=''; document.getElementById('wHasta').style.display='none';
+  document.getElementById('fAnt').checked=false; document.getElementById('fAntMonto').value=''; antUI();
   document.getElementById('fHoras').value=''; document.getElementById('heDetalle').innerHTML='';
   document.querySelectorAll('#cmgGrid input').forEach(i => i.value='');
   fColab.focus();

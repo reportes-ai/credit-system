@@ -291,7 +291,8 @@ const getAdicionales = async (req, res) => {
     // Los del mes + los PERMANENTES nacidos antes que siguen vigentes este mes
     const [rows] = await pool.query(
       `SELECT a.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre_actual,
-              (a.mes < ?) heredado
+              (a.mes < ?) heredado,
+              (SELECT d.valor_cuota FROM rh_descuentos d WHERE d.id_adicional=a.id AND d.estado='VIGENTE' LIMIT 1) anticipo_pagado
          FROM rh_adicionales a
         LEFT JOIN usuarios u ON u.id_usuario=a.id_usuario
         WHERE a.mes=? OR (a.permanente=1 AND a.mes<? AND (a.permanente_fin IS NULL OR a.permanente_fin>?))
@@ -354,7 +355,7 @@ const crearAdicional = async (req, res) => {
         const j = await crearUno({ ...b, id_usuario: g.id_usuario }, req, { silencioso: true });
         if (j && j.ok) creados++; else if (j && j.error) return fail(res, j.error, j.status || 400);
       }
-      auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', detalle: `Adicional ${mes} a ${grupo ? 'un GRUPO' : contrato ? 'el personal ' + contrato : 'TODO EL PERSONAL'} (${creados}): ${causal} $${Math.round(Number(b.monto) || 0).toLocaleString('es-CL')}${b.es_liquido ? ' LÍQUIDO' : ''}` });
+      auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', detalle: `Adicional ${mes} a ${grupo ? 'un GRUPO' : contrato ? 'el personal ' + contrato : 'TODO EL PERSONAL'} (${creados}): ${causal} $${Math.round(Number(b.monto) || 0).toLocaleString('es-CL')}${b.es_liquido ? ' LÍQUIDO' : ''}${b.pagado_anticipo ? ` — PAGADO COMO ANTICIPO ($${Math.round(Number(b.monto_pagado) || Number(b.monto) || 0).toLocaleString('es-CL')} c/u)` : ''}` });
       return ok(res, { creados, personas: gente.map(g => g.nombre) });
     }
     const j = await crearUno(b, req);
@@ -414,9 +415,23 @@ async function crearUno(b, req, { silencioso = false } = {}) {
     // El detalle deja el cálculo a la vista: sin el "10 h × $10.341" hay que
     // reconstruir a mano de dónde salió el monto cuando alguien lo pregunta.
     const glosaHE = cantidad ? ` (${cantidad} h × $${Math.round(valorUnitario).toLocaleString('es-CL')})` : '';
+    /* PAGADO COMO ANTICIPO (Pato, 16-09-2026): el haber ya se transfirió por fuera. Además del
+       haber se crea un descuento ANTICIPO de 1 cuota, en el MISMO mes, por lo efectivamente
+       pagado (monto_pagado; si no viene y el haber es líquido, el monto). Así la liquidación
+       muestra el haber y la deducción, y el líquido a pagar no lo repite. */
+    let anticipo = null;
+    if (b.pagado_anticipo && !permanente) {
+      const pagado = Math.round(Number(b.monto_pagado) || (esLiquido ? monto : 0));
+      if (!(pagado > 0)) return fail('Indica el monto que se pagó como anticipo (en un haber bruto no se puede deducir solo)', 400);
+      const glosa = `Anticipo ${causal === 'OTRO' ? String(b.causal_texto || '').trim() : causal}`.slice(0, 200);
+      const [d] = await pool.query(
+        `INSERT INTO rh_descuentos (id_usuario, tipo, detalle_texto, monto_total, cuotas, valor_cuota, mes_inicio, creado_por, moneda, id_adicional)
+         VALUES (?,'ANTICIPO',?,?,1,?,?,?,'CLP',?)`, [idU, glosa, pagado, pagado, mes, nombreDe(u), r.insertId]);
+      anticipo = { id: d.insertId, monto: pagado };
+    }
     if (!silencioso) auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: r.insertId,
-      detalle: `Adicional ${mes} ${colab.nombre}: ${causal}${causal === 'OTRO' ? ' (' + b.causal_texto + ')' : ''} $${monto.toLocaleString('es-CL')}${glosaHE}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}${permanente ? (hasta ? ` desde ${mes} hasta ${hasta}` : ' PERMANENTE') : ''}` });
-    return { ok: true, data: { id: r.insertId, imponible, es_liquido: esLiquido, permanente, hasta } };
+      detalle: `Adicional ${mes} ${colab.nombre}: ${causal}${causal === 'OTRO' ? ' (' + b.causal_texto + ')' : ''} $${monto.toLocaleString('es-CL')}${glosaHE}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}${permanente ? (hasta ? ` desde ${mes} hasta ${hasta}` : ' PERMANENTE') : ''}${anticipo ? ` — PAGADO COMO ANTICIPO: descuento #${anticipo.id} por $${anticipo.monto.toLocaleString('es-CL')}` : ''}` });
+    return { ok: true, data: { id: r.insertId, imponible, es_liquido: esLiquido, permanente, hasta, anticipo } };
 }
 
 const eliminarAdicional = async (req, res) => {
@@ -427,7 +442,9 @@ const eliminarAdicional = async (req, res) => {
     if (!a) return fail(res, 'No existe', 404);
     if (await mesEmitido(a.mes)) return fail(res, 'El mes ya fue emitido: no se puede eliminar', 423);
     await pool.query('DELETE FROM rh_adicionales WHERE id=?', [req.params.id]);
-    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: Number(req.params.id), detalle: `Eliminó adicional ${a.mes} ${a.nombre_actual || a.nombre} ${a.causal} $${Number(a.monto).toLocaleString('es-CL')}` });
+    // El descuento ANTICIPO que nació con este haber se va con él (nunca queda una deducción huérfana)
+    const [da] = await pool.query("DELETE FROM rh_descuentos WHERE id_adicional=? AND estado='VIGENTE'", [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: Number(req.params.id), detalle: `Eliminó adicional ${a.mes} ${a.nombre_actual || a.nombre} ${a.causal} $${Number(a.monto).toLocaleString('es-CL')}${da.affectedRows ? ' y su descuento por anticipo' : ''}` });
     ok(res, { eliminado: true });
   } catch (e) { fail(res, 'Error interno del servidor'); }
 };
@@ -583,7 +600,12 @@ require('../../../../shared/migrate').enFila('rrhh-descuentos', async () => {
       /* Numeración REAL de la cuota (14-09-2026): un plan que viene andando (AVSOFT "001/004", nómina Caja "17/27")
          se registra acá solo con las cuotas que faltan; cuota_desde/cuotas_total hacen que la liquidación diga
          "cuota 3 de 4" y no "2 de 3". */
-      'cuota_desde INT NULL', 'cuotas_total INT NULL'])
+      'cuota_desde INT NULL', 'cuotas_total INT NULL',
+      /* Haber PAGADO COMO ANTICIPO (Pato, 16-09-2026): el adicional se pagó por fuera antes de la
+         liquidación (aguinaldo transferido el 16-09). El haber igual va a la liquidación, y este
+         descuento ANTICIPO de 1 cuota por lo pagado lo neutraliza. id_adicional ata los dos:
+         al eliminar el adicional se elimina el descuento. */
+      'id_adicional INT NULL'])
       await pool.query(`ALTER TABLE rh_descuentos ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
     console.log('[rrhh-descuentos] listo');
   } catch (e) { console.error('[rrhh-descuentos migration]', e.message); }
