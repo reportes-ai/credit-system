@@ -185,6 +185,15 @@ router.put('/remuneraciones/adicionales/:id',    verifyToken, requireFunc('rh_re
 router.delete('/remuneraciones/adicionales/:id', verifyToken, requireFunc('rh_remuneraciones'), rem.eliminarAdicional);
 router.put('/remuneraciones/adicionales/:id/permanente', verifyToken, requireFunc('rh_remuneraciones'), rem.permanenteAdicional);
 router.post('/remuneraciones/adicionales/conceptos', verifyToken, requireFunc('rh_remuneraciones'), rem.crearConceptoAdic);
+// Nómina EDENRED (tarjeta alimentación, por día hábil; no va en la liquidación) — Pato 16-09-2026
+const edenred = require('../controllers/edenred.controller');
+router.get('/remuneraciones/edenred',            verifyToken, requireFunc('rh_remuneraciones'), edenred.getMes);
+router.get('/remuneraciones/edenred/resumen',    verifyToken, requireFunc('rh_remuneraciones'), edenred.resumen);
+router.get('/remuneraciones/edenred/nomina.csv', verifyToken, requireFunc('rh_remuneraciones'), edenred.nominaCsv);
+router.put('/remuneraciones/edenred/param',      verifyToken, requireFunc('rh_remuneraciones'), edenred.putParam);
+router.put('/remuneraciones/edenred/persona',    verifyToken, requireFunc('rh_remuneraciones'), edenred.putPersona);
+router.post('/remuneraciones/edenred/generar',   verifyToken, requireFunc('rh_remuneraciones'), edenred.generar);
+router.post('/remuneraciones/edenred/anular',    verifyToken, requireFunc('rh_remuneraciones'), edenred.anular);
 router.put('/remuneraciones/adicionales/ficha-asignacion', verifyToken, requireFunc('rh_remuneraciones'), rem.asignacionFicha);   // colación/movilización de la ficha
 router.put('/remuneraciones/adicionales/conceptos/proporcional', verifyToken, requireFunc('rh_remuneraciones'), rem.proporcionalConceptoAdic);   // casilla 30avos por concepto
 router.post('/remuneraciones/descuentos/conceptos',  verifyToken, requireFunc('rh_remuneraciones'), rem.crearConceptoDesc);

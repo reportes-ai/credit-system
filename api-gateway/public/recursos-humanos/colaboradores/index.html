@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v2.5 — colación y movilización mensuales en Previsión y pago (fuente única de la liquidación). v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
+  <!-- v2.6 — montos con $ y puntos (sueldo, colación, movilización) y casilla Tarjeta Edenred. v2.5 — colación y movilización mensuales en Previsión y pago (fuente única de la liquidación). v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -110,6 +110,10 @@ function render(){
 
 // req=true marca el campo como OBLIGATORIO (lo exige el archivo Previred / LRE)
 const REQ = '<span style="color:#dc2626;font-weight:800" title="Obligatorio para Previred"> *</span>';
+// Montos en pesos: se ven con $ y puntos, se guardan como número (Pato 16-09-2026)
+const fmtCLP = v => (v==null||v==='') ? '' : '$'+Math.round(Number(String(v).replace(/\D/g,''))||0).toLocaleString('es-CL');
+const clp = (id, lbl, val, req) => `<div class="fld"><label>${lbl}${req?REQ:''}</label><input id="${id}" type="text" inputmode="numeric" data-clp="1" value="${fmtCLP(val)}" oninput="this.value=fmtCLP(this.value)" ${req&&(val==null||val==='')?'style="border-color:#fca5a5"':''}></div>`;
+const chk = (id, lbl, val, hint) => `<div class="fld"><label>${lbl}</label><label style="display:flex;align-items:center;gap:8px;font-size:.88rem;font-weight:500;text-transform:none;color:#111827;margin-top:6px"><input type="checkbox" id="${id}" ${val?'checked':''} style="width:16px;height:16px">${hint||''}</label></div>`;
 const inp = (id, lbl, val, type='text', req) => `<div class="fld"><label>${lbl}${req?REQ:''}</label><input id="${id}" type="${type}" value="${esc(val==null?'':val)}" ${req&&(val==null||val==='')?'style="border-color:#fca5a5"':''}></div>`;
 const sel = (id, lbl, val, ops, req) => `<div class="fld"><label>${lbl}${req?REQ:''}</label><select id="${id}" ${req&&!val?'style="border-color:#fca5a5"':''}><option value=""></option>${ops.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select></div>`;
 
@@ -186,9 +190,10 @@ async function abrir(id){
       ${sel('f_afp','AFP',f.afp,opsCat(C.afp,f.afp),1)}
       ${sel('f_salud','Salud (Fonasa / Isapre)',f.salud,opsCat(C.salud,f.salud),1)}
       ${inp('f_plan_isapre_uf','Plan Isapre pactado (UF, vacío si Fonasa)',f.plan_isapre_uf,'number')}
-      ${inp('f_sueldo_base','Sueldo base ($)',f.sueldo_base,'number',1)}
-      ${inp('f_colacion','Colación mensual ($, no imponible, 30avos)',f.colacion,'number')}
-      ${inp('f_movilizacion','Movilización mensual ($, no imponible, 30avos)',f.movilizacion,'number')}
+      ${clp('f_sueldo_base','Sueldo base',f.sueldo_base,1)}
+      ${clp('f_colacion','Colación mensual (no imponible, 30avos)',f.colacion)}
+      ${clp('f_movilizacion','Movilización mensual (no imponible, 30avos)',f.movilizacion)}
+      ${chk('f_edenred','Tarjeta Edenred',f.edenred==null?1:Number(f.edenred),'Recibe el monto diario por día hábil (nómina Edenred, no va en la liquidación)')}
       ${sel('f_banco_pago','Banco (depósito de sueldo)',f.banco_pago,opsCat(C.banco,f.banco_pago))}
       ${sel('f_tipo_cuenta_pago','Tipo de cuenta',f.tipo_cuenta_pago,['CUENTA CORRIENTE','CUENTA VISTA','CUENTA RUT','CHEQUERA ELECTRONICA'])}
       ${inp('f_num_cuenta_pago','N° de cuenta',f.num_cuenta_pago)}
@@ -254,6 +259,7 @@ function leerHijos(){
 
 async function guardarFicha(){
   const g = id => document.getElementById(id)?.value.trim() ?? '';
+  const num = id => { const v = String(document.getElementById(id)?.value ?? '').replace(/\D/g,''); return v === '' ? '' : Number(v); };   // campos con $ → número
   const body = {
     cargo:g('f_cargo'), fecha_ingreso:g('f_fecha_ingreso'), centro_costo:g('f_centro_costo'),
     fecha_nacimiento:g('f_fecha_nacimiento'), sexo:g('f_sexo'), telefono:g('f_telefono'),
@@ -267,7 +273,7 @@ async function guardarFicha(){
     conyuge_misma_dir: document.getElementById('f_conyuge_misma_dir')?.checked ? 1 : 0,
     conyuge_direccion: document.getElementById('f_conyuge_misma_dir')?.checked ? '' : g('f_conyuge_direccion'),
     hijos: leerHijos(),
-    afp:g('f_afp'), salud:g('f_salud'), plan_isapre_uf:g('f_plan_isapre_uf'), sueldo_base:g('f_sueldo_base'), colacion:g('f_colacion'), movilizacion:g('f_movilizacion'),
+    afp:g('f_afp'), salud:g('f_salud'), plan_isapre_uf:g('f_plan_isapre_uf'), sueldo_base:num('f_sueldo_base'), colacion:num('f_colacion'), movilizacion:num('f_movilizacion'), edenred: document.getElementById('f_edenred')?.checked ? 1 : 0,
     tramo_asignacion:g('f_tramo_asignacion'), cargas_otras:g('f_cargas_otras'), cargas_maternales:g('f_cargas_maternales'), cargas_invalidas:g('f_cargas_invalidas'), anos_trabajados_previos:g('f_anos_trabajados_previos'),
     banco_pago:g('f_banco_pago'), tipo_cuenta_pago:g('f_tipo_cuenta_pago'), num_cuenta_pago:g('f_num_cuenta_pago'),
     observaciones:g('f_observaciones'),

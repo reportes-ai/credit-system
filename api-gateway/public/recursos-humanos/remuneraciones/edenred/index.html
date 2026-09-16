@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nómina Edenred — AutoFácil</title>
+  <!-- v1.0 — Nómina Edenred: monto por día hábil (L-V, sin feriados) pagado por adelantado, faltas del mes anterior se descuentan; parámetros con vigencia desde mes; generar congela el mes; CSV provisorio de carga; historial por mes y por persona (Pato 16-09-2026) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:28px 36px; max-width:1200px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:18px; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 12px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:7px 12px; border-bottom:1px solid #f1f5f9; }
+    .text-right { text-align:right; } .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .pill { border-radius:9px; padding:2px 8px; font-size:.68rem; font-weight:700; }
+    .card-kpi { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:12px 20px; }
+    .card-kpi .v { font-family:Consolas,monospace; font-weight:800; font-size:1.1rem; color:var(--navy); }
+    .card-kpi .l { font-size:.7rem; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
+    .foot { background:#f7f9fc; border-left:4px solid #0255c5; border-radius:10px; padding:12px 18px; font-size:.76rem; color:#475569; line-height:1.8; }
+    .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Recursos Humanos', href:'/recursos-humanos/' }, { label:'Remuneraciones', href:'/recursos-humanos/remuneraciones/' }, { label:'Nómina Edenred', icon:'bi-credit-card-2-front', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-credit-card-2-front"></i><div><h2>Nómina Edenred</h2><p>Tarjeta de alimentación: un monto por cada día hábil del mes (lunes a viernes), pagado por adelantado. Las faltas de un mes se descuentan en la nómina del mes siguiente. No va en la liquidación de sueldo.</p></div></div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" id="tabM" onclick="tab('M');return false"><i class="bi bi-calendar-month me-1"></i>Nómina del mes</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabH" onclick="tab('H');return false"><i class="bi bi-clock-history me-1"></i>Historial pagado</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabP" onclick="tab('P');return false"><i class="bi bi-sliders me-1"></i>Parámetros</a></li>
+  </ul>
+
+  <div id="secM">
+    <div class="d-flex gap-3 align-items-end mb-3 flex-wrap">
+      <div><label class="form-label small fw-semibold mb-1">Mes de remuneración</label><input type="month" id="fMes" class="form-control form-control-sm" onchange="cargar()"></div>
+      <span id="lblEstado"></span>
+      <div class="ms-auto d-flex gap-2">
+        <button class="btn btn-sm btn-primary" id="btnGenerar" onclick="generar()"><i class="bi bi-lock me-1"></i>Generar nómina</button>
+        <button class="btn btn-sm btn-success" id="btnCsv" onclick="descargar()" style="display:none"><i class="bi bi-download me-1"></i>Descargar nómina</button>
+        <button class="btn btn-sm btn-outline-danger" id="btnAnular" onclick="anular()" style="display:none"><i class="bi bi-x-circle me-1"></i>Anular</button>
+      </div>
+    </div>
+    <div class="d-flex gap-3 mb-3 flex-wrap" id="kpis"></div>
+    <div class="panel" style="padding:0;overflow:auto">
+      <table><thead><tr><th>Colaborador</th><th>RUT</th><th class="text-right">Días hábiles</th><th class="text-right" id="thDesc">Descuento</th><th class="text-right">$/día</th><th class="text-right">Monto</th><th>Detalle</th></tr></thead>
+      <tbody id="tb"><tr><td colspan="7" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div id="secH" style="display:none">
+    <div class="row g-3">
+      <div class="col-md-5"><div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Mes</th><th class="text-right">Personas</th><th class="text-right">Días desc.</th><th class="text-right">Total pagado</th></tr></thead><tbody id="tbMes"></tbody></table></div></div>
+      <div class="col-md-7"><div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Colaborador (últimos 12 meses)</th><th class="text-right">Meses</th><th class="text-right">Días desc.</th><th class="text-right">Total pagado</th></tr></thead><tbody id="tbPer"></tbody></table></div></div>
+    </div>
+  </div>
+
+  <div id="secP" style="display:none">
+    <div class="panel">
+      <div class="fw-bold mb-2"><i class="bi bi-sliders me-1"></i>Nuevo parámetro (rige desde el mes indicado; los meses ya generados no se recalculan)</div>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Desde mes</label><input type="month" id="pMes" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Monto por día hábil</label><input id="pMonto" class="form-control form-control-sm text-end" inputmode="numeric" oninput="this.value=fmtCLP(this.value)"></div>
+        <div class="col-md-2"><div class="form-check mt-3"><input type="checkbox" class="form-check-input" id="pFer" checked><label class="form-check-label small fw-semibold" for="pFer" title="Con esto marcado, un feriado legal en semana no cuenta como día hábil">Feriados no se pagan</label></div></div>
+        <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Ausencias que descuentan (del mes anterior)</label><div id="pTipos" class="d-flex gap-2 flex-wrap"></div></div>
+        <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" onclick="guardarParam()"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+      </div>
+    </div>
+    <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Rige desde</th><th class="text-right">$/día</th><th>Feriados</th><th>Descuentan</th><th>Registrado por</th><th>Fecha</th></tr></thead><tbody id="tbParam"></tbody></table></div>
+  </div>
+
+  <div class="foot mt-3"><b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+    <ul class="mb-0">
+      <li><b>Monto por día hábil</b> → nómina Edenred de cada mes desde el mes indicado; no toca la <a href="/recursos-humanos/remuneraciones/liquidaciones/">liquidación de sueldo</a>.</li>
+      <li><b>Feriados no se pagan</b> → cuántos días hábiles tiene el mes (tabla de <a href="/mantenedores/feriados/">Feriados</a>).</li>
+      <li><b>Ausencias que descuentan</b> → tipos de <a href="/recursos-humanos/ausencias/">Ausencias y Permisos</a> (y Vacaciones) del mes anterior que restan días en la nómina de este mes.</li>
+      <li><b>Tarjeta Edenred</b> (casilla en la <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a>) → quién entra en la nómina.</li>
+      <li><b>Generar nómina</b> → congela el mes en el historial; el CSV de carga sale de ahí. <b>Anular</b> lo borra para rehacerlo (auditado).</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const H = { Authorization:'Bearer '+sessionStorage.getItem('token'), 'Content-Type':'application/json' };
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const fmt = v => Math.round(Number(v)||0).toLocaleString('es-CL');
+const fmtCLP = v => (v==null||v==='') ? '' : '$'+fmt(String(v).replace(/\D/g,''));
+const MESES=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesTxt = m => m ? (MESES[Number(String(m).slice(5,7))]||m)+' '+String(m).slice(0,4) : '';
+const TIPOS_AUS = ['LICENCIA MEDICA','PERMISO CON GOCE','PERMISO SIN GOCE','DIA ADMINISTRATIVO','TRAMITE','NACIMIENTO/MATRIMONIO/DUELO','AUSENCIA INJUSTIFICADA','OTRO','VACACIONES'];
+let D = null;
+const fMes = document.getElementById('fMes');
+fMes.value = new Date().toISOString().slice(0,7);
+
+function tab(t){ ['M','H','P'].forEach(x=>{ document.getElementById('sec'+x).style.display = x===t?'':'none'; document.getElementById('tab'+x).classList.toggle('active', x===t); });
+  if (t==='H') cargarHist(); }
+
+async function cargar(){
+  const r = await fetch('/api/rrhh/remuneraciones/edenred?mes='+fMes.value,{headers:H});
+  const j = await r.json(); if (!j.success) { alert(j.error); return; }
+  D = j.data; render();
+}
+function render(){
+  const p = D.param || {};
+  document.getElementById('lblEstado').innerHTML = D.generada
+    ? `<span class="pill" style="background:#dcfce7;color:#15803d"><i class="bi bi-lock-fill"></i> NÓMINA GENERADA</span> <span class="small text-muted">por ${esc(D.generado_por||'')} el ${String(D.generado_at||'').slice(0,10)}</span>`
+    : `<span class="pill" style="background:#fef9c3;color:#854d0e">VISTA PREVIA — se recalcula sola hasta generar</span>`;
+  document.getElementById('btnGenerar').style.display = D.generada?'none':'';
+  document.getElementById('btnCsv').style.display = D.generada?'':'none';
+  document.getElementById('btnAnular').style.display = D.generada?'':'none';
+  document.getElementById('thDesc').textContent = 'Faltas '+mesTxt(D.mes_descuento);
+  const filas = D.filas||[];
+  const desc = filas.reduce((s,f)=>s+Number(f.dias_descuento||0),0);
+  document.getElementById('kpis').innerHTML = `
+    <div class="card-kpi"><div class="v">${filas.length}</div><div class="l">Personas</div></div>
+    <div class="card-kpi"><div class="v">$${fmt(p.monto_diario)}</div><div class="l">Por día hábil${p.mes_desde?' · desde '+p.mes_desde:''}</div></div>
+    <div class="card-kpi"><div class="v">${D.dias_habiles_mes??'—'}</div><div class="l">Días hábiles del mes</div></div>
+    <div class="card-kpi"><div class="v">${desc}</div><div class="l">Días descontados (${mesTxt(D.mes_descuento)})</div></div>
+    <div class="card-kpi"><div class="v">$${fmt(D.total)}</div><div class="l">Total nómina</div></div>`;
+  document.getElementById('tb').innerHTML = filas.map(f=>`<tr>
+    <td>${esc(f.nombre)}</td><td>${esc(f.rut||'')}</td>
+    <td class="text-right">${f.dias_habiles}${f.parcial?` <span class="text-muted small">(${esc(f.parcial)})</span>`:''}</td>
+    <td class="text-right ${Number(f.dias_descuento)?'text-danger fw-bold':''}">${Number(f.dias_descuento)?'−'+f.dias_descuento:'—'}</td>
+    <td class="text-right">$${fmt(f.monto_diario)}</td>
+    <td class="text-right num">$${fmt(f.monto)}</td>
+    <td class="small text-muted">${esc(f.detalle||'')}</td></tr>`).join('') || '<tr><td colspan="7" class="text-center text-muted py-3">Nadie con Edenred este mes</td></tr>';
+  // parámetros
+  document.getElementById('tbParam').innerHTML = (D.params||[]).map(x=>`<tr><td>${esc(x.mes_desde)}</td><td class="text-right num">$${fmt(x.monto_diario)}</td><td>${x.descuenta_feriados?'no se pagan':'se pagan'}</td><td class="small">${esc(x.tipos_descuento)}</td><td>${esc(x.creado_por||'')}</td><td>${String(x.created_at||'').slice(0,10)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted text-center py-2">Sin parámetros</td></tr>';
+  if (!document.getElementById('pTipos').children.length) {
+    const vig = (p.tipos||[]);
+    document.getElementById('pTipos').innerHTML = TIPOS_AUS.map(t=>`<label class="small" style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="pt" value="${t}" ${vig.includes(t)?'checked':''}>${t}</label>`).join('');
+    document.getElementById('pFer').checked = p.descuenta_feriados!==0;
+    document.getElementById('pMonto').value = p.monto_diario ? fmtCLP(p.monto_diario) : '';
+    const [y,m] = fMes.value.split('-').map(Number); const n = new Date(y, m, 1); document.getElementById('pMes').value = n.toISOString().slice(0,7);
+  }
+}
+async function cargarHist(){
+  const j = await (await fetch('/api/rrhh/remuneraciones/edenred/resumen',{headers:H})).json(); if (!j.success) return;
+  document.getElementById('tbMes').innerHTML = j.data.por_mes.map(m=>`<tr><td>${mesTxt(m.mes)}</td><td class="text-right">${m.personas}</td><td class="text-right">${Number(m.dias_desc||0)}</td><td class="text-right num">$${fmt(m.total)}</td></tr>`).join('') || '<tr><td colspan="4" class="text-muted text-center py-2">Aún no hay nóminas generadas</td></tr>';
+  document.getElementById('tbPer').innerHTML = j.data.por_persona.map(p=>`<tr><td>${esc(p.nombre)}</td><td class="text-right">${p.meses}</td><td class="text-right">${Number(p.dias_desc||0)}</td><td class="text-right num">$${fmt(p.total)}</td></tr>`).join('') || '<tr><td colspan="4" class="text-muted text-center py-2">—</td></tr>';
+}
+async function generar(){
+  if (!confirm(`¿Generar la nómina Edenred de ${mesTxt(fMes.value)} por $${fmt(D.total)} (${(D.filas||[]).length} personas)?\n\nEl mes queda congelado con estos valores.`)) return;
+  const j = await (await fetch('/api/rrhh/remuneraciones/edenred/generar',{method:'POST',headers:H,body:JSON.stringify({mes:fMes.value})})).json();
+  if (!j.success) return alert(j.error);
+  cargar();
+}
+async function anular(){
+  const motivo = prompt('Motivo para anular la nómina generada (queda en auditoría):'); if (motivo==null) return;
+  const j = await (await fetch('/api/rrhh/remuneraciones/edenred/anular',{method:'POST',headers:H,body:JSON.stringify({mes:fMes.value, motivo})})).json();
+  if (!j.success) return alert(j.error);
+  cargar();
+}
+async function descargar(){
+  const r = await fetch('/api/rrhh/remuneraciones/edenred/nomina.csv?mes='+fMes.value,{headers:H});
+  if (!r.ok) { const j = await r.json().catch(()=>({})); return alert(j.error||'No se pudo descargar'); }
+  const b = await r.blob(); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `nomina-edenred-${fMes.value}.csv`; a.click();
+}
+async function guardarParam(){
+  const body = { mes_desde: document.getElementById('pMes').value, monto_diario: Number(String(document.getElementById('pMonto').value).replace(/\D/g,'')),
+    descuenta_feriados: document.getElementById('pFer').checked, tipos_descuento: [...document.querySelectorAll('#pTipos .pt:checked')].map(x=>x.value) };
+  if (!body.mes_desde) return alert('Indica desde qué mes rige');
+  if (!body.monto_diario) return alert('Indica el monto por día');
+  const j = await (await fetch('/api/rrhh/remuneraciones/edenred/param',{method:'PUT',headers:H,body:JSON.stringify(body)})).json();
+  if (!j.success) return alert(j.error);
+  document.getElementById('pTipos').innerHTML=''; cargar();
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
