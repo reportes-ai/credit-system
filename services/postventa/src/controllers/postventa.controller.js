@@ -1125,8 +1125,14 @@ const getAll = async (req, res) => {
          otorgados, pero nunca sacaba a los que se anulaban después, y quedaban
          pidiendo etapas para siempre (10 casos al 07-08-2026). Se excluye solo
          ANULADO — un PREPAGADO sí sigue: su saldo precio puede estar pendiente. */
-      WHERE c.id IS NULL OR COALESCE(c.estado_credito, '') <> 'ANULADO'
-      ORDER BY s.fecha_otorgado DESC, s.id DESC LIMIT 1000`);
+      WHERE (c.id IS NULL OR COALESCE(c.estado_credito, '') <> 'ANULADO')
+        /* Las 1.000 más recientes + TODA op con saldo precio o comisión sin pagar, sea
+           de cuando sea: el tope dejaba fuera las viejas aún pendientes (78716, 79332,
+           79348 de abr/may-2025 no aparecían y no se podían enviar a pago, 16-09-2026). */
+        AND (s.fecha_otorgado >= COALESCE((SELECT x.fecha_otorgado FROM postventa_seguimiento x ORDER BY x.fecha_otorgado DESC, x.id DESC LIMIT 1 OFFSET 999), '1900-01-01')
+             OR NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento = s.id AND e.track = 'SALDO' AND e.etapa = 'SALDO PRECIO PAGADO')
+             OR NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento = s.id AND e.track = 'COMISION' AND e.etapa = 'COMISION PAGADA'))
+      ORDER BY s.fecha_otorgado DESC, s.id DESC LIMIT 3000`);
     const [etapas] = await pool.query(
       `SELECT id_seguimiento, track, etapa, usuario, fecha FROM postventa_etapas
        WHERE id_seguimiento IN (SELECT id FROM postventa_seguimiento)`);
