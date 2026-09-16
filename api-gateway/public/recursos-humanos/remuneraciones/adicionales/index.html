@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adicionales de Remuneración — AutoFácil</title>
-  <!-- v1.10 — "Pagado como anticipo": además del haber se crea un descuento ANTICIPO de 1 cuota por lo pagado (mismo mes, atado al adicional); etiqueta en la lista. v1.9 — COMISIÓN MÍNIMA GARANTIZADA: por persona, mes de inicio y término con un mínimo por cada mes; en la liquidación se paga solo la diferencia si las comisiones del mes no alcanzan el mínimo. v1.8 — Colaborador "SOLO CONTRATO INDEFINIDO" / "SOLO PLAZO FIJO" (aguinaldo 70.000 / 35.000) + atajos por contrato en el grupo; pestaña Comisiones del mes (variable que entra en la liquidación, mes vencido, con estado de aprobación). v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <!-- v1.11 — casilla por concepto "Proporcional a días trabajados (30avos)" + etiqueta 30AVOS en la lista. v1.10 — "Pagado como anticipo": además del haber se crea un descuento ANTICIPO de 1 cuota por lo pagado (mismo mes, atado al adicional); etiqueta en la lista. v1.9 — COMISIÓN MÍNIMA GARANTIZADA: por persona, mes de inicio y término con un mínimo por cada mes; en la liquidación se paga solo la diferencia si las comisiones del mes no alcanzan el mínimo. v1.8 — Colaborador "SOLO CONTRATO INDEFINIDO" / "SOLO PLAZO FIJO" (aguinaldo 70.000 / 35.000) + atajos por contrato en el grupo; pestaña Comisiones del mes (variable que entra en la liquidación, mes vencido, con estado de aprobación). v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -268,7 +268,17 @@ function hintImp(){
     : noImp
     ? '<i class="bi bi-info-circle me-1"></i>Marcado <b>No imponible</b>: este monto no paga AFP, salud ni impuesto, aunque la causal diga otra cosa.'
     : `<i class="bi bi-info-circle me-1"></i>${esc(c)} es <b>${imp?'IMPONIBLE (paga AFP, salud e impuesto)':'NO imponible (se paga tal cual)'}</b>.`)
-    + (perm ? (hasta ? ` <b>Desde ${esc(fMes.value)} hasta ${esc(hasta)}</b> (inclusive): después deja de pagarse solo.` : ' <b>PERMANENTE</b>: se incluirá todos los meses hasta que se desmarque (o pon un mes "hasta").') : '');
+    + (perm ? (hasta ? ` <b>Desde ${esc(fMes.value)} hasta ${esc(hasta)}</b> (inclusive): después deja de pagarse solo.` : ' <b>PERMANENTE</b>: se incluirá todos los meses hasta que se desmarque (o pon un mes "hasta").') : '')
+    // Casilla del CONCEPTO (no del adicional): se paga en 30avos según días trabajados, como colación y movilización
+    + (c!=='OTRO' && !esHE() && !esCMG() ? `<div class="form-check mt-1"><input type="checkbox" class="form-check-input" id="fProp" ${esProp(c)?'checked':''} onchange="propConcepto('${esc(c).replace(/'/g,'&#39;')}', this.checked)">
+        <label class="form-check-label" for="fProp" title="Es una propiedad del concepto: aplica a todos los que lo reciban. Asignaciones que compensan el mes (celular, viático) sí; bonos y aguinaldos no">Proporcional a días trabajados (30avos) ${esProp(c)?'— se paga <b>días/30</b> como movilización':''}</label></div>` : '');
+}
+function esProp(c){ return !!(D && (D.proporcionales||[]).includes(c)); }
+async function propConcepto(nombre, proporcional){
+  const r = await fetch('/api/rrhh/remuneraciones/adicionales/conceptos/proporcional',{method:'PUT',headers:H,body:JSON.stringify({nombre, proporcional})});
+  const j = await r.json(); if (!j.success) { alert(j.error); hintImp(); return; }
+  D.proporcionales = (D.proporcionales||[]).filter(x=>x!==nombre).concat(proporcional?[nombre]:[]);
+  hintImp(); render();
 }
 document.addEventListener('change', e=>{ if (['fLiq','fOtroImp','fNoImp','fPerm'].includes(e.target.id)) hintImp(); });
 
@@ -328,6 +338,7 @@ function render(){
       <span class="pill ${a.es_liquido?'liq':'noimp'}">${a.es_liquido?'LÍQUIDO':'BRUTO'}</span>
       <span class="pill ${a.imponible?'imp':'noimp'}">${a.imponible?'IMPONIBLE':'NO IMPONIBLE'}</span>
       ${a.anticipo_pagado?`<span class="pill" style="background:#fee2e2;color:#991b1b" title="Ya se pagó por fuera: la liquidación lo descuenta como anticipo">PAGADO COMO ANTICIPO $${fmt(a.anticipo_pagado)}</span>`:''}
+      ${esProp(a.causal)?`<span class="pill" style="background:#ecfeff;color:#155e75" title="El concepto está marcado proporcional: se paga días/30 según los días trabajados del mes">30AVOS</span>`:''}
       <span style="margin-left:auto">
         ${a.permanente&&!a.permanente_fin?`<button class="btn btn-sm btn-outline-secondary py-0" onclick="desmarcarPerm(${a.id})" title="Deja de pagarse todos los meses">Desmarcar permanente</button>`:''}
         ${!a.heredado&&!D.bloqueado?`<i class="bi bi-trash text-danger ms-2" style="cursor:pointer" onclick="eliminar(${a.id})"></i>`:''}

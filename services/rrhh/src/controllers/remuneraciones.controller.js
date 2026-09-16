@@ -258,6 +258,20 @@ require('../../../../shared/migrate').enFila('rrhh-adic-permanente', async () =>
     creado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
 });
 
+/* PROPORCIONAL A DÍAS TRABAJADOS (Pato, 16-09-2026): las asignaciones que compensan el mes
+   (celular, viático mensual…) se pagan en 30avos como colación y movilización; los bonos y
+   aguinaldos no. Es una casilla por Concepto de Pago (rh_conceptos_adic.proporcional), que
+   también puede marcarse en una causal base (queda una fila con su imponibilidad base).
+   Caso: Fernando Contreras, 12/30 días, movilización prorrateada y celular completa. */
+require('../../../../shared/migrate').migrar('rrhh-adic-proporcional', async () => {
+  await pool.query('ALTER TABLE rh_conceptos_adic ADD COLUMN IF NOT EXISTS proporcional TINYINT(1) NOT NULL DEFAULT 0');
+  await pool.query("UPDATE rh_conceptos_adic SET proporcional=1 WHERE nombre='ASIGNACION CELULAR'");
+});
+async function proporcionalesAdic() {
+  const [rows] = await pool.query('SELECT nombre FROM rh_conceptos_adic WHERE activo=1 AND proporcional=1').catch(() => [[]]);
+  return new Set(rows.map(r => r.nombre));
+}
+
 // Causales vigentes = base fija + conceptos agregados por el usuario (OTRO al final)
 async function causalesAdic() {
   const m = { ...CAUSALES_ADIC };
@@ -300,7 +314,7 @@ const getAdicionales = async (req, res) => {
     const tot = { imponible: 0, no_imponible: 0, liquido: 0 };
     rows.forEach(r => { const m = Number(r.monto);
       if (r.es_liquido) tot.liquido += m; else if (r.imponible) tot.imponible += m; else tot.no_imponible += m; });
-    ok(res, { mes, adicionales: rows, totales: tot, bloqueado: await mesEmitido(mes), causales: await causalesAdic() });
+    ok(res, { mes, adicionales: rows, totales: tot, bloqueado: await mesEmitido(mes), causales: await causalesAdic(), proporcionales: [...await proporcionalesAdic()] });
   } catch (e) { console.error('[rrhh adicionales get]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -469,9 +483,10 @@ async function adicionalesDelMes(mes) {
     `SELECT id, id_usuario, causal, causal_texto, monto, imponible, es_liquido FROM rh_adicionales
       WHERE mes=? OR (permanente=1 AND mes<? AND (permanente_fin IS NULL OR permanente_fin>?)) ORDER BY id`, [mes, mes, mes]).catch(() => [[]]);
   const titulo = t => String(t || '').toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+  const PROP = await proporcionalesAdic();
   det.forEach(r => { if (!m[r.id_usuario]) return;
     const it = { id: r.id, nombre: titulo(r.causal === 'OTRO' && r.causal_texto ? r.causal_texto : r.causal),
-      monto: Number(r.monto), imponible: !!r.imponible, liquido: !!r.es_liquido };
+      monto: Number(r.monto), imponible: !!r.imponible, liquido: !!r.es_liquido, proporcional: PROP.has(r.causal) };
     if (r.causal === 'COMISIÓN MÍNIMA GARANTIZADA') { it.garantia = true; it.minimo = Number(r.monto); }
     m[r.id_usuario].items.push(it);
     if (r.es_liquido && r.imponible) m[r.id_usuario].liq_imp.push(it); });
@@ -496,6 +511,23 @@ function aplicarGarantiaComision(inp, adic) {
   adic.items = adic.items.filter(x => !x.garantia || x.monto > 0);
   adic.liq_imp = (adic.liq_imp || []).filter(x => !x.garantia || x.monto > 0);
   if (Array.isArray(inp.adicionales)) inp.adicionales = adic.items;
+}
+
+/* PROPORCIONAL A DÍAS (Pato, 16-09-2026): los ítems cuyo concepto está marcado "proporcional"
+   se pagan en 30avos según inp.dias, igual que colación y movilización; el nombre queda
+   "(12/30 días)". Se aplica ANTES del gross-up y de la garantía (ambos leen it.monto).
+   Muta inp (otros_imponibles / otros_no_imponibles traían el monto completo). */
+function aplicarProporcional(inp, adic) {
+  if (!adic || !Array.isArray(adic.items)) return;
+  const dias = Math.max(0, Math.min(30, Number(inp.dias)));
+  if (!(dias < 30)) return;
+  for (const it of adic.items.filter(x => x.proporcional && !x.garantia)) {
+    const completo = R(it.monto), pago = Math.round(completo * dias / 30), rebaja = completo - pago;
+    if (it.imponible && !it.liquido) inp.otros_imponibles = R(inp.otros_imponibles) - rebaja;
+    else if (!it.imponible) inp.otros_no_imponibles = R(inp.otros_no_imponibles) - rebaja;
+    it.monto = pago; it.monto_completo = completo; it.dias = dias;
+    it.nombre = `${it.nombre} (${dias}/30 días)`;
+  }
 }
 
 /* GROSS-UP de los adicionales "líquidos imponibles" (Pato, 14-09-2026): para cada ítem se busca el
@@ -555,6 +587,20 @@ const crearConceptoAdic = async (req, res) => {
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'concepto_adicional', detalle: `Concepto de pago "${nombre}" (${imponible ? 'imponible' : 'no imponible'})` });
     ok(res, { nombre, imponible });
   } catch (e) { fail(res, 'Error interno del servidor'); }
+};
+/* Casilla "Proporcional a días trabajados" de un Concepto de Pago (base o del usuario).
+   Una causal base que se marca queda con una fila propia, con su imponibilidad base. */
+const proporcionalConceptoAdic = async (req, res) => {
+  try {
+    const nombre = String(req.body?.nombre || '').toUpperCase().trim().slice(0, 60);
+    const CAUS = await causalesAdic();
+    if (!nombre || !(nombre in CAUS) || nombre === 'OTRO') return fail(res, 'Concepto no válido', 400);
+    const prop = req.body?.proporcional ? 1 : 0;
+    await pool.query('INSERT INTO rh_conceptos_adic (nombre, imponible, proporcional, creado_por) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE proporcional=VALUES(proporcional), activo=1',
+      [nombre, CAUS[nombre] ? 1 : 0, prop, nombreDe(req.usuario || {})]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'concepto_adicional', detalle: `Concepto de pago "${nombre}": ${prop ? 'PROPORCIONAL a días trabajados (30avos)' : 'ya NO proporcional (se paga completo)'}` });
+    ok(res, { nombre, proporcional: prop });
+  } catch (e) { console.error('[rrhh concepto proporcional]', e.message); fail(res, 'Error interno del servidor'); }
 };
 const crearConceptoDesc = async (req, res) => {
   try {
@@ -1194,6 +1240,7 @@ const getMes = async (req, res) => {
         descuentos_detalle: descs.items[e.id_usuario] || [],
         apv: descs.apv[e.id_usuario] || 0,
       };
+      aplicarProporcional(inp, adics[e.id_usuario]);             // asignaciones en 30avos (concepto marcado proporcional)
       aplicarGarantiaComision(inp, adics[e.id_usuario]);          // comisión mínima garantizada: solo la diferencia
       aplicarLiquidosImponibles(inp, adics[e.id_usuario], ind);   // aguinaldo "$70.000 líquidos" → bruto por persona
       return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo, fecha_ingreso: isoDeBD(e.fecha_ingreso),
@@ -1248,6 +1295,7 @@ const guardar = async (req, res) => {
         descuentos_detalle: descs.items[emp.id_usuario] || [],
         apv: descs.apv[emp.id_usuario] || 0,
       };
+      aplicarProporcional(inp, adics[emp.id_usuario]);
       aplicarGarantiaComision(inp, adics[emp.id_usuario]);
       aplicarLiquidosImponibles(inp, adics[emp.id_usuario], ind);
       const calc = calcLiquidacion(inp, ind);
@@ -2049,7 +2097,7 @@ async function getNominaBanco(req, res) {
   } catch (e) { fail(res, e.message); }
 }
 
-module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo,
+module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion,
   getDescuentos, crearDescuento, anularDescuento, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
