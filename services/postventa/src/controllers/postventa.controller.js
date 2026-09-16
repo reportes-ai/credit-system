@@ -1599,6 +1599,8 @@ const setEtapa = async (req, res) => {
       await pool.query(
         'DELETE FROM postventa_etapas WHERE id_seguimiento = ? AND track = ? AND etapa = ?',
         [req.params.id, track, etapa]);
+      // Op histórica (antes de 2026): que el relleno de cierre no vuelva a marcarla
+      await pool.query("UPDATE postventa_seguimiento SET sin_relleno_historico=1 WHERE id=? AND fecha_otorgado < '2026-01-01'", [req.params.id]).catch(() => {});
       // Al desmarcar FACTURA RECIBIDA de comisión, borrar los datos de la factura
       // (si era la titular, también sus réplicas: la factura es una sola).
       if (track === 'COMISION' && etapa === 'FACTURA RECIBIDA') {
@@ -2792,9 +2794,13 @@ const marcarHistorico = async (req, res) => {
        que un Administrador acababa de reversar (ops 82933/83753, 18-08-2026:
        el cierre histórico las dio por pagadas y era falso). Una reversa
        registrada en postventa_reversas manda sobre el marcado histórico. */
+    /* Y excluye lo DESMARCADO a mano: al quitar una etapa de una op anterior a 2026 se
+       marca sin_relleno_historico=1 (ops 78716/79332/79348, 16-09-2026: el relleno volvía
+       a darlas por pagadas cada vez que se abría Seguimiento). */
+    await pool.query('ALTER TABLE postventa_seguimiento ADD COLUMN IF NOT EXISTS sin_relleno_historico TINYINT(1) NOT NULL DEFAULT 0').catch(() => {});
     const [segs] = await pool.query(
       `SELECT id FROM postventa_seguimiento
-        WHERE fecha_otorgado < '2026-01-01'
+        WHERE fecha_otorgado < '2026-01-01' AND COALESCE(sin_relleno_historico,0)=0
           AND id NOT IN (SELECT DISTINCT id_seguimiento FROM postventa_reversas)`
     );
     if (!segs.length) return res.json({ success: true, data: { marcados: 0 }, error: null });
