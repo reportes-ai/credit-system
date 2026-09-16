@@ -181,6 +181,7 @@ router.get('/remuneraciones/adicionales/comisiones', verifyToken, requireFunc('r
 // Valor de la hora extra del colaborador (sueldo base de su ficha + jornada y recargo paramétricos)
 router.get('/remuneraciones/hora-extra',         verifyToken, requireFunc('rh_remuneraciones'), rem.getHoraExtra);
 router.post('/remuneraciones/adicionales',       verifyToken, requireFunc('rh_remuneraciones'), rem.crearAdicional);
+router.put('/remuneraciones/adicionales/:id',    verifyToken, requireFunc('rh_remuneraciones'), rem.editarAdicional);   // monto, líquido, no imponible, anticipo
 router.delete('/remuneraciones/adicionales/:id', verifyToken, requireFunc('rh_remuneraciones'), rem.eliminarAdicional);
 router.put('/remuneraciones/adicionales/:id/permanente', verifyToken, requireFunc('rh_remuneraciones'), rem.permanenteAdicional);
 router.post('/remuneraciones/adicionales/conceptos', verifyToken, requireFunc('rh_remuneraciones'), rem.crearConceptoAdic);

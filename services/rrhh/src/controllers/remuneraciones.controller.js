@@ -449,6 +449,46 @@ async function crearUno(b, req, { silencioso = false } = {}) {
     return { ok: true, data: { id: r.insertId, imponible, es_liquido: esLiquido, permanente, hasta, anticipo } };
 }
 
+/* EDITAR un adicional (Pato, 16-09-2026): monto, líquido, no imponible y "pagado como anticipo"
+   (con su monto). No cambia colaborador, causal ni mes; horas extras y comisión mínima
+   garantizada se eliminan y se vuelven a ingresar (su monto lo arma el motor). El descuento
+   ANTICIPO atado sigue al cambio: se crea, se actualiza o se elimina según la casilla. */
+const editarAdicional = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const [[a]] = await pool.query(
+      `SELECT a.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre_actual
+       FROM rh_adicionales a LEFT JOIN usuarios u ON u.id_usuario = a.id_usuario WHERE a.id=?`, [req.params.id]);
+    if (!a) return fail(res, 'No existe', 404);
+    if (await mesEmitido(a.mes)) return fail(res, 'El mes ya fue emitido: no se puede editar', 423);
+    if (a.causal === 'HORAS EXTRAS' || a.causal === 'COMISIÓN MÍNIMA GARANTIZADA') return fail(res, 'Este adicional se elimina y se vuelve a ingresar (su monto lo calcula el sistema)', 400);
+    const monto = Math.round(Number(b.monto) || 0);
+    if (!(monto > 0)) return fail(res, 'El monto debe ser mayor a $0', 400);
+    const CAUS = await causalesAdic();
+    const esLiquido = b.es_liquido ? 1 : 0;
+    const imponible = b.no_imponible ? 0 : (CAUS[a.causal] != null ? CAUS[a.causal] : (a.imponible ? 1 : 0));
+    await pool.query('UPDATE rh_adicionales SET monto=?, es_liquido=?, imponible=? WHERE id=?', [monto, esLiquido, imponible, a.id]);
+    // Descuento por anticipo: sigue a la casilla
+    const [[dAnt]] = await pool.query("SELECT id, valor_cuota FROM rh_descuentos WHERE id_adicional=? AND estado='VIGENTE' LIMIT 1", [a.id]);
+    let txtAnt = '';
+    if (b.pagado_anticipo && !a.permanente) {
+      const pagado = Math.round(Number(b.monto_pagado) || (esLiquido ? monto : 0));
+      if (!(pagado > 0)) return fail(res, 'Indica el monto que se pagó como anticipo (en un haber bruto no se puede deducir solo)', 400);
+      const glosa = (a.causal === 'OTRO' ? String(a.causal_texto || '').trim() : a.causal).slice(0, 200);
+      if (dAnt) await pool.query('UPDATE rh_descuentos SET monto_total=?, valor_cuota=?, detalle_texto=? WHERE id=?', [pagado, pagado, glosa, dAnt.id]);
+      else await pool.query(`INSERT INTO rh_descuentos (id_usuario, tipo, detalle_texto, monto_total, cuotas, valor_cuota, mes_inicio, creado_por, moneda, id_adicional)
+                             VALUES (?,'ANTICIPO',?,?,1,?,?,?,'CLP',?)`, [a.id_usuario, glosa, pagado, pagado, a.mes, nombreDe(req.usuario || {}), a.id]);
+      txtAnt = ` — pagado como anticipo $${pagado.toLocaleString('es-CL')}`;
+    } else if (dAnt) {
+      await pool.query('DELETE FROM rh_descuentos WHERE id=?', [dAnt.id]);
+      txtAnt = ' — ya NO pagado como anticipo (descuento eliminado)';
+    }
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: a.id,
+      detalle: `Editó adicional ${a.mes} ${a.nombre_actual || a.nombre} ${a.causal}: $${Number(a.monto).toLocaleString('es-CL')} → $${monto.toLocaleString('es-CL')}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}${txtAnt}` });
+    ok(res, { id: a.id, monto, es_liquido: esLiquido, imponible });
+  } catch (e) { console.error('[rrhh adicionales editar]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 const eliminarAdicional = async (req, res) => {
   try {
     const [[a]] = await pool.query(
@@ -2097,7 +2137,7 @@ async function getNominaBanco(req, res) {
   } catch (e) { fail(res, e.message); }
 }
 
-module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic,
+module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic, editarAdicional,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion,
   getDescuentos, crearDescuento, anularDescuento, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };

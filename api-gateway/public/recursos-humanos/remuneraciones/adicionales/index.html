@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adicionales de Remuneración — AutoFácil</title>
-  <!-- v1.11 — casilla por concepto "Proporcional a días trabajados (30avos)" + etiqueta 30AVOS en la lista. v1.10 — "Pagado como anticipo": además del haber se crea un descuento ANTICIPO de 1 cuota por lo pagado (mismo mes, atado al adicional); etiqueta en la lista. v1.9 — COMISIÓN MÍNIMA GARANTIZADA: por persona, mes de inicio y término con un mínimo por cada mes; en la liquidación se paga solo la diferencia si las comisiones del mes no alcanzan el mínimo. v1.8 — Colaborador "SOLO CONTRATO INDEFINIDO" / "SOLO PLAZO FIJO" (aguinaldo 70.000 / 35.000) + atajos por contrato en el grupo; pestaña Comisiones del mes (variable que entra en la liquidación, mes vencido, con estado de aprobación). v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <!-- v1.12 — editar un adicional (lápiz: monto, líquido, no imponible, pagado como anticipo) con Cancelar. v1.11 — casilla por concepto "Proporcional a días trabajados (30avos)" + etiqueta 30AVOS en la lista. v1.10 — "Pagado como anticipo": además del haber se crea un descuento ANTICIPO de 1 cuota por lo pagado (mismo mes, atado al adicional); etiqueta en la lista. v1.9 — COMISIÓN MÍNIMA GARANTIZADA: por persona, mes de inicio y término con un mínimo por cada mes; en la liquidación se paga solo la diferencia si las comisiones del mes no alcanzan el mínimo. v1.8 — Colaborador "SOLO CONTRATO INDEFINIDO" / "SOLO PLAZO FIJO" (aguinaldo 70.000 / 35.000) + atajos por contrato en el grupo; pestaña Comisiones del mes (variable que entra en la liquidación, mes vencido, con estado de aprobación). v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -93,6 +93,7 @@
       </div>
       <div class="col-md-2 d-flex align-items-end">
         <button class="btn btn-sm btn-primary w-100" id="btnGuardar" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+        <button class="btn btn-sm btn-outline-secondary ms-1" id="btnCancelar" style="display:none" onclick="cancelarEdicion()" title="Deja de editar sin guardar">Cancelar</button>
       </div>
     </div>
     <!-- COMISIÓN MÍNIMA GARANTIZADA: período (mes de arriba = inicio) + mínimo por cada mes.
@@ -341,6 +342,7 @@ function render(){
       ${esProp(a.causal)?`<span class="pill" style="background:#ecfeff;color:#155e75" title="El concepto está marcado proporcional: se paga días/30 según los días trabajados del mes">30AVOS</span>`:''}
       <span style="margin-left:auto">
         ${a.permanente&&!a.permanente_fin?`<button class="btn btn-sm btn-outline-secondary py-0" onclick="desmarcarPerm(${a.id})" title="Deja de pagarse todos los meses">Desmarcar permanente</button>`:''}
+        ${!a.heredado&&!D.bloqueado&&!['HORAS EXTRAS','COMISIÓN MÍNIMA GARANTIZADA'].includes(a.causal)?`<i class="bi bi-pencil text-primary ms-2" style="cursor:pointer" title="Editar monto, líquido, no imponible o anticipo" onclick="editar(${a.id})"></i>`:''}
         ${!a.heredado&&!D.bloqueado?`<i class="bi bi-trash text-danger ms-2" style="cursor:pointer" onclick="eliminar(${a.id})"></i>`:''}
       </span>
     </div>`).join('') : '';
@@ -377,6 +379,16 @@ function grupoTodos(v){ document.querySelectorAll('#grupoLista .gr').forEach(x=>
 function grupoContrato(t){ document.querySelectorAll('#grupoLista .gr').forEach(x=>x.checked = String(x.dataset.contrato||'').toUpperCase()===t); grupoN(); }
 function grupoN(){ const n = grupoSel().length; document.getElementById('grupoN').textContent = n ? `${n} seleccionado(s)` : ''; }
 async function guardar(){
+  if (EDIT_ID) {
+    const ant = document.getElementById('fAnt').checked, liq = document.getElementById('fLiq').checked;
+    const body = { monto: montoVal(), es_liquido: liq, no_imponible: document.getElementById('fNoImp').checked,
+      pagado_anticipo: ant, monto_pagado: ant ? (parseInt(String(document.getElementById('fAntMonto').value).replace(/\D/g,''))||undefined) : undefined };
+    if (!body.monto) return alert('Ingresa el monto');
+    if (ant && !liq && !body.monto_pagado) return alert('El haber es BRUTO: indica cuánto se pagó como anticipo (líquido transferido)');
+    const r = await fetch('/api/rrhh/remuneraciones/adicionales/'+EDIT_ID,{method:'PUT',headers:H,body:JSON.stringify(body)});
+    const j = await r.json(); if (!j.success) return alert(j.error);
+    cancelarEdicion(); cargar(); return;
+  }
   const horas = parseFloat(String(document.getElementById('fHoras').value).replace(',','.')) || 0;
   const grupo = fColab.value==='GRUPO' ? grupoSel() : null;
   if (grupo && !grupo.length) return alert('Marca al menos una persona del grupo');
@@ -422,6 +434,34 @@ async function guardar(){
   document.querySelectorAll('#cmgGrid input').forEach(i => i.value='');
   fColab.focus();
   cargar();
+}
+
+/* EDITAR (Pato, 16-09-2026): la fila se carga en el mismo formulario; colaborador y causal
+   quedan fijos, se cambia monto / líquido / no imponible / pagado como anticipo. */
+let EDIT_ID = null;
+function editar(id){
+  const a = D.adicionales.find(x => x.id===id); if (!a) return;
+  EDIT_ID = id;
+  fColab.value = String(a.id_usuario); fColab.disabled = true; grupoUI();
+  fCausal.value = a.causal; fCausal.disabled = true; causalUI();
+  if (a.causal==='OTRO') fOtro.value = a.causal_texto||'';
+  document.getElementById('fMonto').value = fmt(a.monto);
+  document.getElementById('fLiq').checked = !!a.es_liquido;
+  document.getElementById('fNoImp').checked = !a.imponible && CAUSALES[a.causal]===1;
+  document.getElementById('fPerm').checked = false; document.getElementById('fPerm').disabled = true;
+  document.getElementById('fAnt').checked = !!a.anticipo_pagado;
+  document.getElementById('fAntMonto').value = a.anticipo_pagado ? fmt(a.anticipo_pagado) : ''; antUI();
+  document.getElementById('btnGuardar').innerHTML = '<i class="bi bi-check-lg me-1"></i>Guardar cambios';
+  document.getElementById('btnCancelar').style.display = '';
+  hintImp(); window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function cancelarEdicion(){
+  EDIT_ID = null;
+  fColab.disabled = false; fCausal.disabled = false; document.getElementById('fPerm').disabled = false;
+  document.getElementById('btnGuardar').innerHTML = '<i class="bi bi-check-lg me-1"></i>Guardar';
+  document.getElementById('btnCancelar').style.display = 'none';
+  fColab.value=''; document.getElementById('fMonto').value=''; document.getElementById('fLiq').checked=false; document.getElementById('fNoImp').checked=false;
+  document.getElementById('fAnt').checked=false; document.getElementById('fAntMonto').value=''; antUI(); hintImp();
 }
 
 async function eliminar(id){
