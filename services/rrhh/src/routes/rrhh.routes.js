@@ -185,6 +185,7 @@ router.put('/remuneraciones/adicionales/:id',    verifyToken, requireFunc('rh_re
 router.delete('/remuneraciones/adicionales/:id', verifyToken, requireFunc('rh_remuneraciones'), rem.eliminarAdicional);
 router.put('/remuneraciones/adicionales/:id/permanente', verifyToken, requireFunc('rh_remuneraciones'), rem.permanenteAdicional);
 router.post('/remuneraciones/adicionales/conceptos', verifyToken, requireFunc('rh_remuneraciones'), rem.crearConceptoAdic);
+router.put('/remuneraciones/adicionales/ficha-asignacion', verifyToken, requireFunc('rh_remuneraciones'), rem.asignacionFicha);   // colación/movilización de la ficha
 router.put('/remuneraciones/adicionales/conceptos/proporcional', verifyToken, requireFunc('rh_remuneraciones'), rem.proporcionalConceptoAdic);   // casilla 30avos por concepto
 router.post('/remuneraciones/descuentos/conceptos',  verifyToken, requireFunc('rh_remuneraciones'), rem.crearConceptoDesc);
 router.get('/remuneraciones/descuentos',         verifyToken, requireFunc('rh_remuneraciones'), rem.getDescuentos);

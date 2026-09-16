@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adicionales de Remuneración — AutoFácil</title>
-  <!-- v1.12 — editar un adicional (lápiz: monto, líquido, no imponible, pagado como anticipo) con Cancelar. v1.11 — casilla por concepto "Proporcional a días trabajados (30avos)" + etiqueta 30AVOS en la lista. v1.10 — "Pagado como anticipo": además del haber se crea un descuento ANTICIPO de 1 cuota por lo pagado (mismo mes, atado al adicional); etiqueta en la lista. v1.9 — COMISIÓN MÍNIMA GARANTIZADA: por persona, mes de inicio y término con un mínimo por cada mes; en la liquidación se paga solo la diferencia si las comisiones del mes no alcanzan el mínimo. v1.8 — Colaborador "SOLO CONTRATO INDEFINIDO" / "SOLO PLAZO FIJO" (aguinaldo 70.000 / 35.000) + atajos por contrato en el grupo; pestaña Comisiones del mes (variable que entra en la liquidación, mes vencido, con estado de aprobación). v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <!-- v1.13 — asignaciones de la ficha (colación/movilización) listadas y editables (PUT ficha-asignacion). v1.12 — editar un adicional (lápiz: monto, líquido, no imponible, pagado como anticipo) con Cancelar. v1.11 — casilla por concepto "Proporcional a días trabajados (30avos)" + etiqueta 30AVOS en la lista. v1.10 — "Pagado como anticipo": además del haber se crea un descuento ANTICIPO de 1 cuota por lo pagado (mismo mes, atado al adicional); etiqueta en la lista. v1.9 — COMISIÓN MÍNIMA GARANTIZADA: por persona, mes de inicio y término con un mínimo por cada mes; en la liquidación se paga solo la diferencia si las comisiones del mes no alcanzan el mínimo. v1.8 — Colaborador "SOLO CONTRATO INDEFINIDO" / "SOLO PLAZO FIJO" (aguinaldo 70.000 / 35.000) + atajos por contrato en el grupo; pestaña Comisiones del mes (variable que entra en la liquidación, mes vencido, con estado de aprobación). v1.7 — Colaborador "UN GRUPO": casillas por persona para pagar algo a varios (no a todos). v1.6 — AGUINALDO DE FIESTAS PATRIAS (antes BONO); Líquido conserva la imponibilidad de la causal y el bruto se calcula por persona en la liquidación (gross-up) · v1.5 — OTRO se muestra como TEXTO LIBRE (concepto digitado + imponible sí/no) · v1.4 — bonos Fiestas Patrias/Navidad/Vacaciones + opción TODO EL PERSONAL · v1.3 — VARIABLE ASEGURADO · v1.2 — causales SUELDO ASEGURADO y BONO ASEGURADO; vigencia desde/hasta en los permanentes (permanente_fin = hasta+1) · v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -113,6 +113,7 @@
     <div class="mt-2"><button class="btn btn-sm btn-outline-primary" onclick="nuevoConcepto()"><i class="bi bi-plus-circle me-1"></i>Concepto de Pago</button>
       <span class="small text-muted ms-2">agrega una causal nueva a la lista (queda disponible para siempre)</span></div>
     <div id="listaMes" class="mt-3"></div>
+    <div id="listaFicha"></div>
   </div>
 
   <div id="secD" style="display:none">
@@ -346,6 +347,26 @@ function render(){
         ${!a.heredado&&!D.bloqueado?`<i class="bi bi-trash text-danger ms-2" style="cursor:pointer" onclick="eliminar(${a.id})"></i>`:''}
       </span>
     </div>`).join('') : '';
+
+  // ── Asignaciones de la FICHA (colación / movilización): fuente única rh_fichas, se pagan en 30avos ──
+  const fichas = (D.ficha||[]).filter(f => Number(f.colacion)||Number(f.movilizacion));
+  document.getElementById('listaFicha').innerHTML = fichas.length ? `<div class="fw-bold small mb-1 mt-3">Asignaciones de la ficha <span class="fw-normal text-muted">— colación y movilización de cada persona: se pagan todos los meses en 30avos según días trabajados; el lápiz las corrige en la ficha (rige desde la próxima liquidación no emitida)</span></div>`
+    + fichas.map(f => `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:9px;padding:6px 12px;margin-bottom:5px;background:#fbfdff">
+      <b style="font-size:.82rem">${esc(f.nombre)}</b>
+      <span class="small text-muted">COLACIÓN</span><span class="num" style="font-size:.85rem">$${fmt(f.colacion||0)}</span>
+      ${D.bloqueado?'':`<i class="bi bi-pencil text-primary" style="cursor:pointer" title="Cambiar colación en la ficha" onclick="editarFicha(${f.id_usuario},'colacion',${Number(f.colacion)||0})"></i>`}
+      <span class="small text-muted ms-3">MOVILIZACIÓN</span><span class="num" style="font-size:.85rem">$${fmt(f.movilizacion||0)}</span>
+      ${D.bloqueado?'':`<i class="bi bi-pencil text-primary" style="cursor:pointer" title="Cambiar movilización en la ficha" onclick="editarFicha(${f.id_usuario},'movilizacion',${Number(f.movilizacion)||0})"></i>`}
+      <span style="margin-left:auto"><span class="pill" style="background:#e0e7ff;color:#3730a3">FICHA · PERMANENTE</span> <span class="pill noimp">NO IMPONIBLE</span> <span class="pill" style="background:#ecfeff;color:#155e75">30AVOS</span></span>
+    </div>`).join('') : '';
+}
+async function editarFicha(id_usuario, campo, actual){
+  const v = prompt(`Nuevo monto mensual de ${campo==='colacion'?'COLACIÓN':'MOVILIZACIÓN'} (hoy $${fmt(actual)}):`, actual);
+  if (v==null) return;
+  const monto = parseInt(String(v).replace(/\D/g,''))||0;
+  const r = await fetch('/api/rrhh/remuneraciones/adicionales/ficha-asignacion',{method:'PUT',headers:H,body:JSON.stringify({id_usuario, campo, monto})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  cargar();
 }
 
 async function desmarcarPerm(id){

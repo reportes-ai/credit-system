@@ -265,7 +265,11 @@ require('../../../../shared/migrate').enFila('rrhh-adic-permanente', async () =>
    Caso: Fernando Contreras, 12/30 días, movilización prorrateada y celular completa. */
 require('../../../../shared/migrate').migrar('rrhh-adic-proporcional', async () => {
   await pool.query('ALTER TABLE rh_conceptos_adic ADD COLUMN IF NOT EXISTS proporcional TINYINT(1) NOT NULL DEFAULT 0');
-  await pool.query("UPDATE rh_conceptos_adic SET proporcional=1 WHERE nombre='ASIGNACION CELULAR'");
+});
+// ASIGNACION CELULAR nació marcada (v250.1) y Pato la desmarcó el mismo día: con licencia
+// igual se paga el teléfono. Ningún concepto viene marcado de fábrica; se marca en la pantalla.
+require('../../../../shared/migrate').migrar('rrhh-adic-celular-no-proporcional', async () => {
+  await pool.query("UPDATE rh_conceptos_adic SET proporcional=0 WHERE nombre='ASIGNACION CELULAR'");
 });
 async function proporcionalesAdic() {
   const [rows] = await pool.query('SELECT nombre FROM rh_conceptos_adic WHERE activo=1 AND proporcional=1').catch(() => [[]]);
@@ -314,7 +318,15 @@ const getAdicionales = async (req, res) => {
     const tot = { imponible: 0, no_imponible: 0, liquido: 0 };
     rows.forEach(r => { const m = Number(r.monto);
       if (r.es_liquido) tot.liquido += m; else if (r.imponible) tot.imponible += m; else tot.no_imponible += m; });
-    ok(res, { mes, adicionales: rows, totales: tot, bloqueado: await mesEmitido(mes), causales: await causalesAdic(), proporcionales: [...await proporcionalesAdic()] });
+    /* Asignaciones de la FICHA (colación y movilización): viven en rh_fichas (una sola fuente,
+       las lee la liquidación en 30avos) y no tenían pantalla propia. Se muestran acá para
+       que RRHH vea todo lo que recibe cada persona y las pueda corregir (Pato, 16-09-2026). */
+    const [ficha] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, f.colacion, f.movilizacion
+         FROM usuarios u JOIN rh_fichas f ON f.id_usuario=u.id_usuario
+        WHERE (u.estado='activo' OR DATE_FORMAT(u.fecha_baja,'%Y-%m') >= ?) AND COALESCE(f.sueldo_base,0) > 0
+        ORDER BY nombre`, [mes]);
+    ok(res, { mes, adicionales: rows, totales: tot, bloqueado: await mesEmitido(mes), causales: await causalesAdic(), proporcionales: [...await proporcionalesAdic()], ficha });
   } catch (e) { console.error('[rrhh adicionales get]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -641,6 +653,23 @@ const proporcionalConceptoAdic = async (req, res) => {
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'concepto_adicional', detalle: `Concepto de pago "${nombre}": ${prop ? 'PROPORCIONAL a días trabajados (30avos)' : 'ya NO proporcional (se paga completo)'}` });
     ok(res, { nombre, proporcional: prop });
   } catch (e) { console.error('[rrhh concepto proporcional]', e.message); fail(res, 'Error interno del servidor'); }
+};
+/* Colación / movilización de la ficha, editadas desde Adicionales (escribe rh_fichas: fuente única).
+   Rige desde la próxima liquidación no emitida; los meses emitidos ya están congelados. */
+const asignacionFicha = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const idU = Number(b.id_usuario), campo = String(b.campo || '');
+    if (!idU || !['colacion', 'movilizacion'].includes(campo)) return fail(res, 'Datos inválidos', 400);
+    const monto = Math.round(Number(b.monto) || 0);
+    if (monto < 0 || monto > 2000000) return fail(res, 'Monto fuera de rango', 400);
+    const [[f]] = await pool.query(`SELECT f.colacion, f.movilizacion, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre FROM rh_fichas f JOIN usuarios u ON u.id_usuario=f.id_usuario WHERE f.id_usuario=?`, [idU]);
+    if (!f) return fail(res, 'Ficha no encontrada', 404);
+    await pool.query(`UPDATE rh_fichas SET ${campo}=?, updated_by=?, updated_at=NOW() WHERE id_usuario=?`, [monto, nombreDe(req.usuario || {}), idU]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'ficha', entidad_id: idU,
+      detalle: `${f.nombre}: ${campo === 'colacion' ? 'colación' : 'movilización'} $${Number(f[campo] || 0).toLocaleString('es-CL')} → $${monto.toLocaleString('es-CL')} (desde Adicionales)` });
+    ok(res, { id_usuario: idU, campo, monto });
+  } catch (e) { console.error('[rrhh asignacion ficha]', e.message); fail(res, 'Error interno del servidor'); }
 };
 const crearConceptoDesc = async (req, res) => {
   try {
@@ -2137,7 +2166,7 @@ async function getNominaBanco(req, res) {
   } catch (e) { fail(res, e.message); }
 }
 
-module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic, editarAdicional,
+module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic, editarAdicional, asignacionFicha,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion,
   getDescuentos, crearDescuento, anularDescuento, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
