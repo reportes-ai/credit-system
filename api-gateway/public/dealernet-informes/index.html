@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v3.4 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
+  <!-- v3.5 — Alertas de uso: clic en el encabezado de cualquier columna ordena de mayor a menor y viceversa (fechas y números por su valor real). v3.4 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -624,24 +624,27 @@ function renderAlertas(d){
     '<div class="card" style="margin-bottom:14px;border-left:4px solid '+color+'"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'+
     '<h3 style="margin:0;font-size:.95rem">'+titulo+' <span style="background:'+(n?color:'#94a3b8')+';color:#fff;border-radius:12px;padding:1px 9px;font-size:.75rem;margin-left:6px">'+n+'</span></h3></div>'+
     '<div class="muted" style="margin:4px 0 8px">'+desc+'</div>'+(n ? inner : '<div class="muted">Sin casos.</div>')+'</div>';
-  const tabla = (cab, filas) => '<div style="overflow:auto"><table class="tb"><thead><tr>'+cab.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+filas.join('')+'</tbody></table></div>';
+  // Encabezados clicables: ordenan la tabla (ver ordenarTabla). Las fechas llevan data-o con su valor real.
+  const tabla = (cab, filas) => '<div style="overflow:auto"><table class="tb"><thead><tr>'+cab.map((x,i)=>'<th class="ord" onclick="ordenarTabla(this,'+i+')" title="Ordenar por '+x+'" style="cursor:pointer;user-select:none;white-space:nowrap">'+x+' <i class="bi bi-arrow-down-up" style="opacity:.35;font-size:.7rem"></i></th>').join('')+'</tr></thead><tbody>'+filas.join('')+'</tbody></table></div>';
+  const tdF = s => '<td data-o="'+(s ? new Date(s).getTime() : 0)+'">'+fh(s)+'</td>';
+  const tdD = s => '<td data-o="'+(s ? new Date(String(s).slice(0,10)+'T12:00:00').getTime() : 0)+'">'+fd(s)+'</td>';
   const total = d.rafagas.length + d.fueraHorario.length + d.sinDestino.length + d.repetidos.length + d.volumen.length + d.autoConsulta.length + d.consultaEmpresa.length;
   let h = '<div style="font-size:.85rem;margin-bottom:12px">Ventana: últimos <b>'+d.dias+'</b> días · <b>'+total+'</b> señal(es).</div>';
 
   h += sec('#b91c1c', 'Ráfaga de RUTs', 'Más de <b>'+c.al_ruts_hora+'</b> RUTs distintos consultados por la misma persona en <b>60 minutos</b>. Puede ser una jornada intensa en el parque, o alguien pasando una lista.', d.rafagas.length,
-    tabla(['Usuario','Desde','Hasta','RUTs en 1 h','RUTs'], d.rafagas.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td>'+fh(x.desde)+'</td><td>'+fh(x.hasta)+'</td><td><b>'+x.n+'</b></td><td class="muted" style="font-size:.75rem">'+esc(x.ruts)+'</td></tr>')));
+    tabla(['Usuario','Desde','Hasta','RUTs en 1 h','RUTs'], d.rafagas.map(x=>'<tr><td>'+esc(x.usuario)+'</td>'+tdF(x.desde)+tdF(x.hasta)+'<td><b>'+x.n+'</b></td><td class="muted" style="font-size:.75rem">'+esc(x.ruts)+'</td></tr>')));
 
   h += sec('#92400e', 'Fuera de horario', 'Consultas antes de las <b>'+String(c.al_hora_ini).padStart(2,'0')+':00</b>, desde las <b>'+String(c.al_hora_fin).padStart(2,'0')+':00</b> o en <b>domingo</b>. El sábado se vende; el domingo de noche, no tanto.', d.fueraHorario.length,
-    tabla(['Usuario','Consultas','Domingos','Última','Ejemplos'], d.fueraHorario.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td><b>'+x.n+'</b></td><td>'+x.domingos+'</td><td>'+fh(x.ultima)+'</td><td class="muted" style="font-size:.75rem">'+esc(String(x.ejemplos||'').split(', ').slice(0,6).join(', '))+'</td></tr>')));
+    tabla(['Usuario','Consultas','Domingos','Última','Ejemplos'], d.fueraHorario.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td><b>'+x.n+'</b></td><td>'+x.domingos+'</td>'+tdF(x.ultima)+'<td class="muted" style="font-size:.75rem">'+esc(String(x.ejemplos||'').split(', ').slice(0,6).join(', '))+'</td></tr>')));
 
   h += sec('#7c2d12', 'Consultas sin destino', 'RUTs consultados hace <b>'+c.al_sin_destino_dias+'</b> días o más que <b>nunca</b> aparecen en un crédito, una cotización ni una carta. Se lista a quien supera el <b>'+c.al_sin_destino_pct+'%</b> (mínimo 5 RUTs). Es la señal más directa: se gastó saldo en personas que no entraron al negocio.', d.sinDestino.length,
     tabla(['Usuario','RUTs evaluados','Sin destino','%','Ejemplos'], d.sinDestino.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td>'+x.ruts+'</td><td><b>'+x.sin_destino+'</b></td><td><b>'+String(x.pct).replace('.',',')+'%</b></td><td class="muted" style="font-size:.75rem">'+esc(x.ejemplos.join(', '))+'</td></tr>')));
 
   h += sec('#1d4ed8', 'RUT repetido', 'La misma persona pide informes del mismo RUT <b>'+c.al_rut_repetido+'</b> veces o más en 30 días. El repositorio ya los tiene: repetirlos gasta saldo y sugiere seguimiento a alguien que no es cliente.', d.repetidos.length,
-    tabla(['Usuario','RUT','Veces','Primera','Última'], d.repetidos.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td>'+esc(x.rut)+'</td><td><b>'+x.n+'</b></td><td>'+fh(x.primera)+'</td><td>'+fh(x.ultima)+'</td></tr>')));
+    tabla(['Usuario','RUT','Veces','Primera','Última'], d.repetidos.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td>'+esc(x.rut)+'</td><td><b>'+x.n+'</b></td>'+tdF(x.primera)+tdF(x.ultima)+'</tr>')));
 
   h += sec('#0f766e', 'Volumen anómalo', 'Un día con <b>'+c.al_volumen_factor+'×</b> o más el promedio diario de esa persona (sobre sus días con actividad, mínimo 5 consultas). Un salto así sin una feria o un evento detrás merece una pregunta.', d.volumen.length,
-    tabla(['Usuario','Día','Consultas','Su promedio'], d.volumen.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td>'+fd(x.dia)+'</td><td><b>'+x.n+'</b></td><td>'+String(x.promedio).replace('.',',')+'</td></tr>')));
+    tabla(['Usuario','Día','Consultas','Su promedio'], d.volumen.map(x=>'<tr><td>'+esc(x.usuario)+'</td>'+tdD(x.dia)+'<td><b>'+x.n+'</b></td><td>'+String(x.promedio).replace('.',',')+'</td></tr>')));
 
   h += sec('#b91c1c', 'Consultas a su propio RUT (90 días)', 'Uso personal del saldo de la empresa. Ya avisa a supervisor y RRHH al momento.', d.autoConsulta.length,
     tabla(['Usuario','Veces'], d.autoConsulta.map(x=>'<tr><td>'+esc(x.usuario)+'</td><td><b>'+x.n+'</b></td></tr>')));
@@ -653,6 +656,22 @@ function renderAlertas(d){
     '<li>Los umbrales se ajustan en <a href="/mantenedores/dealernet-productos/">Productos DealerNet → Alertas de uso</a>. Si una sección lista a todo el equipo, el umbral está bajo.</li>'+
     '<li>Para ver qué consultó exactamente una persona, usa la pestaña Repositorio (buscar por RUT) o la <a href="/auditoria/">Auditoría</a> del sistema.</li></ul></div>';
   document.getElementById('alBody').innerHTML = h;
+}
+
+/* Ordena una tabla por la columna del encabezado pulsado: primer clic de mayor a menor, segundo de
+   menor a mayor. Usa data-o si la celda lo trae (fechas); si no, número (coma decimal, %) o texto. */
+function ordenarTabla(th, col){
+  const tabla = th.closest('table'), tb = tabla.tBodies[0];
+  const desc = th.dataset.dir !== 'desc';   // alterna; parte de mayor a menor
+  tabla.querySelectorAll('th.ord').forEach(x => { delete x.dataset.dir; const i = x.querySelector('i'); if (i) { i.className = 'bi bi-arrow-down-up'; i.style.opacity = .35; } });
+  th.dataset.dir = desc ? 'desc' : 'asc';
+  const ic = th.querySelector('i'); if (ic) { ic.className = desc ? 'bi bi-sort-down' : 'bi bi-sort-up'; ic.style.opacity = 1; }
+  const val = tr => { const td = tr.cells[col]; if (!td) return ''; if (td.dataset.o != null) return Number(td.dataset.o);
+    const t = td.textContent.trim(); const n = Number(t.replace(/\./g,'').replace(',','.').replace('%','').replace('$',''));
+    return t !== '' && !isNaN(n) ? n : t.toLowerCase(); };
+  const filas = [...tb.rows].map(tr => [val(tr), tr]);
+  filas.sort((a,b) => { const x=a[0], y=b[0]; const r = (typeof x==='number' && typeof y==='number') ? x-y : String(x).localeCompare(String(y),'es'); return desc ? -r : r; });
+  filas.forEach(f => tb.appendChild(f[1]));
 }
 
 /* ── Pestañas ────────────────────────────────────────────────────────────── */
