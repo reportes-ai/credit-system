@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Ficha — AutoFácil</title>
-  <!-- v1.13 — logo real de AutoFácil en la liquidación impresa. v1.12 — mes de comisiones a la chilena. v1.11 — liquidación con glosa por descuento. v1.10 — pensionado: AFP 'Pensionado (no cotiza)'. v1.9 — Previsión y Pago: plan Isapre en UF y pesos del día. v1.8 — foto real de Credenciales en el avatar del hero -->
+  <!-- v1.14 — Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, seguro de salud; la fila conserva su id al guardar (Pato 17-09-2026). v1.13 — logo real de AutoFácil en la liquidación impresa. v1.12 — mes de comisiones a la chilena. v1.11 — liquidación con glosa por descuento. v1.10 — pensionado: AFP 'Pensionado (no cotiza)'. v1.9 — Previsión y Pago: plan Isapre en UF y pesos del día. v1.8 — foto real de Credenciales en el avatar del hero -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -54,8 +54,8 @@
     <div class="grid3" id="gContacto"></div>
     <h5 style="margin-top:16px"><i class="bi bi-heart"></i> Cónyuge / Conviviente</h5>
     <div class="grid3" id="gConyuge"></div>
-    <h5 style="margin-top:16px;justify-content:space-between"><span><i class="bi bi-emoji-smile"></i> Hijos</span>
-      <button class="btn-ghost" id="btnHijo" style="display:none;padding:3px 12px;font-size:.78rem" onclick="agregarHijo()"><i class="bi bi-plus-lg me-1"></i>Agregar hijo</button></h5>
+    <h5 style="margin-top:16px;justify-content:space-between"><span><i class="bi bi-emoji-smile"></i> Hijos y cargas familiares</span>
+      <button class="btn-ghost" id="btnHijo" style="display:none;padding:3px 12px;font-size:.78rem" onclick="agregarHijo()"><i class="bi bi-plus-lg me-1"></i>Agregar</button></h5>
     <div id="gHijos"></div>
   </div>
 
@@ -242,20 +242,25 @@ function renderHijos(){
   document.getElementById('btnHijo').style.display = EDIT ? '' : 'none';
   const box = document.getElementById('gHijos');
   if (!EDIT){
-    box.innerHTML = hijos.length ? `<table><thead><tr><th>Nombre</th><th>RUT</th><th>Nacimiento</th><th>Carga</th></tr></thead><tbody>${
-      hijos.map(h=>`<tr><td>${esc(h.nombre||'—')}</td><td>${esc(h.rut||'—')}</td><td>${fD(h.fecha_nacimiento)}</td><td>${h.es_carga?'✔ Carga familiar':'—'}</td></tr>`).join('')
-    }</tbody></table>` : '<div style="font-size:.82rem;color:#94a3b8">Sin hijos registrados.</div>';
+    box.innerHTML = hijos.length ? `<table><thead><tr><th>Relación</th><th>Nombre</th><th>RUT</th><th>Nacimiento</th><th>Carga Previred</th><th>Seguro de salud</th></tr></thead><tbody>${
+      hijos.map(h=>`<tr><td>${esc(h.relacion||'HIJO')}</td><td>${esc(h.nombre||'—')}</td><td>${esc(h.rut||'—')}</td><td>${fD(h.fecha_nacimiento)}</td><td>${h.es_carga?'✔':'—'}</td><td>${h.en_seguro?'✔'+(h.certificado_estudios?' (cert. estudios)':''):'—'}</td></tr>`).join('')
+    }</tbody></table>` : '<div style="font-size:.82rem;color:#94a3b8">Sin hijos ni cargas registrados.</div>';
     return;
   }
-  box.innerHTML = hijos.length ? hijos.map(filaHijo).join('') : '<div style="font-size:.82rem;color:#94a3b8;margin-bottom:6px">Sin hijos registrados — usa "Agregar hijo".</div>';
+  box.innerHTML = hijos.length ? hijos.map(filaHijo).join('') : '<div style="font-size:.82rem;color:#94a3b8;margin-bottom:6px">Sin hijos ni cargas registrados — usa "Agregar".</div>';
 }
 function filaHijo(h={}){
-  return `<div class="hijo-row" style="display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:10px 16px;align-items:end;margin-bottom:8px">
-    <div class="fld"><label>Nombre</label><input class="h_nombre" value="${esc(h.nombre||'')}"></div>
+  const rel = h.relacion||'HIJO';
+  const opt = v => `<option ${rel===v?'selected':''}>${v}</option>`;
+  return `<div class="hijo-row" data-id="${h.id||''}" data-seg="${h.en_seguro==null?1:(h.en_seguro?1:0)}" data-cert="${h.certificado_estudios?1:0}" style="display:grid;grid-template-columns:1fr 1.6fr 1.1fr 1.1fr 1fr 1.1fr auto auto;gap:8px 12px;align-items:end;margin-bottom:8px">
+    <div class="fld"><label>Relación</label><select class="h_rel">${opt('HIJO')}${opt('CONYUGE')}${opt('CONVIVIENTE CIVIL')}${opt('OTRO')}</select></div>
+    <div class="fld"><label>Nombres</label><input class="h_nombre" value="${esc(h.nombres||h.nombre||'')}"></div>
+    <div class="fld"><label>Apellido paterno</label><input class="h_pat" value="${esc(h.apellido_paterno||'')}"></div>
+    <div class="fld"><label>Apellido materno</label><input class="h_mat" value="${esc(h.apellido_materno||'')}"></div>
     <div class="fld"><label>RUT</label><input class="h_rut" value="${esc(h.rut||'')}"></div>
-    <div class="fld"><label>Fecha de nacimiento</label><input type="date" class="h_fnac" value="${esc(h.fecha_nacimiento||'')}"></div>
+    <div class="fld"><label>Nacimiento</label><input type="date" class="h_fnac" value="${esc(h.fecha_nacimiento||'')}"></div>
     <label style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:#334155;padding-bottom:8px;cursor:pointer;white-space:nowrap">
-      <input type="checkbox" class="h_carga" ${h.es_carga?'checked':''}> Es carga familiar</label>
+      <input type="checkbox" class="h_carga" ${h.es_carga?'checked':''}> Carga familiar</label>
     <button class="btn-ghost" style="padding:4px 10px;color:#b91c1c;margin-bottom:4px" title="Quitar" onclick="this.closest('.hijo-row').remove()"><i class="bi bi-trash"></i></button>
   </div>`;
 }
@@ -271,16 +276,22 @@ async function guardar(){
   CONYUGE.forEach(([k]) => body[k] = document.getElementById('c_'+k).value.trim());
   body.conyuge_misma_dir = document.getElementById('c_conyuge_misma_dir')?.checked ? 1 : 0;
   body.conyuge_direccion = body.conyuge_misma_dir ? '' : (document.getElementById('c_conyuge_direccion')?.value.trim() || '');
+  // El colaborador no decide el seguro: las marcas de seguro/certificado viajan tal como estaban
   body.hijos = [...document.querySelectorAll('#gHijos .hijo-row')].map(r => ({
-    nombre: r.querySelector('.h_nombre').value.trim(),
+    id: Number(r.dataset.id) || null,
+    relacion: r.querySelector('.h_rel').value,
+    nombres: r.querySelector('.h_nombre').value.trim(),
+    apellido_paterno: r.querySelector('.h_pat').value.trim(),
+    apellido_materno: r.querySelector('.h_mat').value.trim(),
     rut: r.querySelector('.h_rut').value.trim(),
     fecha_nacimiento: r.querySelector('.h_fnac').value,
     es_carga: r.querySelector('.h_carga').checked ? 1 : 0,
-  })).filter(h => h.nombre || h.rut || h.fecha_nacimiento);
+    en_seguro: Number(r.dataset.seg), certificado_estudios: Number(r.dataset.cert),
+  })).filter(h => h.nombres || h.rut || h.fecha_nacimiento);
   const j = await (await fetch('/api/rrhh/ficha/'+DATA.usuario.id_usuario, { method:'PUT', headers:HJ, body:JSON.stringify(body) })).json();
   if (!j.success) return alert(j.error||'No se pudo guardar');
   Object.assign(DATA.ficha = DATA.ficha||{}, body);
-  DATA.hijos = body.hijos;
+  DATA.hijos = body.hijos.map(h => ({ ...h, nombre: [h.nombres, h.apellido_paterno, h.apellido_materno].filter(Boolean).join(' ') }));
   modoEdicion(false); toast('✓ Datos actualizados');
 }
 async function abrirDoc(id){

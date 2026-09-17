@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v2.6 — montos con $ y puntos (sueldo, colación, movilización) y casilla Tarjeta Edenred. v2.5 — colación y movilización mensuales en Previsión y pago (fuente única de la liquidación). v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
+  <!-- v2.7 — sección Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, sexo, carga Previred, seguro de salud y certificado de estudios; se conserva la fila al guardar (Pato 17-09-2026). v2.6 — montos con $ y puntos (sueldo, colación, movilización) y casilla Tarjeta Edenred. v2.5 — colación y movilización mensuales en Previsión y pago (fuente única de la liquidación). v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -175,7 +175,7 @@ async function abrir(id){
         </label>
       </div>
     </div>
-    <div class="sec">Hijos <button class="btn-ghost" style="padding:2px 10px;font-size:.74rem;margin-left:8px" onclick="agregarHijo()"><i class="bi bi-plus-lg me-1"></i>Agregar hijo</button></div>
+    <div class="sec">Hijos y cargas familiares <button class="btn-ghost" style="padding:2px 10px;font-size:.74rem;margin-left:8px" onclick="agregarHijo()"><i class="bi bi-plus-lg me-1"></i>Agregar</button> <span style="font-size:.72rem;color:#64748b;font-weight:400;margin-left:8px">Una sola lista para Previred (carga familiar) y para el <a href="/recursos-humanos/remuneraciones/seguro-salud/">Seguro de Salud</a></span></div>
     <div id="hijosBox"></div>
     <div class="sec">Contactos de emergencia</div>
     <div class="grid3">
@@ -201,7 +201,7 @@ async function abrir(id){
     <div class="sec">Cargas familiares (Previred)</div>
     <div class="grid3">
       ${sel('f_tramo_asignacion','Tramo asignación familiar',f.tramo_asignacion,['A','B','C','D'],1)}
-      <div class="fld"><label>Cargas simples — hijos</label><input disabled value="${(FICHA.hijos||[]).filter(h=>h.es_carga).length} (marcados como carga en Hijos)"></div>
+      <div class="fld"><label>Cargas simples — hijos</label><input disabled value="${(FICHA.hijos||[]).filter(h=>h.es_carga&&(h.relacion||'HIJO')==='HIJO').length} (hijos marcados como carga en Hijos y cargas familiares)"></div>
       ${inp('f_cargas_otras','Cargas simples — otras (cónyuge, ascendientes)',f.cargas_otras??0,'number')}
       ${inp('f_cargas_maternales','Cargas maternales',f.cargas_maternales??0,'number')}
       ${inp('f_cargas_invalidas','Cargas inválidas',f.cargas_invalidas??0,'number')}
@@ -228,19 +228,28 @@ async function abrir(id){
 
 /* ── Hijos (filas dinámicas) ── */
 function filaHijo(h={}){
-  return `<div class="hijo-row" style="display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:10px 16px;align-items:end;margin-bottom:8px">
-    <div class="fld"><label>Nombre</label><input class="h_nombre" value="${esc(h.nombre||'')}"></div>
+  const rel = h.relacion||'HIJO';
+  const opt = v => `<option ${rel===v?'selected':''}>${v}</option>`;
+  return `<div class="hijo-row" data-id="${h.id||''}" style="display:grid;grid-template-columns:1.1fr 1.6fr 1.1fr 1.1fr 1fr 1.1fr .7fr auto;gap:8px 12px;align-items:end;margin-bottom:8px">
+    <div class="fld"><label>Relación</label><select class="h_rel">${opt('HIJO')}${opt('CONYUGE')}${opt('CONVIVIENTE CIVIL')}${opt('OTRO')}</select></div>
+    <div class="fld"><label>Nombres</label><input class="h_nombre" value="${esc(h.nombres||h.nombre||'')}"></div>
+    <div class="fld"><label>Apellido paterno</label><input class="h_pat" value="${esc(h.apellido_paterno||'')}"></div>
+    <div class="fld"><label>Apellido materno</label><input class="h_mat" value="${esc(h.apellido_materno||'')}"></div>
     <div class="fld"><label>RUT</label><input class="h_rut" value="${esc(h.rut||'')}"></div>
-    <div class="fld"><label>Fecha de nacimiento</label><input type="date" class="h_fnac" value="${esc(h.fecha_nacimiento||'')}"></div>
-    <label style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:#334155;padding-bottom:8px;cursor:pointer;white-space:nowrap">
-      <input type="checkbox" class="h_carga" ${h.es_carga?'checked':''}> Es carga familiar</label>
-    <button class="btn-mini del" style="margin-bottom:6px" title="Quitar" onclick="this.closest('.hijo-row').remove()"><i class="bi bi-trash"></i></button>
+    <div class="fld"><label>Nacimiento</label><input type="date" class="h_fnac" value="${esc(h.fecha_nacimiento||'')}"></div>
+    <div class="fld"><label>Sexo</label><select class="h_sexo"><option value="">—</option><option value="F" ${h.sexo==='F'?'selected':''}>F</option><option value="M" ${h.sexo==='M'?'selected':''}>M</option></select></div>
+    <button class="btn-mini del" style="margin-bottom:6px" title="Quitar (se da de baja; las nóminas del seguro ya generadas la conservan)" onclick="this.closest('.hijo-row').remove()"><i class="bi bi-trash"></i></button>
+    <div style="grid-column:1 / -1;display:flex;gap:18px;font-size:.78rem;color:#334155;margin-top:-4px;margin-bottom:4px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="h_carga" ${h.es_carga?'checked':''}> Carga familiar (Previred)</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="h_seguro" ${h.en_seguro==null||h.en_seguro?'checked':''}> Seguro de salud</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Hijos sobre la edad máxima: con certificado enviado siguen en el seguro hasta la renovación de la póliza"><input type="checkbox" class="h_cert" ${h.certificado_estudios?'checked':''}> Certificado de estudios</label>
+    </div>
   </div>`;
 }
 function pintarHijos(hijos){
   document.getElementById('hijosBox').innerHTML = hijos.length
     ? hijos.map(filaHijo).join('')
-    : '<div style="font-size:.8rem;color:#94a3b8;margin-bottom:6px">Sin hijos registrados.</div>';
+    : '<div style="font-size:.8rem;color:#94a3b8;margin-bottom:6px">Sin hijos ni cargas registrados.</div>';
 }
 function agregarHijo(){
   const box = document.getElementById('hijosBox');
@@ -250,11 +259,18 @@ function agregarHijo(){
 }
 function leerHijos(){
   return [...document.querySelectorAll('#hijosBox .hijo-row')].map(r => ({
-    nombre: r.querySelector('.h_nombre').value.trim(),
+    id: Number(r.dataset.id) || null,
+    relacion: r.querySelector('.h_rel').value,
+    nombres: r.querySelector('.h_nombre').value.trim(),
+    apellido_paterno: r.querySelector('.h_pat').value.trim(),
+    apellido_materno: r.querySelector('.h_mat').value.trim(),
     rut: r.querySelector('.h_rut').value.trim(),
     fecha_nacimiento: r.querySelector('.h_fnac').value,
+    sexo: r.querySelector('.h_sexo').value,
     es_carga: r.querySelector('.h_carga').checked ? 1 : 0,
-  })).filter(h => h.nombre || h.rut || h.fecha_nacimiento);
+    en_seguro: r.querySelector('.h_seguro').checked ? 1 : 0,
+    certificado_estudios: r.querySelector('.h_cert').checked ? 1 : 0,
+  })).filter(h => h.nombres || h.rut || h.fecha_nacimiento);
 }
 
 async function guardarFicha(){

@@ -6,9 +6,10 @@
    · Quién paga la carga: a quienes se contrató HASTA una fecha de corte (paramétrica) el
      seguro de sus cargas lo paga AutoFácil; después de esa fecha la carga la paga el
      EMPLEADO y se le descuenta en la liquidación. Se puede corregir carga por carga.
-   · Registro de cargas (rh_cargas): nombre, RUT, nacimiento, sexo, relación. Fuente única
-     de los beneficiarios del seguro. (Los contadores de cargas de la ficha son de la
-     ASIGNACIÓN FAMILIAR legal: otra magnitud, no se fusionan.)
+   · Registro de cargas (rh_cargas): nombre, RUT, nacimiento, sexo, relación. FUENTE ÚNICA de la
+     familia del colaborador: la misma fila lleva es_carga (asignación familiar Previred, la edita
+     la ficha) y en_seguro / certificado_estudios (seguro). rh_hijos quedó en desuso (17-09-2026).
+     Se ve y se edita en la ficha del colaborador (sección Hijos y cargas familiares) y acá.
    · Edad máxima de los hijos (paramétrica, 23 según la póliza): la aseguradora rechazó
      cargas de 24 y 28 años. Pasada la edad la carga se marca y sale de la nómina sola,
      SALVO que tenga certificado de estudios (rh_cargas.certificado_estudios): la aseguradora
@@ -65,6 +66,13 @@ require('../../../../shared/migrate').migrar('rrhh-seguro-salud', async () => {
 });
 require('../../../../shared/migrate').migrar('rrhh-seguro-salud-certificado', async () => {
   await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_estudios_hasta DATE NULL');
+});
+require('../../../../shared/migrate').migrar('rrhh-cargas-fuente-unica', async () => {
+  await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS es_carga TINYINT(1) NOT NULL DEFAULT 0');
+  // rh_hijos estaba vacía al unificar; si alguna vez tuvo filas, se traen sin duplicar por RUT
+  await pool.query(`INSERT INTO rh_cargas (id_usuario, nombres, rut, fecha_nacimiento, relacion, es_carga, en_seguro, creado_por)
+    SELECT h.id_usuario, h.nombre, h.rut, h.fecha_nacimiento, 'HIJO', h.es_carga, 0, 'Migrado de rh_hijos'
+      FROM rh_hijos h WHERE NOT EXISTS (SELECT 1 FROM rh_cargas c WHERE c.id_usuario=h.id_usuario AND (c.rut=h.rut OR c.nombres=h.nombre))`).catch(() => {});
 });
 require('../../../../shared/migrate').migrar('rrhh-seguro-salud-poliza', async () => {
   await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_estudios TINYINT(1) NOT NULL DEFAULT 0');

@@ -1945,7 +1945,7 @@ async function getPrevired(req, res) {
     const afpCodDe = n => { const k = String(n || '').toUpperCase().trim();
       return (afpsCod.find(a => a.afp === k) || {}).codigo_previred || PREV_AFP[k]; };
     // Cargas familiares: tramo y cargas de la ficha + hijos marcados como carga (fuente única)
-    const [cargasHijos] = await pool.query('SELECT id_usuario, COUNT(*) n FROM rh_hijos WHERE es_carga=1 GROUP BY id_usuario');
+    const [cargasHijos] = await pool.query("SELECT id_usuario, COUNT(*) n FROM rh_cargas WHERE es_carga=1 AND activo=1 AND relacion='HIJO' GROUP BY id_usuario");   // fuente única de la familia (17-09-2026)
     const hijosDe = id => (cargasHijos.find(h => h.id_usuario === id) || {}).n || 0;
     const [fichasCargas] = await pool.query('SELECT id_usuario, tramo_asignacion, cargas_otras, cargas_maternales, cargas_invalidas FROM rh_fichas');
     const cargasDe = id => fichasCargas.find(f => f.id_usuario === id) || {};

@@ -271,8 +271,13 @@ async function armarFicha(idUsuario, conSueldo, soloVisibles) {
     `SELECT id, tipo, nombre_archivo, mime_type, subido_por, created_at, visible_colaborador
        FROM rh_documentos WHERE id_usuario=? ${soloVisibles ? 'AND visible_colaborador=1' : ''}
       ORDER BY created_at DESC`, [idUsuario]);
+  /* Familia (hijos, cónyuge y otras cargas): FUENTE ÚNICA rh_cargas (17-09-2026). La misma fila
+     sirve a la asignación familiar (es_carga, Previred) y al Seguro de Salud (en_seguro,
+     certificado_estudios). rh_hijos quedó vacía y en desuso. */
   const [hijos] = await pool.query(
-    "SELECT id, nombre, rut, DATE_FORMAT(fecha_nacimiento,'%Y-%m-%d') fecha_nacimiento, es_carga FROM rh_hijos WHERE id_usuario=? ORDER BY fecha_nacimiento, id", [idUsuario]);
+    `SELECT id, TRIM(CONCAT_WS(' ', nombres, apellido_paterno, apellido_materno)) nombre, nombres, apellido_paterno, apellido_materno, rut,
+            DATE_FORMAT(fecha_nacimiento,'%Y-%m-%d') fecha_nacimiento, sexo, relacion, es_carga, en_seguro, certificado_estudios
+       FROM rh_cargas WHERE id_usuario=? AND activo=1 ORDER BY FIELD(relacion,'CONYUGE','CONVIVIENTE CIVIL','HIJO','OTRO'), fecha_nacimiento, id`, [idUsuario]);
   // UF del día para mostrar el plan Isapre (pactado en UF) también en pesos
   let uf = null; try { uf = await require('../../../../shared/uf').getUF(new Date()); } catch (_) {}
   return { usuario: u, ficha, documentos: docs, hijos, uf };
@@ -317,18 +322,29 @@ const putFicha = async (req, res) => {
          ON DUPLICATE KEY UPDATE ${sets.join(', ')}, updated_by = ?`,
         [objetivo, ...vals, nombreDe(u), ...vals, nombreDe(u)]);
     }
-    // Hijos: reemplazo completo del set (viene el arreglo entero desde la ficha)
+    // Familia: viene el arreglo entero desde la ficha. Las filas con id se ACTUALIZAN (conservan las
+    // marcas del seguro), las nuevas se insertan y las que ya no vienen se dan de baja (activo=0),
+    // nunca se borran: las nóminas del seguro ya generadas las referencian.
     if (Array.isArray(b.hijos)) {
+      const REL = ['CONYUGE', 'CONVIVIENTE CIVIL', 'HIJO', 'OTRO'];
       const hijos = b.hijos
-        .map(h => ({ nombre: String(h.nombre || '').trim().slice(0, 160), rut: String(h.rut || '').trim().slice(0, 15),
+        .map(h => ({ id: Number(h.id) || null, nombres: String(h.nombres ?? h.nombre ?? '').trim().slice(0, 120),
+                     apellido_paterno: String(h.apellido_paterno || '').trim().slice(0, 80) || null, apellido_materno: String(h.apellido_materno || '').trim().slice(0, 80) || null,
+                     rut: String(h.rut || '').trim().toUpperCase().slice(0, 15) || null,
                      fecha_nacimiento: /^\d{4}-\d{2}-\d{2}$/.test(String(h.fecha_nacimiento || '')) ? h.fecha_nacimiento : null,
-                     es_carga: h.es_carga ? 1 : 0 }))
-        .filter(h => h.nombre || h.rut || h.fecha_nacimiento)
+                     sexo: ['M', 'F'].includes(String(h.sexo || '').toUpperCase()) ? String(h.sexo).toUpperCase() : null,
+                     relacion: REL.includes(String(h.relacion || '').toUpperCase()) ? String(h.relacion).toUpperCase() : 'HIJO',
+                     es_carga: h.es_carga ? 1 : 0, en_seguro: h.en_seguro === undefined ? 1 : (h.en_seguro ? 1 : 0), certificado_estudios: h.certificado_estudios ? 1 : 0 }))
+        .filter(h => h.nombres || h.rut || h.fecha_nacimiento)
         .slice(0, 20);
-      await pool.query('DELETE FROM rh_hijos WHERE id_usuario=?', [objetivo]);
-      for (const h of hijos)
-        await pool.query('INSERT INTO rh_hijos (id_usuario, nombre, rut, fecha_nacimiento, es_carga) VALUES (?,?,?,?,?)',
-          [objetivo, h.nombre || null, h.rut || null, h.fecha_nacimiento, h.es_carga]);
+      const quedan = hijos.map(h => h.id).filter(Boolean);
+      await pool.query(`UPDATE rh_cargas SET activo=0, en_seguro=0, updated_at=NOW() WHERE id_usuario=? AND activo=1 ${quedan.length ? 'AND id NOT IN (?)' : ''}`, quedan.length ? [objetivo, quedan] : [objetivo]);
+      for (const h of hijos) {
+        if (h.id) await pool.query(`UPDATE rh_cargas SET nombres=?, apellido_paterno=?, apellido_materno=?, rut=?, fecha_nacimiento=?, sexo=?, relacion=?, es_carga=?, en_seguro=?, certificado_estudios=?, updated_at=NOW() WHERE id=? AND id_usuario=?`,
+          [h.nombres || null, h.apellido_paterno, h.apellido_materno, h.rut, h.fecha_nacimiento, h.sexo, h.relacion, h.es_carga, h.en_seguro, h.certificado_estudios, h.id, objetivo]);
+        else await pool.query(`INSERT INTO rh_cargas (id_usuario, nombres, apellido_paterno, apellido_materno, rut, fecha_nacimiento, sexo, relacion, es_carga, en_seguro, certificado_estudios, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [objetivo, h.nombres || null, h.apellido_paterno, h.apellido_materno, h.rut, h.fecha_nacimiento, h.sexo, h.relacion, h.es_carga, h.en_seguro, h.certificado_estudios, 'Ficha']);
+      }
     }
     // Identidad (usuarios) solo RRHH
     if (rrhh) {
