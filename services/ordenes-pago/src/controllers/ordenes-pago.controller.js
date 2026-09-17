@@ -499,9 +499,10 @@ const listarOrdenes = async (req, res) => {
       const ids = crs.map(c => c.id);
       const ops = [...new Set(crs.map(c => String(c.num_op || '')).filter(x => /^\d+$/.test(x)))].slice(0, 150);
       const conds = [U('oc.numero'), U('oc.concepto'), U('op.proveedor_nombre'), U('spv.nombre_dealer'), U('cpv.nombre_dealer'),
+        U('ppf.razon_social'), U('ppfac.numero_factura'),
         U('op.numero_documento'), U('pfc.numero_factura'), U('spv.ejecutivo'), U('cpv.ejecutivo'),
         'CAST(spv.num_op AS CHAR) = ?', 'CAST(cpv.num_op AS CHAR) = ?'];
-      const cargs = [like, like, like, like, like, like, like, like, like, q, q];
+      const cargs = [like, like, like, like, like, like, like, like, like, like, like, q, q];
       if (valRut) {
         conds.push(condRut('op.proveedor_rut'), condRut('spv.rut_dealer'), condRut('cpv.rut_dealer'));
         cargs.push(valRut, valRut, valRut);
@@ -530,6 +531,10 @@ const listarOrdenes = async (req, res) => {
       LEFT JOIN postventa_ordenes_comision poc ON oc.origen='COMISION' AND poc.id = oc.origen_id
       LEFT JOIN postventa_seguimiento cpv      ON cpv.id = poc.id_seguimiento
       LEFT JOIN postventa_facturas_comision pfc ON oc.origen='COMISION' AND pfc.id_seguimiento = poc.id_seguimiento
+      LEFT JOIN parques_pagos_mes ppm   ON oc.origen='PARQUE' AND ppm.id = oc.origen_id
+      LEFT JOIN parques_comisiones ppc  ON ppc.nombre = ppm.parque
+      LEFT JOIN parques_ficha ppf       ON ppf.id_parque = ppc.id
+      LEFT JOIN parques_facturas ppfac  ON ppfac.parque = ppm.parque AND ppfac.mes = DATE_FORMAT(ppm.mes,'%Y-%m')
       WHERE ${where.join(' AND ')}`;
     const estFiltro = norm(req.query.estado).toUpperCase();
     const filtraEstado = ESTADOS.includes(estFiltro);
@@ -546,6 +551,7 @@ const listarOrdenes = async (req, res) => {
                op.fecha_pago AS g_fechapago, op.categoria AS g_categoria,
                pfc.numero_factura AS c_factura,
                spv.nombre_dealer AS s_dealer, cpv.nombre_dealer AS c_dealer,
+               COALESCE(NULLIF(ppf.razon_social,''), NULLIF(ppf.nombre_cuenta,''), ppm.parque) AS p_parque, ppfac.numero_factura AS p_factura,
                ${ESTADO_SQL} AS estado_calc
         ${FROM_SQL}
       ) t ${whereEstado}
@@ -569,6 +575,7 @@ const listarOrdenes = async (req, res) => {
     const opsSinDealer = new Set();
     for (const r of rows) {
       if (r.origen === 'GENERAL') continue;
+      if (r.origen === 'PARQUE') continue;   // el proveedor es el PARQUE (su ficha), no el dealer de una operación
       if (r.origen === 'SALDO' ? r.s_dealer : r.c_dealer) continue;
       const m = String(r.concepto || '').match(/OP\s+(\d+)/i);
       if (m) opsSinDealer.add(m[1]);
@@ -588,14 +595,18 @@ const listarOrdenes = async (req, res) => {
     }
     let data = rows.map(r => {
       const esGen = r.origen === 'GENERAL';
-      let proveedor = esGen ? r.g_prov : (r.origen === 'SALDO' ? r.s_dealer : r.c_dealer);
+      /* PARQUE (Pato 17-09-2026): salía "—" en proveedor y documento. El proveedor es la razón social
+         de la ficha del parque y el documento la factura registrada contra la cartola (parques_facturas),
+         las mismas fuentes que usa Comisiones Parques a Pagar. */
+      let proveedor = esGen ? r.g_prov : r.origen === 'PARQUE' ? r.p_parque : (r.origen === 'SALDO' ? r.s_dealer : r.c_dealer);
       if (!proveedor && !esGen) {
         const m = String(r.concepto || '').match(/OP\s+(\d+)/i);
         if (m && dealerPorOp.has(m[1])) proveedor = dealerPorOp.get(m[1]);
       }
       const estado = r.estado_calc;   // regla única: ESTADO_SQL
       const documento = esGen ? [r.g_tipodoc, r.g_numdoc].filter(Boolean).join(' ')
-                              : (r.origen === 'COMISION' && r.c_factura ? 'Factura ' + r.c_factura : '');
+                              : (r.origen === 'COMISION' && r.c_factura ? 'Factura ' + r.c_factura
+                                : r.origen === 'PARQUE' && r.p_factura ? 'Factura ' + r.p_factura : '');
       const emitidaPorMi = dobleP && (
         (r.id_usuario != null && yo.id_usuario != null && Number(r.id_usuario) === Number(yo.id_usuario)) ||
         (r.id_usuario == null && nombreYo && String(r.usuario_nombre || '').trim().toLowerCase() === nombreYo));
