@@ -483,8 +483,8 @@ Recordatorio: quien se retire después de generada la nómina conserva lo cargad
 Saludos cordiales,
 Auto Fácil Business Suite`,
     para_perfiles: 'Consultora Recursos Humanos,Gerente de Finanzas',
-    cc: '',
-    destinatario: 'Los perfiles marcados aquí abajo (RRHH y Gerente de Finanzas)',
+    cc: 'recursos.humanos@autofacilchile.cl',
+    destinatario: 'Los perfiles marcados aquí abajo (RRHH y Gerente de Finanzas) + la casilla de RRHH en copia',
     variables: '{MES} {FECHA} {PERSONAS} {TOTAL} {MONTO_DIA} {LINK}',
   },
 ];
@@ -588,6 +588,12 @@ require('./migrate').migrar('correo-parque-odp-contabilidad-destinos', async () 
 require('./migrate').migrar('correo-anticipo-asuntos', async () => {
   await pool.query("UPDATE correos_plantillas SET asunto='¡Feliz 18! {GLOSA}' WHERE codigo='anticipo_fiestas_patrias' AND asunto='¡Feliz 18! Aguinaldo de Fiestas Patrias {GLOSA}'");
   await pool.query("UPDATE correos_plantillas SET asunto='¡Feliz Navidad! {GLOSA}' WHERE codigo='anticipo_navidad' AND asunto='¡Feliz Navidad! Aguinaldo {GLOSA}'");
+});
+
+/* Aviso Edenred: la Consultora de RRHH es usuario EXTERNO (los correos por perfil la excluyen)
+   pero lee la casilla de RRHH → va en copia (Pato 17-09-2026). Solo si nadie editó el CC. */
+require('./migrate').migrar('correo-edenred-aviso-cc-rrhh', async () => {
+  await pool.query("UPDATE correos_plantillas SET cc='recursos.humanos@autofacilchile.cl' WHERE codigo='edenred_generar_aviso' AND (cc IS NULL OR cc='')");
 });
 
 const obtener = async codigo => {
