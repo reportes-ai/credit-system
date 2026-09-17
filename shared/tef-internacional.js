@@ -20,7 +20,13 @@
    CUPO: el banco no cobra hasta tef_gratis_mes (150) cargos al mes. Cada archivo
    generado se registra en tef_envios (plataforma, mes, cargos, monto, usuario) y
    cupoMes() suma las TRES plataformas; las páginas muestran "te quedan N/150 gratis".
-   Parámetros en postventa_config: tef_gratis_mes, tef_monto_max.
+   Parámetros en postventa_config: tef_gratis_mes, tef_monto_max, tef_dividir, tef_bancos_vista.
+
+   BANCOS SOLO CUENTA VISTA (17-09-2026): Mercado Pago, Tenpo y los demás emisores de prepago
+   NO tienen cuenta corriente: sus cuentas (también las de empresa) son cuenta vista. Las fichas
+   llegan sin tipo y el archivo las mandaba como corriente → el banco rechazó ODP2610887 y
+   ODP2610972 ("este registro no será inscrito"). Para los bancos de tef_bancos_vista el tipo
+   de cuenta sale SIEMPRE 2 (vista), diga lo que diga la ficha.
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('./config/database');
 const XLSX = require('xlsx');
@@ -40,20 +46,22 @@ require('./migrate').enFila('tef-internacional', async () => {
     KEY ix_mes (mes)
   )`);
   await pool.query("INSERT IGNORE INTO postventa_config (clave, valor) VALUES ('tef_gratis_mes', '150'), ('tef_monto_max', '7000000'), ('tef_dividir', '1')").catch(() => {});
+  await pool.query("INSERT IGNORE INTO postventa_config (clave, valor) VALUES ('tef_bancos_vista', '\"MERCADO PAGO, TENPO\"')").catch(() => {});
 });
 
 const R = v => Math.round(Number(v) || 0);
 const mesChile = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }).slice(0, 7);
 
 async function parametros() {
-  const out = { gratis: 150, montoMax: 7000000, dividir: true };
+  const out = { gratis: 150, montoMax: 7000000, dividir: true, bancosVista: ['MERCADO PAGO', 'TENPO'] };
   try {
-    const [rows] = await pool.query("SELECT clave, valor FROM postventa_config WHERE clave IN ('tef_gratis_mes','tef_monto_max','tef_dividir')");
+    const [rows] = await pool.query("SELECT clave, valor FROM postventa_config WHERE clave IN ('tef_gratis_mes','tef_monto_max','tef_dividir','tef_bancos_vista')");
     for (const r of rows) {
       let v = r.valor; try { v = JSON.parse(v); } catch (_) {}
       if (r.clave === 'tef_gratis_mes' && Number(v) > 0) out.gratis = Number(v);
       if (r.clave === 'tef_monto_max' && Number(v) > 0) out.montoMax = Number(v);
       if (r.clave === 'tef_dividir') out.dividir = Number(v) === 1;
+      if (r.clave === 'tef_bancos_vista') out.bancosVista = String(v || '').split(',').map(x => sinAcentos(x).toUpperCase().replace(/\s+/g, ' ').trim()).filter(Boolean);
     }
   } catch (_) {}
   return out;
@@ -139,12 +147,15 @@ async function construirTEF({ plataforma, filas, usuario }) {
     /* Monto sobre el máximo del banco: se DIVIDE en transferencias a la misma cuenta, cada una por
        el MÁXIMO y la última por la diferencia (Pato, 11-09-2026); glosa "<motivo> Transf. k/n".
        Cada parte es un cargo para el cupo del mes. */
+    // Emisores de prepago: solo cuenta vista (paramétrico, tef_bancos_vista)
+    const bancoTxt = sinAcentos(f.banco).toUpperCase().replace(/\s+/g, ' ');
+    const soloVista = P.bancosVista.some(b => bancoTxt.includes(b));
     const partes = monto > P.montoMax ? Math.ceil(monto / P.montoMax) : 1;
     let resto = monto;
     for (let k = 1; k <= partes; k++) {
       const m = k === partes ? resto : P.montoMax;
       resto -= m;
-      ok.push([rut, nombre, cuenta, m, tipoCuenta(f.tipo_cuenta), banco, correo, partes > 1 ? glosaParte(motivo, k, partes) : motivo]);
+      ok.push([rut, nombre, cuenta, m, soloVista ? 2 : tipoCuenta(f.tipo_cuenta), banco, correo, partes > 1 ? glosaParte(motivo, k, partes) : motivo]);
     }
     if (partes > 1) divididas.push({ ref, nombre: f.nombre || '', monto, partes });
   }
