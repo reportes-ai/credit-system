@@ -135,7 +135,7 @@ async function calcularMes(mes) {
     const aj = ajuste[g.id_usuario];
     const diasAj = aj ? Number(aj.dias) : 0;
     const monto = Math.max(0, Math.round((habiles - descuento + diasAj) * p.monto_diario));
-    return { id_usuario: g.id_usuario, nombre: g.nombre, rut: g.rut, cargo: g.cargo, area: g.area, sabado: sab ? 1 : 0,
+    return { id_usuario: g.id_usuario, nombre: g.nombre, rut: g.rut, cargo: g.cargo, area: g.area, sabado: sab ? 1 : 0, baja: g.fecha_baja ? 1 : 0,
              dias_habiles: habiles, dias_descuento: descuento, dias_ajuste: diasAj, observacion: aj?.observacion || null,
              monto_diario: p.monto_diario, monto, detalle: f.det.join(' · ') || null,
              parcial: desde !== ini || hasta !== fin ? `${desde.slice(8)}/${desde.slice(5, 7)} → ${hasta.slice(8)}/${hasta.slice(5, 7)}` : null };
@@ -151,7 +151,10 @@ const getMes = async (req, res) => {
     let data;
     if (gen.length) {
       const p = await paramDe(mes);
-      data = { param: p, filas: gen.map(r => ({ ...r, dias_habiles: Number(r.dias_habiles), dias_descuento: Number(r.dias_descuento), dias_ajuste: Number(r.dias_ajuste), monto_diario: Number(r.monto_diario), monto: Number(r.monto) })),
+      // Punto de color de la fila (L-S / L-V / contrato terminado): la nómina congelada guarda el área; la baja se lee del usuario
+      const [bj] = await pool.query('SELECT id_usuario FROM usuarios WHERE id_usuario IN (?) AND fecha_baja IS NOT NULL', [gen.map(r => r.id_usuario)]);
+      const bajas = new Set(bj.map(b => b.id_usuario));
+      data = { param: p, filas: gen.map(r => ({ ...r, sabado: p.areas.includes(sinTilde(r.area)) ? 1 : 0, baja: bajas.has(r.id_usuario) ? 1 : 0, dias_habiles: Number(r.dias_habiles), dias_descuento: Number(r.dias_descuento), dias_ajuste: Number(r.dias_ajuste), monto_diario: Number(r.monto_diario), monto: Number(r.monto) })),
                mes_descuento: mesAnterior(mes), generada: true, generado_por: gen[0].generado_por, generado_at: gen[0].created_at };
     } else data = { ...(await calcularMes(mes)), generada: false };
     const [params] = await pool.query('SELECT * FROM rh_edenred_param ORDER BY mes_desde DESC');

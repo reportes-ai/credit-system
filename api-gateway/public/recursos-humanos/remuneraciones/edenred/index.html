@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nómina Edenred — AutoFácil</title>
+  <!-- v1.2 — punto de color por colaborador en vez de la etiqueta L-S: rojo lunes a sábado, azul lunes a viernes, negro contrato terminado; leyenda bajo la tabla (Pato 17-09-2026) -->
   <!-- v1.1 — layout real de Edenred: áreas de lunes a sábado (paramétrico, COMERCIAL), ajustes manuales en días con observación (premios / descuentos), descarga del Archivo Edenred (el que se sube) y de la nómina del mes en Excel (Pato 17-09-2026) -->
   <!-- v1.0 — Nómina Edenred: monto por día hábil (L-V, sin feriados) pagado por adelantado, faltas del mes anterior se descuentan; parámetros con vigencia desde mes; generar congela el mes; CSV provisorio de carga; historial por mes y por persona (Pato 16-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -24,6 +25,7 @@
     .card-kpi { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:12px 20px; }
     .card-kpi .v { font-family:Consolas,monospace; font-weight:800; font-size:1.1rem; color:var(--navy); }
     .card-kpi .l { font-size:.7rem; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
+    .pt-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:8px; vertical-align:middle; }
     .foot { background:#f7f9fc; border-left:4px solid #0255c5; border-radius:10px; padding:12px 18px; font-size:.76rem; color:#475569; line-height:1.8; }
     .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
   </style>
@@ -56,6 +58,11 @@
     <div class="panel" style="padding:0;overflow:auto">
       <table><thead><tr><th>Colaborador</th><th>RUT</th><th class="text-right">Días hábiles</th><th class="text-right" id="thDesc">Descuento</th><th class="text-right">Ajuste (días)</th><th class="text-right">$/día</th><th class="text-right">Monto</th><th>Detalle</th></tr></thead>
       <tbody id="tb"><tr><td colspan="8" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
+    </div>
+    <div class="small text-muted mb-3" style="margin-top:-8px;padding-left:4px">
+      <span class="pt-dot" style="background:#dc2626"></span>Lunes a sábado
+      <span class="pt-dot" style="background:#2563eb;margin-left:18px"></span>Lunes a viernes
+      <span class="pt-dot" style="background:#111827;margin-left:18px"></span>Contrato terminado
     </div>
   </div>
 
@@ -136,8 +143,8 @@ function render(){
     <div class="card-kpi"><div class="v">${desc}</div><div class="l">Días descontados (${mesTxt(D.mes_descuento)})</div></div>
     <div class="card-kpi"><div class="v">$${fmt(D.total)}</div><div class="l">Total nómina</div></div>`;
   document.getElementById('tb').innerHTML = filas.map(f=>`<tr>
-    <td>${esc(f.nombre)}</td><td>${esc(f.rut||'')}</td>
-    <td class="text-right">${f.dias_habiles}${f.sabado?' <span class="pill" style="background:#e0f2fe;color:#0369a1">L-S</span>':''}${f.parcial?` <span class="text-muted small">(${esc(f.parcial)})</span>`:''}</td>
+    <td><span class="pt-dot" style="background:${f.baja?'#111827':f.sabado?'#dc2626':'#2563eb'}" title="${f.baja?'Contrato terminado':f.sabado?'Lunes a sábado':'Lunes a viernes'}"></span>${esc(f.nombre)}</td><td>${esc(f.rut||'')}</td>
+    <td class="text-right">${f.dias_habiles}${f.parcial?` <span class="text-muted small">(${esc(f.parcial)})</span>`:''}</td>
     <td class="text-right ${Number(f.dias_descuento)?'text-danger fw-bold':''}">${Number(f.dias_descuento)?'−'+f.dias_descuento:'—'}</td>
     <td class="text-right ${Number(f.dias_ajuste)<0?'text-danger fw-bold':Number(f.dias_ajuste)>0?'text-success fw-bold':''}">${Number(f.dias_ajuste)?(Number(f.dias_ajuste)>0?'+':'−')+Math.abs(Number(f.dias_ajuste)).toLocaleString('es-CL'):'—'}${D.generada?'':` <a href="#" onclick="ajustar(${f.id_usuario});return false" title="Ajustar días (premio o descuento)"><i class="bi bi-pencil"></i></a>`}</td>
     <td class="text-right">$${fmt(f.monto_diario)}</td>
