@@ -10,7 +10,9 @@
      de los beneficiarios del seguro. (Los contadores de cargas de la ficha son de la
      ASIGNACIÓN FAMILIAR legal: otra magnitud, no se fusionan.)
    · Edad máxima de los hijos (paramétrica, 23 según la póliza): la aseguradora rechazó
-     cargas de 24 y 28 años. Pasada la edad la carga se marca y sale de la nómina sola.
+     cargas de 24 y 28 años. Pasada la edad la carga se marca y sale de la nómina sola,
+     SALVO que tenga certificado de estudios vigente (rh_cargas.certificado_estudios_hasta):
+     la aseguradora acepta al hijo estudiante mientras se le envíe el certificado (Pato 17-09-2026).
    · Selección: casilla por titular (rh_fichas.seguro_salud) y por carga (rh_cargas.en_seguro).
    · Generar la nómina CONGELA el mes (rh_seguro_nomina) y crea UN descuento VARIOS por
      empleado con cargas a su costo (rh_descuentos.seguro_mes lo ata al mes). Anular la
@@ -57,6 +59,7 @@ require('../../../../shared/migrate').migrar('rrhh-seguro-salud', async () => {
     generado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_mes (mes))`);
   await pool.query('ALTER TABLE rh_fichas ADD COLUMN IF NOT EXISTS seguro_salud TINYINT(1) NOT NULL DEFAULT 0');
+  await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_estudios_hasta DATE NULL');
   await pool.query('ALTER TABLE rh_descuentos ADD COLUMN IF NOT EXISTS seguro_mes CHAR(7) NULL');
 });
 
@@ -90,13 +93,16 @@ async function calcularMes(mes) {
   const titulares = gente.map(g => {
     const cs = cargas.filter(c => c.id_usuario === g.id_usuario).map(c => {
       const edad = edadAl(c.fecha_nacimiento, ini);
-      const excedeEdad = c.relacion === 'HIJO' && edad != null && edad > p.edad_max_hijo;
+      const certHasta = c.certificado_estudios_hasta ? iso(c.certificado_estudios_hasta) : null;
+      const estudiante = !!certHasta && certHasta >= ini;   // certificado de estudios vigente para el mes
+      const excedeEdad = c.relacion === 'HIJO' && edad != null && edad > p.edad_max_hijo && !estudiante;
+      const certVencido = !!certHasta && certHasta < ini && c.relacion === 'HIJO' && edad != null && edad > p.edad_max_hijo;
       const pagaAuto = p.corte_cargas_empresa && g.fecha_ingreso && iso(g.fecha_ingreso) <= p.corte_cargas_empresa ? 'EMPRESA' : 'EMPLEADO';
       const paga = c.paga === 'EMPRESA' || c.paga === 'EMPLEADO' ? c.paga : pagaAuto;
       const incluida = !!c.en_seguro && !!g.seguro_salud && !excedeEdad;
       return { id: c.id, nombre: [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' '), nombres: c.nombres, apellido_paterno: c.apellido_paterno,
         apellido_materno: c.apellido_materno, rut: c.rut, fecha_nacimiento: c.fecha_nacimiento ? iso(c.fecha_nacimiento) : null, sexo: c.sexo, relacion: c.relacion,
-        edad, excede_edad: excedeEdad, en_seguro: c.en_seguro ? 1 : 0, paga, paga_manual: !!c.paga, incluida, prima: incluida ? aCLP(p.prima_carga) : 0 };
+        edad, excede_edad: excedeEdad, estudiante, certificado_estudios_hasta: certHasta, cert_vencido: certVencido, en_seguro: c.en_seguro ? 1 : 0, paga, paga_manual: !!c.paga, incluida, prima: incluida ? aCLP(p.prima_carga) : 0 };
     });
     const primaTit = g.seguro_salud ? aCLP(p.prima_titular) : 0;
     const costoEmpresa = primaTit + cs.filter(c => c.incluida && c.paga === 'EMPRESA').reduce((s, c) => s + c.prima, 0);
@@ -177,16 +183,17 @@ const guardarCarga = async (req, res) => {
     const sexo = ['M', 'F'].includes(String(b.sexo || '').toUpperCase()) ? String(b.sexo).toUpperCase() : null;
     const paga = ['EMPRESA', 'EMPLEADO'].includes(b.paga) ? b.paga : null;
     const rut = String(b.rut || '').trim().toUpperCase().slice(0, 15) || null;
+    const cert = fechaOk(b.certificado_estudios_hasta) ? b.certificado_estudios_hasta : null;
     const vals = [nombres, String(b.apellido_paterno || '').trim().slice(0, 80) || null, String(b.apellido_materno || '').trim().slice(0, 80) || null, rut, nac, sexo, relacion, b.en_seguro === false || b.en_seguro === 0 ? 0 : 1, paga];
     let idFinal = id;
     if (id) {
-      const [r] = await pool.query('UPDATE rh_cargas SET nombres=?, apellido_paterno=?, apellido_materno=?, rut=?, fecha_nacimiento=?, sexo=?, relacion=?, en_seguro=?, paga=?, updated_at=NOW() WHERE id=? AND id_usuario=?', [...vals, id, idU]);
+      const [r] = await pool.query('UPDATE rh_cargas SET nombres=?, apellido_paterno=?, apellido_materno=?, rut=?, fecha_nacimiento=?, sexo=?, relacion=?, en_seguro=?, paga=?, certificado_estudios_hasta=?, updated_at=NOW() WHERE id=? AND id_usuario=?', [...vals, cert, id, idU]);
       if (!r.affectedRows) return fail(res, 'Carga no encontrada', 404);
     } else {
-      const [r] = await pool.query('INSERT INTO rh_cargas (nombres, apellido_paterno, apellido_materno, rut, fecha_nacimiento, sexo, relacion, en_seguro, paga, id_usuario, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [...vals, idU, nombreDe(req.usuario)]);
+      const [r] = await pool.query('INSERT INTO rh_cargas (nombres, apellido_paterno, apellido_materno, rut, fecha_nacimiento, sexo, relacion, en_seguro, paga, certificado_estudios_hasta, id_usuario, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [...vals, cert, idU, nombreDe(req.usuario)]);
       idFinal = r.insertId;
     }
-    auditar({ req, accion: id ? 'EDITAR' : 'CREAR', modulo: 'rrhh', entidad: 'carga', entidad_id: idFinal, detalle: `${id ? 'Editó' : 'Registró'} carga ${nombres} (${relacion}, nac. ${nac}) del usuario ${idU} · seguro ${vals[7] ? 'sí' : 'no'} · paga ${paga || 'según fecha de corte'}` });
+    auditar({ req, accion: id ? 'EDITAR' : 'CREAR', modulo: 'rrhh', entidad: 'carga', entidad_id: idFinal, detalle: `${id ? 'Editó' : 'Registró'} carga ${nombres} (${relacion}, nac. ${nac}) del usuario ${idU} · seguro ${vals[7] ? 'sí' : 'no'} · paga ${paga || 'según fecha de corte'}${cert ? ' · certificado de estudios hasta ' + cert : ''}` });
     ok(res, { id: idFinal });
   } catch (e) { console.error('[seguro carga]', e.message); fail(res, 'Error interno del servidor'); }
 };

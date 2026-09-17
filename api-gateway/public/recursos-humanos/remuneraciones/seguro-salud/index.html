@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguro de Salud — AutoFácil</title>
+  <!-- v1.1 — hijo sobre la edad máxima con certificado de estudios vigente sigue en la nómina (fecha de vigencia en la carga, etiqueta ESTUDIANTE, aviso cuando vence) (Pato 17-09-2026) -->
   <!-- v1.0 — Seguro Complementario de Salud (MetLife): nómina mensual de titulares y cargas con casillas de selección, registro de cargas, quién paga (empresa según fecha de corte de contratación / empleado con descuento en la liquidación), edad máxima de hijos, primas paramétricas con vigencia, generar congela el mes y crea los descuentos, Excel para la aseguradora (Pato 17-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
@@ -90,7 +91,7 @@
       <li><b>Cargas</b> (botón <i class="bi bi-person-plus"></i>) → registro único de los beneficiarios del seguro. No son los contadores de cargas de la asignación familiar de la ficha.</li>
       <li><b>Paga: Empleado</b> → al generar la nómina se crea un descuento en <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a> que sale en la <a href="/recursos-humanos/remuneraciones/liquidaciones/">liquidación</a> de ese mes. <b>Paga: Empresa</b> → costo de AutoFácil, sin descuento.</li>
       <li><b>Empresa paga cargas de contratados hasta</b> → define quién paga por defecto según la fecha de ingreso del colaborador; se puede corregir carga por carga.</li>
-      <li><b>Edad máxima de hijos</b> → la carga que la supera queda marcada y fuera de la nómina (la aseguradora la rechaza).</li>
+      <li><b>Edad máxima de hijos</b> → la carga que la supera queda marcada y fuera de la nómina (la aseguradora la rechaza), salvo que tenga <b>certificado de estudios vigente</b> (fecha en la carga): sigue en la nómina hasta esa fecha y después sale sola.</li>
       <li><b>Primas</b> (UF o pesos; la UF es la del día 1 del mes) → monto de la nómina y de los descuentos desde el mes indicado.</li>
       <li><b>Generar nómina</b> → congela el mes; el pago a la aseguradora se emite en <a href="/ordenes-pago/">Órdenes de Pago</a> con el Excel adjunto. <b>Anular</b> borra la nómina y anula los descuentos del mes (auditado).</li>
     </ul>
@@ -108,6 +109,7 @@
     <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Fecha de nacimiento</label><input id="dcNac" type="date" class="form-control form-control-sm"></div>
     <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Sexo</label><select id="dcSexo" class="form-select form-select-sm"><option value="">—</option><option value="F">Femenino</option><option value="M">Masculino</option></select></div>
     <div class="col-md-6"><label class="form-label small fw-semibold mb-1">Relación</label><select id="dcRel" class="form-select form-select-sm"></select></div>
+    <div class="col-md-6"><label class="form-label small fw-semibold mb-1" title="Solo hijos: mientras el certificado esté vigente, la aseguradora lo acepta aunque supere la edad máxima">Certificado de estudios vigente hasta</label><input id="dcCert" type="date" class="form-control form-control-sm"></div>
     <div class="col-md-6"><label class="form-label small fw-semibold mb-1">Quién paga</label><select id="dcPaga" class="form-select form-select-sm"><option value="">Según fecha de contratación</option><option value="EMPRESA">Empresa</option><option value="EMPLEADO">Empleado (descuento)</option></select></div>
     <div class="col-12"><span id="dcMsg" class="small text-danger"></span></div>
   </div>
@@ -168,7 +170,7 @@ function render(){
       </tr>` + t.cargas.map(c => `
       <tr class="car ${c.incluida?'':'fuera'}">
         <td><input type="checkbox" class="form-check-input" ${c.en_seguro?'checked':''} ${t.seguro_salud?'':'disabled'} onchange="marcarCarga(${c.id},this.checked)"></td>
-        <td><i class="bi bi-arrow-return-right me-1 text-muted"></i>${esc(c.nombre)}${c.excede_edad?` <span class="pill" style="background:#fee2e2;color:#b91c1c" title="La aseguradora no acepta hijos sobre ${p.edad_max_hijo} años">SUPERA ${p.edad_max_hijo} AÑOS — fuera</span>`:''}</td>
+        <td><i class="bi bi-arrow-return-right me-1 text-muted"></i>${esc(c.nombre)}${c.excede_edad?` <span class="pill" style="background:#fee2e2;color:#b91c1c" title="La aseguradora no acepta hijos sobre ${p.edad_max_hijo} años${c.cert_vencido?'; el certificado de estudios venció el '+dmy(c.certificado_estudios_hasta):''}">SUPERA ${p.edad_max_hijo} AÑOS${c.cert_vencido?' · CERTIFICADO VENCIDO':''} — fuera</span>`:''}${c.estudiante?` <span class="pill" style="background:#dbeafe;color:#1d4ed8" title="Certificado de estudios vigente hasta ${dmy(c.certificado_estudios_hasta)}">ESTUDIANTE hasta ${dmy(c.certificado_estudios_hasta)}</span>`:''}</td>
         <td>${esc(c.rut||'')}</td><td>${esc(c.relacion)}</td><td>${dmy(c.fecha_nacimiento)}${c.edad!=null?' · '+c.edad+' años':''}</td>
         <td><select class="form-select form-select-sm py-0" style="width:auto;display:inline-block;font-size:.76rem" onchange="cambiarPaga(${c.id},this.value)" title="${c.paga_manual?'Definido a mano':'Según la fecha de ingreso del titular'}">
           <option value="" ${c.paga_manual?'':'selected'}>Auto: ${c.paga_manual?'—':c.paga}</option><option value="EMPRESA" ${c.paga_manual&&c.paga==='EMPRESA'?'selected':''}>EMPRESA</option><option value="EMPLEADO" ${c.paga_manual&&c.paga==='EMPLEADO'?'selected':''}>EMPLEADO</option></select></td>
@@ -205,7 +207,7 @@ function abrirCarga(idU, c){
   document.getElementById('dcId').value = c?c.id:''; document.getElementById('dcUsuario').value = idU;
   document.getElementById('dcNombres').value = c?c.nombres||'':''; document.getElementById('dcPat').value = c?c.apellido_paterno||'':''; document.getElementById('dcMat').value = c?c.apellido_materno||'':'';
   document.getElementById('dcRut').value = c?c.rut||'':''; document.getElementById('dcNac').value = c?c.fecha_nacimiento||'':''; document.getElementById('dcSexo').value = c?c.sexo||'':'';
-  document.getElementById('dcRel').value = c?c.relacion:'HIJO'; document.getElementById('dcPaga').value = c&&c.paga_manual?c.paga:'';
+  document.getElementById('dcRel').value = c?c.relacion:'HIJO'; document.getElementById('dcPaga').value = c&&c.paga_manual?c.paga:''; document.getElementById('dcCert').value = c?c.certificado_estudios_hasta||'':'';
   document.getElementById('dcBaja').style.display = c?'':'none'; document.getElementById('dcMsg').textContent='';
   dlgCarga.showModal();
 }
@@ -214,7 +216,7 @@ const editarCarga = (idU, idC) => abrirCarga(idU, D.titulares.find(x=>x.id_usuar
 async function guardarCarga(){
   const body = { id: Number(document.getElementById('dcId').value)||null, id_usuario: Number(document.getElementById('dcUsuario').value), nombres: document.getElementById('dcNombres').value,
     apellido_paterno: document.getElementById('dcPat').value, apellido_materno: document.getElementById('dcMat').value, rut: document.getElementById('dcRut').value,
-    fecha_nacimiento: document.getElementById('dcNac').value, sexo: document.getElementById('dcSexo').value, relacion: document.getElementById('dcRel').value, paga: document.getElementById('dcPaga').value||null };
+    fecha_nacimiento: document.getElementById('dcNac').value, sexo: document.getElementById('dcSexo').value, relacion: document.getElementById('dcRel').value, paga: document.getElementById('dcPaga').value||null, certificado_estudios_hasta: document.getElementById('dcCert').value||null };
   if (body.id) { const c = D.titulares.find(x=>x.id_usuario===body.id_usuario).cargas.find(k=>k.id===body.id); body.en_seguro = c ? !!c.en_seguro : true; }
   const j = await api('/carga','POST',body);
   if (!j.success) { document.getElementById('dcMsg').textContent = j.error; return; }
