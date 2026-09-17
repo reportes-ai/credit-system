@@ -1918,26 +1918,7 @@ async function datosSaldosAPagar() {
        3 meses, no si se le puede pagar. Con el filtro, la OP 26090202 (AUTOMOTORA MYS,
        activo=0) llegó sin cuenta ni banco, quedó FUERA del archivo TEF y siguió
        "enviada a pago" sin pagarse. Si un RUT tiene varias fichas, gana la que tiene cuenta y, entre esas, la activa. */
-    const sinDatos = rows.filter(r => r.rut_dealer && (!r.num_cuenta || !r.banco || !r.categoria || !r.correo || !r.tipo_cuenta));
-    if (sinDatos.length) {
-      const [ds] = await pool.query(
-        `SELECT rut, num_cuenta, banco, COALESCE(tipo_cuenta, cuenta_tipo) AS tipo_cuenta,
-                COALESCE(NULLIF(correo,''), NULLIF(cf_email,'')) AS correo,
-                COALESCE(NULLIF(categoria_asignada,''), NULLIF(categoria_propuesta,''), '') AS categoria,
-                COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre
-           FROM dealers ORDER BY (num_cuenta IS NOT NULL AND num_cuenta<>'') DESC, COALESCE(activo,1) DESC, id_dealer DESC`);
-      const mapa = new Map();
-      ds.forEach(d => { const k = normRutSaldo(d.rut); if (k && !mapa.has(k)) mapa.set(k, d); });
-      sinDatos.forEach(r => {
-        const d = mapa.get(normRutSaldo(r.rut_dealer)); if (!d) return;
-        if (!r.num_cuenta) r.num_cuenta = d.num_cuenta;
-        if (!r.banco) r.banco = d.banco;
-        if (!r.tipo_cuenta) r.tipo_cuenta = d.tipo_cuenta;
-        if (!r.correo) r.correo = d.correo;
-        if (!r.categoria) r.categoria = d.categoria;
-        if (!r.nombre_dealer) r.nombre_dealer = d.nombre;
-      });
-    }
+    await completarPagoPorRut(rows);
     // AUTOFIN: el monto a pagar/disponer = saldo + Transferencia + Limitación (la orden ya lo registra así).
     const fijos = await getFijosAutoFin();
     /* Fecha comprometida de pago según el SLA de la categoría del dealer
@@ -2390,6 +2371,32 @@ const updateFacturaComision = async (req, res) => {
   }
 };
 
+/* Respaldo por RUT de los datos de pago del dealer (motor único de Saldos y Comisiones a Pagar):
+   si el crédito no tiene id_dealer enlazado, o su ficha está sin cuenta, se completa desde OTRA
+   ficha del mismo RUT (gana la que tiene cuenta y, entre esas, la activa). Sin esto la fila llega
+   sin banco ni cuenta y queda FUERA del archivo TEF (ODP2610954 y otras, 17-09-2026). */
+async function completarPagoPorRut(rows) {
+  const sinDatos = rows.filter(r => r.rut_dealer && (!r.num_cuenta || !r.banco || !r.categoria || !r.correo || !r.tipo_cuenta));
+  if (!sinDatos.length) return;
+  const [ds] = await pool.query(
+    `SELECT rut, num_cuenta, banco, COALESCE(tipo_cuenta, cuenta_tipo) AS tipo_cuenta,
+            COALESCE(NULLIF(correo,''), NULLIF(cf_email,'')) AS correo,
+            COALESCE(NULLIF(categoria_asignada,''), NULLIF(categoria_propuesta,''), '') AS categoria,
+            COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre
+       FROM dealers ORDER BY (num_cuenta IS NOT NULL AND num_cuenta<>'') DESC, COALESCE(activo,1) DESC, id_dealer DESC`);
+  const mapa = new Map();
+  ds.forEach(d => { const k = normRutSaldo(d.rut); if (k && !mapa.has(k)) mapa.set(k, d); });
+  sinDatos.forEach(r => {
+    const d = mapa.get(normRutSaldo(r.rut_dealer)); if (!d) return;
+    if (!r.num_cuenta) r.num_cuenta = d.num_cuenta;
+    if (!r.banco) r.banco = d.banco;
+    if (!r.tipo_cuenta) r.tipo_cuenta = d.tipo_cuenta;
+    if (!r.correo) r.correo = d.correo;
+    if (!r.categoria) r.categoria = d.categoria;
+    if (!r.nombre_dealer) r.nombre_dealer = d.nombre;
+  });
+}
+
 /* ── GET /api/postventa/comisiones-a-pagar — ops con orden de pago de comisión emitida, no pagadas ── */
 /* Datos puros (sin HTTP): la cola de comisiones a pagar. La usan el endpoint
    y el correo diario de ODPs pendientes (un solo motor). */
@@ -2399,7 +2406,9 @@ async function datosComisionesAPagar() {
              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS nombre_dealer,
              c.id_financiera,
              COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
-             d.num_cuenta, d.banco,
+             d.num_cuenta, d.banco, COALESCE(d.tipo_cuenta, d.cuenta_tipo) AS tipo_cuenta,
+             COALESCE(NULLIF(d.correo,''), NULLIF(d.cf_email,'')) AS correo,
+             COALESCE(NULLIF(d.categoria_asignada,''), NULLIF(d.categoria_propuesta,''), '') AS categoria,
              /* GOTCHA TiDB: COALESCE(DATE, DATETIME) devuelve NULL aunque ambos
                 existan (medido 25-08-2026). Formatear a texto antes de mezclar. */
              COALESCE(DATE_FORMAT(fc.fecha_factura,'%Y-%m-%d'), DATE_FORMAT(efa.fecha,'%Y-%m-%d')) AS fecha_factura,
@@ -2440,6 +2449,7 @@ async function datosComisionesAPagar() {
               AND DATE(ep.fecha) < CURDATE())
       ORDER BY COALESCE(fc.fecha_factura, DATE(efa.fecha)) ASC, s.num_op ASC
     `);
+  await completarPagoPorRut(rows);
   /* Detalle de las operaciones de cada orden: la titular + las réplicas de su factura
      (Pato, 11-09-2026: en la pantalla se paga por ODP y factura, y al hacer click se ven las OP). */
   const porTitular = new Map(rows.map(r => [r.id, [{ num_op: r.num_op, id_financiera: r.id_financiera, ejecutivo: r.ejecutivo, comision: Number(r.comision) || 0, titular: 1 }]]));
