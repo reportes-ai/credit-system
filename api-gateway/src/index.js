@@ -42,6 +42,7 @@ require('../../shared/uptime');                         // monitor de uptime por
 require('../../shared/latido-host');                    // alerta si DOS procesos con motores laten contra la misma base (host_latidos)
 require('../../shared/vigia-relojes');                  // chequeo diario 08:00: relojes coherentes, sin marcas del futuro
 require('../../shared/vigia-mes-atribucion');           // cada hora: mes contable = mes de la fecha de curse (desde el corte); corrige y avisa
+require('../../shared/enlazar-dealer');                 // cada 6 h: créditos con RUT de dealer pero sin ficha enlazada (id_dealer) → los enlaza por RUT
 
 // ── Sanitizar errores 500: el detalle técnico va al log, nunca al cliente ──
 // (los 4xx pasan intactos: son mensajes de negocio como "mes cerrado".

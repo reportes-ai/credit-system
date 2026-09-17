@@ -276,6 +276,10 @@ async function crearCreditoDesdeCartas(c) {
   ]);
     return rIns;
   });
+  // El crédito nace con el RUT del dealer pero sin su ficha: se enlaza acá (motor único).
+  // Sin id_dealer, Post Venta y el TEF no encuentran banco ni cuenta (17-09-2026).
+  try { await require('../../../../shared/enlazar-dealer').enlazar({ idCredito: r.insertId }); }
+  catch (e) { console.error('[cartas enlazar dealer]', e.message); }
   // Parque/Calle: el LOCAL DE LA CARTA manda (multi-local v218.4) — la carta trae el
   // NOMBRE del parque donde cursó, y ese nombre es el que atribuye la comisión del
   // dealer y del parque (cartola del parque correcto). La ficha del dealer queda solo
