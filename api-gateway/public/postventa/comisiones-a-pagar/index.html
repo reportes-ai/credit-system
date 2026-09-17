@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Dealer a Pagar — AutoFácil</title>
-  <!-- v2.1 — TEF: cupo gratis del mes como badge dentro del botón. v2.0 — vista por ORDEN DE PAGO y factura (una fila por ODP con sus OP desplegables, monto de la ODP, popup de la orden y factura adjunta); nómina y TEF por ODP. v1.9 — TEF: generar el archivo registra el pago (y sus correos). v1.8 — botón TEF B.Internacional con el cupo gratis del mes. v1.7 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v2.2 — celdas apiladas para caber al 100% de zoom: 10 columnas → 8 (Dealer+RUT, Banco+cuenta), tabla de ancho fijo sin scroll horizontal (Pato 17-09-2026). v2.1 — TEF: cupo gratis del mes como badge dentro del botón. v2.0 — vista por ORDEN DE PAGO y factura (una fila por ODP con sus OP desplegables, monto de la ODP, popup de la orden y factura adjunta); nómina y TEF por ODP. v1.9 — TEF: generar el archivo registra el pago (y sus correos). v1.8 — botón TEF B.Internacional con el cupo gratis del mes. v1.7 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -53,6 +53,10 @@
     thead th { position:sticky; top:0; z-index:2; background:#0f2a52; color:#fff; font-size:.68rem; text-transform:uppercase; letter-spacing:.3px; padding:9px 10px; text-align:left; white-space:nowrap; }
     thead th.num { text-align:right; }
     tbody td { padding:7px 10px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+    /* Celdas apiladas (espejo de Otras Compras a Pagar): dato principal arriba, secundario abajo; tabla de ancho fijo */
+    .tbl-scroll > table { table-layout:fixed; width:100%; }
+    tbody td.corta { overflow:hidden; text-overflow:ellipsis; }
+    tbody td.corta .sub { font-size:.72rem; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; }
     tbody td.num { text-align:right; font-variant-numeric:tabular-nums; }
     tbody tr:hover { background:#f8fafc; }
     tbody tr.sel { background:#ecfdf3; }
@@ -168,22 +172,20 @@
       <table>
         <thead>
           <tr>
-            <th>Orden de Pago</th>
-            <th>Factura</th>
-            <th>Rut Dealer</th>
-            <th>Nombre Dealer</th>
-            <th>Cuenta Corriente</th>
-            <th>Banco</th>
-            <th style="text-align:center">Operaciones</th>
-            <th style="text-align:center">Días</th>
-            <th class="num">Monto a pagar</th>
-            <th style="text-align:center">Pagar</th>
+            <th style="width:11%">Orden de Pago</th>
+            <th style="width:14%">Factura</th>
+            <th style="width:25%">Dealer · RUT</th>
+            <th style="width:15%">Banco · Cuenta</th>
+            <th style="text-align:center;width:8%">Operaciones</th>
+            <th style="text-align:center;width:6%">Días</th>
+            <th class="num" style="width:11%">Monto a pagar</th>
+            <th style="text-align:center;width:10%">Pagar</th>
           </tr>
         </thead>
         <tbody id="body"></tbody>
         <tfoot>
           <tr>
-            <td colspan="8" style="text-align:right">TOTAL A PAGAR (visible)</td>
+            <td colspan="6" style="text-align:right">TOTAL A PAGAR (visible)</td>
             <td class="num" id="totSaldo">$0</td>
             <td></td>
           </tr>
@@ -242,7 +244,7 @@ function quienTxt(accion){
     DATA = (j.data || []).map(x => ({ ...x, pagado: !!Number(x.pagado_hoy), enviado: !!Number(x.enviado) }));
     colorearDias();
     render();
-  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="10" class="vacio">Error: ${e.message}</td></tr>`; }
+  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="8" class="vacio">Error: ${e.message}</td></tr>`; }
 })();
 
 setInterval(async () => {
@@ -303,18 +305,16 @@ function render(){
   document.getElementById('vacio').style.display='none';
   tb.innerHTML = rows.map(r => `
     <tr id="row_${r.id}" class="${r.pagado?'sel':(r.enviado?'row-enviado':(r.sel?'row-sel':''))}">
-      <td>${r.orden_id ? `<a href="javascript:void 0" onclick="verODP(${r.orden_id})" title="Ver la Orden de Pago" style="color:#0141A2;font-weight:800;text-decoration:none"><i class="bi bi-file-earmark-text me-1"></i>${escH(r.num_orden)}</a><div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_orden)}</div>` : (r.num_orden ? `<b>${escH(r.num_orden)}</b>` : '—')}</td>
-      <td>${r.numero_factura ? `${r.factura_doc_id ? `<a href="javascript:void 0" onclick="verFactura(${r.factura_doc_id})" title="Ver el documento adjunto" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-paperclip me-1"></i>` : '<b>'}${r.es_boleta?'Boleta':'Factura'} N° ${escH(r.numero_factura)}${r.factura_doc_id ? '</a>' : '</b>'}<div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_factura)}${r.monto_factura ? ' · ' + fmt(r.monto_factura) : ''}</div>` : fechaCL(r.fecha_factura)}</td>
-      <td>${escH(r.rut_dealer||'—')}</td>
-      <td>${escH(r.nombre_dealer||'—')}</td>
-      <td>${escH(r.num_cuenta||'—')}</td>
-      <td>${escH(r.banco||'—')}</td>
+      <td class="corta">${r.orden_id ? `<a href="javascript:void 0" onclick="verODP(${r.orden_id})" title="Ver la Orden de Pago" style="color:#0141A2;font-weight:800;text-decoration:none"><i class="bi bi-file-earmark-text me-1"></i>${escH(r.num_orden)}</a><div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_orden)}</div>` : (r.num_orden ? `<b>${escH(r.num_orden)}</b>` : '—')}</td>
+      <td class="corta">${r.numero_factura ? `${r.factura_doc_id ? `<a href="javascript:void 0" onclick="verFactura(${r.factura_doc_id})" title="Ver el documento adjunto" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-paperclip me-1"></i>` : '<b>'}${r.es_boleta?'Boleta':'Factura'} N° ${escH(r.numero_factura)}${r.factura_doc_id ? '</a>' : '</b>'}<div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_factura)}${r.monto_factura ? ' · ' + fmt(r.monto_factura) : ''}</div>` : fechaCL(r.fecha_factura)}</td>
+      <td class="corta" title="${escH(r.nombre_dealer||'')}">${escH(r.nombre_dealer||'—')}<div class="sub">${escH(r.rut_dealer||'—')}</div></td>
+      <td class="corta" title="${escH([r.banco,r.num_cuenta].filter(Boolean).join(' · '))}">${escH(r.banco||'—')}<div class="sub">${escH(r.num_cuenta||'—')}</div></td>
       <td style="text-align:center"><span class="ops-link" onclick="toggleDet(${r.id})" title="Ver las operaciones de esta orden"><i class="bi bi-chevron-down me-1" id="chev_${r.id}"></i>${r.n_ops||1} OP</span></td>
       <td style="text-align:center"><span class="dias-pill ${r.dcls}">${r.dias==null?'—':r.dias+' d'}</span></td>
       <td class="num">${fmt(montoP(r))}</td>
-      <td style="text-align:center">${celdaAccion(r)}</td>
+      <td style="text-align:center;white-space:normal">${celdaAccion(r)}</td>
     </tr>
-    <tr class="det" id="det_${r.id}" style="display:none"><td colspan="10">
+    <tr class="det" id="det_${r.id}" style="display:none"><td colspan="8">
       <table><thead><tr><th>N° OP</th><th>ID Financiera</th><th>Ejecutivo</th><th class="num">Comisión</th></tr></thead>
       <tbody>${(r.ops||[]).map(o => `<tr><td><b>${escH(o.num_op)}</b>${o.titular ? '' : ' <span style="font-size:.66rem;color:#94a3b8">(misma factura)</span>'}</td><td>${escH(o.id_financiera||'—')}</td><td>${escH(o.ejecutivo||'—')}</td><td class="num">${fmt(o.comision)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="3" style="text-align:right;position:static;font-size:.76rem">Total ODP${montoP(r) !== (r.ops||[]).reduce((a,o)=>a+o.comision,0) ? ' (incluye ajustes de cartola)' : ''}</td><td class="num" style="position:static">${fmt(montoP(r))}</td></tr></tfoot></table>

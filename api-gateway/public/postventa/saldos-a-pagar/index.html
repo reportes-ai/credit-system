@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v5.8 — TEF: cupo gratis del mes como badge dentro del botón. v5.7 — fix: el bloque TEF quedó dentro de <script src=timbre-pagado.js> y el navegador lo ignoraba (descargarTEF is not defined). v5.6 — TEF: generar el archivo registra el pago (y sus correos). v5.5 — botón TEF B.Internacional (archivo de transferencias masivas) con el cupo gratis del mes. v5.4 — "Vencen hoy/mañana" con letra chica (clase venc, como "Nada enviado a pago todavía"). v5.3 — cuadro Pendientes de pago: líneas "Vencen hoy" y "Vencen mañana" (ops X monto, según SLA). v5.2 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v5.9 — celdas apiladas para caber al 100% de zoom: 14 columnas → 8 (N° OP+ID financiera, Dealer+RUT+categoría, Banco+cuenta, Fondos+fecha de pago), tabla de ancho fijo sin scroll horizontal (Pato 17-09-2026). v5.8 — TEF: cupo gratis del mes como badge dentro del botón. v5.7 — fix: el bloque TEF quedó dentro de <script src=timbre-pagado.js> y el navegador lo ignoraba (descargarTEF is not defined). v5.6 — TEF: generar el archivo registra el pago (y sus correos). v5.5 — botón TEF B.Internacional (archivo de transferencias masivas) con el cupo gratis del mes. v5.4 — "Vencen hoy/mañana" con letra chica (clase venc, como "Nada enviado a pago todavía"). v5.3 — cuadro Pendientes de pago: líneas "Vencen hoy" y "Vencen mañana" (ops X monto, según SLA). v5.2 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -58,6 +58,10 @@
     thead th { position:sticky; top:0; z-index:2; background:#0f2a52; color:#fff; font-size:.68rem; text-transform:uppercase; letter-spacing:.3px; padding:9px 10px; text-align:left; white-space:nowrap; }
     thead th.num { text-align:right; }
     tbody td { padding:7px 10px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+    /* Celdas apiladas (espejo de Otras Compras a Pagar): dato principal arriba, secundario abajo; tabla de ancho fijo */
+    .tbl-scroll > table { table-layout:fixed; width:100%; }
+    tbody td.corta { overflow:hidden; text-overflow:ellipsis; }
+    tbody td.corta .sub { font-size:.72rem; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; }
     tbody td.num { text-align:right; font-variant-numeric:tabular-nums; }
     tbody tr:hover { background:#f8fafc; }
     tbody tr.sel { background:#ecfdf3; }
@@ -178,26 +182,20 @@
       <table>
         <thead>
           <tr>
-            <th>N° OP</th>
-            <th>Orden de Pago</th>
-            <th>ID Financiera</th>
-            <th>Financiera</th>
-            <th>Rut Dealer</th>
-            <th>Nombre Dealer</th>
-            <th>Categoría</th>
-            <th>Cuenta Corriente</th>
-            <th>Banco</th>
-            <th>Fondos Recibidos</th>
-            <th>Fecha de Pago</th>
-            <th style="text-align:center">Días</th>
-            <th class="num">Saldo Precio</th>
-            <th style="text-align:center">Pagar</th>
+            <th style="width:11%">Orden de Pago</th>
+            <th style="width:12%">N° OP · ID Financiera</th>
+            <th style="width:25%">Dealer · RUT · Categoría</th>
+            <th style="width:15%">Banco · Cuenta</th>
+            <th style="width:11%">Fondos · Fecha de pago</th>
+            <th style="text-align:center;width:6%">Días</th>
+            <th class="num" style="width:10%">Saldo Precio</th>
+            <th style="text-align:center;width:10%">Pagar</th>
           </tr>
         </thead>
         <tbody id="body"></tbody>
         <tfoot>
           <tr>
-            <td colspan="12" style="text-align:right">TOTAL SALDO PRECIO (visible)</td>
+            <td colspan="6" style="text-align:right">TOTAL SALDO PRECIO (visible)</td>
             <td class="num" id="totSaldo">$0</td>
             <td></td>
           </tr>
@@ -259,7 +257,7 @@ function quienTxt(accion){
     DATA = (j.data || []).map(x => ({ ...x, pagado: !!Number(x.pagado_hoy), enviado: !!Number(x.enviado) }));
     colorearDias();
     render();
-  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="14" class="vacio">Error: ${e.message}</td></tr>`; }
+  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="8" class="vacio">Error: ${e.message}</td></tr>`; }
 })();
 
 // Cada minuto: borrar al cambiar de día (00:00 Chile) y sincronizar el monto
@@ -322,20 +320,14 @@ function render(){
   document.getElementById('vacio').style.display='none';
   tb.innerHTML = rows.map(r => `
     <tr id="row_${r.id}" class="${r.pagado?'sel':(r.enviado?'row-enviado':(r.sel?'row-sel':''))}">
-      <td><b>${escH(r.num_op)}</b></td>
-      <td>${r.orden_id?`<a href="javascript:void 0" onclick="verODP(${r.orden_id})" title="Ver la Orden de Pago (datos de transferencia)" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-file-earmark-text"></i> ${escH(r.num_orden||'Ver')}</a>${r.fecha_orden?`<div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_orden)}</div>`:''}`:'—'}</td>
-      <td>${escH(r.id_financiera||'—')}</td>
-      <td>${escH(r.financiera||'—')}</td>
-      <td>${escH(r.rut_dealer||'—')}</td>
-      <td>${escH(r.nombre_dealer||'—')}</td>
-      <td>${escH(r.categoria||'—')}</td>
-      <td>${escH(r.num_cuenta||'—')}</td>
-      <td>${escH(r.banco||'—')}</td>
-      <td>${fechaCL(r.fecha_fondos)}</td>
-      <td>${r.fecha_pago_sla ? r.fecha_pago_sla.split('-').reverse().join('-') : '—'}</td>
+      <td class="corta">${r.orden_id?`<a href="javascript:void 0" onclick="verODP(${r.orden_id})" title="Ver la Orden de Pago (datos de transferencia)" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-file-earmark-text"></i> ${escH(r.num_orden||'Ver')}</a>${r.fecha_orden?`<div class="sub">${fechaCL(r.fecha_orden)}</div>`:''}`:'—'}</td>
+      <td class="corta" title="${escH([r.num_op,r.id_financiera,r.financiera].filter(Boolean).join(' · '))}"><b>${escH(r.num_op)}</b><div class="sub">${escH([r.id_financiera,r.financiera].filter(Boolean).join(' · ')||'—')}</div></td>
+      <td class="corta" title="${escH(r.nombre_dealer||'')}">${escH(r.nombre_dealer||'—')}<div class="sub">${escH([r.rut_dealer,r.categoria].filter(Boolean).join(' · ')||'—')}</div></td>
+      <td class="corta" title="${escH([r.banco,r.num_cuenta].filter(Boolean).join(' · '))}">${escH(r.banco||'—')}<div class="sub">${escH(r.num_cuenta||'—')}</div></td>
+      <td class="corta" title="Fondos recibidos · fecha de pago según SLA">${fechaCL(r.fecha_fondos)}<div class="sub">Pago ${r.fecha_pago_sla ? r.fecha_pago_sla.split('-').reverse().join('-') : '—'}</div></td>
       <td style="text-align:center"><span class="dias-pill ${r.dcls}" title="Respecto de la fecha de pago SLA (categoría ${escH(r.categoria||'SOCIO')})">${r.dias_sla==null?'—':(r.dias_sla>0?'+':'')+r.dias_sla+' d'}</span></td>
       <td class="num">${fmt(montoP(r))}${esAutoFinRow(r)?` <span title="Saldo ${fmt(r.saldo_precio)} + Transferencia + Limitación" style="color:#0141A2;cursor:help">ⓘ</span>`:''}</td>
-      <td style="text-align:center">${celdaAccion(r)}</td>
+      <td style="text-align:center;white-space:normal">${celdaAccion(r)}</td>
     </tr>`).join('');
   recalc();
 }
