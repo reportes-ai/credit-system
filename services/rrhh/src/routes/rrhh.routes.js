@@ -195,6 +195,16 @@ router.get('/remuneraciones/anticipos/:id/tef.xlsx',   verifyToken, requireFunc(
 router.post('/remuneraciones/anticipos/:id/correos',   verifyToken, requireFunc('rh_remuneraciones'), anticipos.reenviarCorreos);
 router.post('/remuneraciones/anticipos/:id/anular',    verifyToken, requireFunc('rh_remuneraciones'), anticipos.anular);
 // Nómina EDENRED (tarjeta alimentación, por día hábil; no va en la liquidación) — Pato 16-09-2026
+const seguro = require('../controllers/seguro-salud.controller');
+router.get('/remuneraciones/seguro',                  verifyToken, requireFunc('rh_remuneraciones'), seguro.getMes);
+router.get('/remuneraciones/seguro/nomina.xlsx',      verifyToken, requireFunc('rh_remuneraciones'), seguro.nominaXlsx);
+router.put('/remuneraciones/seguro/param',            verifyToken, requireFunc('rh_remuneraciones'), seguro.putParam);
+router.put('/remuneraciones/seguro/titular',          verifyToken, requireFunc('rh_remuneraciones'), seguro.putTitular);
+router.post('/remuneraciones/seguro/carga',           verifyToken, requireFunc('rh_remuneraciones'), seguro.guardarCarga);
+router.put('/remuneraciones/seguro/carga/seleccion',  verifyToken, requireFunc('rh_remuneraciones'), seguro.seleccionCarga);
+router.delete('/remuneraciones/seguro/carga/:id',     verifyToken, requireFunc('rh_remuneraciones'), seguro.bajaCarga);
+router.post('/remuneraciones/seguro/generar',         verifyToken, requireFunc('rh_remuneraciones'), seguro.generar);
+router.post('/remuneraciones/seguro/anular',          verifyToken, requireFunc('rh_remuneraciones'), seguro.anular);
 const edenred = require('../controllers/edenred.controller');
 router.get('/remuneraciones/edenred',            verifyToken, requireFunc('rh_remuneraciones'), edenred.getMes);
 router.get('/remuneraciones/edenred/resumen',    verifyToken, requireFunc('rh_remuneraciones'), edenred.resumen);

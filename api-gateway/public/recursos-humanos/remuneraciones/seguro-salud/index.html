@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seguro de Salud — AutoFácil</title>
+  <!-- v1.0 — Seguro Complementario de Salud (MetLife): nómina mensual de titulares y cargas con casillas de selección, registro de cargas, quién paga (empresa según fecha de corte de contratación / empleado con descuento en la liquidación), edad máxima de hijos, primas paramétricas con vigencia, generar congela el mes y crea los descuentos, Excel para la aseguradora (Pato 17-09-2026) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:28px 36px; max-width:1250px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:18px; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 12px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:7px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    tr.tit td { background:#fbfdff; font-weight:600; } tr.car td { color:#475569; } tr.car td:first-child { padding-left:40px; }
+    tr.fuera td { opacity:.5; }
+    .text-right { text-align:right; } .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .pill { border-radius:9px; padding:2px 8px; font-size:.68rem; font-weight:700; white-space:nowrap; }
+    .card-kpi { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:12px 20px; }
+    .card-kpi .v { font-family:Consolas,monospace; font-weight:800; font-size:1.1rem; color:var(--navy); }
+    .card-kpi .l { font-size:.7rem; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
+    .foot { background:#f7f9fc; border-left:4px solid #0255c5; border-radius:10px; padding:12px 18px; font-size:.76rem; color:#475569; line-height:1.8; }
+    .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
+    dialog { border:none; border-radius:16px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.3); width:560px; max-width:96%; }
+    dialog::backdrop { background:rgba(15,23,42,.45); }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Recursos Humanos', href:'/recursos-humanos/' }, { label:'Remuneraciones', href:'/recursos-humanos/remuneraciones/' }, { label:'Seguro de Salud', icon:'bi-heart-pulse', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-heart-pulse"></i><div><h2>Seguro Complementario de Salud</h2><p>Nómina mensual de asegurados: el titular lo paga AutoFácil; las cargas las paga la empresa (contratados hasta la fecha de corte) o el empleado, con descuento en su liquidación. Marca quiénes van en la nómina del mes.</p></div></div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" id="tabM" onclick="tab('M');return false"><i class="bi bi-people me-1"></i>Nómina del mes</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabH" onclick="tab('H');return false"><i class="bi bi-clock-history me-1"></i>Historial</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabP" onclick="tab('P');return false"><i class="bi bi-sliders me-1"></i>Parámetros</a></li>
+  </ul>
+
+  <div id="secM">
+    <div class="d-flex gap-3 align-items-end mb-3 flex-wrap">
+      <div><label class="form-label small fw-semibold mb-1">Mes</label><input type="month" id="fMes" class="form-control form-control-sm" onchange="cargar()"></div>
+      <div class="form-check mb-1"><input type="checkbox" class="form-check-input" id="fSolo" onchange="render()"><label class="form-check-label small" for="fSolo">Solo asegurados</label></div>
+      <span id="lblEstado"></span>
+      <div class="ms-auto d-flex gap-2">
+        <button class="btn btn-sm btn-primary" id="btnGenerar" onclick="generar()"><i class="bi bi-lock me-1"></i>Generar nómina</button>
+        <button class="btn btn-sm btn-success" id="btnXls" onclick="descargar()" style="display:none"><i class="bi bi-file-earmark-excel me-1"></i>Nómina para la aseguradora</button>
+        <button class="btn btn-sm btn-outline-danger" id="btnAnular" onclick="anular()" style="display:none"><i class="bi bi-x-circle me-1"></i>Anular</button>
+      </div>
+    </div>
+    <div class="d-flex gap-3 mb-3 flex-wrap" id="kpis"></div>
+    <div id="avisos"></div>
+    <div class="panel" style="padding:0;overflow:auto">
+      <table><thead><tr><th style="width:36px"></th><th>Asegurado</th><th>RUT</th><th>Relación</th><th>Nacimiento · edad</th><th>Paga</th><th class="text-right">Prima</th><th></th></tr></thead>
+      <tbody id="tb"><tr><td colspan="8" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div id="secH" style="display:none">
+    <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Mes</th><th class="text-right">Titulares</th><th class="text-right">Cargas</th><th class="text-right">Descontado a empleados</th><th class="text-right">Total nómina</th><th>Generada</th></tr></thead><tbody id="tbHist"></tbody></table></div>
+  </div>
+
+  <div id="secP" style="display:none">
+    <div class="panel">
+      <div class="fw-bold mb-2"><i class="bi bi-sliders me-1"></i>Nuevo parámetro (rige desde el mes indicado; los meses ya generados no se recalculan)</div>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Desde mes</label><input type="month" id="pMes" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Aseguradora</label><input id="pAseg" class="form-control form-control-sm"></div>
+        <div class="col-md-1"><label class="form-label small fw-semibold mb-1">Moneda</label><select id="pMon" class="form-select form-select-sm"><option>UF</option><option value="CLP">$</option></select></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Prima titular</label><input id="pTit" class="form-control form-control-sm text-end" inputmode="decimal"></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Prima por carga</label><input id="pCar" class="form-control form-control-sm text-end" inputmode="decimal"></div>
+        <div class="col-md-1"><label class="form-label small fw-semibold mb-1" title="Los hijos mayores de esta edad salen solos de la nómina">Edad máx. hijos</label><input id="pEdad" type="number" class="form-control form-control-sm text-end"></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1" title="A quienes ingresaron hasta esta fecha, AutoFácil les paga también el seguro de sus cargas. Después, la carga la paga el empleado.">Empresa paga cargas de contratados hasta</label><input id="pCorte" type="date" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" onclick="guardarParam()"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+      </div>
+    </div>
+    <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Rige desde</th><th>Aseguradora</th><th class="text-right">Titular</th><th class="text-right">Carga</th><th>Hijos hasta</th><th>Empresa paga cargas hasta</th><th>Registrado por</th></tr></thead><tbody id="tbParam"></tbody></table></div>
+  </div>
+
+  <div class="foot mt-3"><b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+    <ul class="mb-0">
+      <li><b>Casilla del titular</b> → si el colaborador va en la nómina del seguro (se guarda en su <a href="/recursos-humanos/colaboradores/">ficha</a>). Al desmarcarlo salen también sus cargas.</li>
+      <li><b>Cargas</b> (botón <i class="bi bi-person-plus"></i>) → registro único de los beneficiarios del seguro. No son los contadores de cargas de la asignación familiar de la ficha.</li>
+      <li><b>Paga: Empleado</b> → al generar la nómina se crea un descuento en <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a> que sale en la <a href="/recursos-humanos/remuneraciones/liquidaciones/">liquidación</a> de ese mes. <b>Paga: Empresa</b> → costo de AutoFácil, sin descuento.</li>
+      <li><b>Empresa paga cargas de contratados hasta</b> → define quién paga por defecto según la fecha de ingreso del colaborador; se puede corregir carga por carga.</li>
+      <li><b>Edad máxima de hijos</b> → la carga que la supera queda marcada y fuera de la nómina (la aseguradora la rechaza).</li>
+      <li><b>Primas</b> (UF o pesos; la UF es la del día 1 del mes) → monto de la nómina y de los descuentos desde el mes indicado.</li>
+      <li><b>Generar nómina</b> → congela el mes; el pago a la aseguradora se emite en <a href="/ordenes-pago/">Órdenes de Pago</a> con el Excel adjunto. <b>Anular</b> borra la nómina y anula los descuentos del mes (auditado).</li>
+    </ul>
+  </div>
+</div>
+
+<dialog id="dlgCarga">
+  <div style="padding:18px 22px;border-bottom:1px solid #e5e7eb;font-weight:700;color:#0141A2"><i class="bi bi-person-plus me-1"></i><span id="dcTitulo">Carga</span></div>
+  <div style="padding:16px 22px" class="row g-2">
+    <input type="hidden" id="dcId"><input type="hidden" id="dcUsuario">
+    <div class="col-md-12"><label class="form-label small fw-semibold mb-1">Nombres</label><input id="dcNombres" class="form-control form-control-sm"></div>
+    <div class="col-md-6"><label class="form-label small fw-semibold mb-1">Apellido paterno</label><input id="dcPat" class="form-control form-control-sm"></div>
+    <div class="col-md-6"><label class="form-label small fw-semibold mb-1">Apellido materno</label><input id="dcMat" class="form-control form-control-sm"></div>
+    <div class="col-md-4"><label class="form-label small fw-semibold mb-1">RUT</label><input id="dcRut" class="form-control form-control-sm"></div>
+    <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Fecha de nacimiento</label><input id="dcNac" type="date" class="form-control form-control-sm"></div>
+    <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Sexo</label><select id="dcSexo" class="form-select form-select-sm"><option value="">—</option><option value="F">Femenino</option><option value="M">Masculino</option></select></div>
+    <div class="col-md-6"><label class="form-label small fw-semibold mb-1">Relación</label><select id="dcRel" class="form-select form-select-sm"></select></div>
+    <div class="col-md-6"><label class="form-label small fw-semibold mb-1">Quién paga</label><select id="dcPaga" class="form-select form-select-sm"><option value="">Según fecha de contratación</option><option value="EMPRESA">Empresa</option><option value="EMPLEADO">Empleado (descuento)</option></select></div>
+    <div class="col-12"><span id="dcMsg" class="small text-danger"></span></div>
+  </div>
+  <div style="padding:12px 22px;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn btn-sm btn-outline-danger me-auto" id="dcBaja" onclick="bajaCarga()" style="display:none"><i class="bi bi-trash me-1"></i>Dar de baja</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="dlgCarga.close()">Cancelar</button>
+    <button class="btn btn-sm btn-primary" onclick="guardarCarga()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+  </div>
+</dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const H = { Authorization:'Bearer '+sessionStorage.getItem('token'), 'Content-Type':'application/json' };
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const fmt = v => Math.round(Number(v)||0).toLocaleString('es-CL');
+const dmy = f => f ? String(f).slice(0,10).split('-').reverse().join('-') : '—';
+const MESES=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesTxt = m => m ? (MESES[Number(String(m).slice(5,7))]||m)+' '+String(m).slice(0,4) : '';
+const dlgCarga = document.getElementById('dlgCarga');
+let D = null;
+const fMes = document.getElementById('fMes');
+fMes.value = new Date().toISOString().slice(0,7);
+const api = async (url, method, body) => (await fetch('/api/rrhh/remuneraciones/seguro'+url, { method: method||'GET', headers:H, body: body?JSON.stringify(body):undefined })).json();
+
+function tab(t){ ['M','H','P'].forEach(x=>{ document.getElementById('sec'+x).style.display = x===t?'':'none'; document.getElementById('tab'+x).classList.toggle('active', x===t); }); }
+
+async function cargar(){
+  const j = await api('?mes='+fMes.value); if (!j.success) { alert(j.error); return; }
+  D = j.data; render();
+}
+function pillPaga(p){ return p==='EMPLEADO' ? '<span class="pill" style="background:#fef3c7;color:#92400e">EMPLEADO · descuento</span>' : '<span class="pill" style="background:#dcfce7;color:#15803d">EMPRESA</span>'; }
+
+function render(){
+  const p = D.param||{}, T = D.totales||{}, mon = p.moneda==='UF' ? 'UF ' : '$';
+  document.getElementById('lblEstado').innerHTML = D.generada
+    ? `<span class="pill" style="background:#dcfce7;color:#15803d"><i class="bi bi-lock-fill"></i> NÓMINA GENERADA</span> <span class="small text-muted">por ${esc(D.generado_por||'')} el ${String(D.generado_at||'').slice(0,10)}</span>`
+    : `<span class="pill" style="background:#fef9c3;color:#854d0e">VISTA PREVIA — marca quiénes van y genera</span>`;
+  document.getElementById('btnGenerar').style.display = D.generada?'none':'';
+  document.getElementById('btnXls').style.display = D.generada?'':'none';
+  document.getElementById('btnAnular').style.display = D.generada?'':'none';
+  const sinPrima = !Number(p.prima_titular) && !Number(p.prima_carga);
+  document.getElementById('avisos').innerHTML = sinPrima ? `<div class="panel" style="border-left:4px solid #dc2626;padding:10px 16px;font-size:.84rem"><i class="bi bi-exclamation-triangle text-danger me-1"></i>Faltan las <b>primas</b>: cárgalas en la pestaña <a href="#" onclick="tab('P');return false">Parámetros</a> (titular y por carga, en UF o pesos). Sin ellas la nómina sale en $0.</div>` : '';
+
+  if (D.generada) {
+    const n = D.nomina||[], tot = n.reduce((s,r)=>s+r.prima,0), emp = n.filter(r=>r.paga==='EMPLEADO').reduce((s,r)=>s+r.prima,0);
+    document.getElementById('kpis').innerHTML = kpis(n.filter(r=>!r.id_carga).length, n.filter(r=>r.id_carga).length, tot-emp, emp, tot, p, n[0]?.valor_uf);
+    document.getElementById('tb').innerHTML = n.map(r=>`<tr class="${r.id_carga?'car':'tit'}"><td></td><td>${esc(r.nombre)}</td><td>${esc(r.rut||'')}</td><td>${esc(r.relacion)}</td><td>${dmy(r.fecha_nacimiento)}</td><td>${pillPaga(r.paga)}</td><td class="text-right num">$${fmt(r.prima)}</td><td></td></tr>`).join('');
+  } else {
+    document.getElementById('kpis').innerHTML = kpis(T.titulares, T.cargas, T.empresa, T.empleado, T.total, p, D.valor_uf);
+    const solo = document.getElementById('fSolo').checked;
+    document.getElementById('tb').innerHTML = (D.titulares||[]).filter(t => !solo || t.seguro_salud).map(t => `
+      <tr class="tit ${t.seguro_salud?'':'fuera'}">
+        <td><input type="checkbox" class="form-check-input" ${t.seguro_salud?'checked':''} onchange="marcarTitular(${t.id_usuario},this.checked)" title="Va en la nómina del seguro"></td>
+        <td>${esc(t.nombre)}${t.baja?' <span class="pill" style="background:#111827;color:#fff">CONTRATO TERMINADO</span>':''}<div class="small text-muted fw-normal">Ingreso ${dmy(t.fecha_ingreso)}</div></td>
+        <td>${esc(t.rut||'')}</td><td>TITULAR</td><td>${dmy(t.fecha_nacimiento)}</td><td>${pillPaga('EMPRESA')}</td>
+        <td class="text-right num">$${fmt(t.prima)}</td>
+        <td class="text-right"><button class="btn btn-sm btn-outline-primary py-0" onclick="nuevaCarga(${t.id_usuario})" title="Agregar carga"><i class="bi bi-person-plus"></i></button></td>
+      </tr>` + t.cargas.map(c => `
+      <tr class="car ${c.incluida?'':'fuera'}">
+        <td><input type="checkbox" class="form-check-input" ${c.en_seguro?'checked':''} ${t.seguro_salud?'':'disabled'} onchange="marcarCarga(${c.id},this.checked)"></td>
+        <td><i class="bi bi-arrow-return-right me-1 text-muted"></i>${esc(c.nombre)}${c.excede_edad?` <span class="pill" style="background:#fee2e2;color:#b91c1c" title="La aseguradora no acepta hijos sobre ${p.edad_max_hijo} años">SUPERA ${p.edad_max_hijo} AÑOS — fuera</span>`:''}</td>
+        <td>${esc(c.rut||'')}</td><td>${esc(c.relacion)}</td><td>${dmy(c.fecha_nacimiento)}${c.edad!=null?' · '+c.edad+' años':''}</td>
+        <td><select class="form-select form-select-sm py-0" style="width:auto;display:inline-block;font-size:.76rem" onchange="cambiarPaga(${c.id},this.value)" title="${c.paga_manual?'Definido a mano':'Según la fecha de ingreso del titular'}">
+          <option value="" ${c.paga_manual?'':'selected'}>Auto: ${c.paga_manual?'—':c.paga}</option><option value="EMPRESA" ${c.paga_manual&&c.paga==='EMPRESA'?'selected':''}>EMPRESA</option><option value="EMPLEADO" ${c.paga_manual&&c.paga==='EMPLEADO'?'selected':''}>EMPLEADO</option></select></td>
+        <td class="text-right num">$${fmt(c.prima)}</td>
+        <td class="text-right"><a href="#" onclick="editarCarga(${t.id_usuario},${c.id});return false" title="Editar carga"><i class="bi bi-pencil"></i></a></td>
+      </tr>`).join('')).join('') || '<tr><td colspan="8" class="text-center text-muted py-3">Sin colaboradores</td></tr>';
+  }
+  document.getElementById('tbHist').innerHTML = (D.historial||[]).map(h=>`<tr><td>${mesTxt(h.mes)}</td><td class="text-right">${h.titulares}</td><td class="text-right">${h.cargas}</td><td class="text-right">$${fmt(h.empleado)}</td><td class="text-right num">$${fmt(h.total)}</td><td>${String(h.generado_at||'').slice(0,10)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted text-center py-2">Aún no hay nóminas generadas</td></tr>';
+  document.getElementById('tbParam').innerHTML = (D.params||[]).map(x=>{ const m = x.moneda==='UF'?'UF ':'$'; return `<tr><td>${esc(x.mes_desde)}</td><td>${esc(x.aseguradora)}</td><td class="text-right num">${m}${Number(x.prima_titular).toLocaleString('es-CL')}</td><td class="text-right num">${m}${Number(x.prima_carga).toLocaleString('es-CL')}</td><td>${x.edad_max_hijo} años</td><td>${dmy(x.corte_cargas_empresa)}</td><td>${esc(x.creado_por||'')}</td></tr>`; }).join('') || '<tr><td colspan="7" class="text-muted text-center py-2">Sin parámetros: carga el primero</td></tr>';
+  if (!document.getElementById('pMes').value) {
+    document.getElementById('pMes').value = fMes.value; document.getElementById('pAseg').value = p.aseguradora||'METLIFE'; document.getElementById('pMon').value = p.moneda||'UF';
+    document.getElementById('pTit').value = p.prima_titular ? String(p.prima_titular).replace('.',',') : ''; document.getElementById('pCar').value = p.prima_carga ? String(p.prima_carga).replace('.',',') : '';
+    document.getElementById('pEdad').value = p.edad_max_hijo||23; document.getElementById('pCorte').value = p.corte_cargas_empresa||'';
+  }
+  document.getElementById('dcRel').innerHTML = (D.relaciones||[]).map(r=>`<option>${r}</option>`).join('');
+}
+function kpis(tit, car, empresa, empleado, total, p, uf){
+  const m = p.moneda==='UF';
+  return `<div class="card-kpi"><div class="v">${tit||0}</div><div class="l">Titulares</div></div>
+    <div class="card-kpi"><div class="v">${car||0}</div><div class="l">Cargas</div></div>
+    <div class="card-kpi"><div class="v">${m?'UF ':'$'}${Number(p.prima_titular||0).toLocaleString('es-CL')} · ${m?'UF ':'$'}${Number(p.prima_carga||0).toLocaleString('es-CL')}</div><div class="l">Prima titular · carga${m&&uf?' · UF $'+fmt(uf):''}</div></div>
+    <div class="card-kpi"><div class="v">$${fmt(empresa)}</div><div class="l">Costo AutoFácil</div></div>
+    <div class="card-kpi"><div class="v">$${fmt(empleado)}</div><div class="l">Descuento a empleados</div></div>
+    <div class="card-kpi"><div class="v">$${fmt(total)}</div><div class="l">Total nómina ${esc(p.aseguradora||'')}</div></div>`;
+}
+
+async function marcarTitular(id, v){ const j = await api('/titular','PUT',{ id_usuario:id, seguro_salud:v }); if (!j.success) alert(j.error); cargar(); }
+async function marcarCarga(id, v){ const j = await api('/carga/seleccion','PUT',{ id, en_seguro:v }); if (!j.success) alert(j.error); cargar(); }
+async function cambiarPaga(id, v){ const j = await api('/carga/seleccion','PUT',{ id, paga:v||null }); if (!j.success) alert(j.error); cargar(); }
+
+function abrirCarga(idU, c){
+  const t = D.titulares.find(x=>x.id_usuario===idU);
+  document.getElementById('dcTitulo').textContent = (c?'Editar carga de ':'Nueva carga de ')+(t?t.nombre:'');
+  document.getElementById('dcId').value = c?c.id:''; document.getElementById('dcUsuario').value = idU;
+  document.getElementById('dcNombres').value = c?c.nombres||'':''; document.getElementById('dcPat').value = c?c.apellido_paterno||'':''; document.getElementById('dcMat').value = c?c.apellido_materno||'':'';
+  document.getElementById('dcRut').value = c?c.rut||'':''; document.getElementById('dcNac').value = c?c.fecha_nacimiento||'':''; document.getElementById('dcSexo').value = c?c.sexo||'':'';
+  document.getElementById('dcRel').value = c?c.relacion:'HIJO'; document.getElementById('dcPaga').value = c&&c.paga_manual?c.paga:'';
+  document.getElementById('dcBaja').style.display = c?'':'none'; document.getElementById('dcMsg').textContent='';
+  dlgCarga.showModal();
+}
+const nuevaCarga = idU => abrirCarga(idU, null);
+const editarCarga = (idU, idC) => abrirCarga(idU, D.titulares.find(x=>x.id_usuario===idU).cargas.find(c=>c.id===idC));
+async function guardarCarga(){
+  const body = { id: Number(document.getElementById('dcId').value)||null, id_usuario: Number(document.getElementById('dcUsuario').value), nombres: document.getElementById('dcNombres').value,
+    apellido_paterno: document.getElementById('dcPat').value, apellido_materno: document.getElementById('dcMat').value, rut: document.getElementById('dcRut').value,
+    fecha_nacimiento: document.getElementById('dcNac').value, sexo: document.getElementById('dcSexo').value, relacion: document.getElementById('dcRel').value, paga: document.getElementById('dcPaga').value||null };
+  if (body.id) { const c = D.titulares.find(x=>x.id_usuario===body.id_usuario).cargas.find(k=>k.id===body.id); body.en_seguro = c ? !!c.en_seguro : true; }
+  const j = await api('/carga','POST',body);
+  if (!j.success) { document.getElementById('dcMsg').textContent = j.error; return; }
+  dlgCarga.close(); cargar();
+}
+async function bajaCarga(){
+  if (!confirm('¿Dar de baja esta carga? Sale del seguro; las nóminas ya generadas la conservan.')) return;
+  const j = await (await fetch('/api/rrhh/remuneraciones/seguro/carga/'+document.getElementById('dcId').value,{ method:'DELETE', headers:H })).json();
+  if (!j.success) { document.getElementById('dcMsg').textContent = j.error; return; }
+  dlgCarga.close(); cargar();
+}
+async function generar(){
+  const T = D.totales;
+  if (!confirm(`¿Generar la nómina del seguro de ${mesTxt(fMes.value)}?\n\n${T.titulares} titulares + ${T.cargas} cargas = $${fmt(T.total)}\nCosto AutoFácil: $${fmt(T.empresa)}\nDescuento a empleados: $${fmt(T.empleado)} (sale en la liquidación de ${mesTxt(fMes.value)})\n\nEl mes queda congelado.`)) return;
+  const j = await api('/generar','POST',{ mes:fMes.value }); if (!j.success) return alert(j.error);
+  cargar();
+}
+async function anular(){
+  const motivo = prompt('Motivo para anular la nómina (también anula los descuentos de cargas del mes):'); if (motivo==null) return;
+  const j = await api('/anular','POST',{ mes:fMes.value, motivo }); if (!j.success) return alert(j.error);
+  cargar();
+}
+async function descargar(){
+  const r = await fetch('/api/rrhh/remuneraciones/seguro/nomina.xlsx?mes='+fMes.value,{headers:H});
+  if (!r.ok) { const j = await r.json().catch(()=>({})); return alert(j.error||'No se pudo descargar'); }
+  const b = await r.blob(); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `nomina-seguro-salud-${fMes.value}.xlsx`; a.click();
+}
+async function guardarParam(){
+  const n = id => Number(String(document.getElementById(id).value).replace(/\./g,'').replace(',','.'));
+  const body = { mes_desde: document.getElementById('pMes').value, aseguradora: document.getElementById('pAseg').value, moneda: document.getElementById('pMon').value,
+    prima_titular: n('pTit'), prima_carga: n('pCar'), edad_max_hijo: Number(document.getElementById('pEdad').value), corte_cargas_empresa: document.getElementById('pCorte').value||null };
+  const j = await api('/param','PUT',body); if (!j.success) return alert(j.error);
+  document.getElementById('pMes').value=''; cargar();
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
