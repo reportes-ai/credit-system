@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Otras Compras a Pagar — AutoFácil</title>
+  <!-- v1.1 — columnas Proveedor, Concepto y Documento más angostas (elipsis + título al pasar el mouse) para que la tabla quepa al 100% de zoom; se quitan los dos cuadros indicadores de propuesta de la columna Pagar (Pato 17-09-2026) -->
   <!-- v1.0 — cola de pago de las ODP a proveedores (origen GENERAL): mismo flujo que Saldos Precios a Pagar (fondos, propuestas, Enviar a Pago, nomina, Confirmar pago via pagarOrden con caja activa) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
@@ -43,6 +44,7 @@
     thead th { position:sticky; top:0; z-index:2; background:#0f2a52; color:#fff; font-size:.68rem; text-transform:uppercase; letter-spacing:.3px; padding:9px 10px; text-align:left; white-space:nowrap; }
     thead th.num { text-align:right; }
     tbody td { padding:7px 10px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+    tbody td.corta { overflow:hidden; text-overflow:ellipsis; }
     tbody td.num { text-align:right; font-variant-numeric:tabular-nums; }
     tbody tr:hover { background:#f8fafc; }
     tbody tr.row-sel { background:#ecfdf3; }
@@ -221,8 +223,6 @@ function celdaAccion(r){
   }
   const dis = CAN.seleccionar ? '' : 'disabled title="Necesitas el permiso Seleccionar Compras a Pagar"';
   return `<span class="pagar-cell">
-    <span class="indbox" id="indmax_${r.id}" title="En propuesta Máximo de órdenes"></span>
-    <span class="indbox" id="indant_${r.id}" title="En propuesta Prioriza antigüedad"></span>
     <input type="checkbox" class="selchk" ${r.sel?'checked':''} ${dis} onchange="toggleSel(${r.id},this)">
   </span>`;
 }
@@ -235,11 +235,11 @@ function render(){
   tb.innerHTML = rows.map(r => `
     <tr id="row_${r.id}" class="${r.pagado?'sel':(r.enviado?'row-enviado':(r.sel?'row-sel':''))}">
       <td><a href="javascript:void 0" onclick="verODP(${r.id})" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-file-earmark-text"></i> ${escH(r.numero)}</a><div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_orden)}</div></td>
-      <td>${escH(r.proveedor_nombre||'—')}</td>
+      <td class="corta" style="max-width:170px" title="${escH(r.proveedor_nombre||'')}">${escH(r.proveedor_nombre||'—')}</td>
       <td>${escH(r.proveedor_rut||'—')}</td>
-      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${escH(r.concepto||'')}">${escH(r.concepto||'—')}</td>
+      <td class="corta" style="max-width:200px" title="${escH(r.concepto||'')}">${escH(r.concepto||'—')}</td>
       <td>${escH(r.categoria||'—')}${r.id_pago_recurrente?' <span title="Generada automáticamente por Tesorería → Pagos Recurrentes" style="background:#ede9fe;color:#5b21b6;border-radius:8px;padding:1px 7px;font-size:.62rem;font-weight:800"><i class="bi bi-arrow-repeat"></i> Recurrente</span>':''}</td>
-      <td>${escH([r.tipo_documento, r.numero_documento?('N° '+r.numero_documento):''].filter(Boolean).join(' ')||'—')}</td>
+      <td class="corta" style="max-width:120px" title="${escH([r.tipo_documento, r.numero_documento?('N° '+r.numero_documento):''].filter(Boolean).join(' '))}">${escH([r.tipo_documento, r.numero_documento?('N° '+r.numero_documento):''].filter(Boolean).join(' ')||'—')}</td>
       <td>${escH(r.numero_cuenta||'—')}</td>
       <td>${escH(r.banco||'—')}</td>
       <td>${escH(r.metodo_pago||'—')}</td>
