@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Otras Compras a Pagar — AutoFácil</title>
+  <!-- v1.2 — tabla en dos líneas por celda para caber al 100% de zoom: Proveedor+RUT, Concepto+Categoría, Banco+Cuenta+Método (12 columnas → 8); tabla con ancho fijo al contenedor, sin scroll horizontal (Pato 17-09-2026) -->
   <!-- v1.1 — columnas Proveedor, Concepto y Documento más angostas (elipsis + título al pasar el mouse) para que la tabla quepa al 100% de zoom; se quitan los dos cuadros indicadores de propuesta de la columna Pagar (Pato 17-09-2026) -->
   <!-- v1.0 — cola de pago de las ODP a proveedores (origen GENERAL): mismo flujo que Saldos Precios a Pagar (fondos, propuestas, Enviar a Pago, nomina, Confirmar pago via pagarOrden con caja activa) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -44,7 +45,9 @@
     thead th { position:sticky; top:0; z-index:2; background:#0f2a52; color:#fff; font-size:.68rem; text-transform:uppercase; letter-spacing:.3px; padding:9px 10px; text-align:left; white-space:nowrap; }
     thead th.num { text-align:right; }
     tbody td { padding:7px 10px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+    .tbl-scroll table { table-layout:fixed; width:100%; }
     tbody td.corta { overflow:hidden; text-overflow:ellipsis; }
+    tbody td.corta .sub { font-size:.72rem; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; }
     tbody td.num { text-align:right; font-variant-numeric:tabular-nums; }
     tbody tr:hover { background:#f8fafc; }
     tbody tr.row-sel { background:#ecfdf3; }
@@ -135,22 +138,18 @@
     <div class="tbl-scroll">
       <table>
         <thead><tr>
-          <th>Orden de Pago</th>
-          <th>Proveedor</th>
-          <th>RUT</th>
-          <th>Concepto</th>
-          <th>Categoría</th>
-          <th>Documento</th>
-          <th>Cuenta</th>
-          <th>Banco</th>
-          <th>Método</th>
-          <th style="text-align:center">Días</th>
-          <th class="num">A pagar</th>
-          <th style="text-align:center">Pagar</th>
+          <th style="width:10%">Orden de Pago</th>
+          <th style="width:20%">Proveedor · RUT</th>
+          <th style="width:24%">Concepto · Categoría</th>
+          <th style="width:11%">Documento</th>
+          <th style="width:14%">Banco · Cuenta</th>
+          <th style="text-align:center;width:5%">Días</th>
+          <th class="num" style="width:8%">A pagar</th>
+          <th style="text-align:center;width:8%">Pagar</th>
         </tr></thead>
         <tbody id="body"></tbody>
         <tfoot><tr>
-          <td colspan="10" style="text-align:right">TOTAL A PAGAR (visible)</td>
+          <td colspan="6" style="text-align:right">TOTAL A PAGAR (visible)</td>
           <td class="num" id="totMonto">$0</td><td></td>
         </tr></tfoot>
       </table>
@@ -235,17 +234,13 @@ function render(){
   tb.innerHTML = rows.map(r => `
     <tr id="row_${r.id}" class="${r.pagado?'sel':(r.enviado?'row-enviado':(r.sel?'row-sel':''))}">
       <td><a href="javascript:void 0" onclick="verODP(${r.id})" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-file-earmark-text"></i> ${escH(r.numero)}</a><div style="font-size:.72rem;color:#94a3b8">${fechaCL(r.fecha_orden)}</div></td>
-      <td class="corta" style="max-width:170px" title="${escH(r.proveedor_nombre||'')}">${escH(r.proveedor_nombre||'—')}</td>
-      <td>${escH(r.proveedor_rut||'—')}</td>
-      <td class="corta" style="max-width:200px" title="${escH(r.concepto||'')}">${escH(r.concepto||'—')}</td>
-      <td>${escH(r.categoria||'—')}${r.id_pago_recurrente?' <span title="Generada automáticamente por Tesorería → Pagos Recurrentes" style="background:#ede9fe;color:#5b21b6;border-radius:8px;padding:1px 7px;font-size:.62rem;font-weight:800"><i class="bi bi-arrow-repeat"></i> Recurrente</span>':''}</td>
-      <td class="corta" style="max-width:120px" title="${escH([r.tipo_documento, r.numero_documento?('N° '+r.numero_documento):''].filter(Boolean).join(' '))}">${escH([r.tipo_documento, r.numero_documento?('N° '+r.numero_documento):''].filter(Boolean).join(' ')||'—')}</td>
-      <td>${escH(r.numero_cuenta||'—')}</td>
-      <td>${escH(r.banco||'—')}</td>
-      <td>${escH(r.metodo_pago||'—')}</td>
+      <td class="corta" title="${escH(r.proveedor_nombre||'')}">${escH(r.proveedor_nombre||'—')}<div class="sub">${escH(r.proveedor_rut||'—')}</div></td>
+      <td class="corta" title="${escH(r.concepto||'')}">${escH(r.concepto||'—')}<div class="sub">${escH(r.categoria||'—')}${r.id_pago_recurrente?' <span title="Generada automáticamente por Tesorería → Pagos Recurrentes" style="background:#ede9fe;color:#5b21b6;border-radius:8px;padding:1px 7px;font-size:.62rem;font-weight:800"><i class="bi bi-arrow-repeat"></i> Recurrente</span>':''}</div></td>
+      <td class="corta" title="${escH([r.tipo_documento, r.numero_documento?('N° '+r.numero_documento):''].filter(Boolean).join(' '))}">${escH(r.tipo_documento||'—')}<div class="sub">${escH(r.numero_documento?('N° '+r.numero_documento):'')}</div></td>
+      <td class="corta" title="${escH([r.banco,r.numero_cuenta,r.metodo_pago].filter(Boolean).join(' · '))}">${escH(r.banco||'—')}<div class="sub">${escH([r.numero_cuenta,r.metodo_pago].filter(Boolean).join(' · ')||'—')}</div></td>
       <td style="text-align:center"><span class="dias-pill ${r.dias>5?'d-red':(r.dias>2?'d-yel':'d-grn')}">${r.dias} d</span></td>
       <td class="num">${fmt(montoP(r))}</td>
-      <td style="text-align:center">${celdaAccion(r)}</td>
+      <td style="text-align:center;white-space:normal">${celdaAccion(r)}</td>
     </tr>`).join('');
   recalc();
 }
