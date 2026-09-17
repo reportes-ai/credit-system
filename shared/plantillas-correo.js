@@ -463,6 +463,30 @@ Recursos Humanos — AutoFácil`,
     destinatario: 'El colaborador (correo personal de su ficha; si no tiene, el corporativo)',
     variables: '{NOMBRE} {NOMBRE_COMPLETO} {MONTO} {CONCEPTO} {GLOSA} {FECHA} {MES_DESCUENTO} {CUOTAS} {CUOTA} {BANCO} {CUENTA}',
   },
+  {
+    codigo: 'edenred_generar_aviso',
+    ambito: 'Recursos Humanos — Edenred',
+    nombre: 'Hoy se genera la nómina Edenred → RRHH y Gerente de Finanzas',
+    descripcion: 'Sale solo a las 09:00 del ÚLTIMO DÍA HÁBIL de cada mes, si la nómina Edenred del mes siguiente aún no está generada. El beneficio se carga por adelantado: la nómina debe quedar generada y subida a Edenred ese día.',
+    asunto: 'Hoy se genera la nómina Edenred de {MES}',
+    cuerpo: `Estimados:
+
+Hoy {FECHA} es el último día hábil del mes: corresponde generar la nómina Edenred de {MES}, para que la tarjeta quede cargada al comenzar el mes.
+
+Vista previa al día de hoy: {PERSONAS} personas por {TOTAL} ({MONTO_DIA} por día).
+
+Pasos: revisar la vista previa y los ajustes en días, Generar nómina, descargar el Archivo Edenred y subirlo al portal, y emitir la Orden de Pago a Edenred.
+{LINK}
+
+Recordatorio: quien se retire después de generada la nómina conserva lo cargado (se da por perdido, no se recupera).
+
+Saludos cordiales,
+Auto Fácil Business Suite`,
+    para_perfiles: 'Consultora Recursos Humanos,Gerente de Finanzas',
+    cc: '',
+    destinatario: 'Los perfiles marcados aquí abajo (RRHH y Gerente de Finanzas)',
+    variables: '{MES} {FECHA} {PERSONAS} {TOTAL} {MONTO_DIA} {LINK}',
+  },
 ];
 
 require('./migrate').enFila('correos-plantillas', async () => {

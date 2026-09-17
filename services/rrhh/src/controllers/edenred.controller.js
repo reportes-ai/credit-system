@@ -16,10 +16,14 @@
    · 17-09-2026 (archivo real "Solicitud Autorización de Pago #1100"): las ÁREAS de lunes a
      SÁBADO (paramétrico, nace con COMERCIAL) cuentan también los sábados; AJUSTES manuales
      en días (+ premio / − descuento) con observación, por persona y mes; dos descargas con
-     el layout real: "Archivo Edenred" (el que se sube al portal) y la nómina del mes. */
+     el layout real: "Archivo Edenred" (el que se sube al portal) y la nómina del mes.
+   · CUÁNDO SE GENERA (Pato 17-09-2026): el ÚLTIMO DÍA HÁBIL del mes anterior a la entrega del
+     beneficio. Ese día a las 09:00 el motor `edenred-aviso-generar` avisa por correo y campana
+     a RRHH y al Gerente de Finanzas (plantilla edenred_generar_aviso, perfiles editables).
+     Quien se va después de generada la nómina conserva lo cargado: se da por perdido. */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
-const { esFeriado, cargarFeriados } = require('../../../../shared/feriados');
+const { esFeriado, esHabil, cargarFeriados } = require('../../../../shared/feriados');
 const XLSX = require('xlsx');
 const esFinde = d => d.getDay() === 0 || d.getDay() === 6;
 
@@ -160,7 +164,12 @@ const getMes = async (req, res) => {
     const [params] = await pool.query('SELECT * FROM rh_edenred_param ORDER BY mes_desde DESC');
     const [hist] = await pool.query('SELECT mes, COUNT(*) personas, SUM(monto) total, SUM(dias_descuento) dias_desc, MAX(created_at) generado_at FROM rh_edenred_nomina GROUP BY mes ORDER BY mes DESC LIMIT 24');
     const total = data.filas.reduce((s, f) => s + Number(f.monto), 0);
-    ok(res, { mes, ...data, total, params, historial: hist });
+    // Día en que corresponde generar este mes: último hábil del mes anterior
+    await cargarFeriados().catch(() => {});
+    let generar_el = null;
+    { const [y, m] = mes.split('-').map(Number); const d = new Date(y, m - 1, 0, 12);
+      while (!esHabil(d)) d.setDate(d.getDate() - 1); generar_el = iso(d); }
+    ok(res, { mes, ...data, total, params, historial: hist, generar_el });
   } catch (e) { console.error('[edenred get]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -313,4 +322,54 @@ const resumen = async (req, res) => {
   } catch (e) { console.error('[edenred resumen]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
-module.exports = { getMes, putParam, putAjuste, generar, anular, archivoXlsx, nominaXlsx, putPersona, resumen, calcularMes };
+/* ── Aviso del día de generación ───────────────────────────────────────────────
+   Último día hábil del mes, desde las 09:00 (hora de Chile): si la nómina del mes
+   SIGUIENTE no está generada, correo + campana. Una sola vez por mes (clave de la
+   notificación). Corre cada 10 min para no depender de la hora de arranque. */
+const mesSiguiente = m => { let [y, mm] = m.split('-').map(Number); mm++; if (mm > 12) { mm = 1; y++; } return `${y}-${String(mm).padStart(2, '0')}`; };
+const MESES_TXT = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+function esUltimoHabilDelMes(hoyISO) {
+  const d = new Date(hoyISO + 'T12:00:00');
+  if (!esHabil(d)) return false;
+  const mes = d.getMonth();
+  for (d.setDate(d.getDate() + 1); d.getMonth() === mes; d.setDate(d.getDate() + 1)) if (esHabil(d)) return false;
+  return true;
+}
+const _avisados = new Set();
+async function avisarGeneracion() {
+  try {
+    const ahora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+    if (ahora.getHours() < 9) return;
+    await cargarFeriados().catch(() => {});
+    const hoy = iso(ahora);
+    if (!esUltimoHabilDelMes(hoy)) return;
+    const mes = mesSiguiente(hoy.slice(0, 7));
+    const clave = `edenred_generar_${mes}`;
+    if (_avisados.has(clave)) return;   // respaldo en memoria: sin destinatarios de campana no queda fila con la clave
+    const [[ya]] = await pool.query('SELECT 1 ok FROM notificaciones WHERE clave=? LIMIT 1', [clave]);
+    if (ya) return;
+    const [[gen]] = await pool.query('SELECT COUNT(*) n FROM rh_edenred_nomina WHERE mes=?', [mes]);
+    if (gen.n) return;
+    _avisados.add(clave);
+    const c = await calcularMes(mes);
+    const total = c.filas.reduce((s, f) => s + f.monto, 0);
+    const mesTxt = `${MESES_TXT[Number(mes.slice(5))]} ${mes.slice(0, 4)}`;
+    const plant = require('../../../../shared/plantillas-correo');
+    const p = await plant.obtener('edenred_generar_aviso').catch(() => null);
+    // Campana a los mismos perfiles de la plantilla (una sola fuente de destinatarios)
+    const perfiles = String(p?.para_perfiles || '').split(',').map(x => x.trim()).filter(Boolean);
+    const [us] = perfiles.length ? await pool.query(
+      "SELECT u.id_usuario FROM usuarios u JOIN perfiles pf ON pf.id_perfil=u.id_perfil WHERE pf.nombre IN (?) AND u.estado='activo'", [perfiles]) : [[]];
+    const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+    await notificar(us.map(u => u.id_usuario), { tipo: 'RRHH', prioridad: 'alta', sonar: true,
+      titulo: `Hoy se genera la nómina Edenred de ${mesTxt}`,
+      mensaje: `Último día hábil del mes: genera la nómina (${c.filas.length} personas, ${CLP(total)}), sube el Archivo Edenred y emite la Orden de Pago.`,
+      href: '/recursos-humanos/remuneraciones/edenred/', clave });
+    const base = process.env.APP_URL || 'https://afbs.autofacilchile.cl';
+    await plant.enviar({ codigo: 'edenred_generar_aviso', datos: { MES: mesTxt, FECHA: hoy.split('-').reverse().join('-'),
+      PERSONAS: c.filas.length, TOTAL: CLP(total), MONTO_DIA: CLP(c.param.monto_diario), LINK: base + '/recursos-humanos/remuneraciones/edenred/' } });
+  } catch (e) { console.error('[edenred aviso]', e.message); }
+}
+require('../../../../shared/scheduler').programar('edenred-aviso-generar', avisarGeneracion, 10 * 60 * 1000);
+
+module.exports = { avisarGeneracion, esUltimoHabilDelMes, getMes, putParam, putAjuste, generar, anular, archivoXlsx, nominaXlsx, putPersona, resumen, calcularMes };

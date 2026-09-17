@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nómina Edenred — AutoFácil</title>
+  <!-- v1.3 — regla escrita arriba: se genera el último día hábil del mes anterior (fecha exacta del mes elegido); aviso 09:00 a RRHH y Gerente de Finanzas; quien se va conserva lo cargado (Pato 17-09-2026) -->
   <!-- v1.2 — punto de color por colaborador en vez de la etiqueta L-S: rojo lunes a sábado, azul lunes a viernes, negro contrato terminado; leyenda bajo la tabla (Pato 17-09-2026) -->
   <!-- v1.1 — layout real de Edenred: áreas de lunes a sábado (paramétrico, COMERCIAL), ajustes manuales en días con observación (premios / descuentos), descarga del Archivo Edenred (el que se sube) y de la nómina del mes en Excel (Pato 17-09-2026) -->
   <!-- v1.0 — Nómina Edenred: monto por día hábil (L-V, sin feriados) pagado por adelantado, faltas del mes anterior se descuentan; parámetros con vigencia desde mes; generar congela el mes; CSV provisorio de carga; historial por mes y por persona (Pato 16-09-2026) -->
@@ -36,6 +37,11 @@
 <script src="/js/topnav.js"></script>
 <div class="main-content">
   <div class="page-banner"><i class="bi bi-credit-card-2-front"></i><div><h2>Nómina Edenred</h2><p>Tarjeta de alimentación: un monto por cada día hábil del mes (lunes a viernes; lunes a sábado en las áreas marcadas), pagado por adelantado. Las faltas de un mes se descuentan en la nómina del mes siguiente. No va en la liquidación de sueldo.</p></div></div>
+
+  <div class="panel" style="border-left:4px solid #d97706;padding:12px 18px;font-size:.84rem">
+    <i class="bi bi-calendar-check me-1" style="color:#d97706"></i><b>Cuándo se genera:</b> el <b>último día hábil del mes anterior</b> a la entrega del beneficio<span id="lblGenerarEl"></span>. Ese día a las 09:00 el sistema avisa por correo y campana a RRHH y al Gerente de Finanzas.
+    Si alguien se retira después de generada la nómina, lo cargado <b>se da por perdido</b> (no se recupera).
+  </div>
 
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><a class="nav-link active" href="#" id="tabM" onclick="tab('M');return false"><i class="bi bi-calendar-month me-1"></i>Nómina del mes</a></li>
@@ -98,6 +104,7 @@
       <li><b>Áreas de lunes a sábado</b> → a quienes tienen ese centro de costo en <a href="/usuarios/">Usuarios</a> se les cuentan también los sábados (no feriados) del mes.</li>
       <li><b>Ajuste (días)</b> (lápiz en cada fila, antes de generar) → suma o resta días a la carga de esa persona ese mes, con su observación (premios, descuentos no registrados como ausencia). Sale en la nómina del mes.</li>
       <li><b>Nombre Sucursal</b> → primera columna del <b>Archivo Edenred</b> que se sube al portal de Edenred.</li>
+      <li><b>Aviso del día de generación</b> → plantilla <i>Hoy se genera la nómina Edenred</i> en <a href="/mantenedores/correos/">Correos del Sistema</a>: ahí se cambian el texto y los perfiles que lo reciben (correo y campana).</li>
       <li><b>Generar nómina</b> → congela el mes en el historial; el Archivo Edenred y la nómina del mes (Excel) salen de ahí. <b>Anular</b> lo borra para rehacerlo (auditado).</li>
     </ul>
   </div>
@@ -129,6 +136,7 @@ function render(){
   document.getElementById('lblEstado').innerHTML = D.generada
     ? `<span class="pill" style="background:#dcfce7;color:#15803d"><i class="bi bi-lock-fill"></i> NÓMINA GENERADA</span> <span class="small text-muted">por ${esc(D.generado_por||'')} el ${String(D.generado_at||'').slice(0,10)}</span>`
     : `<span class="pill" style="background:#fef9c3;color:#854d0e">VISTA PREVIA — se recalcula sola hasta generar</span>`;
+  document.getElementById('lblGenerarEl').innerHTML = D.generar_el ? ` — la de ${mesTxt(D.mes)} corresponde el <b>${D.generar_el.split('-').reverse().join('-')}</b>` : '';
   document.getElementById('btnGenerar').style.display = D.generada?'none':'';
   document.getElementById('btnCsv').style.display = D.generada?'':'none';
   document.getElementById('btnNom').style.display = D.generada?'':'none';
