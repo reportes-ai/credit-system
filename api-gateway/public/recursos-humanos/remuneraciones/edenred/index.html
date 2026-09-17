@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nómina Edenred — AutoFácil</title>
+  <!-- v1.1 — layout real de Edenred: áreas de lunes a sábado (paramétrico, COMERCIAL), ajustes manuales en días con observación (premios / descuentos), descarga del Archivo Edenred (el que se sube) y de la nómina del mes en Excel (Pato 17-09-2026) -->
   <!-- v1.0 — Nómina Edenred: monto por día hábil (L-V, sin feriados) pagado por adelantado, faltas del mes anterior se descuentan; parámetros con vigencia desde mes; generar congela el mes; CSV provisorio de carga; historial por mes y por persona (Pato 16-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
@@ -32,7 +33,7 @@
 <script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Recursos Humanos', href:'/recursos-humanos/' }, { label:'Remuneraciones', href:'/recursos-humanos/remuneraciones/' }, { label:'Nómina Edenred', icon:'bi-credit-card-2-front', current:true } ] };</script>
 <script src="/js/topnav.js"></script>
 <div class="main-content">
-  <div class="page-banner"><i class="bi bi-credit-card-2-front"></i><div><h2>Nómina Edenred</h2><p>Tarjeta de alimentación: un monto por cada día hábil del mes (lunes a viernes), pagado por adelantado. Las faltas de un mes se descuentan en la nómina del mes siguiente. No va en la liquidación de sueldo.</p></div></div>
+  <div class="page-banner"><i class="bi bi-credit-card-2-front"></i><div><h2>Nómina Edenred</h2><p>Tarjeta de alimentación: un monto por cada día hábil del mes (lunes a viernes; lunes a sábado en las áreas marcadas), pagado por adelantado. Las faltas de un mes se descuentan en la nómina del mes siguiente. No va en la liquidación de sueldo.</p></div></div>
 
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><a class="nav-link active" href="#" id="tabM" onclick="tab('M');return false"><i class="bi bi-calendar-month me-1"></i>Nómina del mes</a></li>
@@ -46,14 +47,15 @@
       <span id="lblEstado"></span>
       <div class="ms-auto d-flex gap-2">
         <button class="btn btn-sm btn-primary" id="btnGenerar" onclick="generar()"><i class="bi bi-lock me-1"></i>Generar nómina</button>
-        <button class="btn btn-sm btn-success" id="btnCsv" onclick="descargar()" style="display:none"><i class="bi bi-download me-1"></i>Descargar nómina</button>
+        <button class="btn btn-sm btn-success" id="btnCsv" onclick="descargar('archivo')" style="display:none" title="El archivo que se sube al portal de Edenred"><i class="bi bi-upload me-1"></i>Archivo Edenred</button>
+        <button class="btn btn-sm btn-outline-success" id="btnNom" onclick="descargar('nomina')" style="display:none" title="Nómina del mes con días, faltas, ajustes y observaciones"><i class="bi bi-file-earmark-excel me-1"></i>Nómina del mes</button>
         <button class="btn btn-sm btn-outline-danger" id="btnAnular" onclick="anular()" style="display:none"><i class="bi bi-x-circle me-1"></i>Anular</button>
       </div>
     </div>
     <div class="d-flex gap-3 mb-3 flex-wrap" id="kpis"></div>
     <div class="panel" style="padding:0;overflow:auto">
-      <table><thead><tr><th>Colaborador</th><th>RUT</th><th class="text-right">Días hábiles</th><th class="text-right" id="thDesc">Descuento</th><th class="text-right">$/día</th><th class="text-right">Monto</th><th>Detalle</th></tr></thead>
-      <tbody id="tb"><tr><td colspan="7" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
+      <table><thead><tr><th>Colaborador</th><th>RUT</th><th class="text-right">Días hábiles</th><th class="text-right" id="thDesc">Descuento</th><th class="text-right">Ajuste (días)</th><th class="text-right">$/día</th><th class="text-right">Monto</th><th>Detalle</th></tr></thead>
+      <tbody id="tb"><tr><td colspan="8" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
     </div>
   </div>
 
@@ -72,10 +74,12 @@
         <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Monto por día hábil</label><input id="pMonto" class="form-control form-control-sm text-end" inputmode="numeric" oninput="this.value=fmtCLP(this.value)"></div>
         <div class="col-md-2"><div class="form-check mt-3"><input type="checkbox" class="form-check-input" id="pFer" checked><label class="form-check-label small fw-semibold" for="pFer" title="Con esto marcado, un feriado legal en semana no cuenta como día hábil">Feriados no se pagan</label></div></div>
         <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Ausencias que descuentan (del mes anterior)</label><div id="pTipos" class="d-flex gap-2 flex-wrap"></div></div>
+        <div class="col-md-4"><label class="form-label small fw-semibold mb-1" title="Centros de costo cuyo horario es de lunes a sábado: el sábado también cuenta como día de Edenred. Separar con coma.">Áreas de lunes a sábado</label><input id="pAreas" class="form-control form-control-sm" placeholder="COMERCIAL"></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Nombre Sucursal (archivo Edenred)</label><input id="pSuc" class="form-control form-control-sm"></div>
         <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" onclick="guardarParam()"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
       </div>
     </div>
-    <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Rige desde</th><th class="text-right">$/día</th><th>Feriados</th><th>Descuentan</th><th>Registrado por</th><th>Fecha</th></tr></thead><tbody id="tbParam"></tbody></table></div>
+    <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Rige desde</th><th class="text-right">$/día</th><th>Feriados</th><th>Descuentan</th><th>Lunes a sábado</th><th>Registrado por</th><th>Fecha</th></tr></thead><tbody id="tbParam"></tbody></table></div>
   </div>
 
   <div class="foot mt-3"><b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
@@ -84,7 +88,10 @@
       <li><b>Feriados no se pagan</b> → cuántos días hábiles tiene el mes (tabla de <a href="/mantenedores/feriados/">Feriados</a>).</li>
       <li><b>Ausencias que descuentan</b> → tipos de <a href="/recursos-humanos/ausencias/">Ausencias y Permisos</a> (y Vacaciones) del mes anterior que restan días en la nómina de este mes.</li>
       <li><b>Tarjeta Edenred</b> (casilla en la <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a>) → quién entra en la nómina.</li>
-      <li><b>Generar nómina</b> → congela el mes en el historial; el CSV de carga sale de ahí. <b>Anular</b> lo borra para rehacerlo (auditado).</li>
+      <li><b>Áreas de lunes a sábado</b> → a quienes tienen ese centro de costo en <a href="/usuarios/">Usuarios</a> se les cuentan también los sábados (no feriados) del mes.</li>
+      <li><b>Ajuste (días)</b> (lápiz en cada fila, antes de generar) → suma o resta días a la carga de esa persona ese mes, con su observación (premios, descuentos no registrados como ausencia). Sale en la nómina del mes.</li>
+      <li><b>Nombre Sucursal</b> → primera columna del <b>Archivo Edenred</b> que se sube al portal de Edenred.</li>
+      <li><b>Generar nómina</b> → congela el mes en el historial; el Archivo Edenred y la nómina del mes (Excel) salen de ahí. <b>Anular</b> lo borra para rehacerlo (auditado).</li>
     </ul>
   </div>
 </div>
@@ -117,6 +124,7 @@ function render(){
     : `<span class="pill" style="background:#fef9c3;color:#854d0e">VISTA PREVIA — se recalcula sola hasta generar</span>`;
   document.getElementById('btnGenerar').style.display = D.generada?'none':'';
   document.getElementById('btnCsv').style.display = D.generada?'':'none';
+  document.getElementById('btnNom').style.display = D.generada?'':'none';
   document.getElementById('btnAnular').style.display = D.generada?'':'none';
   document.getElementById('thDesc').textContent = 'Faltas '+mesTxt(D.mes_descuento);
   const filas = D.filas||[];
@@ -124,23 +132,26 @@ function render(){
   document.getElementById('kpis').innerHTML = `
     <div class="card-kpi"><div class="v">${filas.length}</div><div class="l">Personas</div></div>
     <div class="card-kpi"><div class="v">$${fmt(p.monto_diario)}</div><div class="l">Por día hábil${p.mes_desde?' · desde '+p.mes_desde:''}</div></div>
-    <div class="card-kpi"><div class="v">${D.dias_habiles_mes??'—'}</div><div class="l">Días hábiles del mes</div></div>
+    <div class="card-kpi"><div class="v">${D.dias_habiles_mes??'—'}${D.dias_habiles_sabado?' · '+D.dias_habiles_sabado:''}</div><div class="l">Días hábiles L-V${D.dias_habiles_sabado?' · L-S':''}</div></div>
     <div class="card-kpi"><div class="v">${desc}</div><div class="l">Días descontados (${mesTxt(D.mes_descuento)})</div></div>
     <div class="card-kpi"><div class="v">$${fmt(D.total)}</div><div class="l">Total nómina</div></div>`;
   document.getElementById('tb').innerHTML = filas.map(f=>`<tr>
     <td>${esc(f.nombre)}</td><td>${esc(f.rut||'')}</td>
-    <td class="text-right">${f.dias_habiles}${f.parcial?` <span class="text-muted small">(${esc(f.parcial)})</span>`:''}</td>
+    <td class="text-right">${f.dias_habiles}${f.sabado?' <span class="pill" style="background:#e0f2fe;color:#0369a1">L-S</span>':''}${f.parcial?` <span class="text-muted small">(${esc(f.parcial)})</span>`:''}</td>
     <td class="text-right ${Number(f.dias_descuento)?'text-danger fw-bold':''}">${Number(f.dias_descuento)?'−'+f.dias_descuento:'—'}</td>
+    <td class="text-right ${Number(f.dias_ajuste)<0?'text-danger fw-bold':Number(f.dias_ajuste)>0?'text-success fw-bold':''}">${Number(f.dias_ajuste)?(Number(f.dias_ajuste)>0?'+':'−')+Math.abs(Number(f.dias_ajuste)).toLocaleString('es-CL'):'—'}${D.generada?'':` <a href="#" onclick="ajustar(${f.id_usuario});return false" title="Ajustar días (premio o descuento)"><i class="bi bi-pencil"></i></a>`}</td>
     <td class="text-right">$${fmt(f.monto_diario)}</td>
     <td class="text-right num">$${fmt(f.monto)}</td>
-    <td class="small text-muted">${esc(f.detalle||'')}</td></tr>`).join('') || '<tr><td colspan="7" class="text-center text-muted py-3">Nadie con Edenred este mes</td></tr>';
+    <td class="small text-muted">${esc([f.observacion,f.detalle].filter(Boolean).join(' · '))}</td></tr>`).join('') || '<tr><td colspan="8" class="text-center text-muted py-3">Nadie con Edenred este mes</td></tr>';
   // parámetros
-  document.getElementById('tbParam').innerHTML = (D.params||[]).map(x=>`<tr><td>${esc(x.mes_desde)}</td><td class="text-right num">$${fmt(x.monto_diario)}</td><td>${x.descuenta_feriados?'no se pagan':'se pagan'}</td><td class="small">${esc(x.tipos_descuento)}</td><td>${esc(x.creado_por||'')}</td><td>${String(x.created_at||'').slice(0,10)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted text-center py-2">Sin parámetros</td></tr>';
+  document.getElementById('tbParam').innerHTML = (D.params||[]).map(x=>`<tr><td>${esc(x.mes_desde)}</td><td class="text-right num">$${fmt(x.monto_diario)}</td><td>${x.descuenta_feriados?'no se pagan':'se pagan'}</td><td class="small">${esc(x.tipos_descuento)}</td><td class="small">${esc(x.areas_sabado||'—')}</td><td>${esc(x.creado_por||'')}</td><td>${String(x.created_at||'').slice(0,10)}</td></tr>`).join('') || '<tr><td colspan="7" class="text-muted text-center py-2">Sin parámetros</td></tr>';
   if (!document.getElementById('pTipos').children.length) {
     const vig = (p.tipos||[]);
     document.getElementById('pTipos').innerHTML = TIPOS_AUS.map(t=>`<label class="small" style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="pt" value="${t}" ${vig.includes(t)?'checked':''}>${t}</label>`).join('');
     document.getElementById('pFer').checked = p.descuenta_feriados!==0;
     document.getElementById('pMonto').value = p.monto_diario ? fmtCLP(p.monto_diario) : '';
+    document.getElementById('pAreas').value = p.areas_sabado ?? 'COMERCIAL';
+    document.getElementById('pSuc').value = p.sucursal || 'AUTOFACIL SPA';
     const [y,m] = fMes.value.split('-').map(Number); const n = new Date(y, m, 1); document.getElementById('pMes').value = n.toISOString().slice(0,7);
   }
 }
@@ -161,14 +172,26 @@ async function anular(){
   if (!j.success) return alert(j.error);
   cargar();
 }
-async function descargar(){
-  const r = await fetch('/api/rrhh/remuneraciones/edenred/nomina.csv?mes='+fMes.value,{headers:H});
+async function descargar(cual){
+  const arch = cual==='archivo' ? 'archivo' : 'nomina';
+  const r = await fetch('/api/rrhh/remuneraciones/edenred/'+arch+'.xlsx?mes='+fMes.value,{headers:H});
   if (!r.ok) { const j = await r.json().catch(()=>({})); return alert(j.error||'No se pudo descargar'); }
-  const b = await r.blob(); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `nomina-edenred-${fMes.value}.csv`; a.click();
+  const b = await r.blob(); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `${arch}-edenred-${fMes.value}.xlsx`; a.click();
+}
+async function ajustar(id){
+  const f = (D.filas||[]).find(x=>x.id_usuario===id); if (!f) return;
+  const d = prompt(`Ajuste en DÍAS para ${f.nombre} (${mesTxt(fMes.value)}).\nPositivo = premio / días extra · negativo = descuento · 0 = quitar el ajuste.\nCada día vale $${fmt(f.monto_diario)}.`, String(f.dias_ajuste||0).replace('.',','));
+  if (d==null) return;
+  const dias = Number(String(d).replace(',','.')); if (isNaN(dias)) return alert('Número de días inválido');
+  let observacion = '';
+  if (dias) { observacion = prompt('Observación del ajuste (sale en la nómina del mes):', f.observacion||''); if (observacion==null) return; }
+  const j = await (await fetch('/api/rrhh/remuneraciones/edenred/ajuste',{method:'PUT',headers:H,body:JSON.stringify({mes:fMes.value,id_usuario:id,dias,observacion})})).json();
+  if (!j.success) return alert(j.error);
+  cargar();
 }
 async function guardarParam(){
   const body = { mes_desde: document.getElementById('pMes').value, monto_diario: Number(String(document.getElementById('pMonto').value).replace(/\D/g,'')),
-    descuenta_feriados: document.getElementById('pFer').checked, tipos_descuento: [...document.querySelectorAll('#pTipos .pt:checked')].map(x=>x.value) };
+    descuenta_feriados: document.getElementById('pFer').checked, areas_sabado: document.getElementById('pAreas').value, sucursal: document.getElementById('pSuc').value, tipos_descuento: [...document.querySelectorAll('#pTipos .pt:checked')].map(x=>x.value) };
   if (!body.mes_desde) return alert('Indica desde qué mes rige');
   if (!body.monto_diario) return alert('Indica el monto por día');
   const j = await (await fetch('/api/rrhh/remuneraciones/edenred/param',{method:'PUT',headers:H,body:JSON.stringify(body)})).json();

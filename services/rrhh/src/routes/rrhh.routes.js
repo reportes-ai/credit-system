@@ -198,7 +198,9 @@ router.post('/remuneraciones/anticipos/:id/anular',    verifyToken, requireFunc(
 const edenred = require('../controllers/edenred.controller');
 router.get('/remuneraciones/edenred',            verifyToken, requireFunc('rh_remuneraciones'), edenred.getMes);
 router.get('/remuneraciones/edenred/resumen',    verifyToken, requireFunc('rh_remuneraciones'), edenred.resumen);
-router.get('/remuneraciones/edenred/nomina.csv', verifyToken, requireFunc('rh_remuneraciones'), edenred.nominaCsv);
+router.get('/remuneraciones/edenred/archivo.xlsx', verifyToken, requireFunc('rh_remuneraciones'), edenred.archivoXlsx);
+router.get('/remuneraciones/edenred/nomina.xlsx',  verifyToken, requireFunc('rh_remuneraciones'), edenred.nominaXlsx);
+router.put('/remuneraciones/edenred/ajuste',       verifyToken, requireFunc('rh_remuneraciones'), edenred.putAjuste);
 router.put('/remuneraciones/edenred/param',      verifyToken, requireFunc('rh_remuneraciones'), edenred.putParam);
 router.put('/remuneraciones/edenred/persona',    verifyToken, requireFunc('rh_remuneraciones'), edenred.putPersona);
 router.post('/remuneraciones/edenred/generar',   verifyToken, requireFunc('rh_remuneraciones'), edenred.generar);
