@@ -59,8 +59,10 @@ require('../../../../shared/migrate').migrar('rrhh-seguro-salud', async () => {
     generado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_mes (mes))`);
   await pool.query('ALTER TABLE rh_fichas ADD COLUMN IF NOT EXISTS seguro_salud TINYINT(1) NOT NULL DEFAULT 0');
-  await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_estudios_hasta DATE NULL');
   await pool.query('ALTER TABLE rh_descuentos ADD COLUMN IF NOT EXISTS seguro_mes CHAR(7) NULL');
+});
+require('../../../../shared/migrate').migrar('rrhh-seguro-salud-certificado', async () => {
+  await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_estudios_hasta DATE NULL');
 });
 
 async function paramDe(mes) {
