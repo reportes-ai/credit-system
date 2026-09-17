@@ -397,6 +397,12 @@ async function timeoutMs() {
   } catch (e) { return 90000; }
 }
 
+/* exito = DealerNet respondió retcode 0. Una respuesta con error de negocio (retcode 2 "Cuenta
+   Usuario Bloqueada", 17-09-2026) llegaba bien por la red y quedaba como exitosa: el panel de
+   salud mostraba 100% OK con la cuenta bloqueada. Auditoría, facturación y alertas ya filtraban
+   por retcode='0', así que sus números nunca estuvieron mal. */
+const exitoDe = r => (String(r?.retcode) === '0' ? 1 : 0);
+
 /* Deja registro del intento aunque falle. Antes solo se guardaban las consultas
    exitosas: los timeouts no quedaban en ninguna parte y no había forma de saber
    cuántas veces le pasaba a la gente. */
@@ -551,9 +557,9 @@ const consultar = async (req, res) => {
 
     const [ins] = await pool.query(
       `INSERT INTO dealernet_consultas (rut, dv, productos, retcode, retmsg, output_raw, parsed, id_usuario, duracion_ms, exito)
-       VALUES (?,?,?,?,?,?,?,?,?,1)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
       [num, dv, productos.join(','), r.retcode, (r.retmsg || '').slice(0, 255), r.raw,
-       r.parsed ? JSON.stringify(r.parsed) : null, req.usuario.id_usuario, r.duracion_ms]);
+       r.parsed ? JSON.stringify(r.parsed) : null, req.usuario.id_usuario, r.duracion_ms, exitoDe(r)]);
     auditar({ req, accion: 'CONSULTAR', modulo: 'dealernet', entidad: 'consulta', entidad_id: ins.insertId,
       detalle: `Consultó DealerNet RUT ${num}-${dv} (productos ${productos.join(',')}) → retcode ${r.retcode}`, rut: `${num}-${dv}` });
     res.json({ success: true, data: { id: ins.insertId, retcode: r.retcode, retmsg: r.retmsg, output: r.output, productos }, error: null });
@@ -803,9 +809,9 @@ const solicitarInformes = async (req, res) => {
 
     const [ins] = await pool.query(
       `INSERT INTO dealernet_consultas (rut, dv, productos, retcode, retmsg, output_raw, parsed, id_usuario, duracion_ms, exito)
-       VALUES (?,?,?,?,?,?,?,?,?,1)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
       [num, dv, aPedir.join(','), r.retcode, (r.retmsg || '').slice(0, 255), r.raw,
-       r.parsed ? JSON.stringify(r.parsed) : null, req.usuario.id_usuario, r.duracion_ms]);
+       r.parsed ? JSON.stringify(r.parsed) : null, req.usuario.id_usuario, r.duracion_ms, exitoDe(r)]);
     const guardados = String(r.retcode) === '0'
       ? await guardarInformes({ num, dv, productosPedidos: aPedir, r, idConsulta: ins.insertId, usuario: req.usuario })
       : [];
@@ -913,8 +919,8 @@ async function asegurarInformes({ rut, productos, usuario }) {
       out.consultado = true;
       const [ins] = await pool.query(
         `INSERT INTO dealernet_consultas (rut, dv, productos, retcode, retmsg, output_raw, parsed, id_usuario, duracion_ms, exito)
-         VALUES (?,?,?,?,?,?,?,?,?,1)`,
-        [num, dv, aPedir.join(','), r.retcode, (r.retmsg || '').slice(0, 255), r.raw, r.parsed ? JSON.stringify(r.parsed) : null, usuario?.id_usuario || null, r.duracion_ms]);
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [num, dv, aPedir.join(','), r.retcode, (r.retmsg || '').slice(0, 255), r.raw, r.parsed ? JSON.stringify(r.parsed) : null, usuario?.id_usuario || null, r.duracion_ms, exitoDe(r)]);
       if (String(r.retcode) === '0') {
         await guardarInformes({ num, dv, productosPedidos: aPedir, r, idConsulta: ins.insertId, usuario });
         out.pedidos = aPedir;
