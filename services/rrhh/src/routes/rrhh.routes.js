@@ -199,6 +199,7 @@ const seguro = require('../controllers/seguro-salud.controller');
 router.get('/remuneraciones/seguro',                  verifyToken, requireFunc('rh_remuneraciones'), seguro.getMes);
 router.get('/remuneraciones/seguro/nomina.xlsx',      verifyToken, requireFunc('rh_remuneraciones'), seguro.nominaXlsx);
 router.put('/remuneraciones/seguro/param',            verifyToken, requireFunc('rh_remuneraciones'), seguro.putParam);
+router.put('/remuneraciones/seguro/poliza',           verifyToken, requireFunc('rh_remuneraciones'), seguro.putPoliza);
 router.put('/remuneraciones/seguro/titular',          verifyToken, requireFunc('rh_remuneraciones'), seguro.putTitular);
 router.post('/remuneraciones/seguro/carga',           verifyToken, requireFunc('rh_remuneraciones'), seguro.guardarCarga);
 router.put('/remuneraciones/seguro/carga/seleccion',  verifyToken, requireFunc('rh_remuneraciones'), seguro.seleccionCarga);

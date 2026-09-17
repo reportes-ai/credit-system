@@ -11,8 +11,10 @@
      ASIGNACIÓN FAMILIAR legal: otra magnitud, no se fusionan.)
    · Edad máxima de los hijos (paramétrica, 23 según la póliza): la aseguradora rechazó
      cargas de 24 y 28 años. Pasada la edad la carga se marca y sale de la nómina sola,
-     SALVO que tenga certificado de estudios vigente (rh_cargas.certificado_estudios_hasta):
-     la aseguradora acepta al hijo estudiante mientras se le envíe el certificado (Pato 17-09-2026).
+     SALVO que tenga certificado de estudios (rh_cargas.certificado_estudios): la aseguradora
+     acepta al hijo estudiante HASTA LA RENOVACIÓN DE LA PÓLIZA (rh_seguro_poliza.vigencia_hasta,
+     editable arriba de la nómina). Al renovar, la fecha se actualiza y hay que reenviar los
+     certificados; hasta entonces esos hijos quedan fuera con aviso (Pato 17-09-2026).
    · Selección: casilla por titular (rh_fichas.seguro_salud) y por carga (rh_cargas.en_seguro).
    · Generar la nómina CONGELA el mes (rh_seguro_nomina) y crea UN descuento VARIOS por
      empleado con cargas a su costo (rh_descuentos.seguro_mes lo ata al mes). Anular la
@@ -64,6 +66,19 @@ require('../../../../shared/migrate').migrar('rrhh-seguro-salud', async () => {
 require('../../../../shared/migrate').migrar('rrhh-seguro-salud-certificado', async () => {
   await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_estudios_hasta DATE NULL');
 });
+require('../../../../shared/migrate').migrar('rrhh-seguro-salud-poliza', async () => {
+  await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_estudios TINYINT(1) NOT NULL DEFAULT 0');
+  await pool.query('UPDATE rh_cargas SET certificado_estudios=1 WHERE certificado_estudios_hasta IS NOT NULL');
+  // Póliza vigente: un solo registro (número, vigencia). La vigencia manda sobre los certificados de estudios.
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_seguro_poliza (
+    id INT PRIMARY KEY, numero VARCHAR(40) NULL, vigencia_desde DATE NULL, vigencia_hasta DATE NULL,
+    actualizado_por VARCHAR(160) NULL, updated_at DATETIME NULL)`);
+  await pool.query("INSERT IGNORE INTO rh_seguro_poliza (id, numero, vigencia_desde, vigencia_hasta, actualizado_por) VALUES (1, '340025555', '2026-01-02', '2027-01-01', 'Documento de pago MetLife mar-2026')");
+});
+async function polizaVigente() {
+  const [[p]] = await pool.query('SELECT * FROM rh_seguro_poliza WHERE id=1');
+  return p ? { numero: p.numero, vigencia_desde: p.vigencia_desde ? iso(p.vigencia_desde) : null, vigencia_hasta: p.vigencia_hasta ? iso(p.vigencia_hasta) : null } : { numero: null, vigencia_desde: null, vigencia_hasta: null };
+}
 
 async function paramDe(mes) {
   const [[p]] = await pool.query('SELECT * FROM rh_seguro_param WHERE mes_desde <= ? ORDER BY mes_desde DESC LIMIT 1', [mes]);
@@ -81,6 +96,7 @@ const edadAl = (nac, fechaISO) => {
 /* Vista del mes: titulares + cargas, con quién paga, edad y prima en pesos */
 async function calcularMes(mes) {
   const p = await paramDe(mes);
+  const poliza = await polizaVigente();
   const ini = mes + '-01';
   let valorUF = null;
   if (p.moneda === 'UF') { try { valorUF = Number(await require('../../../../shared/uf').getUF(new Date(ini + 'T12:00:00'))) || null; } catch (_) {} }
@@ -95,16 +111,17 @@ async function calcularMes(mes) {
   const titulares = gente.map(g => {
     const cs = cargas.filter(c => c.id_usuario === g.id_usuario).map(c => {
       const edad = edadAl(c.fecha_nacimiento, ini);
-      const certHasta = c.certificado_estudios_hasta ? iso(c.certificado_estudios_hasta) : null;
-      const estudiante = !!certHasta && certHasta >= ini;   // certificado de estudios vigente para el mes
+      // Certificado de estudios: vale hasta la renovación de la póliza (vigencia_hasta)
+      const certHasta = c.certificado_estudios ? poliza.vigencia_hasta : null;
+      const estudiante = !!c.certificado_estudios && !!certHasta && certHasta >= ini;
       const excedeEdad = c.relacion === 'HIJO' && edad != null && edad > p.edad_max_hijo && !estudiante;
-      const certVencido = !!certHasta && certHasta < ini && c.relacion === 'HIJO' && edad != null && edad > p.edad_max_hijo;
+      const certVencido = !!c.certificado_estudios && !estudiante && c.relacion === 'HIJO' && edad != null && edad > p.edad_max_hijo;
       const pagaAuto = p.corte_cargas_empresa && g.fecha_ingreso && iso(g.fecha_ingreso) <= p.corte_cargas_empresa ? 'EMPRESA' : 'EMPLEADO';
       const paga = c.paga === 'EMPRESA' || c.paga === 'EMPLEADO' ? c.paga : pagaAuto;
       const incluida = !!c.en_seguro && !!g.seguro_salud && !excedeEdad;
       return { id: c.id, nombre: [c.nombres, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(' '), nombres: c.nombres, apellido_paterno: c.apellido_paterno,
         apellido_materno: c.apellido_materno, rut: c.rut, fecha_nacimiento: c.fecha_nacimiento ? iso(c.fecha_nacimiento) : null, sexo: c.sexo, relacion: c.relacion,
-        edad, excede_edad: excedeEdad, estudiante, certificado_estudios_hasta: certHasta, cert_vencido: certVencido, en_seguro: c.en_seguro ? 1 : 0, paga, paga_manual: !!c.paga, incluida, prima: incluida ? aCLP(p.prima_carga) : 0 };
+        edad, excede_edad: excedeEdad, estudiante, certificado_estudios: c.certificado_estudios ? 1 : 0, certificado_estudios_hasta: certHasta, cert_vencido: certVencido, en_seguro: c.en_seguro ? 1 : 0, paga, paga_manual: !!c.paga, incluida, prima: incluida ? aCLP(p.prima_carga) : 0 };
     });
     const primaTit = g.seguro_salud ? aCLP(p.prima_titular) : 0;
     const costoEmpresa = primaTit + cs.filter(c => c.incluida && c.paga === 'EMPRESA').reduce((s, c) => s + c.prima, 0);
@@ -114,7 +131,7 @@ async function calcularMes(mes) {
       nombre_completo: [g.nombres, g.apellido, g.apellido_materno].filter(Boolean).join(' '),
       prima: primaTit, cargas: cs, costo_empresa: costoEmpresa, costo_empleado: costoEmpleado };
   });
-  return { param: p, valor_uf: valorUF, titulares };
+  return { param: p, poliza, valor_uf: valorUF, titulares };
 }
 const totales = ts => ({
   titulares: ts.filter(t => t.seguro_salud).length,
@@ -161,6 +178,21 @@ const putParam = async (req, res) => {
   } catch (e) { console.error('[seguro param]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
+/* PUT /remuneraciones/seguro/poliza {numero, vigencia_desde, vigencia_hasta} — editable arriba de la nómina */
+const putPoliza = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const hasta = fechaOk(b.vigencia_hasta) ? b.vigencia_hasta : null, desde = fechaOk(b.vigencia_desde) ? b.vigencia_desde : null;
+    if (!hasta) return fail(res, 'Indica hasta cuándo rige la póliza (fecha de renovación)', 400);
+    if (desde && desde > hasta) return fail(res, 'La vigencia termina antes de empezar', 400);
+    const numero = String(b.numero || '').trim().slice(0, 40) || null;
+    await pool.query(`INSERT INTO rh_seguro_poliza (id, numero, vigencia_desde, vigencia_hasta, actualizado_por, updated_at) VALUES (1,?,?,?,?,NOW())
+      ON DUPLICATE KEY UPDATE numero=VALUES(numero), vigencia_desde=VALUES(vigencia_desde), vigencia_hasta=VALUES(vigencia_hasta), actualizado_por=VALUES(actualizado_por), updated_at=NOW()`, [numero, desde, hasta, nombreDe(req.usuario)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'seguro_poliza', detalle: `Póliza ${numero || '—'}: vigencia ${desde || '—'} → ${hasta} (los certificados de estudios valen hasta esa fecha)` });
+    ok(res, await polizaVigente());
+  } catch (e) { console.error('[seguro poliza]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 /* PUT /remuneraciones/seguro/titular {id_usuario, seguro_salud} */
 const putTitular = async (req, res) => {
   try {
@@ -185,17 +217,17 @@ const guardarCarga = async (req, res) => {
     const sexo = ['M', 'F'].includes(String(b.sexo || '').toUpperCase()) ? String(b.sexo).toUpperCase() : null;
     const paga = ['EMPRESA', 'EMPLEADO'].includes(b.paga) ? b.paga : null;
     const rut = String(b.rut || '').trim().toUpperCase().slice(0, 15) || null;
-    const cert = fechaOk(b.certificado_estudios_hasta) ? b.certificado_estudios_hasta : null;
+    const cert = b.certificado_estudios ? 1 : 0;
     const vals = [nombres, String(b.apellido_paterno || '').trim().slice(0, 80) || null, String(b.apellido_materno || '').trim().slice(0, 80) || null, rut, nac, sexo, relacion, b.en_seguro === false || b.en_seguro === 0 ? 0 : 1, paga];
     let idFinal = id;
     if (id) {
-      const [r] = await pool.query('UPDATE rh_cargas SET nombres=?, apellido_paterno=?, apellido_materno=?, rut=?, fecha_nacimiento=?, sexo=?, relacion=?, en_seguro=?, paga=?, certificado_estudios_hasta=?, updated_at=NOW() WHERE id=? AND id_usuario=?', [...vals, cert, id, idU]);
+      const [r] = await pool.query('UPDATE rh_cargas SET nombres=?, apellido_paterno=?, apellido_materno=?, rut=?, fecha_nacimiento=?, sexo=?, relacion=?, en_seguro=?, paga=?, certificado_estudios=?, updated_at=NOW() WHERE id=? AND id_usuario=?', [...vals, cert, id, idU]);
       if (!r.affectedRows) return fail(res, 'Carga no encontrada', 404);
     } else {
-      const [r] = await pool.query('INSERT INTO rh_cargas (nombres, apellido_paterno, apellido_materno, rut, fecha_nacimiento, sexo, relacion, en_seguro, paga, certificado_estudios_hasta, id_usuario, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [...vals, cert, idU, nombreDe(req.usuario)]);
+      const [r] = await pool.query('INSERT INTO rh_cargas (nombres, apellido_paterno, apellido_materno, rut, fecha_nacimiento, sexo, relacion, en_seguro, paga, certificado_estudios, id_usuario, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [...vals, cert, idU, nombreDe(req.usuario)]);
       idFinal = r.insertId;
     }
-    auditar({ req, accion: id ? 'EDITAR' : 'CREAR', modulo: 'rrhh', entidad: 'carga', entidad_id: idFinal, detalle: `${id ? 'Editó' : 'Registró'} carga ${nombres} (${relacion}, nac. ${nac}) del usuario ${idU} · seguro ${vals[7] ? 'sí' : 'no'} · paga ${paga || 'según fecha de corte'}${cert ? ' · certificado de estudios hasta ' + cert : ''}` });
+    auditar({ req, accion: id ? 'EDITAR' : 'CREAR', modulo: 'rrhh', entidad: 'carga', entidad_id: idFinal, detalle: `${id ? 'Editó' : 'Registró'} carga ${nombres} (${relacion}, nac. ${nac}) del usuario ${idU} · seguro ${vals[7] ? 'sí' : 'no'} · paga ${paga || 'según fecha de corte'}${cert ? ' · con certificado de estudios (vigente hasta la renovación de la póliza)' : ''}` });
     ok(res, { id: idFinal });
   } catch (e) { console.error('[seguro carga]', e.message); fail(res, 'Error interno del servidor'); }
 };
@@ -302,4 +334,4 @@ const nominaXlsx = async (req, res) => {
   } catch (e) { console.error('[seguro xlsx]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
-module.exports = { getMes, putParam, putTitular, guardarCarga, seleccionCarga, bajaCarga, generar, anular, nominaXlsx, calcularMes };
+module.exports = { getMes, putParam, putPoliza, putTitular, guardarCarga, seleccionCarga, bajaCarga, generar, anular, nominaXlsx, calcularMes };
