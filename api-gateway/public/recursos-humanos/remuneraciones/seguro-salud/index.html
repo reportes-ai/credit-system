@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguro de Salud — AutoFácil</title>
+  <!-- v2.5 — sin Generar/Anular nómina: la nómina del mes es siempre la vista viva (lo que se espera cobrar); el Excel sale de ahí; los descuentos de cargas a costo del empleado se crean al emitir la ODP; el Historial muestra los pagos por mes (Pato 17-09-2026) -->
   <!-- v2.4 — al emitir la ODP se avisa por correo a Contabilidad con copia a RRHH y a quien emitió, con cupón y nómina adjuntos. v2.3 — pestaña Parámetros completa (cambio de compañía sin tocar código): aseguradora y primas, edades, cuándo se pide el certificado y su plazo, tolerancia, quién paga las cargas, y a quién van los correos del seguro (perfiles, copia, activo) (Pato 17-09-2026) -->
   <!-- v2.2 — fecha de envío del certificado de estudios en la carga; un mes antes de cumplir la edad máxima el sistema pide el certificado al colaborador (copia RRHH) (Pato 17-09-2026) -->
   <!-- v2.1 — la nómina de cotización se sube siempre junto con el cupón (obligatoria para emitir la ODP, aunque cuadre) -->
@@ -43,7 +44,7 @@
 <script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Recursos Humanos', href:'/recursos-humanos/' }, { label:'Remuneraciones', href:'/recursos-humanos/remuneraciones/' }, { label:'Seguro de Salud', icon:'bi-heart-pulse', current:true } ] };</script>
 <script src="/js/topnav.js"></script>
 <div class="main-content">
-  <div class="page-banner"><i class="bi bi-heart-pulse"></i><div><h2>Seguro Complementario de Salud</h2><p>Nómina mensual de asegurados, solo contratos indefinidos: el titular lo paga AutoFácil; las cargas las paga la empresa (contratados hasta la fecha de corte) o el empleado, con descuento en su liquidación. Marca quiénes van en la nómina del mes.</p></div></div>
+  <div class="page-banner"><i class="bi bi-heart-pulse"></i><div><h2>Seguro Complementario de Salud</h2><p>Asegurados del mes, solo contratos indefinidos: el titular lo paga AutoFácil; las cargas las paga la empresa (contratados hasta la fecha de corte) o el empleado, con descuento en su liquidación. Marca quiénes van en la nómina del mes.</p></div></div>
 
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><a class="nav-link active" href="#" id="tabM" onclick="tab('M');return false"><i class="bi bi-people me-1"></i>Nómina del mes</a></li>
@@ -56,11 +57,8 @@
     <div class="d-flex gap-3 align-items-end mb-3 flex-wrap">
       <div><label class="form-label small fw-semibold mb-1">Mes</label><input type="month" id="fMes" class="form-control form-control-sm" onchange="cargar()"></div>
       <div class="form-check mb-1"><input type="checkbox" class="form-check-input" id="fSolo" onchange="render()"><label class="form-check-label small" for="fSolo">Solo asegurados</label></div>
-      <span id="lblEstado"></span>
       <div class="ms-auto d-flex gap-2">
-        <button class="btn btn-sm btn-primary" id="btnGenerar" onclick="generar()"><i class="bi bi-lock me-1"></i>Generar nómina</button>
-        <button class="btn btn-sm btn-success" id="btnXls" onclick="descargar()" style="display:none"><i class="bi bi-file-earmark-excel me-1"></i>Nómina para la aseguradora</button>
-        <button class="btn btn-sm btn-outline-danger" id="btnAnular" onclick="anular()" style="display:none"><i class="bi bi-x-circle me-1"></i>Anular</button>
+        <button class="btn btn-sm btn-success" id="btnXls" onclick="descargar()"><i class="bi bi-file-earmark-excel me-1"></i>Nómina del mes (Excel)</button>
       </div>
     </div>
     <div class="panel" style="padding:10px 18px;display:flex;gap:14px;align-items:end;flex-wrap:wrap;border-left:4px solid #0141A2">
@@ -120,7 +118,7 @@
   </div>
 
   <div id="secH" style="display:none">
-    <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Mes</th><th class="text-right">Titulares</th><th class="text-right">Cargas</th><th class="text-right">Descontado a empleados</th><th class="text-right">Total nómina</th><th>Generada</th></tr></thead><tbody id="tbHist"></tbody></table></div>
+    <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Mes</th><th>Estado</th><th class="text-right">Cupón (UF)</th><th class="text-right">Esperado (UF)</th><th class="text-right">Pagado ($)</th><th>Orden de Pago</th><th>Actualizado</th></tr></thead><tbody id="tbHist"></tbody></table></div>
   </div>
 
   <div id="secP" style="display:none">
@@ -163,7 +161,7 @@
       <li><b>Póliza</b> (número y vigencia, arriba de la nómina) → hasta cuándo valen los certificados de estudios; sale en el Excel para la aseguradora.</li>
       <li><b>Primas</b> (UF o pesos; la UF es la del día 1 del mes) → monto de la nómina y de los descuentos desde el mes indicado. <b>Pedir certificado (días antes)</b> y <b>plazo</b> → cuándo sale el correo al colaborador y la fecha límite que le indica.</li>
       <li><b>Correos del seguro</b> (pestaña Parámetros) → perfiles, copia e interruptor de los tres correos del seguro; el texto en <a href="/mantenedores/correos/">Correos del Sistema</a>.</li>
-      <li><b>Generar nómina</b> → congela el mes (es lo que el sistema "espera" cobrar). <b>Anular</b> borra la nómina y anula los descuentos del mes (auditado).</li>
+      <li><b>Nómina del mes</b> → es la vista viva de quién está asegurado: lo que el sistema espera cobrar. No se genera ni se congela; el Excel sale de ahí. Los <b>descuentos</b> de cargas a costo del empleado se crean al emitir la Orden de Pago del mes.</li>
       <li><b>Pago del mes</b> → el cupón de la aseguradora se compara con lo esperado (tolerancia en UF) y la nómina de cotización (obligatoria todos los meses) dice quién quedó fuera (hijo menor de la edad máxima → alerta; hasta la edad de estudiante → pedir certificado; mayor → fuera por edad), se avisa al empleado con copia a RRHH (plantilla en <a href="/mantenedores/correos/">Correos del Sistema</a>) y RRHH puede dar su OK; la <a href="/ordenes-pago/">Orden de Pago</a> a la aseguradora sale con el cupón y la nómina adjuntos y se avisa por correo a Contabilidad con copia a RRHH (plantilla <i>Orden de Pago del seguro emitida</i>).</li>
     </ul>
   </div>
@@ -306,23 +304,13 @@ function pillPaga(p){ return p==='EMPLEADO' ? '<span class="pill" style="backgro
 
 function render(){
   const p = D.param||{}, T = D.totales||{}, mon = p.moneda==='UF' ? 'UF ' : '$';
-  document.getElementById('lblEstado').innerHTML = D.generada
-    ? `<span class="pill" style="background:#dcfce7;color:#15803d"><i class="bi bi-lock-fill"></i> NÓMINA GENERADA</span> <span class="small text-muted">por ${esc(D.generado_por||'')} el ${String(D.generado_at||'').slice(0,10)}</span>`
-    : `<span class="pill" style="background:#fef9c3;color:#854d0e">VISTA PREVIA — marca quiénes van y genera</span>`;
-  document.getElementById('btnGenerar').style.display = D.generada?'none':'';
-  document.getElementById('btnXls').style.display = D.generada?'':'none';
-  document.getElementById('btnAnular').style.display = D.generada?'':'none';
   const pol = D.poliza||{};
   if (document.activeElement?.id?.startsWith('pol') !== true) { document.getElementById('polNum').value = pol.numero||''; document.getElementById('polDesde').value = pol.vigencia_desde||''; document.getElementById('polHasta').value = pol.vigencia_hasta||''; }
   const vencidos = (D.titulares||[]).reduce((s,t)=>s+t.cargas.filter(c=>c.cert_vencido).length,0);
   const sinPrima = !Number(p.prima_titular) && !Number(p.prima_carga);
   document.getElementById('avisos').innerHTML = (vencidos ? `<div class="panel" style="border-left:4px solid #d97706;padding:10px 16px;font-size:.84rem"><i class="bi bi-mortarboard text-warning me-1"></i>La póliza venció el <b>${dmy(pol.vigencia_hasta)}</b>: hay <b>${vencidos}</b> hijo(s) sobre la edad máxima con certificado de estudios que quedaron fuera. Actualiza la vigencia arriba y reenvía los certificados a la aseguradora.</div>` : '') + (sinPrima ? `<div class="panel" style="border-left:4px solid #dc2626;padding:10px 16px;font-size:.84rem"><i class="bi bi-exclamation-triangle text-danger me-1"></i>Faltan las <b>primas</b>: cárgalas en la pestaña <a href="#" onclick="tab('P');return false">Parámetros</a> (titular y por carga, en UF o pesos). Sin ellas la nómina sale en $0.</div>` : '');
 
-  if (D.generada) {
-    const n = D.nomina||[], tot = n.reduce((s,r)=>s+r.prima,0), emp = n.filter(r=>r.paga==='EMPLEADO').reduce((s,r)=>s+r.prima,0);
-    document.getElementById('kpis').innerHTML = kpis(n.filter(r=>!r.id_carga).length, n.filter(r=>r.id_carga).length, tot-emp, emp, tot, p, n[0]?.valor_uf);
-    document.getElementById('tb').innerHTML = n.map(r=>`<tr class="${r.id_carga?'car':'tit'}"><td></td><td>${esc(r.nombre)}</td><td>${esc(r.rut||'')}</td><td>${esc(r.relacion)}</td><td>${dmy(r.fecha_nacimiento)}</td><td>${pillPaga(r.paga)}</td><td class="text-right num">$${fmt(r.prima)}</td><td></td></tr>`).join('');
-  } else {
+  {
     document.getElementById('kpis').innerHTML = kpis(T.titulares, T.cargas, T.empresa, T.empleado, T.total, p, D.valor_uf);
     const solo = document.getElementById('fSolo').checked;
     document.getElementById('tb').innerHTML = (D.titulares||[]).filter(t => !solo || t.seguro_salud).map(t => `
@@ -343,7 +331,8 @@ function render(){
         <td class="text-right"><a href="#" onclick="editarCarga(${t.id_usuario},${c.id});return false" title="Editar carga"><i class="bi bi-pencil"></i></a></td>
       </tr>`).join('')).join('') || '<tr><td colspan="8" class="text-center text-muted py-3">Sin colaboradores</td></tr>';
   }
-  document.getElementById('tbHist').innerHTML = (D.historial||[]).map(h=>`<tr><td>${mesTxt(h.mes)}</td><td class="text-right">${h.titulares}</td><td class="text-right">${h.cargas}</td><td class="text-right">$${fmt(h.empleado)}</td><td class="text-right num">$${fmt(h.total)}</td><td>${String(h.generado_at||'').slice(0,10)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted text-center py-2">Aún no hay nóminas generadas</td></tr>';
+  const EST = { CUADRA:'Cuadra', NO_CUADRA:'No cuadra', OK_RRHH:'OK RRHH', PAGO_EMITIDO:'ODP emitida' };
+  document.getElementById('tbHist').innerHTML = (D.historial||[]).map(h=>`<tr><td>${mesTxt(h.mes)}</td><td>${EST[h.estado]||esc(h.estado)}</td><td class="text-right">${Number(h.uf_total).toLocaleString('es-CL',{minimumFractionDigits:2})}</td><td class="text-right">${Number(h.esperado_uf).toLocaleString('es-CL',{minimumFractionDigits:2})}</td><td class="text-right num">$${fmt(h.total_clp)}</td><td>${esc(h.odp_numero||'—')}</td><td>${String(h.updated_at||h.created_at||'').slice(0,10)}</td></tr>`).join('') || '<tr><td colspan="7" class="text-muted text-center py-2">Aún no hay pagos registrados</td></tr>';
   document.getElementById('tbParam').innerHTML = (D.params||[]).map(x=>{ const m = x.moneda==='UF'?'UF ':'$'; return `<tr><td>${esc(x.mes_desde)}</td><td>${esc(x.aseguradora)}</td><td class="text-right num">${m}${Number(x.prima_titular).toLocaleString('es-CL')}</td><td class="text-right num">${m}${Number(x.prima_carga).toLocaleString('es-CL')}</td><td>${x.edad_max_hijo} años (estudiante ${x.edad_max_estudiante||27})</td><td>se pide ${x.certificado_dias_antes??30} días antes · plazo ${x.certificado_plazo_dias??5} días</td><td>${Number(x.tolerancia_uf||0.05)} UF</td><td>${dmy(x.corte_cargas_empresa)}</td><td>${esc(x.creado_por||'')}</td></tr>`; }).join('') || '<tr><td colspan="9" class="text-muted text-center py-2">Sin parámetros: carga el primero</td></tr>';
   if (!document.getElementById('pMes').value) {
     document.getElementById('pMes').value = fMes.value; document.getElementById('pAseg').value = p.aseguradora||'METLIFE'; document.getElementById('pMon').value = p.moneda||'UF';
@@ -390,21 +379,10 @@ async function guardarCarga(){
   dlgCarga.close(); cargar();
 }
 async function bajaCarga(){
-  if (!confirm('¿Dar de baja esta carga? Sale del seguro; las nóminas ya generadas la conservan.')) return;
+  if (!confirm('¿Dar de baja esta carga? Sale del seguro; los pagos ya registrados la conservan.')) return;
   const j = await (await fetch('/api/rrhh/remuneraciones/seguro/carga/'+document.getElementById('dcId').value,{ method:'DELETE', headers:H })).json();
   if (!j.success) { document.getElementById('dcMsg').textContent = j.error; return; }
   dlgCarga.close(); cargar();
-}
-async function generar(){
-  const T = D.totales;
-  if (!confirm(`¿Generar la nómina del seguro de ${mesTxt(fMes.value)}?\n\n${T.titulares} titulares + ${T.cargas} cargas = $${fmt(T.total)}\nCosto AutoFácil: $${fmt(T.empresa)}\nDescuento a empleados: $${fmt(T.empleado)} (sale en la liquidación de ${mesTxt(fMes.value)})\n\nEl mes queda congelado.`)) return;
-  const j = await api('/generar','POST',{ mes:fMes.value }); if (!j.success) return alert(j.error);
-  cargar();
-}
-async function anular(){
-  const motivo = prompt('Motivo para anular la nómina (también anula los descuentos de cargas del mes):'); if (motivo==null) return;
-  const j = await api('/anular','POST',{ mes:fMes.value, motivo }); if (!j.success) return alert(j.error);
-  cargar();
 }
 async function descargar(){
   const r = await fetch('/api/rrhh/remuneraciones/seguro/nomina.xlsx?mes='+fMes.value,{headers:H});

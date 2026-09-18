@@ -17,9 +17,10 @@
      editable arriba de la nómina). Al renovar, la fecha se actualiza y hay que reenviar los
      certificados; hasta entonces esos hijos quedan fuera con aviso (Pato 17-09-2026).
    · Selección: casilla por titular (rh_fichas.seguro_salud) y por carga (rh_cargas.en_seguro).
-   · Generar la nómina CONGELA el mes (rh_seguro_nomina) y crea UN descuento VARIOS por
-     empleado con cargas a su costo (rh_descuentos.seguro_mes lo ata al mes). Anular la
-     nómina anula esos descuentos. La liquidación ya emitida no se toca.
+   · NO hay "generar nómina" (Pato 17-09-2026): la nómina del mes es la vista viva (lo que se
+     espera cobrar) y el Excel sale de ahí. Al EMITIR LA ODP del mes se crea UN descuento
+     VARIOS por empleado con cargas a su costo (rh_descuentos.seguro_mes lo ata al mes).
+     rh_seguro_nomina y generar/anular quedan como endpoints sin uso en la pantalla.
    · Primas paramétricas con vigencia desde un mes (UF o pesos): titular y por carga.
    · SOLO INDEFINIDOS (Pato 17-09-2026): el plazo fijo no tiene seguro. Cuando un contrato pasa a
      INDEFINIDO (vencimiento del plazo fijo o edición de la ficha) el motor `seguro-inscribir-aviso`
@@ -192,8 +193,7 @@ const getMes = async (req, res) => {
     const c = await calcularMes(mes);
     const [gen] = await pool.query('SELECT * FROM rh_seguro_nomina WHERE mes=? ORDER BY titular, id_carga IS NOT NULL, nombre', [mes]);
     const [params] = await pool.query('SELECT * FROM rh_seguro_param ORDER BY mes_desde DESC');
-    const [hist] = await pool.query(`SELECT mes, SUM(id_carga IS NULL) titulares, SUM(id_carga IS NOT NULL) cargas, SUM(prima) total,
-        SUM(CASE WHEN paga='EMPLEADO' THEN prima ELSE 0 END) empleado, MAX(created_at) generado_at FROM rh_seguro_nomina GROUP BY mes ORDER BY mes DESC LIMIT 24`);
+    const [hist] = await pool.query('SELECT mes, estado, uf_total, esperado_uf, total_clp, odp_numero, created_at, updated_at FROM rh_seguro_pago ORDER BY mes DESC LIMIT 36').catch(() => [[]]);
     const t = totales(c.titulares);
     ok(res, { mes, ...c, totales: { ...t, total: t.empresa + t.empleado }, generada: gen.length > 0,
       nomina: gen.map(r => ({ ...r, prima: Number(r.prima), prima_origen: Number(r.prima_origen), fecha_nacimiento: r.fecha_nacimiento ? iso(r.fecha_nacimiento) : null })),
@@ -359,29 +359,31 @@ const anular = async (req, res) => {
   } catch (e) { console.error('[seguro anular]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
-/* GET /remuneraciones/seguro/nomina.xlsx?mes= — nómina para la aseguradora (layout de la "Nómina de cotización") + resumen de costo */
+/* GET /remuneraciones/seguro/nomina.xlsx?mes= — nómina del mes desde la vista viva (layout de la "Nómina de cotización") + costo por titular */
 const nominaXlsx = async (req, res) => {
   try {
     const mes = req.query.mes;
     if (!mesOk(mes)) return fail(res, 'Mes inválido', 400);
-    const [rows] = await pool.query(`SELECT n.*, u.nombre u_nombres, u.apellido u_pat, u.apellido_materno u_mat, k.nombres k_nombres, k.apellido_paterno k_pat, k.apellido_materno k_mat
-      FROM rh_seguro_nomina n LEFT JOIN usuarios u ON u.id_usuario=n.id_usuario LEFT JOIN rh_cargas k ON k.id=n.id_carga WHERE n.mes=? ORDER BY n.titular, n.id_carga IS NOT NULL, n.nombre`, [mes]);
-    if (!rows.length) return fail(res, 'Genera la nómina del mes antes de descargarla', 400);
+    const c = await calcularMes(mes), T = c.titulares.filter(t => t.seguro_salud);
+    if (!T.length) return fail(res, 'No hay nadie marcado en el seguro este mes', 400);
     const dmy = f => f ? iso(f).split('-').reverse().join('-') : '';
-    const REL = { TITULAR: 'AS', CONYUGE: 'CO', 'CONVIVIENTE CIVIL': 'CO', HIJO: 'HI', OTRO: 'OT' };
-    const aoa1 = [['Nombre', 'Apellido Paterno', 'Apellido Materno', 'Fecha Nacimiento', 'Sexo', 'Relación', 'RUT', 'Titular', 'Estado asegurado'],
-      ...rows.map(r => r.id_carga ? [r.k_nombres || r.nombre, r.k_pat || '', r.k_mat || '', dmy(r.fecha_nacimiento), r.sexo || '', REL[r.relacion] || r.relacion, r.rut || '', r.titular, 'VIGENTE']
-                                  : [r.u_nombres || r.nombre, r.u_pat || '', r.u_mat || '', dmy(r.fecha_nacimiento), r.sexo || '', 'AS', r.rut || '', r.titular, 'VIGENTE'])];
-    const porTit = {};
-    for (const r of rows) { const t = (porTit[r.id_usuario] = porTit[r.id_usuario] || { titular: r.titular, cargas: 0, empresa: 0, empleado: 0 }); if (r.id_carga) t.cargas++; t[r.paga === 'EMPLEADO' ? 'empleado' : 'empresa'] += Number(r.prima); }
-    const lista = Object.values(porTit);
-    const aoa2 = [['Titular', 'Cargas', 'Costo empresa', 'Descuento al empleado', 'Total'], ...lista.map(t => [t.titular, t.cargas, t.empresa, t.empleado, t.empresa + t.empleado]),
-      [], ['TOTAL', lista.reduce((s, t) => s + t.cargas, 0), lista.reduce((s, t) => s + t.empresa, 0), lista.reduce((s, t) => s + t.empleado, 0), lista.reduce((s, t) => s + t.empresa + t.empleado, 0)]];
+    const REL = { CONYUGE: 'CO', 'CONVIVIENTE CIVIL': 'CO', HIJO: 'HI', OTRO: 'OT' };
+    const aoa1 = [['Nombre', 'Apellido Paterno', 'Apellido Materno', 'Fecha Nacimiento', 'Sexo', 'Relación', 'RUT', 'Titular', 'Paga']];
+    const aoa2 = [['Titular', 'Cargas', 'Costo empresa', 'Descuento al empleado', 'Total']];
+    let tc = 0, te = 0, td = 0;
+    for (const t of T) {
+      aoa1.push([t.nombres || t.nombre, t.apellido || '', t.apellido_materno || '', dmy(t.fecha_nacimiento), t.sexo || '', 'AS', t.rut || '', t.nombre, 'EMPRESA']);
+      const cs = t.cargas.filter(k => k.incluida);
+      for (const k of cs) aoa1.push([k.nombres, k.apellido_paterno || '', k.apellido_materno || '', dmy(k.fecha_nacimiento), k.sexo || '', REL[k.relacion] || k.relacion, k.rut || '', t.nombre, k.paga]);
+      aoa2.push([t.nombre, cs.length, t.costo_empresa, t.costo_empleado, t.costo_empresa + t.costo_empleado]);
+      tc += cs.length; te += t.costo_empresa; td += t.costo_empleado;
+    }
+    aoa2.push([], ['TOTAL', tc, te, td, te + td]);
     const wb = XLSX.utils.book_new();
-    const ws1 = XLSX.utils.aoa_to_sheet(aoa1); ws1['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 6 }, { wch: 9 }, { wch: 13 }, { wch: 28 }, { wch: 16 }];
+    const ws1 = XLSX.utils.aoa_to_sheet(aoa1); ws1['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 6 }, { wch: 9 }, { wch: 13 }, { wch: 28 }, { wch: 10 }];
     const ws2 = XLSX.utils.aoa_to_sheet(aoa2); ws2['!cols'] = [{ wch: 30 }, { wch: 8 }, { wch: 15 }, { wch: 22 }, { wch: 14 }];
     XLSX.utils.book_append_sheet(wb, ws1, 'Nomina de cotizacion'); XLSX.utils.book_append_sheet(wb, ws2, 'Costo por titular');
-    auditar({ req, accion: 'EXPORTAR', modulo: 'rrhh', entidad: 'seguro_nomina', detalle: `Descargó nómina seguro de salud ${mes} (${rows.length} asegurados)` });
+    auditar({ req, accion: 'EXPORTAR', modulo: 'rrhh', entidad: 'seguro_nomina', detalle: `Descargó nómina seguro de salud ${mes} (${T.length} titulares, ${tc} cargas)` });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="nomina-seguro-salud-${mes}.xlsx"`);
     res.send(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
@@ -652,6 +654,18 @@ const emitirOdp = async (req, res) => {
       for (const d of docs) { const buf = await alm.obtener({ ruta: d.doc_ruta, blob: d.archivo }); if (buf) { await pv.guardarFacturaDoc({ origen: 'ODP', ref_id: r.insertId, nombre: d.nombre, mime: d.mime, buffer: buf, usuario: nombreDe(u) }); adjuntos.push({ filename: d.nombre, content: buf, contentType: d.mime || undefined }); } }
     } catch (e) { console.error('[seguro odp adjuntos]', e.message); }
     await pool.query("UPDATE rh_seguro_pago SET estado='PAGO_EMITIDO', odp_id=?, odp_numero=?, updated_at=NOW() WHERE id=?", [r.insertId, numero, pago.id]);
+    // Descuentos de cargas a costo del empleado: nacen con el pago del mes (un descuento por empleado, una cuota)
+    let nDesc = 0, totDesc = 0;
+    try {
+      const cm = await calcularMes(mes);
+      await pool.query("UPDATE rh_descuentos SET estado='ANULADO', anulado_por='Sistema (reemisión seguro)', anulado_at=NOW() WHERE seguro_mes=? AND estado='VIGENTE'", [mes]);
+      for (const t of cm.titulares.filter(x => x.seguro_salud && x.costo_empleado > 0)) {
+        const n = t.cargas.filter(k => k.incluida && k.paga === 'EMPLEADO').length;
+        await pool.query(`INSERT INTO rh_descuentos (id_usuario, tipo, detalle_texto, monto_total, cuotas, valor_cuota, mes_inicio, creado_por, moneda, seguro_mes)
+          VALUES (?,'VARIOS',?,?,1,?,?,?,'CLP',?)`, [t.id_usuario, `Seguro complementario de salud — ${n} carga${n === 1 ? '' : 's'} (${prov.nombre})`, t.costo_empleado, t.costo_empleado, mes, nombreDe(u), mes]);
+        nDesc++; totDesc += t.costo_empleado;
+      }
+    } catch (e3) { console.error('[seguro odp descuentos]', e3.message); }
     // Correo a Contabilidad con copia a RRHH y a quien emitió (Pato 17-09-2026)
     let correo = { enviado: false, motivo: 'no intentado' };
     try {
@@ -666,7 +680,7 @@ const emitirOdp = async (req, res) => {
         TITULARES: e_titulares(pago), CARGAS: e_cargas(pago), CUADRATURA: pago.estado === 'CUADRA' ? 'cuadra' : `NO cuadra (diferencia ${pago.diferencia_uf} UF) — OK de RRHH: ${pago.ok_por}, ${pago.ok_motivo}`,
         QUIEN: nombreDe(u) || 'Sistema', LINK: base + '/ordenes-pago/historial/' } });
     } catch (e2) { correo = { enviado: false, motivo: e2.message }; }
-    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'seguro_pago', entidad_id: pago.id, detalle: `Emitió ${numero} a ${prov.nombre} por ${CLP(pago.total_clp)} — seguro de salud ${mes} · correo a Contabilidad ${correo.enviado ? 'enviado a ' + (correo.to || []).join(', ') + (correo.cc?.length ? ' cc ' + correo.cc.join(', ') : '') : 'NO enviado: ' + correo.motivo}` });
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'seguro_pago', entidad_id: pago.id, detalle: `Emitió ${numero} a ${prov.nombre} por ${CLP(pago.total_clp)} — seguro de salud ${mes}${nDesc ? ` · ${nDesc} descuento(s) a empleados por ${CLP(totDesc)}` : ''} · correo a Contabilidad ${correo.enviado ? 'enviado a ' + (correo.to || []).join(', ') + (correo.cc?.length ? ' cc ' + correo.cc.join(', ') : '') : 'NO enviado: ' + correo.motivo}` });
     ok(res, { odp_id: r.insertId, odp_numero: numero, correo });
   } catch (e) { console.error('[seguro odp]', e.message); fail(res, 'Error interno del servidor'); }
 };
