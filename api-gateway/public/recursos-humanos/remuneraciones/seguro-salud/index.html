@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguro de Salud — AutoFácil</title>
+  <!-- v1.3 — solo contrato INDEFINIDO: el plazo fijo aparece sin casilla (PLAZO FIJO — sin seguro); al pasar a indefinido el sistema lo marca titular y avisa a RRHH con copia a Contabilidad (Pato 17-09-2026) -->
   <!-- v1.2 — póliza (número y vigencia) editable arriba de la nómina; el certificado de estudios es una casilla y vale hasta la renovación de la póliza; al renovar avisa cuántos certificados hay que reenviar (Pato 17-09-2026) -->
   <!-- v1.1 — hijo sobre la edad máxima con certificado de estudios vigente sigue en la nómina (fecha de vigencia en la carga, etiqueta ESTUDIANTE, aviso cuando vence) (Pato 17-09-2026) -->
   <!-- v1.0 — Seguro Complementario de Salud (MetLife): nómina mensual de titulares y cargas con casillas de selección, registro de cargas, quién paga (empresa según fecha de corte de contratación / empleado con descuento en la liquidación), edad máxima de hijos, primas paramétricas con vigencia, generar congela el mes y crea los descuentos, Excel para la aseguradora (Pato 17-09-2026) -->
@@ -38,7 +39,7 @@
 <script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Recursos Humanos', href:'/recursos-humanos/' }, { label:'Remuneraciones', href:'/recursos-humanos/remuneraciones/' }, { label:'Seguro de Salud', icon:'bi-heart-pulse', current:true } ] };</script>
 <script src="/js/topnav.js"></script>
 <div class="main-content">
-  <div class="page-banner"><i class="bi bi-heart-pulse"></i><div><h2>Seguro Complementario de Salud</h2><p>Nómina mensual de asegurados: el titular lo paga AutoFácil; las cargas las paga la empresa (contratados hasta la fecha de corte) o el empleado, con descuento en su liquidación. Marca quiénes van en la nómina del mes.</p></div></div>
+  <div class="page-banner"><i class="bi bi-heart-pulse"></i><div><h2>Seguro Complementario de Salud</h2><p>Nómina mensual de asegurados, solo contratos indefinidos: el titular lo paga AutoFácil; las cargas las paga la empresa (contratados hasta la fecha de corte) o el empleado, con descuento en su liquidación. Marca quiénes van en la nómina del mes.</p></div></div>
 
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><a class="nav-link active" href="#" id="tabM" onclick="tab('M');return false"><i class="bi bi-people me-1"></i>Nómina del mes</a></li>
@@ -96,7 +97,7 @@
 
   <div class="foot mt-3"><b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
     <ul class="mb-0">
-      <li><b>Casilla del titular</b> → si el colaborador va en la nómina del seguro (se guarda en su <a href="/recursos-humanos/colaboradores/">ficha</a>). Al desmarcarlo salen también sus cargas.</li>
+      <li><b>Casilla del titular</b> → si el colaborador va en la nómina del seguro (se guarda en su <a href="/recursos-humanos/colaboradores/">ficha</a>). Al desmarcarlo salen también sus cargas. Solo contrato <b>INDEFINIDO</b>: cuando un plazo fijo pasa a indefinido, el sistema lo marca titular y manda el correo <i>Inscribir en el seguro complementario</i> a RRHH con copia a Contabilidad (<a href="/mantenedores/correos/">Correos del Sistema</a>).</li>
       <li><b>Cargas</b> (botón <i class="bi bi-person-plus"></i>) → registro único de los beneficiarios del seguro. No son los contadores de cargas de la asignación familiar de la ficha.</li>
       <li><b>Paga: Empleado</b> → al generar la nómina se crea un descuento en <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a> que sale en la <a href="/recursos-humanos/remuneraciones/liquidaciones/">liquidación</a> de ese mes. <b>Paga: Empresa</b> → costo de AutoFácil, sin descuento.</li>
       <li><b>Empresa paga cargas de contratados hasta</b> → define quién paga por defecto según la fecha de ingreso del colaborador; se puede corregir carga por carga.</li>
@@ -175,8 +176,8 @@ function render(){
     const solo = document.getElementById('fSolo').checked;
     document.getElementById('tb').innerHTML = (D.titulares||[]).filter(t => !solo || t.seguro_salud).map(t => `
       <tr class="tit ${t.seguro_salud?'':'fuera'}">
-        <td><input type="checkbox" class="form-check-input" ${t.seguro_salud?'checked':''} onchange="marcarTitular(${t.id_usuario},this.checked)" title="Va en la nómina del seguro"></td>
-        <td>${esc(t.nombre)}${t.baja?' <span class="pill" style="background:#111827;color:#fff">CONTRATO TERMINADO</span>':''}<div class="small text-muted fw-normal">Ingreso ${dmy(t.fecha_ingreso)}</div></td>
+        <td>${t.elegible?`<input type="checkbox" class="form-check-input" ${t.seguro_salud?'checked':''} onchange="marcarTitular(${t.id_usuario},this.checked)" title="Va en la nómina del seguro">`:''}</td>
+        <td>${esc(t.nombre)}${t.baja?' <span class="pill" style="background:#111827;color:#fff">CONTRATO TERMINADO</span>':''}${!t.elegible?` <span class="pill" style="background:#f1f5f9;color:#64748b" title="El seguro es solo para contrato indefinido; al pasar a indefinido el sistema lo marca y avisa a RRHH">${esc(t.tipo_contrato||'SIN CONTRATO')} — sin seguro</span>`:''}<div class="small text-muted fw-normal">Ingreso ${dmy(t.fecha_ingreso)}</div></td>
         <td>${esc(t.rut||'')}</td><td>TITULAR</td><td>${dmy(t.fecha_nacimiento)}</td><td>${pillPaga('EMPRESA')}</td>
         <td class="text-right num">$${fmt(t.prima)}</td>
         <td class="text-right"><button class="btn btn-sm btn-outline-primary py-0" onclick="nuevaCarga(${t.id_usuario})" title="Agregar carga"><i class="bi bi-person-plus"></i></button></td>

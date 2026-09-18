@@ -464,6 +464,26 @@ Recursos Humanos — AutoFácil`,
     variables: '{NOMBRE} {NOMBRE_COMPLETO} {MONTO} {CONCEPTO} {GLOSA} {FECHA} {MES_DESCUENTO} {CUOTAS} {CUOTA} {BANCO} {CUENTA}',
   },
   {
+    codigo: 'seguro_inscribir_aviso',
+    ambito: 'Recursos Humanos — Seguro de Salud',
+    nombre: 'Colaborador pasó a INDEFINIDO → inscribirlo en el seguro (RRHH, copia Contabilidad)',
+    descripcion: 'Sale solo cuando un contrato pasa a INDEFINIDO (por vencimiento del plazo fijo o al editar la ficha): el seguro complementario de salud es solo para indefinidos y RRHH debe inscribir a la persona en la aseguradora. Copia a Contabilidad. Una vez por persona.',
+    asunto: 'Inscribir en el seguro complementario: {NOMBRE}',
+    cuerpo: `Estimados:
+
+{NOMBRE_COMPLETO} (RUT {RUT}) pasó a contrato INDEFINIDO el {FECHA}. Corresponde inscribirlo(a) en el seguro complementario de salud ({ASEGURADORA}, póliza {POLIZA}).
+
+El sistema ya lo(a) marcó como titular: aparecerá en la nómina del seguro desde {MES}. Falta hacer la inscripción en el portal de la aseguradora y, si corresponde, registrar sus cargas en la ficha.
+{LINK}
+
+Saludos cordiales,
+Auto Fácil Business Suite`,
+    para_perfiles: 'Consultora Recursos Humanos',
+    cc: 'recursos.humanos@autofacilchile.cl',
+    destinatario: 'Los perfiles marcados aquí abajo (RRHH) + la casilla de RRHH y Contabilidad en copia',
+    variables: '{NOMBRE} {NOMBRE_COMPLETO} {RUT} {FECHA} {MES} {ASEGURADORA} {POLIZA} {LINK}',
+  },
+  {
     codigo: 'edenred_generar_aviso',
     ambito: 'Recursos Humanos — Edenred',
     nombre: 'Hoy se genera la nómina Edenred → RRHH y Gerente de Finanzas',

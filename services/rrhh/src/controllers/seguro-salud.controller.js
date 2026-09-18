@@ -20,7 +20,12 @@
    · Generar la nómina CONGELA el mes (rh_seguro_nomina) y crea UN descuento VARIOS por
      empleado con cargas a su costo (rh_descuentos.seguro_mes lo ata al mes). Anular la
      nómina anula esos descuentos. La liquidación ya emitida no se toca.
-   · Primas paramétricas con vigencia desde un mes (UF o pesos): titular y por carga. */
+   · Primas paramétricas con vigencia desde un mes (UF o pesos): titular y por carga.
+   · SOLO INDEFINIDOS (Pato 17-09-2026): el plazo fijo no tiene seguro. Cuando un contrato pasa a
+     INDEFINIDO (vencimiento del plazo fijo o edición de la ficha) el motor `seguro-inscribir-aviso`
+     lo marca titular y manda correo a RRHH con copia a Contabilidad para que lo inscriban en la
+     aseguradora (plantilla seguro_inscribir_aviso, una vez por persona: rh_fichas.seguro_aviso_at).
+     Los indefinidos existentes al 17-09-2026 se dieron por informados. */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const XLSX = require('xlsx');
@@ -74,6 +79,13 @@ require('../../../../shared/migrate').migrar('rrhh-cargas-fuente-unica', async (
     SELECT h.id_usuario, h.nombre, h.rut, h.fecha_nacimiento, 'HIJO', h.es_carga, 0, 'Migrado de rh_hijos'
       FROM rh_hijos h WHERE NOT EXISTS (SELECT 1 FROM rh_cargas c WHERE c.id_usuario=h.id_usuario AND (c.rut=h.rut OR c.nombres=h.nombre))`).catch(() => {});
 });
+require('../../../../shared/migrate').migrar('rrhh-seguro-solo-indefinidos', async () => {
+  await pool.query('ALTER TABLE rh_fichas ADD COLUMN IF NOT EXISTS seguro_aviso_at DATETIME NULL');
+  // Punto de partida: los indefinidos de hoy ya fueron informados a la aseguradora (Pato) → titulares, sin correo
+  await pool.query("UPDATE rh_fichas f JOIN usuarios u ON u.id_usuario=f.id_usuario SET f.seguro_salud=1, f.seguro_aviso_at=NOW() WHERE u.estado='activo' AND f.tipo_contrato='INDEFINIDO' AND f.seguro_aviso_at IS NULL");
+  // El plazo fijo no tiene seguro
+  await pool.query("UPDATE rh_fichas SET seguro_salud=0 WHERE tipo_contrato<>'INDEFINIDO' AND seguro_salud=1");
+});
 require('../../../../shared/migrate').migrar('rrhh-seguro-salud-poliza', async () => {
   await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_estudios TINYINT(1) NOT NULL DEFAULT 0');
   await pool.query('UPDATE rh_cargas SET certificado_estudios=1 WHERE certificado_estudios_hasta IS NOT NULL');
@@ -111,7 +123,7 @@ async function calcularMes(mes) {
   const aCLP = v => Math.round(p.moneda === 'UF' ? (Number(v) || 0) * (valorUF || 0) : (Number(v) || 0));
   const [gente] = await pool.query(
     `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.nombre nombres, u.apellido, u.apellido_materno, u.rut, u.sexo,
-            u.fecha_nacimiento, u.fecha_ingreso, u.fecha_baja, COALESCE(f.seguro_salud,0) seguro_salud
+            u.fecha_nacimiento, u.fecha_ingreso, u.fecha_baja, COALESCE(f.seguro_salud,0) seguro_salud, f.tipo_contrato
        FROM usuarios u JOIN rh_fichas f ON f.id_usuario=u.id_usuario
       WHERE COALESCE(f.sueldo_base,0) > 0 AND (u.estado='activo' OR (u.fecha_baja IS NOT NULL AND u.fecha_baja > ?))
       ORDER BY nombre`, [ini]);
@@ -136,6 +148,7 @@ async function calcularMes(mes) {
     const costoEmpleado = cs.filter(c => c.incluida && c.paga === 'EMPLEADO').reduce((s, c) => s + c.prima, 0);
     return { id_usuario: g.id_usuario, nombre: g.nombre, rut: g.rut, sexo: g.sexo, fecha_nacimiento: g.fecha_nacimiento ? iso(g.fecha_nacimiento) : null,
       fecha_ingreso: g.fecha_ingreso ? iso(g.fecha_ingreso) : null, seguro_salud: g.seguro_salud ? 1 : 0, baja: g.fecha_baja ? 1 : 0,
+      tipo_contrato: g.tipo_contrato || null, elegible: g.tipo_contrato === 'INDEFINIDO',
       nombre_completo: [g.nombres, g.apellido, g.apellido_materno].filter(Boolean).join(' '),
       prima: primaTit, cargas: cs, costo_empresa: costoEmpresa, costo_empleado: costoEmpleado };
   });
@@ -206,6 +219,8 @@ const putTitular = async (req, res) => {
   try {
     const idU = Number(req.body?.id_usuario), v = req.body?.seguro_salud ? 1 : 0;
     if (!idU) return fail(res, 'Colaborador requerido', 400);
+    if (v) { const [[f]] = await pool.query('SELECT tipo_contrato FROM rh_fichas WHERE id_usuario=?', [idU]);
+      if (f && f.tipo_contrato !== 'INDEFINIDO') return fail(res, `El seguro es solo para contrato INDEFINIDO (esta ficha dice ${f.tipo_contrato || 'sin tipo'})`, 400); }
     const [r] = await pool.query('UPDATE rh_fichas SET seguro_salud=? WHERE id_usuario=?', [v, idU]);
     if (!r.affectedRows) return fail(res, 'Ficha no encontrada', 404);
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'ficha', entidad_id: idU, detalle: `Seguro complementario de salud ${v ? 'INCLUIDO' : 'excluido'} (usuario ${idU})` });
@@ -342,4 +357,35 @@ const nominaXlsx = async (req, res) => {
   } catch (e) { console.error('[seguro xlsx]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
-module.exports = { getMes, putParam, putPoliza, putTitular, guardarCarga, seleccionCarga, bajaCarga, generar, anular, nominaXlsx, calcularMes };
+/* ── Motor: contrato que pasa a INDEFINIDO → titular + aviso a RRHH (copia Contabilidad) ── */
+async function avisarInscripcion() {
+  try {
+    const [gente] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) nombre_completo, u.rut, u.email
+         FROM usuarios u JOIN rh_fichas f ON f.id_usuario=u.id_usuario
+        WHERE u.estado='activo' AND f.tipo_contrato='INDEFINIDO' AND f.seguro_aviso_at IS NULL AND COALESCE(f.sueldo_base,0) > 0`);
+    if (!gente.length) return;
+    const plant = require('../../../../shared/plantillas-correo');
+    const { destinatariosContabilidad } = require('../../../../shared/correo-contabilidad');
+    const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+    const hoy = iso(new Date()), mes = hoy.slice(0, 7), p = await paramDe(mes), pol = await polizaVigente();
+    const mesTxt = `${['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][Number(mes.slice(5))]} ${mes.slice(0, 4)}`;
+    const base = process.env.APP_URL || 'https://afbs.autofacilchile.cl';
+    const [rrhh] = await pool.query("SELECT u.id_usuario FROM usuarios u JOIN perfiles pf ON pf.id_perfil=u.id_perfil WHERE pf.nombre='Consultora Recursos Humanos' AND u.estado='activo'");
+    for (const g of gente) {
+      await pool.query('UPDATE rh_fichas SET seguro_salud=1, seguro_aviso_at=NOW() WHERE id_usuario=?', [g.id_usuario]);
+      const ctb = await destinatariosContabilidad();
+      const r = await plant.enviar({ codigo: 'seguro_inscribir_aviso', cc: [ctb.to, ...(ctb.cc || [])],
+        datos: { NOMBRE: g.nombre, NOMBRE_COMPLETO: g.nombre_completo, RUT: g.rut || '—', FECHA: hoy.split('-').reverse().join('-'), MES: mesTxt,
+                 ASEGURADORA: p.aseguradora || 'METLIFE', POLIZA: pol.numero || '—', LINK: base + '/recursos-humanos/remuneraciones/seguro-salud/' } });
+      await notificar(rrhh.map(x => x.id_usuario), { tipo: 'RRHH', prioridad: 'alta', sonar: true, titulo: `Inscribir en el seguro: ${g.nombre}`,
+        mensaje: `Pasó a contrato INDEFINIDO: inscribirlo(a) en el seguro complementario (${p.aseguradora || 'METLIFE'}). Ya quedó como titular en la nómina.`,
+        href: '/recursos-humanos/remuneraciones/seguro-salud/', clave: `seguro_inscribir_${g.id_usuario}` }).catch(() => {});
+      auditar({ req: null, accion: 'CREAR', modulo: 'rrhh', entidad: 'seguro_titular', entidad_id: g.id_usuario,
+        detalle: `${g.nombre} pasó a INDEFINIDO: marcado titular del seguro de salud y aviso a RRHH (copia Contabilidad) — correo ${r.enviado ? 'enviado a ' + (r.to || []).join(', ') : 'NO enviado: ' + r.motivo}` });
+    }
+  } catch (e) { console.error('[seguro inscribir]', e.message); }
+}
+require('../../../../shared/scheduler').programar('seguro-inscribir-aviso', avisarInscripcion, 60 * 60 * 1000);
+
+module.exports = { avisarInscripcion, getMes, putParam, putPoliza, putTitular, guardarCarga, seleccionCarga, bajaCarga, generar, anular, nominaXlsx, calcularMes };
