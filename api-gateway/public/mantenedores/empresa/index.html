@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Datos de la Empresa — Mantenedores</title>
-  <!-- v1.1 — al guardar invalida la caché de sesión de /js/empresa.js. v1.0 — mantenedor nuevo: razón social, RUT, giro, domicilio, representante legal, contacto, CCAF y mutual en una sola fuente (shared/empresa.js) -->
+  <!-- v1.2 — País. v1.1 — al guardar invalida la caché de sesión de /js/empresa.js. v1.0 — mantenedor nuevo: razón social, RUT, giro, domicilio, representante legal, contacto, CCAF y mutual en una sola fuente (shared/empresa.js) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -46,7 +46,8 @@
     <div class="row">
       <div class="col-md-6"><div class="fld"><label>Domicilio</label><input id="domicilio" placeholder="Av. Ejemplo 1234, of. 56"></div></div>
       <div class="col-md-3"><div class="fld"><label>Comuna</label><input id="comuna"></div></div>
-      <div class="col-md-3"><div class="fld"><label>Ciudad</label><input id="ciudad" placeholder="Santiago"><div class="hint">Sale en la comparecencia del finiquito.</div></div></div>
+      <div class="col-md-2"><div class="fld"><label>Ciudad</label><input id="ciudad" placeholder="Santiago"><div class="hint">Comparecencia del finiquito.</div></div></div>
+      <div class="col-md-1"><div class="fld"><label>País</label><input id="pais" placeholder="Chile"></div></div>
       <div class="col-md-3"><div class="fld"><label>Teléfono</label><input id="telefono"></div></div>
       <div class="col-md-4"><div class="fld"><label>Email</label><input id="email"></div></div>
       <div class="col-md-5"><div class="fld"><label>Sitio web</label><input id="web"></div></div>
@@ -89,7 +90,7 @@
   const token=sessionStorage.getItem('token'), yo=JSON.parse(sessionStorage.getItem('usuario')||'null');
   if(!token||!yo) location.href='/login.html';
   const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
-  const CAMPOS=['razon_social','nombre_fantasia','rut','giro','actividad_economica','domicilio','comuna','ciudad','representante','rut_representante','telefono','email','web','ccaf','mutual','sucursal_mutual'];
+  const CAMPOS=['razon_social','nombre_fantasia','rut','giro','actividad_economica','domicilio','comuna','ciudad','pais','representante','rut_representante','telefono','email','web','ccaf','mutual','sucursal_mutual'];
   async function cargar(){
     const j=await(await fetch('/api/empresa',{headers:H})).json(); if(!j.success) return alert(j.error);
     const d=j.data||{};

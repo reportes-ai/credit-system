@@ -15,7 +15,7 @@
 const pool = require('./config/database');
 
 const CAMPOS = ['razon_social', 'nombre_fantasia', 'rut', 'giro', 'actividad_economica', 'domicilio', 'comuna', 'ciudad',
-  'representante', 'rut_representante', 'telefono', 'email', 'web', 'logo_url', 'ccaf', 'mutual', 'sucursal_mutual'];
+  'pais', 'representante', 'rut_representante', 'telefono', 'email', 'web', 'logo_url', 'ccaf', 'mutual', 'sucursal_mutual'];
 
 require('./migrate').migrar('empresa-config', async () => {
   await pool.query(`CREATE TABLE IF NOT EXISTS empresa_config (
@@ -54,6 +54,12 @@ require('./migrate').migrar('empresa-config', async () => {
      cred?.telefono || null, cred?.email || null, cred?.web || 'https://www.autofacilchile.cl', prev?.ccaf || '00', prev?.mutual || '02', prev?.sucursal_mutual || null]);
   console.log('[empresa] empresa_config sembrada desde credenciales/finiquito/previred');
 });
+// País (Pato 18-09-2026) + representante legal inicial: el Gerente General activo
+require('./migrate').migrar('empresa-config-pais-representante', async () => {
+  await pool.query("ALTER TABLE empresa_config ADD COLUMN IF NOT EXISTS pais VARCHAR(60) NOT NULL DEFAULT 'Chile'");
+  const [[gg]] = await pool.query("SELECT CONCAT_WS(' ', nombre, apellido, apellido_materno) nombre, rut FROM usuarios WHERE estado='activo' AND UPPER(COALESCE(cargo,'')) LIKE '%GERENTE GENERAL%' ORDER BY id_usuario LIMIT 1").catch(() => [[null]]);
+  if (gg) await pool.query("UPDATE empresa_config SET representante=COALESCE(NULLIF(representante,''), ?), rut_representante=COALESCE(NULLIF(rut_representante,''), ?), comuna=COALESCE(comuna,'Las Condes') WHERE id=1", [gg.nombre, String(gg.rut || '').replace(/\./g, '').toUpperCase()]);
+});
 
 let cache = null, cacheAt = 0;
 const fmtRut = r => { const s = String(r || '').replace(/\./g, '').toUpperCase(); const [n, dv] = s.split('-'); if (!n || !dv) return s; return n.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + dv; };
@@ -62,7 +68,7 @@ const fmtRut = r => { const s = String(r || '').replace(/\./g, '').toUpperCase()
 async function datosEmpresa() {
   if (cache && Date.now() - cacheAt < 60000) return cache;
   const [[e]] = await pool.query('SELECT * FROM empresa_config WHERE id=1').catch(() => [[null]]);
-  const d = e || { razon_social: 'AUTOFÁCIL SpA', rut: '76545638-K', ccaf: '00', mutual: '02' };
+  const d = e || { razon_social: 'AUTOFÁCIL SpA', rut: '76545638-K', pais: 'Chile', ccaf: '00', mutual: '02' };
   cache = { ...d, rut: String(d.rut || '').replace(/\./g, '').toUpperCase(), rut_formateado: fmtRut(d.rut), nombre: d.nombre_fantasia || d.razon_social,
             rut_representante_formateado: d.rut_representante ? fmtRut(d.rut_representante) : '' };
   cacheAt = Date.now();
