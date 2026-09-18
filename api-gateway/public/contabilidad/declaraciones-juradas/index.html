@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Declaraciones Juradas — AutoFácil</title>
-  <!-- v1.1 — DJ 1887 (sueldos): renta neta por el motor único de la base tributable, siglas mensuales, horas, resumen y archivo SII. v1.0 — DJ 1879 (honorarios) desde el auxiliar: retención actualizada por factor SII, marcas mensuales, resumen sección C, archivo de carga SII; factores paramétricos -->
+  <!-- v1.2 — cabeceras con la empresa desde Datos de la Empresa. v1.1 — DJ 1887 (sueldos): renta neta por el motor único de la base tributable, siglas mensuales, horas, resumen y archivo SII. v1.0 — DJ 1879 (honorarios) desde el auxiliar: retención actualizada por factor SII, marcas mensuales, resumen sección C, archivo de carga SII; factores paramétricos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -117,6 +117,8 @@
 </div>
 
 <script src="/js/auth-guard.js"></script>
+<script src="/js/empresa.js"></script>
+<script>let EMP={}; AF_EMPRESA.then(e=>{EMP=e;});</script>
 <script>
 const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
@@ -149,7 +151,7 @@ async function cargar1879(){
   DJ = j.data; btnCsv.disabled = !DJ.filas.length; lblCsv.textContent = '';
   const R = DJ.resumen;
   out1879.innerHTML = `
-  <div class="text-center mb-3"><b>AUTOFACIL SPA · RUT 76.545.638-K · DJ 1879 · Año Tributario ${DJ.anio_tributario} (rentas ${DJ.anio})</b>
+  <div class="text-center mb-3"><b>${(EMP.razon_social||'').toUpperCase()} · RUT ${EMP.rut_formateado||''} · DJ 1879 · Año Tributario ${DJ.anio_tributario} (rentas ${DJ.anio})</b>
     ${DJ.provisoria ? ' <span class="badge-prov">PROVISORIA</span>' : ''}<div class="small text-muted">Tasa de retención del año: ${String(DJ.tasa_anio).replace('.',',')}%</div></div>
   ${DJ.avisos.map(a => `<div class="aviso ${a.nivel} no-print">${esc(a.texto)}</div>`).join('')}
   <div class="panel no-print"><h6>BOLETAS POR MES EN EL AUXILIAR (con retención / total) · FACTOR</h6><div class="strip">
@@ -192,7 +194,7 @@ async function cargar1887(){
   DJ7 = j.data; btnCsv7.disabled = !DJ7.filas.length; lblCsv7.textContent = '';
   const R = DJ7.resumen;
   out1887.innerHTML = `
-  <div class="text-center mb-3"><b>AUTOFACIL SPA · RUT 76.545.638-K · DJ 1887 · Año Tributario ${DJ7.anio_tributario} (rentas ${DJ7.anio})</b>
+  <div class="text-center mb-3"><b>${(EMP.razon_social||'').toUpperCase()} · RUT ${EMP.rut_formateado||''} · DJ 1887 · Año Tributario ${DJ7.anio_tributario} (rentas ${DJ7.anio})</b>
     ${DJ7.provisoria ? ' <span class="badge-prov">PROVISORIA</span>' : ''}</div>
   ${DJ7.avisos.map(a => `<div class="aviso ${a.nivel} no-print">${esc(a.texto)}</div>`).join('')}
   <div class="panel no-print"><h6>TRABAJADORES POR MES · RENTA NETA DEL MES (SIN ACTUALIZAR) · FACTOR</h6><div class="strip">

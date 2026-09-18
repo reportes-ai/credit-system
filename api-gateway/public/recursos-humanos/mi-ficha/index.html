@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Ficha — AutoFácil</title>
-  <!-- v1.16 — RUT de la empresa corregido (76.545.638-K). v1.15 — conserva la fecha de envío del certificado al guardar. v1.14 — Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, seguro de salud; la fila conserva su id al guardar (Pato 17-09-2026). v1.13 — logo real de AutoFácil en la liquidación impresa. v1.12 — mes de comisiones a la chilena. v1.11 — liquidación con glosa por descuento. v1.10 — pensionado: AFP 'Pensionado (no cotiza)'. v1.9 — Previsión y Pago: plan Isapre en UF y pesos del día. v1.8 — foto real de Credenciales en el avatar del hero -->
+  <!-- v1.17 — razón social y RUT de la liquidación desde Datos de la Empresa. v1.16 — RUT de la empresa corregido (76.545.638-K). v1.15 — conserva la fecha de envío del certificado al guardar. v1.14 — Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, seguro de salud; la fila conserva su id al guardar (Pato 17-09-2026). v1.13 — logo real de AutoFácil en la liquidación impresa. v1.12 — mes de comisiones a la chilena. v1.11 — liquidación con glosa por descuento. v1.10 — pensionado: AFP 'Pensionado (no cotiza)'. v1.9 — Previsión y Pago: plan Isapre en UF y pesos del día. v1.8 — foto real de Credenciales en el avatar del hero -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -94,6 +94,8 @@
 <div class="toast" id="toast"></div>
 
 <script src="/js/auth-guard.js"></script>
+<script src="/js/empresa.js"></script>
+<script>let EMP={}; AF_EMPRESA.then(e=>{EMP=e;});</script>
 <script>
 const token = sessionStorage.getItem('token'), yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
 if (!token||!yo) location.href='/login.html';
@@ -324,7 +326,7 @@ async function verLiq(id){
   <body style="font-family:Segoe UI,sans-serif;max-width:620px;margin:30px auto;color:#1e293b;font-size:13px">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="height:36px;display:block;margin-bottom:8px">
     <h3 style="color:#012d70;margin:0">LIQUIDACIÓN DE SUELDO — ${l.mes}</h3>
-    <div style="color:#64748b;font-size:12px;margin-bottom:12px">AutoFácil SpA · RUT 76.545.638-K</div>
+    <div style="color:#64748b;font-size:12px;margin-bottom:12px">${esc(EMP.razon_social||'')} · RUT ${esc(EMP.rut_formateado||'')}</div>
     <p><b>${esc(l.nombre)}</b> · ${esc(l.rut||'')} · ${esc(l.cargo||'')}<br>
     <span style="color:#64748b;font-size:12px">${esc(d.tipo_contrato||'')} · AFP ${esc(d.afp||'—')} · ${esc(d.salud||'—')}</span></p>
     <table style="width:100%;border-collapse:collapse">

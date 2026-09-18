@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.12 — tipo Descuentos varios (glosa libre obligatoria, N cuotas). v1.11 — la nómina Caja muestra CUOTA 49 de 60 (no PERMANENTE) · v1.10 — numeración REAL de la cuota (cuota_desde/cuotas_total): un plan que venía andando muestra "cuota 3 de 4" y no "2 de 3"; la nómina Caja la toma de "17/27" · v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
+  <!-- v1.13 — convenio de descuento con razón social y RUT desde Datos de la Empresa. v1.12 — tipo Descuentos varios (glosa libre obligatoria, N cuotas). v1.11 — la nómina Caja muestra CUOTA 49 de 60 (no PERMANENTE) · v1.10 — numeración REAL de la cuota (cuota_desde/cuotas_total): un plan que venía andando muestra "cuota 3 de 4" y no "2 de 3"; la nómina Caja la toma de "17/27" · v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -136,6 +136,8 @@
 
 <script src="/js/auth-guard.js"></script>
 <script src="/js/rrhh-core.js"></script>
+<script src="/js/empresa.js"></script>
+<script>let EMP={}; AF_EMPRESA.then(e=>{EMP=e;});</script>
 <script>
 const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
@@ -387,13 +389,13 @@ function imprimirConvenio(d){
       <img src="/img/logo-autofacil.png" alt="AutoFácil" style="height:42px">
       <div style="font-size:12px;color:#555">Santiago, ${hoy}</div></div>
     <div style="text-align:center;font-weight:800;font-size:16px;margin-bottom:20px">CONVENIO DE ${esP?'PRÉSTAMO AL PERSONAL':'ANTICIPO DE REMUNERACIÓN'}<br><span style="font-size:12px;font-weight:400">y autorización de descuento por planilla (art. 58 Código del Trabajo)</span></div>
-    <p>Entre <b>AUTOFÁCIL SpA</b> y don/doña <b>${esc(d.nombre_actual||d.nombre)}</b>${d.rut?`, RUT <b>${esc(d.rut)}</b>`:''}, se acuerda:</p>
+    <p>Entre <b>${esc(EMP.razon_social||'')}</b>, RUT ${esc(EMP.rut_formateado||'')}, y don/doña <b>${esc(d.nombre_actual||d.nombre)}</b>${d.rut?`, RUT <b>${esc(d.rut)}</b>`:''}, se acuerda:</p>
     <p><b>PRIMERO.</b> La empresa ${esP?'otorga al trabajador un PRÉSTAMO':'anticipa al trabajador'} por la suma de <b>$${fmt(d.monto_total)}</b>${esP&&d.tasa_pct?`, con un interés del <b>${String(Number(d.tasa_pct)).replace('.',',')}% mensual</b> (bajo la TMC vigente)`:''}.</p>
     <p><b>SEGUNDO.</b> El trabajador AUTORIZA expresamente el descuento por planilla de <b>${cuotas} cuota(s)</b> de <b>$${fmt(vc)}</b> cada una (total <b>$${fmt(total)}</b>), a contar de la remuneración de <b>${mesPalabras(d.mes_inicio)}</b> y en los meses sucesivos hasta su total extinción.</p>
     <p><b>TERCERO.</b> En caso de término de la relación laboral por cualquier causa, el saldo pendiente se descontará del finiquito, lo que el trabajador acepta expresamente.</p>
     <p><b>CUARTO.</b> El presente convenio se firma en dos ejemplares; el original firmado se archiva en la carpeta personal del trabajador.</p>
     <div style="display:flex;justify-content:space-between;margin-top:90px;text-align:center;font-size:13px">
-      <div style="border-top:1px solid #333;padding-top:6px;width:44%">AUTOFÁCIL SpA<br>Empleador</div>
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">${esc(EMP.razon_social||'')}<br>Empleador</div>
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">${esc(d.nombre_actual||d.nombre)}<br>Trabajador — acepto y autorizo</div>
     </div>
     <p style="font-size:10px;color:#777;margin-top:26px">Descuento N° ${d.id} · Generado por el Business Suite. Una vez firmado, subir el escaneado con el botón 📤 de la columna Convenio — quedará en la carpeta digital del colaborador.</p>

@@ -98,7 +98,7 @@ require('../../../../shared/migrate').enFila('rrhh', async () => {
     const defaults = [
       ['cert_min_meses', '7'],
       ['cert_cooldown_dias', '15'],
-      ['cert_cuerpo', 'Auto Fácil SpA, RUT 76.545.638-K, certifica que {don} <b>{nombre}</b>, cédula de identidad N° <b>{rut}</b>, presta servicios en nuestra empresa desde el <b>{fecha_ingreso}</b> a la fecha, desempeñándose actualmente en el cargo de <b>{cargo}</b>, con contrato de trabajo indefinido, acumulando una antigüedad laboral de <b>{antiguedad}</b>.'],
+      ['cert_cuerpo', '{empresa}, RUT {rut_empresa}, certifica que {don} <b>{nombre}</b>, cédula de identidad N° <b>{rut}</b>, presta servicios en nuestra empresa desde el <b>{fecha_ingreso}</b> a la fecha, desempeñándose actualmente en el cargo de <b>{cargo}</b>, con contrato de trabajo indefinido, acumulando una antigüedad laboral de <b>{antiguedad}</b>.'],
       ['cert_cierre', 'Se extiende el presente certificado a solicitud {interesado}, para los fines que estime conveniente, en Santiago de Chile con fecha {fecha_emision}.'],
       ['cumple_popup_activo', '1'],
       ['cumple_campana_activo', '1'],
@@ -508,11 +508,21 @@ const resolverAntiguedad = async (req, res) => {
 require('../../../../shared/migrate').migrar('rrhh-cert-rut-empresa', async () => {
   await pool.query("UPDATE rh_config SET valor=REPLACE(valor,'76.916.907-K','76.545.638-K') WHERE clave IN ('cert_cuerpo','cert_cierre') AND valor LIKE '%76.916.907-K%'");
 });
+// Razón social y RUT del certificado pasan a variables {empresa} {rut_empresa} (fuente única: Datos de la Empresa)
+require('../../../../shared/migrate').migrar('rrhh-cert-empresa-variables', async () => {
+  await pool.query("UPDATE rh_config SET valor=REPLACE(REPLACE(valor,'Auto Fácil SpA, RUT 76.545.638-K','{empresa}, RUT {rut_empresa}'),'AutoFácil SpA, RUT 76.545.638-K','{empresa}, RUT {rut_empresa}') WHERE clave='cert_cuerpo'");
+});
 
 /* ════════════ CONFIG RRHH (rh_config) ════════════ */
 async function getConfig() {
   const [rows] = await pool.query('SELECT clave, valor FROM rh_config LIMIT 100');
   const cfg = {}; rows.forEach(r => cfg[r.clave] = r.valor);
+  // Razón social, RUT, ciudad y representante del finiquito: FUENTE ÚNICA Datos de la Empresa (ya no se editan en rh_config)
+  try {
+    const e = await require('../../../../shared/empresa').datosEmpresa();
+    cfg.finiq_empresa = e.razon_social; cfg.finiq_rut_empresa = e.rut_formateado; cfg.finiq_ciudad = e.ciudad || cfg.finiq_ciudad || 'Santiago';
+    cfg.finiq_representante = e.representante || ''; cfg.finiq_rut_representante = e.rut_representante_formateado || '';
+  } catch (_) {}
   return cfg;
 }
 const tpl = (t, vars) => String(t || '').replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? vars[k] : ''));
@@ -546,7 +556,6 @@ const setConfigApi = async (req, res) => {
     const b = req.body || {};
     const PERMITIDAS = ['cert_min_meses', 'cert_cooldown_dias', 'cert_cuerpo', 'cert_cierre', 'cumple_popup_activo', 'cumple_campana_activo', 'cumple_musica', 'cumple_titulo', 'cumple_linea1', 'cumple_linea2', 'cumple_aviso_titulo', 'cumple_aviso_msg', 'cumple_aviso_tarde', 'cumple_dias_tope', 'cumple_midia_dias', 'cumple_banner_dur', 'cumple_banner_sonido',
       // Texto del finiquito (mantenedor Saludos y Certificados RRHH → card Finiquito)
-      'finiq_ciudad', 'finiq_empresa', 'finiq_rut_empresa', 'finiq_representante', 'finiq_rut_representante',
       'finiq_encabezado', 'finiq_c1', 'finiq_c2', 'finiq_c3', 'finiq_c4', 'finiq_c5', 'finiq_c6', 'finiq_pie', 'finiq_anexo'];
     for (const [k, v] of Object.entries(b)) {
       if (!PERMITIDAS.includes(k)) continue;
@@ -605,7 +614,9 @@ const certEmitir = async (req, res) => {
     const hoy = hoyChile();
     const esF = emp.sexo === 'F';
     const RUT = require('../../../../api-gateway/public/js/rut-core'); // motor único de RUT
+    const E = await require('../../../../shared/empresa').datosEmpresa();
     const vars = {
+      empresa: E.razon_social, rut_empresa: E.rut_formateado,
       nombre: emp.nombre, rut: emp.rut ? RUT.formatear(emp.rut) : '—', cargo: emp.cargo || (esF ? 'Colaboradora' : 'Colaborador'),
       don: esF ? 'doña' : 'don', interesado: esF ? 'de la interesada' : 'del interesado',
       fecha_ingreso: fechaLargaCL(emp.fecha_ingreso), antiguedad: antiguedadTexto(meses), fecha_emision: fechaLargaCL(hoy),

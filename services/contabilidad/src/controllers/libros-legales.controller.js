@@ -59,10 +59,8 @@ const motores = require('../libros-legales-motores');
 
 /* ── Excel genérico: cabecera de empresa + una hoja por cada hoja del motor ── */
 async function cabeceraEmpresa() {
-  const [[emp]] = await pool.query('SELECT organizacion FROM credenciales_empresa WHERE id=1').catch(() => [[{}]]);
-  const [[cfg]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_empresa'").catch(() => [[{}]]);
-  const [[cfgR]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_rut_empresa'").catch(() => [[{}]]);
-  return { nombre: cfg?.valor || emp?.organizacion || 'AUTOFÁCIL SpA', rut: cfgR?.valor || '' };
+  const E = await require('../../../../shared/empresa').datosEmpresa();   // fuente única: Datos de la Empresa
+  return { nombre: E.razon_social, rut: E.rut_formateado };
 }
 function libroAWorkbook(lib, out, periodo, quien, emp) {
   const wb = XLSX.utils.book_new();
@@ -275,9 +273,8 @@ exports.remuneracionesXlsx = async (req, res) => {
     if (!/^\d{4}-\d{2}$/.test(mes)) return fail(res, 'mes obligatorio (YYYY-MM)', 400);
     const { fuente, filas } = await filasRemuneraciones(mes);
     if (!filas.length) return fail(res, `No hay remuneraciones para ${mes}`, 404);
-    const [[emp]] = await pool.query('SELECT organizacion FROM credenciales_empresa WHERE id=1').catch(() => [[{}]]);
-    const [[cfg]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_empresa'").catch(() => [[{}]]);
-    const [[cfgR]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_rut_empresa'").catch(() => [[{}]]);
+    const E = await require('../../../../shared/empresa').datosEmpresa();
+    const emp = { organizacion: E.razon_social }, cfg = { valor: E.razon_social }, cfgR = { valor: E.rut_formateado };
     const tot = totalesDe(filas);
     const quien = (req.usuario?.nombre ? (req.usuario.nombre + ' ' + (req.usuario.apellido || '')).trim() : req.usuario?.email) || 'Sistema';
     const generado = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });

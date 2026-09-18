@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Cartolas Parque — AutoFácil</title>
-  <!-- v2.2 — sin la línea Arriendo mensual (el arriendo se paga por su propia ODP) y título CARTOLA COMISIONES. v2.1 — navbar migrada al componente topnav · v1.9 — logo oficial embebido en el PDF · v1.8 — el PDF se DIBUJA (shared/pdf-simple.js), validado con pdftotext y PyMuPDF · v1.7 — el PDF se DIBUJA con jsPDF (no captura de pantalla): no puede salir en blanco, texto seleccionable · v1.6 — PDF: se captura con la pagina al tope (determinista) en vez de corregir el desfase de scroll · v1.5 — el PDF salia en blanco con la pagina scrolleada (fix scrollY + validacion de tamaño) · boton Ver PDF · la cartola ya no dice IVA incluido · v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
+  <!-- v2.3 — leyenda de facturación con la empresa desde Datos de la Empresa. v2.2 — sin la línea Arriendo mensual (el arriendo se paga por su propia ODP) y título CARTOLA COMISIONES. v2.1 — navbar migrada al componente topnav · v1.9 — logo oficial embebido en el PDF · v1.8 — el PDF se DIBUJA (shared/pdf-simple.js), validado con pdftotext y PyMuPDF · v1.7 — el PDF se DIBUJA con jsPDF (no captura de pantalla): no puede salir en blanco, texto seleccionable · v1.6 — PDF: se captura con la pagina al tope (determinista) en vez de corregir el desfase de scroll · v1.5 — el PDF salia en blanco con la pagina scrolleada (fix scrollY + validacion de tamaño) · boton Ver PDF · la cartola ya no dice IVA incluido · v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -62,6 +62,8 @@
 
 <script src="/js/pdf-simple.js"></script>
 <script src="/js/logo-pdf.js"></script>
+<script src="/js/empresa.js"></script>
+<script>let EMP={}; AF_EMPRESA.then(e=>{EMP=e;}); const sinTildes=t=>String(t).normalize("NFD").replace(/[\u0300-\u036f]/g,"");</script>
 <script>
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
@@ -172,7 +174,7 @@ function cartolaHTML(r, i){
           <tr class="linea"><td colspan="5">Comisión por créditos (${r.ops} operación${r.ops===1?'':'es'})</td><td class="r">${fmtCLP(r.comision_creditos)}</td></tr>
           <tr class="total"><td colspan="5">TOTAL</td><td class="r">${fmtCLP(r.total)}</td></tr>
         </table>
-        <div style="font-size:.66rem;color:#94a3b8;margin-top:6px">Documento generado por AutoFácil Business Suite · favor emitir la(s) factura(s) a AUTOFACIL SPA — RUT 76.545.638-K, según el régimen tributario del parque.</div>
+        <div style="font-size:.66rem;color:#94a3b8;margin-top:6px">Documento generado por AutoFácil Business Suite · favor emitir la(s) factura(s) a ${(EMP.razon_social||'').toUpperCase()} — RUT ${EMP.rut_formateado||''}, según el régimen tributario del parque.</div>
       </div>
       <div class="mailrow">
         <label style="font-size:.75rem;font-weight:700;color:#475569">Correo del parque:</label>
@@ -263,7 +265,7 @@ function pdfCartola(i){
 
   y += 9;
   doc.texto(M, y, 'Documento generado por AutoFacil Business Suite - favor emitir la(s) factura(s) a', { size:7, color:GRIS });
-  doc.texto(M, y + 3.5, 'AUTOFACIL SPA - RUT 76.545.638-K, segun el regimen tributario del parque.', { size:7, color:GRIS });
+  doc.texto(M, y + 3.5, sinTildes((EMP.razon_social||'').toUpperCase()) + ' - RUT ' + (EMP.rut_formateado||'') + ', segun el regimen tributario del parque.', { size:7, color:GRIS });
 
   const blob = doc.salida();
   if (!blob || blob.size < 800) throw new Error('El PDF salio vacio. No se envio nada.');

@@ -85,8 +85,7 @@ exports.vcf = async (req, res) => {
         FROM credenciales_usuario c JOIN usuarios u ON u.id_usuario=c.id_usuario
        WHERE c.token=? AND u.estado='activo'`, [token]);
     if (!u) return res.status(404).send('Credencial no vigente');
-    const [[e]] = await pool.query('SELECT organizacion, web, telefono, email FROM credenciales_empresa WHERE id=1');
-    const EMP = e || {};
+    const EMP = await empresaCred();
     const nom = String(u.nombre || '').trim(), ape = [u.apellido, u.apellido_materno].filter(Boolean).join(' ').trim();
     const tel = String(u.telefono || '').replace(/[^\d+]/g, '');
     const lineas = ['BEGIN:VCARD', 'VERSION:3.0', `N:${ape};${nom};;;`, `FN:${nom} ${ape}`.trim(),
@@ -135,19 +134,24 @@ exports.listar = async (_req, res) => {
 };
 
 /* ── Datos comunes de la empresa (van al vCard del QR, no impresos en la tarjeta) ── */
+// Datos de la empresa: FUENTE ÚNICA shared/empresa.js (Mantenedores → Datos de la Empresa). Se mantienen los
+// nombres organizacion/direccion que usan las pantallas de credenciales y firma de correo.
+async function empresaCred() {
+  const e = await require('../../../../shared/empresa').datosEmpresa();
+  return { organizacion: e.nombre_fantasia || e.razon_social, direccion: e.domicilio, web: e.web, telefono: e.telefono, email: e.email, razon_social: e.razon_social, rut: e.rut_formateado };
+}
 exports.empresaGet = async (_req, res) => {
   try {
-    const [[e]] = await pool.query('SELECT organizacion, direccion, web, telefono, email FROM credenciales_empresa WHERE id=1');
-    res.json({ success: true, data: e || {}, error: null });
+    res.json({ success: true, data: await empresaCred(), error: null });
   } catch (e) { errSrv(res, e, 'credenciales empresaGet'); }
 };
 exports.empresaPut = async (req, res) => {
   try {
     const b = req.body || {};
     const v = c => String(b[c] ?? '').trim().slice(0, 200) || null;
-    await pool.query(`INSERT INTO credenciales_empresa (id, organizacion, direccion, web, telefono, email) VALUES (1,?,?,?,?,?)
-      ON DUPLICATE KEY UPDATE organizacion=VALUES(organizacion), direccion=VALUES(direccion), web=VALUES(web), telefono=VALUES(telefono), email=VALUES(email)`,
-      [v('organizacion'), v('direccion'), v('web'), v('telefono'), v('email')]);
+    const u = req.usuario || {};
+    await require('../../../../shared/empresa').guardarEmpresa({ nombre_fantasia: v('organizacion'), domicilio: v('direccion'), web: v('web'), telefono: v('telefono'), email: v('email') },
+      `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.email);
     res.json({ success: true, data: null, error: null });
   } catch (e) { errSrv(res, e, 'credenciales empresaPut'); }
 };
@@ -159,8 +163,7 @@ exports.miFirma = async (req, res) => {
   try {
     const [[u]] = await pool.query('SELECT nombre, apellido, apellido_materno, cargo, telefono, email FROM usuarios WHERE id_usuario=?', [req.usuario.id_usuario]);
     if (!u) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
-    const [[e]] = await pool.query('SELECT organizacion, direccion, web, telefono, email FROM credenciales_empresa WHERE id=1');
-    res.json({ success: true, data: { ...u, empresa: e || {} }, error: null });
+    res.json({ success: true, data: { ...u, empresa: await empresaCred() }, error: null });
   } catch (e) { errSrv(res, e, 'credenciales miFirma'); }
 };
 

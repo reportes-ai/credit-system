@@ -354,8 +354,7 @@ require('../../../../shared/migrate').enFila('rrhh-finiquitos', async () => {
      proporcional) y art. 163 (indemnizaciones). Variables entre llaves. */
   const T = [
     ['finiq_ciudad', 'Santiago'],
-    ['finiq_empresa', 'AUTOFÁCIL SpA'],
-    ['finiq_rut_empresa', '76.545.638-K'],
+    // finiq_empresa / finiq_rut_empresa / finiq_representante / finiq_ciudad ya NO se leen: salen de Datos de la Empresa (shared/empresa.js, 17-09-2026)
     ['finiq_representante', ''],
     ['finiq_rut_representante', ''],
     ['finiq_encabezado', 'En {ciudad}, a {fecha}, entre <b>{empresa}</b>, RUT {rut_empresa}, representada por don/doña <b>{representante}</b>{rut_representante_txt}, ambos domiciliados en {domicilio}, en adelante "el Empleador", y don/doña <b>{trabajador}</b>, cédula de identidad N° <b>{rut}</b>, en adelante "el Trabajador", se ha convenido el siguiente finiquito:'],
@@ -386,10 +385,13 @@ exports.finiquitoColaboradores = async (req, res) => {
                OR (u.fecha_baja IS NOT NULL AND NOT EXISTS (SELECT 1 FROM rh_finiquitos fq WHERE fq.id_usuario=u.id_usuario)))
         ORDER BY u.apellido, u.nombre`);
     const [causales] = await pool.query(`SELECT * FROM rh_finiquito_causales WHERE activo=1 ORDER BY articulo`);
-    // Texto legal paramétrico + datos de la empresa (domicilio desde Credenciales Corporativas: fuente única)
+    // Texto legal paramétrico + datos de la empresa (FUENTE ÚNICA: Mantenedores → Datos de la Empresa)
     const [cfg] = await pool.query(`SELECT clave, valor FROM rh_config WHERE clave LIKE 'finiq\\_%'`);
     const textos = {}; cfg.forEach(c => textos[c.clave] = c.valor);
-    const [[emp]] = await pool.query('SELECT organizacion, direccion FROM credenciales_empresa WHERE id=1').catch(() => [[null]]);
+    const E = await require('../../../../shared/empresa').datosEmpresa();
+    textos.finiq_empresa = E.razon_social; textos.finiq_rut_empresa = E.rut_formateado; textos.finiq_ciudad = E.ciudad || textos.finiq_ciudad || 'Santiago';
+    textos.finiq_representante = E.representante || ''; textos.finiq_rut_representante = E.rut_representante_formateado || '';
+    const emp = { ...E, organizacion: E.razon_social, direccion: E.domicilio };
     // Quién firma por el Empleador: gerentes activos; por defecto el Gerente General (Pato, 14-09-2026)
     const [firmantes] = await pool.query(
       `SELECT id_usuario, CONCAT_WS(' ', nombre, apellido) nombre, rut, cargo FROM usuarios

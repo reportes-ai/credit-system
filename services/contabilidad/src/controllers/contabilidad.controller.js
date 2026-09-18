@@ -2302,7 +2302,8 @@ exports.getLRE = async (req, res) => {
         };
       });
     }
-    ok(res, { mes, fuente, columnas: LRE_COLS, filas, archivo: `76545638-K_${mes.replace('-', '')}.csv` });
+    const E = await require('../../../../shared/empresa').datosEmpresa();   // RUT de la empresa: fuente única
+    ok(res, { mes, fuente, columnas: LRE_COLS, filas, empresa: { razon_social: E.razon_social, rut: E.rut_formateado }, archivo: `${E.rut}_${mes.replace('-', '')}.csv` });
   } catch (e) { console.error('[ctb lre]', e.message); fail(res, e.message); }
 };
 

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>F29 Borrador — AutoFácil</title>
-  <!-- v1.0 — borrador del Formulario 29 desde los auxiliares; códigos manuales editables y guardados por mes -->
+  <!-- v1.1 — cabecera con la empresa desde Datos de la Empresa. v1.0 — borrador del Formulario 29 desde los auxiliares; códigos manuales editables y guardados por mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -56,6 +56,8 @@
 </div>
 
 <script src="/js/auth-guard.js"></script>
+<script src="/js/empresa.js"></script>
+<script>let EMP={}; AF_EMPRESA.then(e=>{EMP=e;});</script>
 <script>
 const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
@@ -80,7 +82,7 @@ const filaM = (cod, glosa) => `<tr class="man"><td class="cod">${cod}</td><td>${
 function render(){
   const [y,m] = D.mes.split('-');
   document.getElementById('out').innerHTML = `
-  <div class="text-center mb-3"><b>AUTOFACIL SPA · RUT 76.545.638-K · Período ${m}/${y}</b></div>
+  <div class="text-center mb-3"><b>${(EMP.razon_social||'').toUpperCase()} · RUT ${EMP.rut_formateado||''} · Período ${m}/${y}</b></div>
   <div class="panel"><h6>DÉBITO FISCAL (ventas)</h6><table>
     ${filaC('503','Cantidad facturas emitidas', D.ventas.c503)}
     ${filaC('512','Cantidad notas de débito emitidas', D.ventas.c512)}

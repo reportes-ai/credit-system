@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Datos de la Empresa — Mantenedores</title>
+  <!-- v1.0 — mantenedor nuevo: razón social, RUT, giro, domicilio, representante legal, contacto, CCAF y mutual en una sola fuente (shared/empresa.js) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main { padding:28px 34px; max-width:980px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.85; } .page-banner h2 { margin:0 0 4px; font-size:1.3rem; font-weight:800; } .page-banner p { margin:0; opacity:.85; font-size:.85rem; }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:22px; margin-bottom:18px; }
+    .card-box h5 { font-size:1rem; font-weight:800; color:var(--navy-dark); margin:0 0 14px; display:flex; align-items:center; gap:8px; }
+    .fld { margin-bottom:14px; } .fld label { display:block; font-size:.78rem; font-weight:600; color:#475569; margin-bottom:5px; }
+    .fld input, .fld select { width:100%; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; font-size:.88rem; }
+    .fld .hint { font-size:.72rem; color:#94a3b8; margin-top:3px; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-weight:700; font-size:.88rem; cursor:pointer; }
+    .afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:16px 20px; font-size:.83rem; color:#475569; margin-top:10px; }
+    .afecta ul { margin:8px 0 0; padding-left:18px; } .afecta a { color:var(--navy); }
+    .toast { position:fixed; bottom:22px; right:22px; background:#16a34a; color:#fff; border-radius:10px; padding:12px 20px; font-weight:700; display:none; }
+    .meta { font-size:.74rem; color:#94a3b8; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Datos de la Empresa',icon:'bi-building',current:true}]};</script>
+<div class="main">
+  <div class="page-banner"><i class="bi bi-building"></i><div><h2>Datos de la Empresa</h2><p>Una sola fuente para la razón social, el RUT, el domicilio y el representante legal que salen en liquidaciones, LRE, F29, declaraciones juradas, finiquitos, contratos, certificados, cartolas y credenciales.</p></div></div>
+
+  <div class="card-box">
+    <h5><i class="bi bi-card-heading"></i> Identificación</h5>
+    <div class="row">
+      <div class="col-md-6"><div class="fld"><label>Razón social *</label><input id="razon_social" placeholder="AUTOFÁCIL SpA"></div></div>
+      <div class="col-md-3"><div class="fld"><label>RUT *</label><input id="rut" placeholder="76545638-K"><div class="hint">Sin puntos, con guion.</div></div></div>
+      <div class="col-md-3"><div class="fld"><label>Nombre de fantasía</label><input id="nombre_fantasia" placeholder="AutoFácil Crédito Automotriz"></div></div>
+      <div class="col-md-8"><div class="fld"><label>Giro</label><input id="giro" placeholder="Corretaje de créditos automotrices"></div></div>
+      <div class="col-md-4"><div class="fld"><label>Actividad económica (código SII)</label><input id="actividad_economica" placeholder="661901"><div class="hint">Ver <a href="/mantenedores/actividades-economicas/">Actividades Económicas</a>.</div></div></div>
+    </div>
+  </div>
+
+  <div class="card-box">
+    <h5><i class="bi bi-geo-alt"></i> Domicilio y contacto</h5>
+    <div class="row">
+      <div class="col-md-6"><div class="fld"><label>Domicilio</label><input id="domicilio" placeholder="Av. Ejemplo 1234, of. 56"></div></div>
+      <div class="col-md-3"><div class="fld"><label>Comuna</label><input id="comuna"></div></div>
+      <div class="col-md-3"><div class="fld"><label>Ciudad</label><input id="ciudad" placeholder="Santiago"><div class="hint">Sale en la comparecencia del finiquito.</div></div></div>
+      <div class="col-md-3"><div class="fld"><label>Teléfono</label><input id="telefono"></div></div>
+      <div class="col-md-4"><div class="fld"><label>Email</label><input id="email"></div></div>
+      <div class="col-md-5"><div class="fld"><label>Sitio web</label><input id="web"></div></div>
+    </div>
+  </div>
+
+  <div class="card-box">
+    <h5><i class="bi bi-person-vcard"></i> Representante legal</h5>
+    <div class="row">
+      <div class="col-md-7"><div class="fld"><label>Nombre</label><input id="representante"><div class="hint">Firma contratos, anexos y finiquitos cuando no se elige otro firmante en cada documento.</div></div></div>
+      <div class="col-md-3"><div class="fld"><label>RUT</label><input id="rut_representante"></div></div>
+    </div>
+  </div>
+
+  <div class="card-box">
+    <h5><i class="bi bi-shield-plus"></i> Previsión de la empresa (Archivo Previred)</h5>
+    <div class="row">
+      <div class="col-md-4"><div class="fld"><label>CCAF (Tabla N°18)</label><select id="ccaf"><option value="00">00 — Sin CCAF</option><option value="01">01 — Los Andes</option><option value="02">02 — La Araucana</option><option value="03">03 — Los Héroes</option><option value="04">04 — 18 de Septiembre</option></select></div></div>
+      <div class="col-md-4"><div class="fld"><label>Mutualidad (Tabla N°19)</label><select id="mutual"><option value="00">00 — Sin mutual (ISL)</option><option value="01">01 — ACHS</option><option value="02">02 — Mutual de Seguridad CChC</option><option value="03">03 — IST</option></select></div></div>
+      <div class="col-md-4"><div class="fld"><label>Sucursal mutual</label><input id="sucursal_mutual"></div></div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px"><span class="meta" id="meta"></span><button class="btn-navy" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar cambios</button></div>
+
+  <div class="afecta">
+    <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+    <ul>
+      <li><b>Razón social y RUT</b> → pie de la <a href="/recursos-humanos/remuneraciones/liquidaciones/">liquidación de sueldo</a> impresa y en <a href="/recursos-humanos/mi-ficha/">Mi Ficha</a>; nombre del archivo y cabecera del <a href="/contabilidad/lre/">LRE</a>; cabecera del <a href="/contabilidad/f29/">F29</a> y de las <a href="/contabilidad/declaraciones-juradas/">Declaraciones Juradas</a>; cabecera de los <a href="/contabilidad/libros-legales/">Libros Legales</a>; leyenda de las <a href="/postventa/cartolas-parque/">cartolas de parque</a>; texto del <a href="/recursos-humanos/antiguedad/">certificado de antigüedad</a> (variables {empresa} {rut_empresa}).</li>
+      <li><b>Razón social, RUT, ciudad, domicilio y representante legal</b> → comparecencia y firmas del <b>finiquito</b>, del <b>contrato</b> y de los <b>anexos</b> en <a href="/recursos-humanos/contratos/">Contratos y Cartas Oferta</a> (los ya cerrados o firmados no cambian).</li>
+      <li><b>Nombre de fantasía, domicilio, web, teléfono y email</b> → reverso y vCard de las <a href="/credenciales/">Credenciales Corporativas</a>.</li>
+      <li><b>CCAF y mutualidad</b> → campos 83–90 y 96–99 del <b>Archivo Previred</b> (<a href="/recursos-humanos/remuneraciones/liquidaciones/">Liquidaciones → Archivo Previred</a>); reemplaza el botón ⚙ que estaba junto a ese archivo.</li>
+      <li><b>No vive aquí</b>: los datos de transferencia que se envían al cliente en cobranza (titular, banco, cuenta) están en <a href="/mantenedores/cobranza-parametros/">Parámetros de Cobranza</a>; las cuentas bancarias de la empresa en <a href="/mantenedores/cuentas-bancarias/">Cuentas Bancarias</a>; el nombre de sucursal del archivo Edenred en su propia card.</li>
+    </ul>
+  </div>
+</div>
+<div class="toast" id="toast">✓ Guardado</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token=sessionStorage.getItem('token'), yo=JSON.parse(sessionStorage.getItem('usuario')||'null');
+  if(!token||!yo) location.href='/login.html';
+  const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
+  const CAMPOS=['razon_social','nombre_fantasia','rut','giro','actividad_economica','domicilio','comuna','ciudad','representante','rut_representante','telefono','email','web','ccaf','mutual','sucursal_mutual'];
+  async function cargar(){
+    const j=await(await fetch('/api/empresa',{headers:H})).json(); if(!j.success) return alert(j.error);
+    const d=j.data||{};
+    CAMPOS.forEach(k=>{ const el=document.getElementById(k); if(el) el.value=d[k]??''; });
+    document.getElementById('meta').textContent=d.updated_at?`Última modificación: ${new Date(d.updated_at).toLocaleString('es-CL')} · ${d.updated_by||''}`:'';
+  }
+  async function guardar(){
+    const b={}; CAMPOS.forEach(k=>b[k]=document.getElementById(k).value);
+    const j=await(await fetch('/api/empresa',{method:'PUT',headers:HJ,body:JSON.stringify(b)})).json();
+    if(!j.success) return alert(j.error||'Error al guardar');
+    const t=document.getElementById('toast'); t.style.display='block'; setTimeout(()=>t.style.display='none',2200); cargar();
+  }
+  cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

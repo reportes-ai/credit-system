@@ -1945,7 +1945,8 @@ async function getPrevired(req, res) {
          LEFT JOIN rh_fichas f ON f.id_usuario=l.id_usuario
         WHERE l.mes=? AND l.estado='EMITIDA' ORDER BY u.apellido, u.nombre`, [mes]);
     if (!liqs.length) return fail(res, `No hay liquidaciones EMITIDAS para ${mes}. Emite el mes primero.`, 404);
-    const [[cfg]] = await pool.query('SELECT * FROM rh_previred_config WHERE id=1');
+    const E = await require('../../../../shared/empresa').datosEmpresa();   // CCAF y mutual: fuente única Datos de la Empresa
+    const cfg = { ccaf: E.ccaf || '00', mutual: E.mutual || '00', sucursal_mutual: E.sucursal_mutual || '' };
     // Códigos AFP desde el mantenedor (rh_afp_tasas), fallback a la tabla oficial
     const [afpsCod] = await pool.query('SELECT afp, codigo_previred FROM rh_afp_tasas');
     const catSalud = await catalogo('SALUD');   // Isapres: código Previred desde el catálogo único
@@ -2116,16 +2117,17 @@ async function subirConvenioDescuento(req, res) {
 
 async function getPreviredConfig(req, res) {
   try {
-    const [[cfg]] = await pool.query('SELECT ccaf, mutual, sucursal_mutual FROM rh_previred_config WHERE id=1');
-    ok(res, cfg || { ccaf: '00', mutual: '02', sucursal_mutual: '' });
+    const E = await require('../../../../shared/empresa').datosEmpresa();
+    ok(res, { ccaf: E.ccaf || '00', mutual: E.mutual || '02', sucursal_mutual: E.sucursal_mutual || '' });
   } catch (e) { fail(res, e.message); }
 }
 
 async function putPreviredConfig(req, res) {
   try {
     const { ccaf, mutual, sucursal_mutual } = req.body || {};
-    await pool.query('UPDATE rh_previred_config SET ccaf=?, mutual=?, sucursal_mutual=? WHERE id=1',
-      [String(ccaf || '00').slice(0, 2), String(mutual || '00').slice(0, 2), String(sucursal_mutual || '').slice(0, 3)]);
+    // Escribe en la fuente única (Datos de la Empresa); el botón ⚙ del libro sigue funcionando
+    await require('../../../../shared/empresa').guardarEmpresa({ ccaf: String(ccaf || '00').slice(0, 2), mutual: String(mutual || '00').slice(0, 2), sucursal_mutual: String(sucursal_mutual || '').slice(0, 3) },
+      `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim());
     ok(res, { ok: true });
   } catch (e) { fail(res, e.message); }
 }
