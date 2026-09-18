@@ -276,7 +276,8 @@ async function armarFicha(idUsuario, conSueldo, soloVisibles) {
      certificado_estudios). rh_hijos quedó vacía y en desuso. */
   const [hijos] = await pool.query(
     `SELECT id, TRIM(CONCAT_WS(' ', nombres, apellido_paterno, apellido_materno)) nombre, nombres, apellido_paterno, apellido_materno, rut,
-            DATE_FORMAT(fecha_nacimiento,'%Y-%m-%d') fecha_nacimiento, sexo, relacion, es_carga, en_seguro, certificado_estudios
+            DATE_FORMAT(fecha_nacimiento,'%Y-%m-%d') fecha_nacimiento, sexo, relacion, es_carga, en_seguro, certificado_estudios,
+            DATE_FORMAT(certificado_enviado_at,'%Y-%m-%d') certificado_enviado_at
        FROM rh_cargas WHERE id_usuario=? AND activo=1 ORDER BY FIELD(relacion,'CONYUGE','CONVIVIENTE CIVIL','HIJO','OTRO'), fecha_nacimiento, id`, [idUsuario]);
   // UF del día para mostrar el plan Isapre (pactado en UF) también en pesos
   let uf = null; try { uf = await require('../../../../shared/uf').getUF(new Date()); } catch (_) {}
@@ -334,16 +335,17 @@ const putFicha = async (req, res) => {
                      fecha_nacimiento: /^\d{4}-\d{2}-\d{2}$/.test(String(h.fecha_nacimiento || '')) ? h.fecha_nacimiento : null,
                      sexo: ['M', 'F'].includes(String(h.sexo || '').toUpperCase()) ? String(h.sexo).toUpperCase() : null,
                      relacion: REL.includes(String(h.relacion || '').toUpperCase()) ? String(h.relacion).toUpperCase() : 'HIJO',
-                     es_carga: h.es_carga ? 1 : 0, en_seguro: h.en_seguro === undefined ? 1 : (h.en_seguro ? 1 : 0), certificado_estudios: h.certificado_estudios ? 1 : 0 }))
+                     es_carga: h.es_carga ? 1 : 0, en_seguro: h.en_seguro === undefined ? 1 : (h.en_seguro ? 1 : 0), certificado_estudios: h.certificado_estudios ? 1 : 0,
+                     certificado_enviado_at: /^\d{4}-\d{2}-\d{2}$/.test(String(h.certificado_enviado_at || '')) ? h.certificado_enviado_at : null }))
         .filter(h => h.nombres || h.rut || h.fecha_nacimiento)
         .slice(0, 20);
       const quedan = hijos.map(h => h.id).filter(Boolean);
       await pool.query(`UPDATE rh_cargas SET activo=0, en_seguro=0, updated_at=NOW() WHERE id_usuario=? AND activo=1 ${quedan.length ? 'AND id NOT IN (?)' : ''}`, quedan.length ? [objetivo, quedan] : [objetivo]);
       for (const h of hijos) {
-        if (h.id) await pool.query(`UPDATE rh_cargas SET nombres=?, apellido_paterno=?, apellido_materno=?, rut=?, fecha_nacimiento=?, sexo=?, relacion=?, es_carga=?, en_seguro=?, certificado_estudios=?, updated_at=NOW() WHERE id=? AND id_usuario=?`,
-          [h.nombres || null, h.apellido_paterno, h.apellido_materno, h.rut, h.fecha_nacimiento, h.sexo, h.relacion, h.es_carga, h.en_seguro, h.certificado_estudios, h.id, objetivo]);
-        else await pool.query(`INSERT INTO rh_cargas (id_usuario, nombres, apellido_paterno, apellido_materno, rut, fecha_nacimiento, sexo, relacion, es_carga, en_seguro, certificado_estudios, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-          [objetivo, h.nombres || null, h.apellido_paterno, h.apellido_materno, h.rut, h.fecha_nacimiento, h.sexo, h.relacion, h.es_carga, h.en_seguro, h.certificado_estudios, 'Ficha']);
+        if (h.id) await pool.query(`UPDATE rh_cargas SET nombres=?, apellido_paterno=?, apellido_materno=?, rut=?, fecha_nacimiento=?, sexo=?, relacion=?, es_carga=?, en_seguro=?, certificado_estudios=?, certificado_enviado_at=?, updated_at=NOW() WHERE id=? AND id_usuario=?`,
+          [h.nombres || null, h.apellido_paterno, h.apellido_materno, h.rut, h.fecha_nacimiento, h.sexo, h.relacion, h.es_carga, h.en_seguro, h.certificado_estudios, h.certificado_enviado_at, h.id, objetivo]);
+        else await pool.query(`INSERT INTO rh_cargas (id_usuario, nombres, apellido_paterno, apellido_materno, rut, fecha_nacimiento, sexo, relacion, es_carga, en_seguro, certificado_estudios, certificado_enviado_at, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [objetivo, h.nombres || null, h.apellido_paterno, h.apellido_materno, h.rut, h.fecha_nacimiento, h.sexo, h.relacion, h.es_carga, h.en_seguro, h.certificado_estudios, h.certificado_enviado_at, 'Ficha']);
       }
     }
     // Identidad (usuarios) solo RRHH

@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguro de Salud — AutoFácil</title>
+  <!-- v2.2 — fecha de envío del certificado de estudios en la carga; un mes antes de cumplir la edad máxima el sistema pide el certificado al colaborador (copia RRHH) (Pato 17-09-2026) -->
   <!-- v2.1 — la nómina de cotización se sube siempre junto con el cupón (obligatoria para emitir la ODP, aunque cuadre) -->
   <!-- v2.0 — pestaña Pago del mes: subir el cupón de MetLife (lee los totales del PDF), cuadratura contra lo esperado, nómina de cotización para ver quién quedó fuera (alerta / pedir certificado / fuera por edad), avisos a los empleados con copia a RRHH, OK de RRHH y emisión de la ODP con los adjuntos; parámetros edad de estudiante y tolerancia (Pato 17-09-2026) -->
   <!-- v1.3 — solo contrato INDEFINIDO: el plazo fijo aparece sin casilla (PLAZO FIJO — sin seguro); al pasar a indefinido el sistema lo marca titular y avisa a RRHH con copia a Contabilidad (Pato 17-09-2026) -->
@@ -147,6 +148,7 @@
       <li><b>Paga: Empleado</b> → al generar la nómina se crea un descuento en <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a> que sale en la <a href="/recursos-humanos/remuneraciones/liquidaciones/">liquidación</a> de ese mes. <b>Paga: Empresa</b> → costo de AutoFácil, sin descuento.</li>
       <li><b>Empresa paga cargas de contratados hasta</b> → define quién paga por defecto según la fecha de ingreso del colaborador; se puede corregir carga por carga.</li>
       <li><b>Edad máxima de hijos</b> → la carga que la supera queda marcada y fuera de la nómina (la aseguradora la rechaza), salvo que tenga <b>certificado de estudios</b> (casilla en la carga): sigue en la nómina hasta la <b>renovación de la póliza</b> (fecha editable arriba de la nómina) y al renovar sale sola con aviso, hasta que se actualice la vigencia y se reenvíe el certificado.</li>
+      <li><b>Certificado de estudios</b> → un mes antes de que un hijo asegurado cumpla la edad máxima, el sistema le pide el certificado al colaborador por correo (copia RRHH, plantilla <i>Certificado de estudios</i> en <a href="/mantenedores/correos/">Correos del Sistema</a>) y avisa por campana; al recibirlo, RRHH marca la casilla y la <b>fecha de envío</b> a la aseguradora en la carga.</li>
       <li><b>Póliza</b> (número y vigencia, arriba de la nómina) → hasta cuándo valen los certificados de estudios; sale en el Excel para la aseguradora.</li>
       <li><b>Primas</b> (UF o pesos; la UF es la del día 1 del mes) → monto de la nómina y de los descuentos desde el mes indicado.</li>
       <li><b>Generar nómina</b> → congela el mes (es lo que el sistema "espera" cobrar). <b>Anular</b> borra la nómina y anula los descuentos del mes (auditado).</li>
@@ -167,6 +169,7 @@
     <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Sexo</label><select id="dcSexo" class="form-select form-select-sm"><option value="">—</option><option value="F">Femenino</option><option value="M">Masculino</option></select></div>
     <div class="col-md-6"><label class="form-label small fw-semibold mb-1">Relación</label><select id="dcRel" class="form-select form-select-sm"></select></div>
     <div class="col-md-6"><div class="form-check mt-4"><input type="checkbox" class="form-check-input" id="dcCert"><label class="form-check-label small fw-semibold" for="dcCert" title="Solo hijos: con certificado de estudios enviado, la aseguradora lo acepta sobre la edad máxima hasta la renovación de la póliza">Certificado de estudios enviado</label></div></div>
+    <div class="col-md-6"><label class="form-label small fw-semibold mb-1" title="Fecha en que se envió el certificado a la aseguradora">Fecha de envío del certificado</label><input id="dcCertAt" type="date" class="form-control form-control-sm"></div>
     <div class="col-md-6"><label class="form-label small fw-semibold mb-1">Quién paga</label><select id="dcPaga" class="form-select form-select-sm"><option value="">Según fecha de contratación</option><option value="EMPRESA">Empresa</option><option value="EMPLEADO">Empleado (descuento)</option></select></div>
     <div class="col-12"><span id="dcMsg" class="small text-danger"></span></div>
   </div>
@@ -299,7 +302,7 @@ function render(){
       </tr>` + t.cargas.map(c => `
       <tr class="car ${c.incluida?'':'fuera'}">
         <td><input type="checkbox" class="form-check-input" ${c.en_seguro?'checked':''} ${t.seguro_salud?'':'disabled'} onchange="marcarCarga(${c.id},this.checked)"></td>
-        <td><i class="bi bi-arrow-return-right me-1 text-muted"></i>${esc(c.nombre)}${c.excede_edad?` <span class="pill" style="background:#fee2e2;color:#b91c1c" title="La aseguradora no acepta hijos sobre ${p.edad_max_hijo} años${c.cert_vencido?'; el certificado de estudios venció el '+dmy(c.certificado_estudios_hasta):''}">SUPERA ${p.edad_max_hijo} AÑOS${c.cert_vencido?' · CERTIFICADO VENCIDO':''} — fuera</span>`:''}${c.estudiante?` <span class="pill" style="background:#dbeafe;color:#1d4ed8" title="Certificado de estudios enviado: vale hasta la renovación de la póliza">ESTUDIANTE hasta ${dmy(c.certificado_estudios_hasta)}</span>`:''}</td>
+        <td><i class="bi bi-arrow-return-right me-1 text-muted"></i>${esc(c.nombre)}${c.excede_edad?` <span class="pill" style="background:#fee2e2;color:#b91c1c" title="La aseguradora no acepta hijos sobre ${p.edad_max_hijo} años${c.cert_vencido?'; el certificado de estudios venció el '+dmy(c.certificado_estudios_hasta):''}">SUPERA ${p.edad_max_hijo} AÑOS${c.cert_vencido?' · CERTIFICADO VENCIDO':''} — fuera</span>`:''}${c.estudiante?` <span class="pill" style="background:#dbeafe;color:#1d4ed8" title="Certificado de estudios${c.certificado_enviado_at?' enviado el '+dmy(c.certificado_enviado_at):''}: vale hasta la renovación de la póliza">ESTUDIANTE hasta ${dmy(c.certificado_estudios_hasta)}</span>`:''}</td>
         <td>${esc(c.rut||'')}</td><td>${esc(c.relacion)}</td><td>${dmy(c.fecha_nacimiento)}${c.edad!=null?' · '+c.edad+' años':''}</td>
         <td><select class="form-select form-select-sm py-0" style="width:auto;display:inline-block;font-size:.76rem" onchange="cambiarPaga(${c.id},this.value)" title="${c.paga_manual?'Definido a mano':'Según la fecha de ingreso del titular'}">
           <option value="" ${c.paga_manual?'':'selected'}>Auto: ${c.paga_manual?'—':c.paga}</option><option value="EMPRESA" ${c.paga_manual&&c.paga==='EMPRESA'?'selected':''}>EMPRESA</option><option value="EMPLEADO" ${c.paga_manual&&c.paga==='EMPLEADO'?'selected':''}>EMPLEADO</option></select></td>
@@ -337,7 +340,7 @@ function abrirCarga(idU, c){
   document.getElementById('dcId').value = c?c.id:''; document.getElementById('dcUsuario').value = idU;
   document.getElementById('dcNombres').value = c?c.nombres||'':''; document.getElementById('dcPat').value = c?c.apellido_paterno||'':''; document.getElementById('dcMat').value = c?c.apellido_materno||'':'';
   document.getElementById('dcRut').value = c?c.rut||'':''; document.getElementById('dcNac').value = c?c.fecha_nacimiento||'':''; document.getElementById('dcSexo').value = c?c.sexo||'':'';
-  document.getElementById('dcRel').value = c?c.relacion:'HIJO'; document.getElementById('dcPaga').value = c&&c.paga_manual?c.paga:''; document.getElementById('dcCert').checked = !!(c&&c.certificado_estudios);
+  document.getElementById('dcRel').value = c?c.relacion:'HIJO'; document.getElementById('dcPaga').value = c&&c.paga_manual?c.paga:''; document.getElementById('dcCert').checked = !!(c&&c.certificado_estudios); document.getElementById('dcCertAt').value = c?c.certificado_enviado_at||'':'';
   document.getElementById('dcBaja').style.display = c?'':'none'; document.getElementById('dcMsg').textContent='';
   dlgCarga.showModal();
 }
@@ -346,7 +349,7 @@ const editarCarga = (idU, idC) => abrirCarga(idU, D.titulares.find(x=>x.id_usuar
 async function guardarCarga(){
   const body = { id: Number(document.getElementById('dcId').value)||null, id_usuario: Number(document.getElementById('dcUsuario').value), nombres: document.getElementById('dcNombres').value,
     apellido_paterno: document.getElementById('dcPat').value, apellido_materno: document.getElementById('dcMat').value, rut: document.getElementById('dcRut').value,
-    fecha_nacimiento: document.getElementById('dcNac').value, sexo: document.getElementById('dcSexo').value, relacion: document.getElementById('dcRel').value, paga: document.getElementById('dcPaga').value||null, certificado_estudios: document.getElementById('dcCert').checked };
+    fecha_nacimiento: document.getElementById('dcNac').value, sexo: document.getElementById('dcSexo').value, relacion: document.getElementById('dcRel').value, paga: document.getElementById('dcPaga').value||null, certificado_estudios: document.getElementById('dcCert').checked, certificado_enviado_at: document.getElementById('dcCertAt').value||null };
   if (body.id) { const c = D.titulares.find(x=>x.id_usuario===body.id_usuario).cargas.find(k=>k.id===body.id); body.en_seguro = c ? !!c.en_seguro : true; }
   const j = await api('/carga','POST',body);
   if (!j.success) { document.getElementById('dcMsg').textContent = j.error; return; }

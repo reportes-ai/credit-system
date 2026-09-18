@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Ficha — AutoFácil</title>
-  <!-- v1.14 — Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, seguro de salud; la fila conserva su id al guardar (Pato 17-09-2026). v1.13 — logo real de AutoFácil en la liquidación impresa. v1.12 — mes de comisiones a la chilena. v1.11 — liquidación con glosa por descuento. v1.10 — pensionado: AFP 'Pensionado (no cotiza)'. v1.9 — Previsión y Pago: plan Isapre en UF y pesos del día. v1.8 — foto real de Credenciales en el avatar del hero -->
+  <!-- v1.15 — conserva la fecha de envío del certificado al guardar. v1.14 — Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, seguro de salud; la fila conserva su id al guardar (Pato 17-09-2026). v1.13 — logo real de AutoFácil en la liquidación impresa. v1.12 — mes de comisiones a la chilena. v1.11 — liquidación con glosa por descuento. v1.10 — pensionado: AFP 'Pensionado (no cotiza)'. v1.9 — Previsión y Pago: plan Isapre en UF y pesos del día. v1.8 — foto real de Credenciales en el avatar del hero -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -252,7 +252,7 @@ function renderHijos(){
 function filaHijo(h={}){
   const rel = h.relacion||'HIJO';
   const opt = v => `<option ${rel===v?'selected':''}>${v}</option>`;
-  return `<div class="hijo-row" data-id="${h.id||''}" data-seg="${h.en_seguro==null?1:(h.en_seguro?1:0)}" data-cert="${h.certificado_estudios?1:0}" style="display:grid;grid-template-columns:1fr 1.6fr 1.1fr 1.1fr 1fr 1.1fr auto auto;gap:8px 12px;align-items:end;margin-bottom:8px">
+  return `<div class="hijo-row" data-id="${h.id||''}" data-seg="${h.en_seguro==null?1:(h.en_seguro?1:0)}" data-cert="${h.certificado_estudios?1:0}" data-cert-at="${esc(h.certificado_enviado_at||'')}" style="display:grid;grid-template-columns:1fr 1.6fr 1.1fr 1.1fr 1fr 1.1fr auto auto;gap:8px 12px;align-items:end;margin-bottom:8px">
     <div class="fld"><label>Relación</label><select class="h_rel">${opt('HIJO')}${opt('CONYUGE')}${opt('CONVIVIENTE CIVIL')}${opt('OTRO')}</select></div>
     <div class="fld"><label>Nombres</label><input class="h_nombre" value="${esc(h.nombres||h.nombre||'')}"></div>
     <div class="fld"><label>Apellido paterno</label><input class="h_pat" value="${esc(h.apellido_paterno||'')}"></div>
@@ -286,7 +286,7 @@ async function guardar(){
     rut: r.querySelector('.h_rut').value.trim(),
     fecha_nacimiento: r.querySelector('.h_fnac').value,
     es_carga: r.querySelector('.h_carga').checked ? 1 : 0,
-    en_seguro: Number(r.dataset.seg), certificado_estudios: Number(r.dataset.cert),
+    en_seguro: Number(r.dataset.seg), certificado_estudios: Number(r.dataset.cert), certificado_enviado_at: r.dataset.certAt || null,
   })).filter(h => h.nombres || h.rut || h.fecha_nacimiento);
   const j = await (await fetch('/api/rrhh/ficha/'+DATA.usuario.id_usuario, { method:'PUT', headers:HJ, body:JSON.stringify(body) })).json();
   if (!j.success) return alert(j.error||'No se pudo guardar');

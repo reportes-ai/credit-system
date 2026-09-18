@@ -484,6 +484,27 @@ Auto Fácil Business Suite`,
     variables: '{NOMBRE} {NOMBRE_COMPLETO} {RUT} {FECHA} {MES} {ASEGURADORA} {POLIZA} {LINK}',
   },
   {
+    codigo: 'seguro_certificado_aviso',
+    ambito: 'Recursos Humanos — Seguro de Salud',
+    nombre: 'Hijo por cumplir la edad máxima → pedir certificado de estudios (colaborador, copia RRHH)',
+    descripcion: 'Sale solo UN MES ANTES de que un hijo asegurado cumpla la edad máxima de la póliza, si no tiene certificado de estudios enviado para la póliza vigente. Va al correo personal del colaborador (o al corporativo) con copia a RRHH. Una vez por hijo y póliza.',
+    asunto: 'Seguro complementario: certificado de estudios de {CARGA}',
+    cuerpo: `Hola {NOMBRE}:
+
+{CARGA} cumple {EDAD} años el {FECHA_CUMPLE}. Desde esa edad la aseguradora ({ASEGURADORA}) solo lo(a) mantiene en el seguro complementario de salud si acredita que estudia.
+
+Para que siga asegurado(a), envía a Recursos Humanos el certificado de alumno regular antes del {FECHA_LIMITE}. Con él, RRHH lo(a) mantiene inscrito(a) hasta la renovación de la póliza ({POLIZA_HASTA}); después hay que renovarlo.
+
+Si no estudia, quedará fuera del seguro al cumplir {EDAD} años.
+
+Saludos cordiales,
+Recursos Humanos — AutoFácil`,
+    para_perfiles: '',
+    cc: 'recursos.humanos@autofacilchile.cl',
+    destinatario: 'El colaborador (correo personal de su ficha; si no tiene, el corporativo), con copia a RRHH',
+    variables: '{NOMBRE} {CARGA} {EDAD} {FECHA_CUMPLE} {FECHA_LIMITE} {ASEGURADORA} {POLIZA_HASTA}',
+  },
+  {
     codigo: 'seguro_carga_fuera_aviso',
     ambito: 'Recursos Humanos — Seguro de Salud',
     nombre: 'Familiar fuera del seguro → colaborador (copia RRHH)',

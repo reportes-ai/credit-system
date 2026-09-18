@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v2.7 — sección Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, sexo, carga Previred, seguro de salud y certificado de estudios; se conserva la fila al guardar (Pato 17-09-2026). v2.6 — montos con $ y puntos (sueldo, colación, movilización) y casilla Tarjeta Edenred. v2.5 — colación y movilización mensuales en Previsión y pago (fuente única de la liquidación). v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
+  <!-- v2.8 — fecha de envío del certificado de estudios en Hijos y cargas. v2.7 — sección Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, sexo, carga Previred, seguro de salud y certificado de estudios; se conserva la fila al guardar (Pato 17-09-2026). v2.6 — montos con $ y puntos (sueldo, colación, movilización) y casilla Tarjeta Edenred. v2.5 — colación y movilización mensuales en Previsión y pago (fuente única de la liquidación). v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -243,6 +243,7 @@ function filaHijo(h={}){
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="h_carga" ${h.es_carga?'checked':''}> Carga familiar (Previred)</label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="h_seguro" ${h.en_seguro==null||h.en_seguro?'checked':''}> Seguro de salud</label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer" title="Hijos sobre la edad máxima: con certificado enviado siguen en el seguro hasta la renovación de la póliza"><input type="checkbox" class="h_cert" ${h.certificado_estudios?'checked':''}> Certificado de estudios</label>
+      <label style="display:flex;align-items:center;gap:6px" title="Fecha en que se envió el certificado a la aseguradora">enviado el <input type="date" class="h_cert_at" style="font-size:.76rem;padding:1px 4px" value="${esc(h.certificado_enviado_at||'')}"></label>
     </div>
   </div>`;
 }
@@ -270,6 +271,7 @@ function leerHijos(){
     es_carga: r.querySelector('.h_carga').checked ? 1 : 0,
     en_seguro: r.querySelector('.h_seguro').checked ? 1 : 0,
     certificado_estudios: r.querySelector('.h_cert').checked ? 1 : 0,
+    certificado_enviado_at: r.querySelector('.h_cert_at').value || null,
   })).filter(h => h.nombres || h.rut || h.fecha_nacimiento);
 }
 
