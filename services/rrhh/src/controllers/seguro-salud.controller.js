@@ -658,11 +658,15 @@ const emitirOdp = async (req, res) => {
     let nDesc = 0, totDesc = 0;
     try {
       const cm = await calcularMes(mes);
+      // Si la liquidación del mes ya fue emitida (el cupón llegó tarde), el descuento parte en la próxima
+      // liquidación no emitida; con mes_inicio=mes se perdería en silencio (code review 17-09-2026).
+      const prox = await require('./remuneraciones.controller').proximaLiquidacion();
+      const mesIni = prox > mes ? prox : mes;
       await pool.query("UPDATE rh_descuentos SET estado='ANULADO', anulado_por='Sistema (reemisión seguro)', anulado_at=NOW() WHERE seguro_mes=? AND estado='VIGENTE'", [mes]);
       for (const t of cm.titulares.filter(x => x.seguro_salud && x.costo_empleado > 0)) {
         const n = t.cargas.filter(k => k.incluida && k.paga === 'EMPLEADO').length;
         await pool.query(`INSERT INTO rh_descuentos (id_usuario, tipo, detalle_texto, monto_total, cuotas, valor_cuota, mes_inicio, creado_por, moneda, seguro_mes)
-          VALUES (?,'VARIOS',?,?,1,?,?,?,'CLP',?)`, [t.id_usuario, `Seguro complementario de salud — ${n} carga${n === 1 ? '' : 's'} (${prov.nombre})`, t.costo_empleado, t.costo_empleado, mes, nombreDe(u), mes]);
+          VALUES (?,'VARIOS',?,?,1,?,?,?,'CLP',?)`, [t.id_usuario, `Seguro complementario de salud ${mes} — ${n} carga${n === 1 ? '' : 's'} (${prov.nombre})`, t.costo_empleado, t.costo_empleado, mesIni, nombreDe(u), mes]);
         nDesc++; totDesc += t.costo_empleado;
       }
     } catch (e3) { console.error('[seguro odp descuentos]', e3.message); }

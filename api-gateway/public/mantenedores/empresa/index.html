@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Datos de la Empresa — Mantenedores</title>
-  <!-- v1.0 — mantenedor nuevo: razón social, RUT, giro, domicilio, representante legal, contacto, CCAF y mutual en una sola fuente (shared/empresa.js) -->
+  <!-- v1.1 — al guardar invalida la caché de sesión de /js/empresa.js. v1.0 — mantenedor nuevo: razón social, RUT, giro, domicilio, representante legal, contacto, CCAF y mutual en una sola fuente (shared/empresa.js) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -100,6 +100,7 @@
     const b={}; CAMPOS.forEach(k=>b[k]=document.getElementById(k).value);
     const j=await(await fetch('/api/empresa',{method:'PUT',headers:HJ,body:JSON.stringify(b)})).json();
     if(!j.success) return alert(j.error||'Error al guardar');
+    try{ sessionStorage.removeItem('af_empresa_v1'); }catch(_){}   // las otras páginas releen la empresa al instante
     const t=document.getElementById('toast'); t.style.display='block'; setTimeout(()=>t.style.display='none',2200); cargar();
   }
   cargar();
