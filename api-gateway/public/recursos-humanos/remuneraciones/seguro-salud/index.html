@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguro de Salud — AutoFácil</title>
-  <!-- v2.3 — pestaña Parámetros completa (cambio de compañía sin tocar código): aseguradora y primas, edades, cuándo se pide el certificado y su plazo, tolerancia, quién paga las cargas, y a quién van los correos del seguro (perfiles, copia, activo) (Pato 17-09-2026) -->
+  <!-- v2.4 — al emitir la ODP se avisa por correo a Contabilidad con copia a RRHH y a quien emitió, con cupón y nómina adjuntos. v2.3 — pestaña Parámetros completa (cambio de compañía sin tocar código): aseguradora y primas, edades, cuándo se pide el certificado y su plazo, tolerancia, quién paga las cargas, y a quién van los correos del seguro (perfiles, copia, activo) (Pato 17-09-2026) -->
   <!-- v2.2 — fecha de envío del certificado de estudios en la carga; un mes antes de cumplir la edad máxima el sistema pide el certificado al colaborador (copia RRHH) (Pato 17-09-2026) -->
   <!-- v2.1 — la nómina de cotización se sube siempre junto con el cupón (obligatoria para emitir la ODP, aunque cuadre) -->
   <!-- v2.0 — pestaña Pago del mes: subir el cupón de MetLife (lee los totales del PDF), cuadratura contra lo esperado, nómina de cotización para ver quién quedó fuera (alerta / pedir certificado / fuera por edad), avisos a los empleados con copia a RRHH, OK de RRHH y emisión de la ODP con los adjuntos; parámetros edad de estudiante y tolerancia (Pato 17-09-2026) -->
@@ -164,7 +164,7 @@
       <li><b>Primas</b> (UF o pesos; la UF es la del día 1 del mes) → monto de la nómina y de los descuentos desde el mes indicado. <b>Pedir certificado (días antes)</b> y <b>plazo</b> → cuándo sale el correo al colaborador y la fecha límite que le indica.</li>
       <li><b>Correos del seguro</b> (pestaña Parámetros) → perfiles, copia e interruptor de los tres correos del seguro; el texto en <a href="/mantenedores/correos/">Correos del Sistema</a>.</li>
       <li><b>Generar nómina</b> → congela el mes (es lo que el sistema "espera" cobrar). <b>Anular</b> borra la nómina y anula los descuentos del mes (auditado).</li>
-      <li><b>Pago del mes</b> → el cupón de la aseguradora se compara con lo esperado (tolerancia en UF) y la nómina de cotización (obligatoria todos los meses) dice quién quedó fuera (hijo menor de la edad máxima → alerta; hasta la edad de estudiante → pedir certificado; mayor → fuera por edad), se avisa al empleado con copia a RRHH (plantilla en <a href="/mantenedores/correos/">Correos del Sistema</a>) y RRHH puede dar su OK; la <a href="/ordenes-pago/">Orden de Pago</a> a la aseguradora sale con el cupón y la nómina adjuntos.</li>
+      <li><b>Pago del mes</b> → el cupón de la aseguradora se compara con lo esperado (tolerancia en UF) y la nómina de cotización (obligatoria todos los meses) dice quién quedó fuera (hijo menor de la edad máxima → alerta; hasta la edad de estudiante → pedir certificado; mayor → fuera por edad), se avisa al empleado con copia a RRHH (plantilla en <a href="/mantenedores/correos/">Correos del Sistema</a>) y RRHH puede dar su OK; la <a href="/ordenes-pago/">Orden de Pago</a> a la aseguradora sale con el cupón y la nómina adjuntos y se avisa por correo a Contabilidad con copia a RRHH (plantilla <i>Orden de Pago del seguro emitida</i>).</li>
     </ul>
   </div>
 </div>
@@ -260,7 +260,7 @@ function renderPago(){
   document.getElementById('btnAvisos').style.display = d && d.fuera.some(f=>f.relacion!=='TITULAR') && pg.estado!=='PAGO_EMITIDO' ? '' : 'none';
   document.getElementById('btnOk').style.display = pg && pg.estado==='NO_CUADRA' ? '' : 'none';
   document.getElementById('btnOdp').style.display = puedeOdp ? '' : 'none';
-  document.getElementById('gPago').innerHTML = !pg ? 'Sube el cupón para continuar.' : pg.estado==='PAGO_EMITIDO' ? `Orden de pago <b>${esc(pg.odp_numero)}</b> emitida a la aseguradora por <b>$${fmt(pg.total_clp)}</b> con el cupón adjunto. Se paga por el flujo normal de <a href="/ordenes-pago/">Órdenes de Pago</a>.` :
+  document.getElementById('gPago').innerHTML = !pg ? 'Sube el cupón para continuar.' : pg.estado==='PAGO_EMITIDO' ? `Orden de pago <b>${esc(pg.odp_numero)}</b> emitida a la aseguradora por <b>$${fmt(pg.total_clp)}</b> con el cupón adjunto y avisada a Contabilidad (copia RRHH). Se paga por el flujo normal de <a href="/ordenes-pago/">Órdenes de Pago</a>.` :
     pg.estado==='OK_RRHH' ? `RRHH autorizó pagar sin cuadrar: <i>${esc(pg.ok_motivo)}</i> (${esc(pg.ok_por)}, ${String(pg.ok_at).slice(0,10)}). ${d?`Emite la orden por $${fmt(pg.total_clp)}.`:'Falta subir la <b>nómina de cotización</b> (paso 2).'}` :
     pg.estado==='CUADRA' ? (d ? `El cupón cuadra con el sistema${d.fuera.length||d.sobran.length?' (pero la nómina de la aseguradora tiene diferencias: revísalas arriba)':' y la nómina de la aseguradora coincide'}. Emite la orden de pago por <b>$${fmt(pg.total_clp)}</b>.` : `El cupón cuadra. Falta subir la <b>nómina de cotización</b> (paso 2) para poder emitir la orden.`) : `El cupón <b>no cuadra</b>. Compara la nómina de cotización para ver quién quedó fuera, avisa a los empleados y, para no demorar el pago, RRHH puede dar su OK.`;
   document.getElementById('gDocs').innerHTML = pg?.docs?.length ? 'Adjuntos: ' + pg.docs.map(x=>`<a href="#" onclick="verDoc(${x.id});return false"><i class="bi bi-paperclip"></i>${esc(x.nombre)}</a>`).join(' · ') : '';
@@ -295,7 +295,7 @@ async function okRRHH(){
 async function emitirOdp(){
   if (!confirm(`¿Emitir la Orden de Pago a la aseguradora por $${fmt(G.pago.total_clp)}?`)) return;
   const j = await api('/emitir-odp','POST',{ mes: document.getElementById('gMes').value }); if (!j.success) return alert(j.error);
-  alert('Emitida '+j.data.odp_numero); cargarPago();
+  alert('Emitida '+j.data.odp_numero+(j.data.correo?.enviado ? '\nCorreo enviado a '+(j.data.correo.to||[]).join(', ')+(j.data.correo.cc?.length?' con copia a '+j.data.correo.cc.join(', '):'') : '\nCorreo NO enviado: '+(j.data.correo?.motivo||''))); cargarPago();
 }
 
 async function cargar(){

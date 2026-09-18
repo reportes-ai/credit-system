@@ -505,6 +505,29 @@ Recursos Humanos — AutoFácil`,
     variables: '{NOMBRE} {CARGA} {EDAD} {FECHA_CUMPLE} {FECHA_LIMITE} {ASEGURADORA} {POLIZA_HASTA}',
   },
   {
+    codigo: 'seguro_odp_contabilidad',
+    ambito: 'Recursos Humanos — Seguro de Salud',
+    nombre: 'Orden de Pago del seguro emitida → Contabilidad (copia RRHH)',
+    descripcion: 'Sale al emitir la Orden de Pago a la aseguradora desde Seguro de Salud → Pago del mes. Va a la casilla de Contabilidad configurada en Correo de Orden de Pago a Contabilidad, con copia a RRHH y a quien la emitió. Adjunta el cupón y la nómina de cotización.',
+    asunto: 'Orden de Pago {ODP} — seguro complementario de salud {MES}',
+    cuerpo: `Estimados:
+
+Se emitió la Orden de Pago {ODP} a {ASEGURADORA} por {MONTO}, correspondiente al seguro complementario de salud de {MES} (póliza {POLIZA}).
+
+Detalle del cupón: {UF_PERIODO} UF del período{AJUSTES} = {UF_TOTAL} UF × UF {UF_COBRO}.
+Cuadratura contra la nómina del sistema ({TITULARES} titulares + {CARGAS} cargas): {CUADRATURA}.
+
+Emitida por {QUIEN}. El cupón de pago y la nómina de cotización van adjuntos y quedan en la orden.
+{LINK}
+
+Saludos cordiales,
+Auto Fácil Business Suite`,
+    para_perfiles: '',
+    cc: 'recursos.humanos@autofacilchile.cl',
+    destinatario: 'Contabilidad (casilla del mantenedor Correo de Orden de Pago a Contabilidad), con copia a RRHH y a quien emitió',
+    variables: '{ODP} {MES} {ASEGURADORA} {POLIZA} {MONTO} {UF_PERIODO} {AJUSTES} {UF_TOTAL} {UF_COBRO} {TITULARES} {CARGAS} {CUADRATURA} {QUIEN} {LINK}',
+  },
+  {
     codigo: 'seguro_carga_fuera_aviso',
     ambito: 'Recursos Humanos — Seguro de Salud',
     nombre: 'Familiar fuera del seguro → colaborador (copia RRHH)',

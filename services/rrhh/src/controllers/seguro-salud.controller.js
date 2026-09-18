@@ -450,6 +450,9 @@ async function cuadrar(mes, uf_periodo, uf_cobro) {
            cuadra: dif != null && Math.abs(dif) <= tol, tolerancia_uf: tol, titulares: e.titulares, cargas: e.cargas, generada: e.generada };
 }
 
+const e_titulares = pg => pg.diff ? (pg.diff.titulares_sistema ?? '') : '';
+const e_cargas = pg => pg.diff ? (pg.diff.cargas_sistema ?? '') : '';
+
 /* GET /remuneraciones/seguro/pago?mes= */
 const getPago = async (req, res) => {
   try {
@@ -562,7 +565,8 @@ const subirCotizacion = async (req, res) => {
       }
     }
     const sobran = disponibles.map(f => ({ nombre: `${f.nombres} ${f.apellido_paterno} ${f.apellido_materno}`.trim(), relacion: f.relacion || '', nacimiento: f.nacimiento }));
-    const diff = { fecha: iso(new Date()), en_metlife: vig.length, fuera, sobran, prima_fuera_uf: fuera.reduce((s, f) => s + (f.relacion === 'TITULAR' ? p.prima_titular : p.prima_carga), 0) };
+    const T = c.titulares.filter(x => x.seguro_salud);
+    const diff = { fecha: iso(new Date()), en_metlife: vig.length, titulares_sistema: T.length, cargas_sistema: T.reduce((s2, t) => s2 + t.cargas.filter(k => k.incluida).length, 0), fuera, sobran, prima_fuera_uf: fuera.reduce((s, f) => s + (f.relacion === 'TITULAR' ? p.prima_titular : p.prima_carga), 0) };
     await pool.query('UPDATE rh_seguro_pago SET diff_json=?, actualizado_por=?, updated_at=NOW() WHERE id=?', [JSON.stringify(diff), nombreDe(req.usuario), pago.id]);
     const pv = require('../../../postventa/src/controllers/postventa.controller');
     await pv.guardarFacturaDoc({ origen: 'SEGURO', ref_id: pago.id, nombre: String(b.archivo_nombre || `nomina-cotizacion-${b.mes}.xlsx`).slice(0, 200), mime: b.mime || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer, usuario: nombreDe(req.usuario) });
@@ -639,25 +643,40 @@ const emitirOdp = async (req, res) => {
     const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
     const { numero } = await emitirCorrelativo({ origen: 'GENERAL', origen_id: r.insertId, concepto, monto: m.aPagar, id_usuario: u.id_usuario || null, usuario_nombre: nombreDe(u) || 'Sistema' });
     await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
-    // Adjuntos: cupón y nómina de cotización → a la ODP (copia del almacén)
+    // Adjuntos: cupón y nómina de cotización → a la ODP (copia del almacén) y al correo
+    const adjuntos = [];
     try {
       const alm = require('../../../../shared/almacen-docs');
       const pv = require('../../../postventa/src/controllers/postventa.controller');
       const [docs] = await pool.query("SELECT * FROM postventa_factura_docs WHERE origen='SEGURO' AND ref_id=?", [pago.id]);
-      for (const d of docs) { const buf = await alm.obtener({ ruta: d.doc_ruta, blob: d.archivo }); if (buf) await pv.guardarFacturaDoc({ origen: 'ODP', ref_id: r.insertId, nombre: d.nombre, mime: d.mime, buffer: buf, usuario: nombreDe(u) }); }
+      for (const d of docs) { const buf = await alm.obtener({ ruta: d.doc_ruta, blob: d.archivo }); if (buf) { await pv.guardarFacturaDoc({ origen: 'ODP', ref_id: r.insertId, nombre: d.nombre, mime: d.mime, buffer: buf, usuario: nombreDe(u) }); adjuntos.push({ filename: d.nombre, content: buf, contentType: d.mime || undefined }); } }
     } catch (e) { console.error('[seguro odp adjuntos]', e.message); }
     await pool.query("UPDATE rh_seguro_pago SET estado='PAGO_EMITIDO', odp_id=?, odp_numero=?, updated_at=NOW() WHERE id=?", [r.insertId, numero, pago.id]);
-    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'seguro_pago', entidad_id: pago.id, detalle: `Emitió ${numero} a ${prov.nombre} por ${CLP(pago.total_clp)} — seguro de salud ${mes}` });
-    ok(res, { odp_id: r.insertId, odp_numero: numero });
+    // Correo a Contabilidad con copia a RRHH y a quien emitió (Pato 17-09-2026)
+    let correo = { enviado: false, motivo: 'no intentado' };
+    try {
+      const plant = require('../../../../shared/plantillas-correo');
+      const { destinatariosContabilidad } = require('../../../../shared/correo-contabilidad');
+      const ctb = await destinatariosContabilidad(u.email);
+      const base = process.env.APP_URL || 'https://afbs.autofacilchile.cl';
+      correo = await plant.enviar({ codigo: 'seguro_odp_contabilidad', to: [ctb.to], cc: ctb.cc || [], adjuntos, datos: {
+        ODP: numero, MES: mesTxt, ASEGURADORA: prov.nombre, POLIZA: pol.numero || '—', MONTO: CLP(pago.total_clp),
+        UF_PERIODO: Number(pago.uf_periodo).toLocaleString('es-CL', { minimumFractionDigits: 2 }), AJUSTES: pago.uf_ajustes ? ` ${pago.uf_ajustes > 0 ? '+' : ''}${Number(pago.uf_ajustes).toLocaleString('es-CL', { minimumFractionDigits: 2 })} UF de ajustes de períodos anteriores` : '',
+        UF_TOTAL: Number(pago.uf_total).toLocaleString('es-CL', { minimumFractionDigits: 2 }), UF_COBRO: '$' + Number(pago.uf_cobro).toLocaleString('es-CL', { minimumFractionDigits: 2 }),
+        TITULARES: e_titulares(pago), CARGAS: e_cargas(pago), CUADRATURA: pago.estado === 'CUADRA' ? 'cuadra' : `NO cuadra (diferencia ${pago.diferencia_uf} UF) — OK de RRHH: ${pago.ok_por}, ${pago.ok_motivo}`,
+        QUIEN: nombreDe(u) || 'Sistema', LINK: base + '/ordenes-pago/historial/' } });
+    } catch (e2) { correo = { enviado: false, motivo: e2.message }; }
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'seguro_pago', entidad_id: pago.id, detalle: `Emitió ${numero} a ${prov.nombre} por ${CLP(pago.total_clp)} — seguro de salud ${mes} · correo a Contabilidad ${correo.enviado ? 'enviado a ' + (correo.to || []).join(', ') + (correo.cc?.length ? ' cc ' + correo.cc.join(', ') : '') : 'NO enviado: ' + correo.motivo}` });
+    ok(res, { odp_id: r.insertId, odp_numero: numero, correo });
   } catch (e) { console.error('[seguro odp]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
 /* ── Correos del seguro: a quién se envían (destinatarios por perfil + copia + interruptor), desde la card ──
    El texto se edita en Correos del Sistema; acá solo lo que cambia si cambia la compañía. */
-const CORREOS_SEGURO = ['seguro_inscribir_aviso', 'seguro_certificado_aviso', 'seguro_carga_fuera_aviso'];
+const CORREOS_SEGURO = ['seguro_inscribir_aviso', 'seguro_certificado_aviso', 'seguro_carga_fuera_aviso', 'seguro_odp_contabilidad'];
 const getCorreos = async (req, res) => {
   try {
-    const [pl] = await pool.query('SELECT codigo, nombre, descripcion, destinatario, para_perfiles, cc, activo FROM correos_plantillas WHERE codigo IN (?) ORDER BY FIELD(codigo, ?, ?, ?)', [CORREOS_SEGURO, ...CORREOS_SEGURO]);
+    const [pl] = await pool.query('SELECT codigo, nombre, descripcion, destinatario, para_perfiles, cc, activo FROM correos_plantillas WHERE codigo IN (?) ORDER BY FIELD(codigo, ?, ?, ?, ?)', [CORREOS_SEGURO, ...CORREOS_SEGURO]);
     const [perfiles] = await pool.query('SELECT nombre FROM perfiles ORDER BY nombre');
     ok(res, { plantillas: pl, perfiles: perfiles.map(x => x.nombre) });
   } catch (e) { console.error('[seguro correos]', e.message); fail(res, 'Error interno del servidor'); }
