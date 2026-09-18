@@ -205,6 +205,8 @@ router.post('/remuneraciones/seguro/cotizacion',      verifyToken, requireFunc('
 router.post('/remuneraciones/seguro/avisos',          verifyToken, requireFunc('rh_remuneraciones'), seguro.enviarAvisos);
 router.post('/remuneraciones/seguro/ok-rrhh',         verifyToken, requireFunc('rh_remuneraciones'), seguro.okRRHH);
 router.post('/remuneraciones/seguro/emitir-odp',      verifyToken, requireFunc('rh_remuneraciones'), seguro.emitirOdp);
+router.get('/remuneraciones/seguro/correos',          verifyToken, requireFunc('rh_remuneraciones'), seguro.getCorreos);
+router.put('/remuneraciones/seguro/correos/:codigo',  verifyToken, requireFunc('rh_remuneraciones'), seguro.putCorreo);
 router.put('/remuneraciones/seguro/poliza',           verifyToken, requireFunc('rh_remuneraciones'), seguro.putPoliza);
 router.put('/remuneraciones/seguro/titular',          verifyToken, requireFunc('rh_remuneraciones'), seguro.putTitular);
 router.post('/remuneraciones/seguro/carga',           verifyToken, requireFunc('rh_remuneraciones'), seguro.guardarCarga);

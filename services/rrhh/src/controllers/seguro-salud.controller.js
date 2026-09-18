@@ -86,6 +86,10 @@ require('../../../../shared/migrate').migrar('rrhh-seguro-solo-indefinidos', asy
   // El plazo fijo no tiene seguro
   await pool.query("UPDATE rh_fichas SET seguro_salud=0 WHERE tipo_contrato<>'INDEFINIDO' AND seguro_salud=1");
 });
+require('../../../../shared/migrate').migrar('rrhh-seguro-param-certificado', async () => {
+  await pool.query('ALTER TABLE rh_seguro_param ADD COLUMN IF NOT EXISTS certificado_dias_antes INT NOT NULL DEFAULT 30');   // cuántos días antes de la edad máxima se pide
+  await pool.query('ALTER TABLE rh_seguro_param ADD COLUMN IF NOT EXISTS certificado_plazo_dias INT NOT NULL DEFAULT 5');    // plazo para entregarlo: N días antes del cumpleaños
+});
 require('../../../../shared/migrate').migrar('rrhh-seguro-certificado-fecha', async () => {
   await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_enviado_at DATE NULL');   // cuándo se envió el certificado a la aseguradora
   await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_aviso_at DATE NULL');     // cuándo se le pidió al colaborador (un mes antes de la edad máxima)
@@ -211,14 +215,16 @@ const putParam = async (req, res) => {
     const edadEst = Math.round(Number(b.edad_max_estudiante) || 27);
     if (edadEst < edad || edadEst > 40) return fail(res, 'La edad máxima de estudiante debe ser mayor o igual a la de hijos', 400);
     const tol = Number(b.tolerancia_uf); const tolF = tol >= 0 && tol < 5 ? tol : 0.05;
+    const diasAntes = Math.round(Number(b.certificado_dias_antes)); const dA = diasAntes >= 7 && diasAntes <= 120 ? diasAntes : 30;
+    const plazo = Math.round(Number(b.certificado_plazo_dias)); const dP = plazo >= 0 && plazo < dA ? plazo : 5;
     const [[gen]] = await pool.query('SELECT COUNT(*) n FROM rh_seguro_nomina WHERE mes >= ?', [b.mes_desde]);
     if (gen.n) return fail(res, `Ya hay nóminas generadas desde ${b.mes_desde}: el cambio debe regir desde un mes sin nómina`, 400);
     const aseg = String(b.aseguradora || 'METLIFE').trim().toUpperCase().slice(0, 80);
-    await pool.query(`INSERT INTO rh_seguro_param (mes_desde, aseguradora, moneda, prima_titular, prima_carga, edad_max_hijo, edad_max_estudiante, tolerancia_uf, corte_cargas_empresa, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?)
+    await pool.query(`INSERT INTO rh_seguro_param (mes_desde, aseguradora, moneda, prima_titular, prima_carga, edad_max_hijo, edad_max_estudiante, tolerancia_uf, certificado_dias_antes, certificado_plazo_dias, corte_cargas_empresa, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
       ON DUPLICATE KEY UPDATE aseguradora=VALUES(aseguradora), moneda=VALUES(moneda), prima_titular=VALUES(prima_titular), prima_carga=VALUES(prima_carga),
-        edad_max_hijo=VALUES(edad_max_hijo), edad_max_estudiante=VALUES(edad_max_estudiante), tolerancia_uf=VALUES(tolerancia_uf), corte_cargas_empresa=VALUES(corte_cargas_empresa), creado_por=VALUES(creado_por), created_at=NOW()`,
-      [b.mes_desde, aseg, moneda, pt, pc, edad, edadEst, tolF, corte, nombreDe(req.usuario)]);
-    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'seguro_param', detalle: `Seguro de salud desde ${b.mes_desde}: ${aseg} · titular ${pt} ${moneda} · carga ${pc} ${moneda} · hijos hasta ${edad} años (estudiantes hasta ${edadEst}) · tolerancia ${tolF} UF · empresa paga cargas de contratados hasta ${corte || '—'}` });
+        edad_max_hijo=VALUES(edad_max_hijo), edad_max_estudiante=VALUES(edad_max_estudiante), tolerancia_uf=VALUES(tolerancia_uf), certificado_dias_antes=VALUES(certificado_dias_antes), certificado_plazo_dias=VALUES(certificado_plazo_dias), corte_cargas_empresa=VALUES(corte_cargas_empresa), creado_por=VALUES(creado_por), created_at=NOW()`,
+      [b.mes_desde, aseg, moneda, pt, pc, edad, edadEst, tolF, dA, dP, corte, nombreDe(req.usuario)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'seguro_param', detalle: `Seguro de salud desde ${b.mes_desde}: ${aseg} · titular ${pt} ${moneda} · carga ${pc} ${moneda} · hijos hasta ${edad} años (estudiantes hasta ${edadEst}) · tolerancia ${tolF} UF · certificado ${dA} días antes, plazo ${dP} días · empresa paga cargas de contratados hasta ${corte || '—'}` });
     ok(res, { mes_desde: b.mes_desde });
   } catch (e) { console.error('[seguro param]', e.message); fail(res, 'Error interno del servidor'); }
 };
@@ -646,6 +652,32 @@ const emitirOdp = async (req, res) => {
   } catch (e) { console.error('[seguro odp]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
+/* ── Correos del seguro: a quién se envían (destinatarios por perfil + copia + interruptor), desde la card ──
+   El texto se edita en Correos del Sistema; acá solo lo que cambia si cambia la compañía. */
+const CORREOS_SEGURO = ['seguro_inscribir_aviso', 'seguro_certificado_aviso', 'seguro_carga_fuera_aviso'];
+const getCorreos = async (req, res) => {
+  try {
+    const [pl] = await pool.query('SELECT codigo, nombre, descripcion, destinatario, para_perfiles, cc, activo FROM correos_plantillas WHERE codigo IN (?) ORDER BY FIELD(codigo, ?, ?, ?)', [CORREOS_SEGURO, ...CORREOS_SEGURO]);
+    const [perfiles] = await pool.query('SELECT nombre FROM perfiles ORDER BY nombre');
+    ok(res, { plantillas: pl, perfiles: perfiles.map(x => x.nombre) });
+  } catch (e) { console.error('[seguro correos]', e.message); fail(res, 'Error interno del servidor'); }
+};
+const putCorreo = async (req, res) => {
+  try {
+    const codigo = String(req.params.codigo || '');
+    if (!CORREOS_SEGURO.includes(codigo)) return fail(res, 'Correo no pertenece al seguro', 400);
+    const b = req.body || {};
+    const perfiles = String(b.para_perfiles || '').split(',').map(x => x.trim()).filter(Boolean).join(',');
+    const cc = String(b.cc || '').split(/[,;]/).map(x => x.trim().toLowerCase()).filter(x => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(x)).join(', ');
+    const activo = b.activo === false || b.activo === 0 ? 0 : 1;
+    const [[prev]] = await pool.query('SELECT para_perfiles, cc, activo FROM correos_plantillas WHERE codigo=?', [codigo]);
+    if (!prev) return fail(res, 'Plantilla no encontrada', 404);
+    await pool.query('UPDATE correos_plantillas SET para_perfiles=?, cc=?, activo=? WHERE codigo=?', [perfiles, cc, activo, codigo]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'correo_plantilla', entidad_id: codigo, detalle: `Seguro de Salud → correo ${codigo}: perfiles "${prev.para_perfiles}" → "${perfiles}" · copia "${prev.cc}" → "${cc}" · ${activo ? 'activo' : 'DESACTIVADO'}` });
+    ok(res, { codigo });
+  } catch (e) { console.error('[seguro correo put]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 /* ── Motor: hijo asegurado por cumplir la edad máxima → pedir el certificado UN MES ANTES ──
    Al colaborador (correo personal, si no el corporativo) con copia a RRHH + campana a RRHH.
    Una vez por hijo y por póliza: certificado_aviso_at anterior a la vigencia actual se considera
@@ -656,7 +688,8 @@ async function avisarCertificados() {
     const p = await paramDe(mes), pol = await polizaVigente();
     const edadMax = Number(p.edad_max_hijo) || 23, edadEst = Number(p.edad_max_estudiante) || 27;
     if (edadMax + 1 > edadEst) return;
-    const lim = new Date(hoy); lim.setDate(lim.getDate() + 31); const limISO = iso(lim);
+    const diasAntes = Number(p.certificado_dias_antes) || 30, plazo = Number(p.certificado_plazo_dias) ?? 5;
+    const lim = new Date(hoy); lim.setDate(lim.getDate() + diasAntes + 1); const limISO = iso(lim);
     const desdePol = pol.vigencia_desde || '1900-01-01';
     const [hijos] = await pool.query(
       `SELECT c.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) titular, u.email, f.email_personal
@@ -677,7 +710,7 @@ async function avisarCertificados() {
       if (h.certificado_estudios && h.certificado_enviado_at && iso(h.certificado_enviado_at) >= desdePol) continue;
       const to = (h.email_personal || h.email || '').trim();
       const nombreCarga = [h.nombres, h.apellido_paterno, h.apellido_materno].filter(Boolean).join(' ');
-      const limiteISO = iso(new Date(cumple.getFullYear(), cumple.getMonth(), cumple.getDate() - 5, 12));
+      const limiteISO = iso(new Date(cumple.getFullYear(), cumple.getMonth(), cumple.getDate() - plazo, 12));
       const r = to ? await plant.enviar({ codigo: 'seguro_certificado_aviso', to: [to], datos: { NOMBRE: h.titular, CARGA: nombreCarga, EDAD: edadMax + 1, FECHA_CUMPLE: dmy(cumpleISO), FECHA_LIMITE: dmy(limiteISO), ASEGURADORA: p.aseguradora || 'METLIFE', POLIZA_HASTA: pol.vigencia_hasta ? dmy(pol.vigencia_hasta) : '—' } }) : { enviado: false, motivo: 'sin correo' };
       await notificar(rrhh.map(x => x.id_usuario), { tipo: 'RRHH', prioridad: 'media', sonar: false, titulo: `Certificado de estudios: ${nombreCarga}`,
         mensaje: `Hijo(a) de ${h.titular} cumple ${edadMax + 1} años el ${dmy(cumpleISO)}. Se le pidió el certificado al colaborador${r.enviado ? '' : ' (correo NO enviado: ' + r.motivo + ')'}; al recibirlo, márcalo en la carga con la fecha de envío a la aseguradora.`,
@@ -720,4 +753,4 @@ async function avisarInscripcion() {
 }
 require('../../../../shared/scheduler').programar('seguro-inscribir-aviso', avisarInscripcion, 60 * 60 * 1000);
 
-module.exports = { avisarInscripcion, avisarCertificados, getPago, subirCupon, subirCotizacion, enviarAvisos, okRRHH, emitirOdp, getMes, putParam, putPoliza, putTitular, guardarCarga, seleccionCarga, bajaCarga, generar, anular, nominaXlsx, calcularMes };
+module.exports = { avisarInscripcion, avisarCertificados, getCorreos, putCorreo, getPago, subirCupon, subirCotizacion, enviarAvisos, okRRHH, emitirOdp, getMes, putParam, putPoliza, putTitular, guardarCarga, seleccionCarga, bajaCarga, generar, anular, nominaXlsx, calcularMes };

@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguro de Salud — AutoFácil</title>
+  <!-- v2.3 — pestaña Parámetros completa (cambio de compañía sin tocar código): aseguradora y primas, edades, cuándo se pide el certificado y su plazo, tolerancia, quién paga las cargas, y a quién van los correos del seguro (perfiles, copia, activo) (Pato 17-09-2026) -->
   <!-- v2.2 — fecha de envío del certificado de estudios en la carga; un mes antes de cumplir la edad máxima el sistema pide el certificado al colaborador (copia RRHH) (Pato 17-09-2026) -->
   <!-- v2.1 — la nómina de cotización se sube siempre junto con el cupón (obligatoria para emitir la ODP, aunque cuadre) -->
   <!-- v2.0 — pestaña Pago del mes: subir el cupón de MetLife (lee los totales del PDF), cuadratura contra lo esperado, nómina de cotización para ver quién quedó fuera (alerta / pedir certificado / fuera por edad), avisos a los empleados con copia a RRHH, OK de RRHH y emisión de la ODP con los adjuntos; parámetros edad de estudiante y tolerancia (Pato 17-09-2026) -->
@@ -124,21 +125,31 @@
 
   <div id="secP" style="display:none">
     <div class="panel">
-      <div class="fw-bold mb-2"><i class="bi bi-sliders me-1"></i>Nuevo parámetro (rige desde el mes indicado; los meses ya generados no se recalculan)</div>
-      <div class="row g-2 align-items-end">
-        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Desde mes</label><input type="month" id="pMes" class="form-control form-control-sm"></div>
-        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Aseguradora</label><input id="pAseg" class="form-control form-control-sm"></div>
+      <div class="fw-bold mb-1"><i class="bi bi-sliders me-1"></i>Reglas de la póliza <span class="small fw-normal text-muted">— todo lo que cambia si cambia la compañía. Rige desde el mes indicado; los meses ya generados no se recalculan.</span></div>
+      <div class="row g-2 align-items-end mt-1">
+        <div class="col-12"><div class="small fw-semibold text-primary">Aseguradora y primas</div></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Rige desde</label><input type="month" id="pMes" class="form-control form-control-sm"></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Aseguradora</label><input id="pAseg" class="form-control form-control-sm"></div>
         <div class="col-md-1"><label class="form-label small fw-semibold mb-1">Moneda</label><select id="pMon" class="form-select form-select-sm"><option>UF</option><option value="CLP">$</option></select></div>
-        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Prima titular</label><input id="pTit" class="form-control form-control-sm text-end" inputmode="decimal"></div>
-        <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Prima por carga</label><input id="pCar" class="form-control form-control-sm text-end" inputmode="decimal"></div>
-        <div class="col-md-1"><label class="form-label small fw-semibold mb-1" title="Los hijos mayores de esta edad salen solos de la nómina">Edad máx. hijos</label><input id="pEdad" type="number" class="form-control form-control-sm text-end"></div>
-        <div class="col-md-1"><label class="form-label small fw-semibold mb-1" title="Con certificado de estudios, hasta esta edad">Máx. estudiante</label><input id="pEdadEst" type="number" class="form-control form-control-sm text-end"></div>
-        <div class="col-md-1"><label class="form-label small fw-semibold mb-1" title="Diferencia en UF que se acepta entre el cupón y lo esperado">Tolerancia UF</label><input id="pTol" class="form-control form-control-sm text-end"></div>
-        <div class="col-md-2"><label class="form-label small fw-semibold mb-1" title="A quienes ingresaron hasta esta fecha, AutoFácil les paga también el seguro de sus cargas. Después, la carga la paga el empleado.">Empresa paga cargas de contratados hasta</label><input id="pCorte" type="date" class="form-control form-control-sm"></div>
-        <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" onclick="guardarParam()"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1" title="Prima mensual del titular (con IVA si la aseguradora lo cobra)">Prima titular</label><input id="pTit" class="form-control form-control-sm text-end" inputmode="decimal"></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1" title="Prima mensual por cada carga adicional (0 si la póliza no cobra las cargas)">Prima por carga adicional</label><input id="pCar" class="form-control form-control-sm text-end" inputmode="decimal"></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1" title="Diferencia en UF que se acepta entre el cupón y lo esperado">Tolerancia cupón (UF)</label><input id="pTol" class="form-control form-control-sm text-end"></div>
+        <div class="col-12 mt-3"><div class="small fw-semibold text-primary">Edades y certificado de estudios</div></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1" title="Hasta esta edad el hijo va sin condiciones; pasada, sale de la nómina">Edad máx. hijo</label><input id="pEdad" type="number" class="form-control form-control-sm text-end"></div>
+        <div class="col-md-2"><label class="form-label small fw-semibold mb-1" title="Con certificado de estudios, hasta esta edad">Edad máx. estudiante</label><input id="pEdadEst" type="number" class="form-control form-control-sm text-end"></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold mb-1" title="Cuántos días antes de cumplir la edad máxima se le pide el certificado al colaborador">Pedir certificado (días antes)</label><input id="pCertDias" type="number" class="form-control form-control-sm text-end"></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold mb-1" title="Fecha límite para entregarlo: N días antes del cumpleaños">Plazo de entrega (días antes del cumpleaños)</label><input id="pCertPlazo" type="number" class="form-control form-control-sm text-end"></div>
+        <div class="col-12 mt-3"><div class="small fw-semibold text-primary">Quién paga las cargas</div></div>
+        <div class="col-md-4"><label class="form-label small fw-semibold mb-1" title="A quienes ingresaron hasta esta fecha, AutoFácil les paga también el seguro de sus cargas. Después, la carga la paga el empleado (descuento). Vacío = todas las cargas las paga el empleado.">Empresa paga cargas de contratados hasta</label><input id="pCorte" type="date" class="form-control form-control-sm"></div>
+        <div class="col-md-2 ms-auto"><button class="btn btn-sm btn-primary w-100" onclick="guardarParam()"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
       </div>
     </div>
-    <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Rige desde</th><th>Aseguradora</th><th class="text-right">Titular</th><th class="text-right">Carga</th><th>Hijos hasta</th><th>Tolerancia</th><th>Empresa paga cargas hasta</th><th>Registrado por</th></tr></thead><tbody id="tbParam"></tbody></table></div>
+    <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Rige desde</th><th>Aseguradora</th><th class="text-right">Titular</th><th class="text-right">Por carga</th><th>Hijos hasta</th><th>Certificado</th><th>Tolerancia</th><th>Empresa paga cargas hasta</th><th>Registrado por</th></tr></thead><tbody id="tbParam"></tbody></table></div>
+    <div class="panel">
+      <div class="fw-bold mb-1"><i class="bi bi-envelope-at me-1"></i>Correos del seguro: a quién se envían</div>
+      <div class="small text-muted mb-2">Perfiles que reciben cada correo, copia (correos separados por coma) e interruptor. El texto de cada correo se edita en <a href="/mantenedores/correos/">Correos del Sistema</a>.</div>
+      <div id="correosBox"></div>
+    </div>
   </div>
 
   <div class="foot mt-3"><b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
@@ -150,7 +161,8 @@
       <li><b>Edad máxima de hijos</b> → la carga que la supera queda marcada y fuera de la nómina (la aseguradora la rechaza), salvo que tenga <b>certificado de estudios</b> (casilla en la carga): sigue en la nómina hasta la <b>renovación de la póliza</b> (fecha editable arriba de la nómina) y al renovar sale sola con aviso, hasta que se actualice la vigencia y se reenvíe el certificado.</li>
       <li><b>Certificado de estudios</b> → un mes antes de que un hijo asegurado cumpla la edad máxima, el sistema le pide el certificado al colaborador por correo (copia RRHH, plantilla <i>Certificado de estudios</i> en <a href="/mantenedores/correos/">Correos del Sistema</a>) y avisa por campana; al recibirlo, RRHH marca la casilla y la <b>fecha de envío</b> a la aseguradora en la carga.</li>
       <li><b>Póliza</b> (número y vigencia, arriba de la nómina) → hasta cuándo valen los certificados de estudios; sale en el Excel para la aseguradora.</li>
-      <li><b>Primas</b> (UF o pesos; la UF es la del día 1 del mes) → monto de la nómina y de los descuentos desde el mes indicado.</li>
+      <li><b>Primas</b> (UF o pesos; la UF es la del día 1 del mes) → monto de la nómina y de los descuentos desde el mes indicado. <b>Pedir certificado (días antes)</b> y <b>plazo</b> → cuándo sale el correo al colaborador y la fecha límite que le indica.</li>
+      <li><b>Correos del seguro</b> (pestaña Parámetros) → perfiles, copia e interruptor de los tres correos del seguro; el texto en <a href="/mantenedores/correos/">Correos del Sistema</a>.</li>
       <li><b>Generar nómina</b> → congela el mes (es lo que el sistema "espera" cobrar). <b>Anular</b> borra la nómina y anula los descuentos del mes (auditado).</li>
       <li><b>Pago del mes</b> → el cupón de la aseguradora se compara con lo esperado (tolerancia en UF) y la nómina de cotización (obligatoria todos los meses) dice quién quedó fuera (hijo menor de la edad máxima → alerta; hasta la edad de estudiante → pedir certificado; mayor → fuera por edad), se avisa al empleado con copia a RRHH (plantilla en <a href="/mantenedores/correos/">Correos del Sistema</a>) y RRHH puede dar su OK; la <a href="/ordenes-pago/">Orden de Pago</a> a la aseguradora sale con el cupón y la nómina adjuntos.</li>
     </ul>
@@ -194,7 +206,28 @@ const fMes = document.getElementById('fMes');
 fMes.value = new Date().toISOString().slice(0,7);
 const api = async (url, method, body) => (await fetch('/api/rrhh/remuneraciones/seguro'+url, { method: method||'GET', headers:H, body: body?JSON.stringify(body):undefined })).json();
 
-function tab(t){ ['M','G','H','P'].forEach(x=>{ document.getElementById('sec'+x).style.display = x===t?'':'none'; document.getElementById('tab'+x).classList.toggle('active', x===t); }); if (t==='G') { if (!document.getElementById('gMes').value) document.getElementById('gMes').value = fMes.value; cargarPago(); } }
+function tab(t){ ['M','G','H','P'].forEach(x=>{ document.getElementById('sec'+x).style.display = x===t?'':'none'; document.getElementById('tab'+x).classList.toggle('active', x===t); }); if (t==='G') { if (!document.getElementById('gMes').value) document.getElementById('gMes').value = fMes.value; cargarPago(); } if (t==='P') cargarCorreos(); }
+
+/* ── Correos del seguro (destinatarios) ── */
+async function cargarCorreos(){
+  const j = await api('/correos'); if (!j.success) return;
+  const perfiles = j.data.perfiles;
+  document.getElementById('correosBox').innerHTML = j.data.plantillas.map(pl => { const sel = String(pl.para_perfiles||'').split(',').map(x=>x.trim()).filter(Boolean); return `
+    <div class="border rounded p-2 mb-2" style="font-size:.82rem">
+      <div class="d-flex align-items-center gap-2 flex-wrap"><b>${esc(pl.nombre)}</b><span class="text-muted">— ${esc(pl.destinatario||'')}</span>
+        <label class="ms-auto d-flex align-items-center gap-1"><input type="checkbox" id="ca_${pl.codigo}" ${pl.activo?'checked':''}> activo</label></div>
+      <div class="small text-muted mb-1">${esc(pl.descripcion||'')}</div>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-5"><label class="form-label small mb-0">Perfiles que lo reciben</label><div class="d-flex flex-wrap gap-2" id="cp_${pl.codigo}">${perfiles.map(pf=>`<label class="d-flex align-items-center gap-1"><input type="checkbox" value="${esc(pf)}" ${sel.includes(pf)?'checked':''}> ${esc(pf)}</label>`).join('')}</div></div>
+        <div class="col-md-5"><label class="form-label small mb-0">Copia (CC)</label><input id="cc_${pl.codigo}" class="form-control form-control-sm" value="${esc(pl.cc||'')}" placeholder="correo@..., correo@..."></div>
+        <div class="col-md-2"><button class="btn btn-sm btn-outline-primary w-100" onclick="guardarCorreo('${pl.codigo}')"><i class="bi bi-check-lg me-1"></i>Guardar</button><span id="cm_${pl.codigo}" class="small"></span></div>
+      </div></div>`; }).join('');
+}
+async function guardarCorreo(codigo){
+  const perfiles = [...document.querySelectorAll('#cp_'+codigo+' input:checked')].map(x=>x.value).join(',');
+  const j = await api('/correos/'+codigo,'PUT',{ para_perfiles: perfiles, cc: document.getElementById('cc_'+codigo).value, activo: document.getElementById('ca_'+codigo).checked });
+  const m = document.getElementById('cm_'+codigo); m.textContent = j.success ? '✓' : '✗ '+j.error; setTimeout(()=>m.textContent='',3000);
+}
 
 /* ── Pago del mes ── */
 let G = null;
@@ -311,12 +344,13 @@ function render(){
       </tr>`).join('')).join('') || '<tr><td colspan="8" class="text-center text-muted py-3">Sin colaboradores</td></tr>';
   }
   document.getElementById('tbHist').innerHTML = (D.historial||[]).map(h=>`<tr><td>${mesTxt(h.mes)}</td><td class="text-right">${h.titulares}</td><td class="text-right">${h.cargas}</td><td class="text-right">$${fmt(h.empleado)}</td><td class="text-right num">$${fmt(h.total)}</td><td>${String(h.generado_at||'').slice(0,10)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted text-center py-2">Aún no hay nóminas generadas</td></tr>';
-  document.getElementById('tbParam').innerHTML = (D.params||[]).map(x=>{ const m = x.moneda==='UF'?'UF ':'$'; return `<tr><td>${esc(x.mes_desde)}</td><td>${esc(x.aseguradora)}</td><td class="text-right num">${m}${Number(x.prima_titular).toLocaleString('es-CL')}</td><td class="text-right num">${m}${Number(x.prima_carga).toLocaleString('es-CL')}</td><td>${x.edad_max_hijo} años (est. ${x.edad_max_estudiante||27})</td><td>${Number(x.tolerancia_uf||0.05)} UF</td><td>${dmy(x.corte_cargas_empresa)}</td><td>${esc(x.creado_por||'')}</td></tr>`; }).join('') || '<tr><td colspan="8" class="text-muted text-center py-2">Sin parámetros: carga el primero</td></tr>';
+  document.getElementById('tbParam').innerHTML = (D.params||[]).map(x=>{ const m = x.moneda==='UF'?'UF ':'$'; return `<tr><td>${esc(x.mes_desde)}</td><td>${esc(x.aseguradora)}</td><td class="text-right num">${m}${Number(x.prima_titular).toLocaleString('es-CL')}</td><td class="text-right num">${m}${Number(x.prima_carga).toLocaleString('es-CL')}</td><td>${x.edad_max_hijo} años (estudiante ${x.edad_max_estudiante||27})</td><td>se pide ${x.certificado_dias_antes??30} días antes · plazo ${x.certificado_plazo_dias??5} días</td><td>${Number(x.tolerancia_uf||0.05)} UF</td><td>${dmy(x.corte_cargas_empresa)}</td><td>${esc(x.creado_por||'')}</td></tr>`; }).join('') || '<tr><td colspan="9" class="text-muted text-center py-2">Sin parámetros: carga el primero</td></tr>';
   if (!document.getElementById('pMes').value) {
     document.getElementById('pMes').value = fMes.value; document.getElementById('pAseg').value = p.aseguradora||'METLIFE'; document.getElementById('pMon').value = p.moneda||'UF';
     document.getElementById('pTit').value = p.prima_titular ? String(p.prima_titular).replace('.',',') : ''; document.getElementById('pCar').value = p.prima_carga ? String(p.prima_carga).replace('.',',') : '';
     document.getElementById('pEdad').value = p.edad_max_hijo||23; document.getElementById('pCorte').value = p.corte_cargas_empresa||'';
     document.getElementById('pEdadEst').value = p.edad_max_estudiante||27; document.getElementById('pTol').value = String(p.tolerancia_uf??0.05).replace('.',',');
+    document.getElementById('pCertDias').value = p.certificado_dias_antes??30; document.getElementById('pCertPlazo').value = p.certificado_plazo_dias??5;
   }
   document.getElementById('dcRel').innerHTML = (D.relaciones||[]).map(r=>`<option>${r}</option>`).join('');
 }
@@ -386,7 +420,7 @@ async function guardarPoliza(){
 async function guardarParam(){
   const n = id => Number(String(document.getElementById(id).value).replace(/\./g,'').replace(',','.'));
   const body = { mes_desde: document.getElementById('pMes').value, aseguradora: document.getElementById('pAseg').value, moneda: document.getElementById('pMon').value,
-    prima_titular: n('pTit'), prima_carga: n('pCar'), edad_max_hijo: Number(document.getElementById('pEdad').value), edad_max_estudiante: Number(document.getElementById('pEdadEst').value), tolerancia_uf: n('pTol'), corte_cargas_empresa: document.getElementById('pCorte').value||null };
+    prima_titular: n('pTit'), prima_carga: n('pCar'), edad_max_hijo: Number(document.getElementById('pEdad').value), edad_max_estudiante: Number(document.getElementById('pEdadEst').value), tolerancia_uf: n('pTol'), certificado_dias_antes: Number(document.getElementById('pCertDias').value), certificado_plazo_dias: Number(document.getElementById('pCertPlazo').value), corte_cargas_empresa: document.getElementById('pCorte').value||null };
   const j = await api('/param','PUT',body); if (!j.success) return alert(j.error);
   document.getElementById('pMes').value=''; cargar();
 }
