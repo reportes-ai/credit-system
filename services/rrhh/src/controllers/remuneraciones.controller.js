@@ -479,13 +479,15 @@ const editarAdicional = async (req, res) => {
     const CAUS = await causalesAdic();
     const esLiquido = b.es_liquido ? 1 : 0;
     const imponible = b.no_imponible ? 0 : (CAUS[a.causal] != null ? CAUS[a.causal] : (a.imponible ? 1 : 0));
+    // Se valida el anticipo ANTES de tocar el haber: si falla, nada queda a medias
+    const conAnt = !!b.pagado_anticipo && !a.permanente;
+    const pagado = conAnt ? Math.round(Number(b.monto_pagado) || (esLiquido ? monto : 0)) : 0;
+    if (conAnt && !(pagado > 0)) return fail(res, 'Indica el monto que se pagó como anticipo (en un haber bruto no se puede deducir solo)', 400);
     await pool.query('UPDATE rh_adicionales SET monto=?, es_liquido=?, imponible=? WHERE id=?', [monto, esLiquido, imponible, a.id]);
     // Descuento por anticipo: sigue a la casilla
     const [[dAnt]] = await pool.query("SELECT id, valor_cuota FROM rh_descuentos WHERE id_adicional=? AND estado='VIGENTE' LIMIT 1", [a.id]);
     let txtAnt = '';
-    if (b.pagado_anticipo && !a.permanente) {
-      const pagado = Math.round(Number(b.monto_pagado) || (esLiquido ? monto : 0));
-      if (!(pagado > 0)) return fail(res, 'Indica el monto que se pagó como anticipo (en un haber bruto no se puede deducir solo)', 400);
+    if (conAnt) {
       const glosa = (a.causal === 'OTRO' ? String(a.causal_texto || '').trim() : a.causal).slice(0, 200);
       if (dAnt) await pool.query('UPDATE rh_descuentos SET monto_total=?, valor_cuota=?, detalle_texto=? WHERE id=?', [pagado, pagado, glosa, dAnt.id]);
       else await pool.query(`INSERT INTO rh_descuentos (id_usuario, tipo, detalle_texto, monto_total, cuotas, valor_cuota, mes_inicio, creado_por, moneda, id_adicional)

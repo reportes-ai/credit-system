@@ -22,6 +22,12 @@ require('../../../../shared/migrate').enFila('postventa-fundantes-devueltos', as
    existiera el reflejo hacia acá (ej. op 85307, devuelta el 17-08). Solo las
    que siguen devueltas (estado PENDIENTE con devuelto_fin=1, aún no re-enviadas):
    se desmarcan RECIBIDOS/ENVIADOS y se estampa la fecha REAL de la devolución. */
+/* La columna nace al ARRANCAR, no dentro de marcarHistorico: setEtapa la escribe al desmarcar
+   una op antigua y, si aún no existía, el .catch la tragaba en silencio y el relleno volvía a
+   marcar la op (revisión 17-09-2026). */
+require('../../../../shared/migrate').enFila('postventa-sin-relleno-historico', async () => {
+  await pool.query('ALTER TABLE postventa_seguimiento ADD COLUMN IF NOT EXISTS sin_relleno_historico TINYINT(1) NOT NULL DEFAULT 0').catch(() => {});
+});
 require('../../../../shared/migrate').migrar('fundantes-devueltos-backfill-v1', async () => {
   const [devs] = await pool.query(`
     SELECT fs.id_credito, fs.devuelto_at, fs.devuelto_por, fs.devuelto_motivo, s.id AS id_seg
@@ -1600,7 +1606,8 @@ const setEtapa = async (req, res) => {
         'DELETE FROM postventa_etapas WHERE id_seguimiento = ? AND track = ? AND etapa = ?',
         [req.params.id, track, etapa]);
       // Op histórica (antes de 2026): que el relleno de cierre no vuelva a marcarla
-      await pool.query("UPDATE postventa_seguimiento SET sin_relleno_historico=1 WHERE id=? AND fecha_otorgado < '2026-01-01'", [req.params.id]).catch(() => {});
+      await pool.query("UPDATE postventa_seguimiento SET sin_relleno_historico=1 WHERE id=? AND fecha_otorgado < '2026-01-01'", [req.params.id])
+        .catch(e => console.error('[postventa setEtapa sin_relleno_historico]', e.message));
       // Al desmarcar FACTURA RECIBIDA de comisión, borrar los datos de la factura
       // (si era la titular, también sus réplicas: la factura es una sola).
       if (track === 'COMISION' && etapa === 'FACTURA RECIBIDA') {

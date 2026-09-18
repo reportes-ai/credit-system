@@ -208,6 +208,14 @@ const generar = async (req, res) => {
     const sinTilde = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
     for (const i of items) { const u = us.find(x => x.id_usuario === i.id_usuario) || {}; i.nombre_tef = [u.apellido, u.apellido_materno, u.nombre].map(sinTilde).filter(Boolean).join(' ');
       if (i.origen === 'DESCUENTO') i.mes_descuento = i.mes; }
+    // La ODP existente se valida ANTES de escribir nada: si no existe, no debe quedar un lote
+    // vivo con los anticipos marcados (desaparecían de Pendientes y había que anular el lote fantasma)
+    let odpExistente = null;
+    if (b.odp_existente) {
+      const [[o]] = await pool.query("SELECT id, numero, monto FROM ordenes_pago WHERE numero=? AND estado<>'ANULADA'", [String(b.odp_existente).trim().toUpperCase()]);
+      if (!o) return fail(res, 'La ODP indicada no existe o está anulada', 400);
+      odpExistente = { id: o.id, numero: o.numero, existente: true, monto: Number(o.monto) };
+    }
     const total = items.reduce((s, i) => s + i.monto, 0);
     const buffer = armarXlsx(items, cta, glosaTef, glosaCorreo);
     const [l] = await pool.query('INSERT INTO rh_tef_lotes (tipo, glosa_tef, glosa_correo, cta_origen, total, personas, archivo, generado_por) VALUES (?,?,?,?,?,?,?,?)',
@@ -219,12 +227,8 @@ const generar = async (req, res) => {
     if (adIds.length) await pool.query('UPDATE rh_adicionales SET tef_lote_id=? WHERE id IN (?)', [lote.id, adIds]);
     if (deIds.length) await pool.query('UPDATE rh_descuentos SET tef_lote_id=? WHERE id IN (?)', [lote.id, deIds]);
     // ODP: una ya emitida (ej. la que hizo Tesorería a mano) o una nueva si hay más de una persona
-    let odp = null;
-    if (b.odp_existente) {
-      const [[o]] = await pool.query("SELECT id, numero, monto FROM ordenes_pago WHERE numero=? AND estado<>'ANULADA'", [String(b.odp_existente).trim().toUpperCase()]);
-      if (!o) return fail(res, 'La ODP indicada no existe o está anulada', 400);
-      odp = { id: o.id, numero: o.numero, existente: true, monto: Number(o.monto) };
-    } else if (items.length > 1) odp = await crearOdp(req, lote, items, buffer);
+    let odp = odpExistente;
+    if (!odp && items.length > 1) odp = await crearOdp(req, lote, items, buffer);
     if (odp) await pool.query('UPDATE rh_tef_lotes SET odp_id=?, odp_numero=? WHERE id=?', [odp.id, odp.numero, lote.id]);
     // Correos a los beneficiarios (best-effort, no bloquea)
     let correos = 0;
