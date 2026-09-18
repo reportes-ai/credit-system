@@ -301,18 +301,8 @@ async function generarODP(sol, datos, req) {
   return numero || `#${r.insertId}`;
 }
 
-/* Tope legal art. 58 CT: la cuota del descuento acordado no puede superar el 15%
-   de la remuneración total (última liquidación EMITIDA; fallback sueldo base). */
-async function validarTope15(idUsuario, valorCuota) {
-  const [[liq]] = await pool.query(
-    `SELECT total_haberes FROM rh_liquidaciones WHERE id_usuario=? AND estado='EMITIDA' ORDER BY mes DESC LIMIT 1`, [idUsuario]);
-  let base = Number(liq?.total_haberes) || 0;
-  if (!base) { const [[f]] = await pool.query(`SELECT sueldo_base FROM rh_fichas WHERE id_usuario=?`, [idUsuario]); base = Number(f?.sueldo_base) || 0; }
-  if (!base) return;   // sin referencia no se puede validar — RRHH decide
-  const tope = Math.round(base * 0.15);
-  if (valorCuota > tope) throw new Error(
-    `La cuota de $${valorCuota.toLocaleString('es-CL')} supera el tope legal del 15% de la remuneración (art. 58 CT): máximo $${tope.toLocaleString('es-CL')} — sube el número de cuotas o baja el monto antes de aprobar`);
-}
+// Tope legal art. 58 CT (15%): motor único services/rrhh/src/tope-descuento.js (también lo usa Descuentos)
+const { validarTope15 } = require('../tope-descuento');
 
 async function ejecutar(sol, datos, req) {
   const mes = await mesProximo();

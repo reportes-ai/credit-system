@@ -856,6 +856,11 @@ const crearDescuento = async (req, res) => {
       if (subtipo === 'OTRO' && !String(b.detalle_texto || '').trim()) return fail(res, 'Describe el descuento (texto libre)', 400);
       cuotas = 0; valorCuota = monto; // mensual indefinido hasta anular
     }
+    // Tope 15% art. 58 CT en anticipos y préstamos registrados directo (Pato 17-09-2026; antes solo lo validaba Solicitudes)
+    if (!todos && ['ANTICIPO', 'PRESTAMO'].includes(tipo)) {
+      try { await require('../tope-descuento').validarTope15(idU, valorCuota); }
+      catch (e) { return fail(res, e.message, 400); }
+    }
     // Texto libre (Pato 08-09-2026): opcional en todos los tipos, obligatorio en PERMANENTE/OTRO
     detalle = String(b.detalle_texto || '').trim().slice(0, 200) || null;
     let r = null, creados = 0; const nombres = [];
