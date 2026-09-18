@@ -98,7 +98,7 @@ require('../../../../shared/migrate').enFila('rrhh', async () => {
     const defaults = [
       ['cert_min_meses', '7'],
       ['cert_cooldown_dias', '15'],
-      ['cert_cuerpo', 'Auto Fácil SpA, RUT 76.916.907-K, certifica que {don} <b>{nombre}</b>, cédula de identidad N° <b>{rut}</b>, presta servicios en nuestra empresa desde el <b>{fecha_ingreso}</b> a la fecha, desempeñándose actualmente en el cargo de <b>{cargo}</b>, con contrato de trabajo indefinido, acumulando una antigüedad laboral de <b>{antiguedad}</b>.'],
+      ['cert_cuerpo', 'Auto Fácil SpA, RUT 76.545.638-K, certifica que {don} <b>{nombre}</b>, cédula de identidad N° <b>{rut}</b>, presta servicios en nuestra empresa desde el <b>{fecha_ingreso}</b> a la fecha, desempeñándose actualmente en el cargo de <b>{cargo}</b>, con contrato de trabajo indefinido, acumulando una antigüedad laboral de <b>{antiguedad}</b>.'],
       ['cert_cierre', 'Se extiende el presente certificado a solicitud {interesado}, para los fines que estime conveniente, en Santiago de Chile con fecha {fecha_emision}.'],
       ['cumple_popup_activo', '1'],
       ['cumple_campana_activo', '1'],
@@ -503,6 +503,11 @@ const resolverAntiguedad = async (req, res) => {
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
+
+// RUT de la empresa mal escrito en el texto del certificado sembrado (Pato, 17-09-2026): 76.916.907-K → 76.545.638-K
+require('../../../../shared/migrate').migrar('rrhh-cert-rut-empresa', async () => {
+  await pool.query("UPDATE rh_config SET valor=REPLACE(valor,'76.916.907-K','76.545.638-K') WHERE clave IN ('cert_cuerpo','cert_cierre') AND valor LIKE '%76.916.907-K%'");
+});
 
 /* ════════════ CONFIG RRHH (rh_config) ════════════ */
 async function getConfig() {
