@@ -484,6 +484,27 @@ Auto Fácil Business Suite`,
     variables: '{NOMBRE} {NOMBRE_COMPLETO} {RUT} {FECHA} {MES} {ASEGURADORA} {POLIZA} {LINK}',
   },
   {
+    codigo: 'seguro_carga_fuera_aviso',
+    ambito: 'Recursos Humanos — Seguro de Salud',
+    nombre: 'Familiar fuera del seguro → colaborador (copia RRHH)',
+    descripcion: 'Se manda desde Seguro de Salud → Pago del mes, botón "Avisar a los empleados", cuando la nómina de cotización de la aseguradora deja fuera a una carga registrada en el sistema. Va al correo personal del colaborador (o al corporativo) con copia a RRHH.',
+    asunto: 'Seguro complementario de salud: familiar fuera de la nómina de {MES}',
+    cuerpo: `Hola {NOMBRE}:
+
+Al revisar la nómina de {MES} del seguro complementario de salud ({ASEGURADORA}), estas personas de tu grupo familiar no aparecen aseguradas:
+
+{DETALLE}
+
+Si corresponde enviar un certificado de estudios u otro antecedente, hazlo llegar a Recursos Humanos para regularizarlo en la aseguradora.
+
+Saludos cordiales,
+Recursos Humanos — AutoFácil`,
+    para_perfiles: '',
+    cc: 'recursos.humanos@autofacilchile.cl',
+    destinatario: 'El colaborador (correo personal de su ficha; si no tiene, el corporativo), con copia a RRHH',
+    variables: '{NOMBRE} {MES} {ASEGURADORA} {DETALLE}',
+  },
+  {
     codigo: 'edenred_generar_aviso',
     ambito: 'Recursos Humanos — Edenred',
     nombre: 'Hoy se genera la nómina Edenred → RRHH y Gerente de Finanzas',

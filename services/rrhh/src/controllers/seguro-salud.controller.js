@@ -86,6 +86,20 @@ require('../../../../shared/migrate').migrar('rrhh-seguro-solo-indefinidos', asy
   // El plazo fijo no tiene seguro
   await pool.query("UPDATE rh_fichas SET seguro_salud=0 WHERE tipo_contrato<>'INDEFINIDO' AND seguro_salud=1");
 });
+require('../../../../shared/migrate').migrar('rrhh-seguro-pago', async () => {
+  await pool.query('ALTER TABLE rh_seguro_param ADD COLUMN IF NOT EXISTS edad_max_estudiante INT NOT NULL DEFAULT 27');
+  await pool.query('ALTER TABLE rh_seguro_param ADD COLUMN IF NOT EXISTS tolerancia_uf DECIMAL(8,4) NOT NULL DEFAULT 0.05');
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_seguro_pago (
+    id INT AUTO_INCREMENT PRIMARY KEY, mes CHAR(7) NOT NULL,
+    uf_periodo DECIMAL(10,4) NULL, uf_ajustes DECIMAL(10,4) NULL, uf_total DECIMAL(10,4) NULL, uf_cobro DECIMAL(12,2) NULL, total_clp DECIMAL(12,0) NULL,
+    esperado_uf DECIMAL(10,4) NULL, esperado_clp DECIMAL(12,0) NULL, diferencia_uf DECIMAL(10,4) NULL,
+    estado VARCHAR(15) NOT NULL DEFAULT 'NO_CUADRA',      -- CUADRA / NO_CUADRA / OK_RRHH / PAGO_EMITIDO
+    diff_json MEDIUMTEXT NULL, avisos_at DATETIME NULL,
+    ok_por VARCHAR(160) NULL, ok_motivo VARCHAR(300) NULL, ok_at DATETIME NULL,
+    odp_id INT NULL, odp_numero VARCHAR(20) NULL,
+    actualizado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+    UNIQUE KEY uq_mes (mes))`);
+});
 require('../../../../shared/migrate').migrar('rrhh-seguro-salud-poliza', async () => {
   await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_estudios TINYINT(1) NOT NULL DEFAULT 0');
   await pool.query('UPDATE rh_cargas SET certificado_estudios=1 WHERE certificado_estudios_hasta IS NOT NULL');
@@ -133,7 +147,8 @@ async function calcularMes(mes) {
       const edad = edadAl(c.fecha_nacimiento, ini);
       // Certificado de estudios: vale hasta la renovación de la póliza (vigencia_hasta)
       const certHasta = c.certificado_estudios ? poliza.vigencia_hasta : null;
-      const estudiante = !!c.certificado_estudios && !!certHasta && certHasta >= ini;
+      const edadEst = Number(p.edad_max_estudiante) || 27;
+      const estudiante = !!c.certificado_estudios && !!certHasta && certHasta >= ini && (edad == null || edad <= edadEst);
       const excedeEdad = c.relacion === 'HIJO' && edad != null && edad > p.edad_max_hijo && !estudiante;
       const certVencido = !!c.certificado_estudios && !estudiante && c.relacion === 'HIJO' && edad != null && edad > p.edad_max_hijo;
       const pagaAuto = p.corte_cargas_empresa && g.fecha_ingreso && iso(g.fecha_ingreso) <= p.corte_cargas_empresa ? 'EMPRESA' : 'EMPLEADO';
@@ -149,6 +164,7 @@ async function calcularMes(mes) {
     return { id_usuario: g.id_usuario, nombre: g.nombre, rut: g.rut, sexo: g.sexo, fecha_nacimiento: g.fecha_nacimiento ? iso(g.fecha_nacimiento) : null,
       fecha_ingreso: g.fecha_ingreso ? iso(g.fecha_ingreso) : null, seguro_salud: g.seguro_salud ? 1 : 0, baja: g.fecha_baja ? 1 : 0,
       tipo_contrato: g.tipo_contrato || null, elegible: g.tipo_contrato === 'INDEFINIDO',
+      nombres: g.nombres, apellido: g.apellido, apellido_materno: g.apellido_materno,
       nombre_completo: [g.nombres, g.apellido, g.apellido_materno].filter(Boolean).join(' '),
       prima: primaTit, cargas: cs, costo_empresa: costoEmpresa, costo_empleado: costoEmpleado };
   });
@@ -187,14 +203,17 @@ const putParam = async (req, res) => {
     const edad = Math.round(Number(b.edad_max_hijo) || 23);
     if (edad < 18 || edad > 35) return fail(res, 'Edad máxima de hijos fuera de rango', 400);
     const corte = fechaOk(b.corte_cargas_empresa) ? b.corte_cargas_empresa : null;
+    const edadEst = Math.round(Number(b.edad_max_estudiante) || 27);
+    if (edadEst < edad || edadEst > 40) return fail(res, 'La edad máxima de estudiante debe ser mayor o igual a la de hijos', 400);
+    const tol = Number(b.tolerancia_uf); const tolF = tol >= 0 && tol < 5 ? tol : 0.05;
     const [[gen]] = await pool.query('SELECT COUNT(*) n FROM rh_seguro_nomina WHERE mes >= ?', [b.mes_desde]);
     if (gen.n) return fail(res, `Ya hay nóminas generadas desde ${b.mes_desde}: el cambio debe regir desde un mes sin nómina`, 400);
     const aseg = String(b.aseguradora || 'METLIFE').trim().toUpperCase().slice(0, 80);
-    await pool.query(`INSERT INTO rh_seguro_param (mes_desde, aseguradora, moneda, prima_titular, prima_carga, edad_max_hijo, corte_cargas_empresa, creado_por) VALUES (?,?,?,?,?,?,?,?)
+    await pool.query(`INSERT INTO rh_seguro_param (mes_desde, aseguradora, moneda, prima_titular, prima_carga, edad_max_hijo, edad_max_estudiante, tolerancia_uf, corte_cargas_empresa, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?)
       ON DUPLICATE KEY UPDATE aseguradora=VALUES(aseguradora), moneda=VALUES(moneda), prima_titular=VALUES(prima_titular), prima_carga=VALUES(prima_carga),
-        edad_max_hijo=VALUES(edad_max_hijo), corte_cargas_empresa=VALUES(corte_cargas_empresa), creado_por=VALUES(creado_por), created_at=NOW()`,
-      [b.mes_desde, aseg, moneda, pt, pc, edad, corte, nombreDe(req.usuario)]);
-    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'seguro_param', detalle: `Seguro de salud desde ${b.mes_desde}: ${aseg} · titular ${pt} ${moneda} · carga ${pc} ${moneda} · hijos hasta ${edad} años · empresa paga cargas de contratados hasta ${corte || '—'}` });
+        edad_max_hijo=VALUES(edad_max_hijo), edad_max_estudiante=VALUES(edad_max_estudiante), tolerancia_uf=VALUES(tolerancia_uf), corte_cargas_empresa=VALUES(corte_cargas_empresa), creado_por=VALUES(creado_por), created_at=NOW()`,
+      [b.mes_desde, aseg, moneda, pt, pc, edad, edadEst, tolF, corte, nombreDe(req.usuario)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'seguro_param', detalle: `Seguro de salud desde ${b.mes_desde}: ${aseg} · titular ${pt} ${moneda} · carga ${pc} ${moneda} · hijos hasta ${edad} años (estudiantes hasta ${edadEst}) · tolerancia ${tolF} UF · empresa paga cargas de contratados hasta ${corte || '—'}` });
     ok(res, { mes_desde: b.mes_desde });
   } catch (e) { console.error('[seguro param]', e.message); fail(res, 'Error interno del servidor'); }
 };
@@ -357,6 +376,267 @@ const nominaXlsx = async (req, res) => {
   } catch (e) { console.error('[seguro xlsx]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
+
+/* ══════════ PAGO DEL MES: cupón de MetLife → cuadratura → nómina de cotización → avisos → ODP ══════════
+   (Pato 17-09-2026) A MetLife no se le sube nómina: se BAJA el cupón de pago (y, si hace falta, la
+   nómina de cotización). Antes de emitir la Orden de Pago se sube el cupón y se valida que cuadre con
+   lo que el sistema espera (titulares + cargas × prima). Si no cuadra: alerta, se carga la nómina de
+   cotización para ver quién quedó fuera (hijo < edad máx → alerta; entre edad máx y edad estudiante →
+   pedir certificado; mayor → fuera por edad), se avisa al empleado con copia a RRHH, y RRHH puede dar
+   su OK para no demorar el pago. La ODP se emite con el cupón (y la nómina) adjuntos. */
+const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+const numCL = s => { const t = String(s || '').replace(/\$/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.'); const n = Number(t); return isNaN(n) ? null : n; };
+
+async function pagoDe(mes) {
+  const [[p]] = await pool.query('SELECT * FROM rh_seguro_pago WHERE mes=?', [mes]);
+  if (!p) return null;
+  const out = { ...p };
+  for (const k of ['uf_cobro', 'uf_periodo', 'uf_ajustes', 'uf_total', 'total_clp', 'esperado_uf', 'esperado_clp', 'diferencia_uf']) out[k] = p[k] == null ? null : Number(p[k]);
+  try { out.diff = p.diff_json ? JSON.parse(p.diff_json) : null; } catch (_) { out.diff = null; }
+  delete out.diff_json;
+  const [docs] = await pool.query("SELECT id, nombre, mime, subido_por, created_at FROM postventa_factura_docs WHERE origen='SEGURO' AND ref_id=? ORDER BY id", [p.id]);
+  out.docs = docs;
+  return out;
+}
+
+/* Lo que el sistema espera cobrar este mes (en UF de la prima): nómina generada si existe, si no la vista previa */
+async function esperadoDe(mes) {
+  const [gen] = await pool.query('SELECT prima_origen, moneda, id_carga FROM rh_seguro_nomina WHERE mes=?', [mes]);
+  if (gen.length) return { uf: gen.reduce((s, r) => s + Number(r.prima_origen), 0), moneda: gen[0].moneda, titulares: gen.filter(r => !r.id_carga).length, cargas: gen.filter(r => r.id_carga).length, generada: true };
+  const c = await calcularMes(mes), T = c.titulares.filter(t => t.seguro_salud);
+  const cargas = T.reduce((s, t) => s + t.cargas.filter(k => k.incluida).length, 0);
+  return { uf: T.length * c.param.prima_titular + cargas * c.param.prima_carga, moneda: c.param.moneda, titulares: T.length, cargas, generada: false };
+}
+
+/* Lee los totales del cupón de MetLife (PDF). Devuelve lo que encuentre; lo que no, queda null. */
+async function leerCupon(buffer, mime) {
+  const out = { mes: null, uf_periodo: null, uf_ajustes: null, uf_total: null, uf_cobro: null, total_clp: null };
+  if (!/pdf/i.test(mime || '') && !(buffer.slice(0, 4).toString() === '%PDF')) return out;
+  let text = '';
+  try { text = (await require('pdf-parse')(buffer)).text || ''; } catch (_) { return out; }
+  const t = text.replace(/\s+/g, ' ');
+  const MES = { enero: '01', febrero: '02', marzo: '03', abril: '04', mayo: '05', junio: '06', julio: '07', agosto: '08', septiembre: '09', setiembre: '09', octubre: '10', noviembre: '11', diciembre: '12' };
+  const m = t.match(/Mes de Cobranza:\s*([a-záéíóú]+)-(\d{4})/i);
+  if (m && MES[m[1].toLowerCase()]) out.mes = `${m[2]}-${MES[m[1].toLowerCase()]}`;
+  const fila = re => { const x = t.match(re); return x ? x.slice(1).map(numCL) : null; };
+  const per = fila(/Periodo Actual \(UF\)\s*(-?[\d.,]+)\s+(-?[\d.,]+)\s+(-?[\d.,]+)/i); if (per) out.uf_periodo = per[2];
+  const aj = fila(/Periodos Anteriores \(UF\)\s*(-?[\d.,]+)\s+(-?[\d.,]+)\s+(-?[\d.,]+)/i); if (aj) out.uf_ajustes = aj[2];
+  const tot = fila(/Total a Pagar Periodo \(UF\)\s*(-?[\d.,]+)\s+(-?[\d.,]+)\s+(-?[\d.,]+)/i); if (tot) out.uf_total = tot[2];
+  const uf = t.match(/Valor UF Cobro\s*\$?\s*([\d.,]+)/i); if (uf) out.uf_cobro = numCL(uf[1]);
+  const clp = t.match(/TOTAL PERIODO \(\$\)\s*\$?\s*([\d.,]+)/i); if (clp) out.total_clp = numCL(clp[1]);
+  return out;
+}
+
+async function cuadrar(mes, uf_periodo, uf_cobro) {
+  const p = await paramDe(mes), e = await esperadoDe(mes);
+  const tol = Number(p.tolerancia_uf) || 0.05;
+  const esperadoUF = e.moneda === 'UF' ? e.uf : (uf_cobro ? e.uf / uf_cobro : null);
+  const dif = esperadoUF == null || uf_periodo == null ? null : Math.round((uf_periodo - esperadoUF) * 10000) / 10000;
+  return { esperado_uf: esperadoUF, esperado_clp: esperadoUF != null && uf_cobro ? Math.round(esperadoUF * uf_cobro) : null, diferencia_uf: dif,
+           cuadra: dif != null && Math.abs(dif) <= tol, tolerancia_uf: tol, titulares: e.titulares, cargas: e.cargas, generada: e.generada };
+}
+
+/* GET /remuneraciones/seguro/pago?mes= */
+const getPago = async (req, res) => {
+  try {
+    const mes = mesOk(req.query.mes) ? req.query.mes : new Date().toISOString().slice(0, 7);
+    const pago = await pagoDe(mes), e = await esperadoDe(mes), p = await paramDe(mes);
+    ok(res, { mes, pago, esperado: e, tolerancia_uf: Number(p.tolerancia_uf) || 0.05, edad_max_hijo: p.edad_max_hijo, edad_max_estudiante: p.edad_max_estudiante });
+  } catch (e) { console.error('[seguro pago get]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* POST /remuneraciones/seguro/cupon {mes, archivo_nombre, mime, archivo_data(base64), uf_periodo?, uf_ajustes?, uf_total?, uf_cobro?, total_clp?} */
+const subirCupon = async (req, res) => {
+  try {
+    const b = req.body || {};
+    if (!mesOk(b.mes)) return fail(res, 'Mes inválido', 400);
+    const ya = await pagoDe(b.mes);
+    if (ya && ya.estado === 'PAGO_EMITIDO') return fail(res, 'La orden de pago de este mes ya fue emitida', 400);
+    let leido = {};
+    let buffer = null;
+    if (b.archivo_data) {
+      buffer = Buffer.from(String(b.archivo_data), 'base64');
+      if (buffer.length > 10 * 1024 * 1024) return fail(res, 'El cupón debe pesar máximo 10 MB', 400);
+      leido = await leerCupon(buffer, b.mime);
+      if (leido.mes && leido.mes !== b.mes) return fail(res, `El cupón es de ${leido.mes}, no de ${b.mes}`, 400);
+    }
+    const v = k => (b[k] !== undefined && b[k] !== null && b[k] !== '') ? Number(b[k]) : leido[k];
+    const uf_periodo = v('uf_periodo'), uf_ajustes = v('uf_ajustes') ?? 0, uf_total = v('uf_total') ?? (uf_periodo != null ? Math.round((uf_periodo + uf_ajustes) * 100) / 100 : null), uf_cobro = v('uf_cobro'), total_clp = v('total_clp') ?? (uf_total != null && uf_cobro ? Math.round(uf_total * uf_cobro) : null);
+    if (!(uf_periodo > 0) || !(uf_cobro > 0) || !(total_clp > 0)) return fail(res, 'No pude leer los totales del cupón: completa Prima del período (UF), Valor UF de cobro y Total $', 400);
+    const c = await cuadrar(b.mes, uf_periodo, uf_cobro);
+    const estado = c.cuadra ? 'CUADRA' : 'NO_CUADRA';
+    const quien = nombreDe(req.usuario);
+    await pool.query(`INSERT INTO rh_seguro_pago (mes, uf_periodo, uf_ajustes, uf_total, uf_cobro, total_clp, esperado_uf, esperado_clp, diferencia_uf, estado, actualizado_por, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW()) ON DUPLICATE KEY UPDATE uf_periodo=VALUES(uf_periodo), uf_ajustes=VALUES(uf_ajustes), uf_total=VALUES(uf_total), uf_cobro=VALUES(uf_cobro), total_clp=VALUES(total_clp),
+        esperado_uf=VALUES(esperado_uf), esperado_clp=VALUES(esperado_clp), diferencia_uf=VALUES(diferencia_uf), estado=VALUES(estado), ok_por=NULL, ok_motivo=NULL, ok_at=NULL, actualizado_por=VALUES(actualizado_por), updated_at=NOW()`,
+      [b.mes, uf_periodo, uf_ajustes, uf_total, uf_cobro, total_clp, c.esperado_uf, c.esperado_clp, c.diferencia_uf, estado, quien]);
+    const pago = await pagoDe(b.mes);
+    if (buffer) {
+      const pv = require('../../../postventa/src/controllers/postventa.controller');
+      await pv.guardarFacturaDoc({ origen: 'SEGURO', ref_id: pago.id, nombre: String(b.archivo_nombre || `cupon-${b.mes}.pdf`).slice(0, 200), mime: b.mime || 'application/pdf', buffer, usuario: quien });
+    }
+    if (!c.cuadra) {
+      try { const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+        const [rr] = await pool.query("SELECT u.id_usuario FROM usuarios u JOIN perfiles pf ON pf.id_perfil=u.id_perfil WHERE pf.nombre IN ('Consultora Recursos Humanos','Gerente de Finanzas') AND u.estado='activo'");
+        await notificar(rr.map(x => x.id_usuario), { tipo: 'RRHH', prioridad: 'alta', sonar: true, titulo: `Seguro de salud ${b.mes}: el cupón NO cuadra`,
+          mensaje: `MetLife cobra ${uf_periodo} UF y el sistema espera ${c.esperado_uf?.toFixed(4)} UF (${c.diferencia_uf > 0 ? '+' : ''}${c.diferencia_uf} UF). Carga la nómina de cotización para ver quién quedó fuera.`,
+          href: '/recursos-humanos/remuneraciones/seguro-salud/', clave: `seguro_nocuadra_${b.mes}_${Date.now()}` }); } catch (_) {}
+    }
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'seguro_pago', entidad_id: pago.id, detalle: `Cupón ${b.mes}: ${uf_periodo} UF período${uf_ajustes ? ` ${uf_ajustes > 0 ? '+' : ''}${uf_ajustes} UF ajustes` : ''} = ${uf_total} UF × $${uf_cobro} = ${CLP(total_clp)} · esperado ${c.esperado_uf?.toFixed(4)} UF → ${estado}${c.diferencia_uf != null ? ` (dif ${c.diferencia_uf} UF)` : ''}` });
+    ok(res, { ...(await pagoDe(b.mes)), cuadratura: c, leido });
+  } catch (e) { console.error('[seguro cupon]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* POST /remuneraciones/seguro/cotizacion {mes, archivo_nombre, mime, archivo_data} — nómina de cotización bajada de MetLife (xlsx) */
+const subirCotizacion = async (req, res) => {
+  try {
+    const b = req.body || {};
+    if (!mesOk(b.mes) || !b.archivo_data) return fail(res, 'Mes y archivo requeridos', 400);
+    const pago = await pagoDe(b.mes);
+    if (!pago) return fail(res, 'Sube primero el cupón de pago del mes', 400);
+    const buffer = Buffer.from(String(b.archivo_data), 'base64');
+    let wb; try { wb = XLSX.read(buffer, { type: 'buffer', raw: false }); } catch (_) { return fail(res, 'No pude leer el Excel', 400); }
+    // Busca la hoja/fila de encabezados: Nombre | Apellido Paterno | Apellido Materno | Fecha Nacimiento | Sexo | Relación | Estado
+    let filas = [];
+    for (const n of wb.SheetNames) {
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false });
+      const h = aoa.findIndex(r => r && r.some(c => /apellido paterno/i.test(String(c))) && r.some(c => /nombre/i.test(String(c))));
+      if (h < 0) continue;
+      const hdr = aoa[h].map(c => norm(c));
+      const ix = k => hdr.findIndex(c => c.includes(k));
+      const iN = ix('NOMBRE'), iP = ix('APELLIDO PATERNO'), iM = ix('APELLIDO MATERNO'), iF = ix('NACIMIENTO'), iR = ix('RELACION'), iE = ix('ESTADO'), iRut = hdr.findIndex(c => c === 'RUT' || c.includes('RUT ASEG'));
+      for (const r of aoa.slice(h + 1)) {
+        if (!r || !r[iN] || !r[iP]) continue;
+        filas.push({ nombres: String(r[iN]).trim(), apellido_paterno: String(r[iP]).trim(), apellido_materno: iM >= 0 ? String(r[iM] || '').trim() : '', nacimiento: iF >= 0 ? String(r[iF] || '').trim() : '',
+                     relacion: iR >= 0 ? String(r[iR] || '').trim().toUpperCase() : '', estado: iE >= 0 ? String(r[iE] || '').trim().toUpperCase() : '', rut: iRut >= 0 ? String(r[iRut] || '').replace(/[^0-9kK]/g, '').toUpperCase() : '' });
+      }
+      if (filas.length) break;
+    }
+    if (!filas.length) return fail(res, 'El archivo no trae la nómina de cotización (Nombre / Apellido Paterno / Apellido Materno / Fecha Nacimiento / Relación)', 400);
+    const vig = filas.filter(f => !f.estado || /VIGENTE/.test(f.estado));
+    /* Cruce por nombre (la nómina de cotización no trae RUT): primer nombre + apellido, tolerando
+       una letra de diferencia (Irribara/Irribarra, Katherin/Katherine) y apellidos invertidos
+       (Bernardo "Pinto Ponce"). Uno a uno: cada fila de la aseguradora se usa una sola vez. */
+    const lev1 = (x, y) => { if (x === y) return true; if (Math.abs(x.length - y.length) > 1) return false; let i = 0, j = 0, d = 0;
+      while (i < x.length && j < y.length) { if (x[i] === y[j]) { i++; j++; continue; } if (++d > 1) return false; if (x.length > y.length) i++; else if (y.length > x.length) j++; else { i++; j++; } }
+      return d + (x.length - i) + (y.length - j) <= 1; };
+    const primer = n => norm(n).split(' ')[0] || '';
+    const disponibles = vig.slice();
+    const tomar = (nombres, pat, mat) => {
+      const n1 = primer(nombres), P = norm(pat), M = norm(mat);
+      const ix = disponibles.findIndex(f => { const fn = primer(f.nombres), fp = norm(f.apellido_paterno), fm = norm(f.apellido_materno);
+        if (!lev1(n1, fn) && !(n1.length >= 5 && fn.startsWith(n1.slice(0, 5)))) return false;
+        return lev1(P, fp) || (M && lev1(M, fp)) || (fm && lev1(P, fm)); });
+      return ix >= 0 ? disponibles.splice(ix, 1)[0] : null;
+    };
+    // Lo que el sistema espera
+    const c = await calcularMes(b.mes), p = c.param, ini = b.mes + '-01';
+    const edadEst = Number(p.edad_max_estudiante) || 27;
+    const fuera = [];
+    for (const t of c.titulares.filter(x => x.seguro_salud)) {
+      const hit = tomar(t.nombres, t.apellido, t.apellido_materno);
+      if (!hit) fuera.push({ id_usuario: t.id_usuario, titular: t.nombre, nombre: t.nombre, relacion: 'TITULAR', edad: edadAl(t.fecha_nacimiento, ini), accion: 'ALERTA', motivo: 'Titular sin inscribir en la aseguradora' });
+      for (const k of t.cargas.filter(x => x.incluida)) {
+        if (tomar(k.nombres, k.apellido_paterno, k.apellido_materno)) continue;
+        let accion = 'ALERTA', motivo = 'Carga fuera de la nómina de la aseguradora';
+        if (k.relacion === 'HIJO' && k.edad != null) {
+          if (k.edad > edadEst) { accion = 'FUERA_EDAD'; motivo = `Hijo de ${k.edad} años: supera la edad máxima incluso como estudiante (${edadEst})`; }
+          else if (k.edad > p.edad_max_hijo) { accion = 'PEDIR_CERTIFICADO'; motivo = `Hijo de ${k.edad} años: la aseguradora exige certificado de estudios (${p.edad_max_hijo + 1} a ${edadEst} años)`; }
+          else motivo = `Hijo de ${k.edad} años, menor de ${p.edad_max_hijo + 1}: no debería estar fuera — revisar inscripción`;
+        }
+        fuera.push({ id_usuario: t.id_usuario, id_carga: k.id, titular: t.nombre, nombre: k.nombre, relacion: k.relacion, edad: k.edad, accion, motivo });
+      }
+    }
+    const sobran = disponibles.map(f => ({ nombre: `${f.nombres} ${f.apellido_paterno} ${f.apellido_materno}`.trim(), relacion: f.relacion || '', nacimiento: f.nacimiento }));
+    const diff = { fecha: iso(new Date()), en_metlife: vig.length, fuera, sobran, prima_fuera_uf: fuera.reduce((s, f) => s + (f.relacion === 'TITULAR' ? p.prima_titular : p.prima_carga), 0) };
+    await pool.query('UPDATE rh_seguro_pago SET diff_json=?, actualizado_por=?, updated_at=NOW() WHERE id=?', [JSON.stringify(diff), nombreDe(req.usuario), pago.id]);
+    const pv = require('../../../postventa/src/controllers/postventa.controller');
+    await pv.guardarFacturaDoc({ origen: 'SEGURO', ref_id: pago.id, nombre: String(b.archivo_nombre || `nomina-cotizacion-${b.mes}.xlsx`).slice(0, 200), mime: b.mime || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer, usuario: nombreDe(req.usuario) });
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'seguro_pago', entidad_id: pago.id, detalle: `Nómina de cotización ${b.mes}: ${vig.length} en la aseguradora · ${fuera.length} del sistema fuera (${fuera.map(f => f.nombre + ' [' + f.accion + ']').join(', ') || '—'}) · ${sobran.length} en la aseguradora que el sistema no tiene` });
+    ok(res, await pagoDe(b.mes));
+  } catch (e) { console.error('[seguro cotizacion]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* POST /remuneraciones/seguro/avisos {mes} — correo a cada empleado con su familia fuera del seguro, copia RRHH */
+const enviarAvisos = async (req, res) => {
+  try {
+    const mes = req.body?.mes; if (!mesOk(mes)) return fail(res, 'Mes inválido', 400);
+    const pago = await pagoDe(mes);
+    if (!pago?.diff) return fail(res, 'Carga primero la nómina de cotización', 400);
+    const cargasFuera = pago.diff.fuera.filter(f => f.relacion !== 'TITULAR');
+    if (!cargasFuera.length) return fail(res, 'No hay cargas fuera que avisar', 400);
+    const plant = require('../../../../shared/plantillas-correo');
+    const p = await paramDe(mes);
+    const porEmp = {}; for (const f of cargasFuera) (porEmp[f.id_usuario] = porEmp[f.id_usuario] || []).push(f);
+    const enviados = [], fallidos = [];
+    for (const [idU, lista] of Object.entries(porEmp)) {
+      const [[u]] = await pool.query('SELECT TRIM(CONCAT_WS(" ", u.nombre, u.apellido)) nombre, u.email, f.email_personal FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE u.id_usuario=?', [idU]);
+      if (!u) continue;
+      const to = (u.email_personal || u.email || '').trim();
+      const detalle = lista.map(f => ` • ${f.nombre} (${f.relacion.toLowerCase()}${f.edad != null ? ', ' + f.edad + ' años' : ''}): ${f.accion === 'PEDIR_CERTIFICADO' ? 'la aseguradora exige certificado de estudios vigente para mantenerlo(a); envíalo a RRHH' : f.accion === 'FUERA_EDAD' ? 'supera la edad máxima de la póliza' : 'quedó fuera de la nómina de la aseguradora; RRHH lo está revisando'}`).join('\n');
+      const r = to ? await plant.enviar({ codigo: 'seguro_carga_fuera_aviso', to: [to], datos: { NOMBRE: u.nombre, MES: mes, ASEGURADORA: p.aseguradora || 'METLIFE', DETALLE: detalle } }) : { enviado: false, motivo: 'sin correo' };
+      (r.enviado ? enviados : fallidos).push(`${u.nombre} (${to || 'sin correo'}${r.enviado ? '' : ': ' + r.motivo})`);
+    }
+    await pool.query('UPDATE rh_seguro_pago SET avisos_at=NOW(), updated_at=NOW() WHERE id=?', [pago.id]);
+    auditar({ req, accion: 'ENVIAR', modulo: 'rrhh', entidad: 'seguro_pago', entidad_id: pago.id, detalle: `Avisos de familia fuera del seguro ${mes}: enviados a ${enviados.join(', ') || '—'}${fallidos.length ? ' · fallidos: ' + fallidos.join(', ') : ''}` });
+    ok(res, { enviados, fallidos });
+  } catch (e) { console.error('[seguro avisos]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* POST /remuneraciones/seguro/ok-rrhh {mes, motivo} — RRHH autoriza pagar aunque no cuadre */
+const okRRHH = async (req, res) => {
+  try {
+    const mes = req.body?.mes, motivo = String(req.body?.motivo || '').trim().slice(0, 300);
+    if (!mesOk(mes)) return fail(res, 'Mes inválido', 400);
+    if (motivo.length < 5) return fail(res, 'Indica el motivo del OK', 400);
+    const pago = await pagoDe(mes);
+    if (!pago) return fail(res, 'Sube primero el cupón', 400);
+    if (pago.estado === 'PAGO_EMITIDO') return fail(res, 'La orden ya fue emitida', 400);
+    await pool.query("UPDATE rh_seguro_pago SET estado='OK_RRHH', ok_por=?, ok_motivo=?, ok_at=NOW(), updated_at=NOW() WHERE id=?", [nombreDe(req.usuario), motivo, pago.id]);
+    auditar({ req, accion: 'APROBAR', modulo: 'rrhh', entidad: 'seguro_pago', entidad_id: pago.id, detalle: `OK de RRHH para pagar el seguro ${mes} sin cuadrar (dif ${pago.diferencia_uf} UF): ${motivo}` });
+    ok(res, await pagoDe(mes));
+  } catch (e) { console.error('[seguro ok]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* POST /remuneraciones/seguro/emitir-odp {mes} — ODP a la aseguradora por el total del cupón, con cupón y nómina adjuntos */
+const emitirOdp = async (req, res) => {
+  try {
+    const mes = req.body?.mes; if (!mesOk(mes)) return fail(res, 'Mes inválido', 400);
+    const pago = await pagoDe(mes);
+    if (!pago) return fail(res, 'Sube primero el cupón', 400);
+    if (pago.estado === 'PAGO_EMITIDO') return fail(res, `La orden ${pago.odp_numero} ya fue emitida`, 400);
+    if (!['CUADRA', 'OK_RRHH'].includes(pago.estado)) return fail(res, 'El cupón no cuadra: carga la nómina de cotización y pide el OK de RRHH, o corrige la nómina', 400);
+    const p = await paramDe(mes), pol = await polizaVigente();
+    const aseg = p.aseguradora || 'METLIFE';
+    let [[prov]] = await pool.query('SELECT id, nombre, rut FROM proveedores WHERE UPPER(nombre) LIKE ? ORDER BY activo DESC, id LIMIT 1', ['%' + aseg + '%']);
+    if (!prov) { const [np] = await pool.query('INSERT INTO proveedores (nombre, activo, comentario) VALUES (?,1,?)', [aseg, 'Aseguradora del seguro complementario de salud (creado desde Remuneraciones → Seguro de Salud)']); prov = { id: np.insertId, nombre: aseg, rut: null }; }
+    const { calcularDoc, } = require('../../../ordenes-pago/src/controllers/ordenes-pago.controller');
+    const m = await calcularDoc('Otros', 'EXENTO', pago.total_clp);
+    const u = req.usuario || {}, hoy = iso(new Date());
+    const mesTxt = `${['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][Number(mes.slice(5))]} ${mes.slice(0, 4)}`;
+    const concepto = `Seguro complementario de salud ${mesTxt} — ${aseg} póliza ${pol.numero || ''}`.trim();
+    const obs = `Generada desde Remuneraciones → Seguro de Salud. Cupón de pago ${mes}: ${pago.uf_periodo} UF período${pago.uf_ajustes ? ` ${pago.uf_ajustes > 0 ? '+' : ''}${pago.uf_ajustes} UF ajustes de períodos anteriores` : ''} = ${pago.uf_total} UF × UF $${Number(pago.uf_cobro).toLocaleString('es-CL')} = ${CLP(pago.total_clp)}.\n` +
+      `Cuadratura: sistema espera ${Number(pago.esperado_uf).toFixed(4)} UF (${pago.esperado_clp != null ? CLP(pago.esperado_clp) : '—'}) → ${pago.estado === 'CUADRA' ? 'CUADRA' : `NO cuadra (dif ${pago.diferencia_uf} UF), OK de RRHH: ${pago.ok_por} — ${pago.ok_motivo}`}.`;
+    const [r] = await pool.query(
+      `INSERT INTO ordenes_pago (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento, tratamiento, monto_bruto, monto_neto, impuesto_pct, impuesto_monto, monto, destino, fecha_emision, fecha_documento, metodo_pago, estado, observaciones, id_usuario, usuario_nombre)
+       VALUES (?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?,'Transferencia','EMITIDA',?,?,?)`,
+      [prov.id, prov.nombre, prov.rut || null, concepto, 'Otros', 'Otros', m.clase, m.bruto, m.neto, m.pct, m.imp, m.aPagar, 'Cupón de pago (convenio Banco de Chile / Servipag)', hoy, hoy, obs, u.id_usuario || null, nombreDe(u) || 'Sistema']);
+    const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
+    const { numero } = await emitirCorrelativo({ origen: 'GENERAL', origen_id: r.insertId, concepto, monto: m.aPagar, id_usuario: u.id_usuario || null, usuario_nombre: nombreDe(u) || 'Sistema' });
+    await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
+    // Adjuntos: cupón y nómina de cotización → a la ODP (copia del almacén)
+    try {
+      const alm = require('../../../../shared/almacen-docs');
+      const pv = require('../../../postventa/src/controllers/postventa.controller');
+      const [docs] = await pool.query("SELECT * FROM postventa_factura_docs WHERE origen='SEGURO' AND ref_id=?", [pago.id]);
+      for (const d of docs) { const buf = await alm.obtener({ ruta: d.doc_ruta, blob: d.archivo }); if (buf) await pv.guardarFacturaDoc({ origen: 'ODP', ref_id: r.insertId, nombre: d.nombre, mime: d.mime, buffer: buf, usuario: nombreDe(u) }); }
+    } catch (e) { console.error('[seguro odp adjuntos]', e.message); }
+    await pool.query("UPDATE rh_seguro_pago SET estado='PAGO_EMITIDO', odp_id=?, odp_numero=?, updated_at=NOW() WHERE id=?", [r.insertId, numero, pago.id]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'seguro_pago', entidad_id: pago.id, detalle: `Emitió ${numero} a ${prov.nombre} por ${CLP(pago.total_clp)} — seguro de salud ${mes}` });
+    ok(res, { odp_id: r.insertId, odp_numero: numero });
+  } catch (e) { console.error('[seguro odp]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 /* ── Motor: contrato que pasa a INDEFINIDO → titular + aviso a RRHH (copia Contabilidad) ── */
 async function avisarInscripcion() {
   try {
@@ -388,4 +668,4 @@ async function avisarInscripcion() {
 }
 require('../../../../shared/scheduler').programar('seguro-inscribir-aviso', avisarInscripcion, 60 * 60 * 1000);
 
-module.exports = { avisarInscripcion, getMes, putParam, putPoliza, putTitular, guardarCarga, seleccionCarga, bajaCarga, generar, anular, nominaXlsx, calcularMes };
+module.exports = { avisarInscripcion, getPago, subirCupon, subirCotizacion, enviarAvisos, okRRHH, emitirOdp, getMes, putParam, putPoliza, putTitular, guardarCarga, seleccionCarga, bajaCarga, generar, anular, nominaXlsx, calcularMes };

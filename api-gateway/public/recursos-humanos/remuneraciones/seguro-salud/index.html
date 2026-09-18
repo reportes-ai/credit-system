@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguro de Salud — AutoFácil</title>
+  <!-- v2.0 — pestaña Pago del mes: subir el cupón de MetLife (lee los totales del PDF), cuadratura contra lo esperado, nómina de cotización para ver quién quedó fuera (alerta / pedir certificado / fuera por edad), avisos a los empleados con copia a RRHH, OK de RRHH y emisión de la ODP con los adjuntos; parámetros edad de estudiante y tolerancia (Pato 17-09-2026) -->
   <!-- v1.3 — solo contrato INDEFINIDO: el plazo fijo aparece sin casilla (PLAZO FIJO — sin seguro); al pasar a indefinido el sistema lo marca titular y avisa a RRHH con copia a Contabilidad (Pato 17-09-2026) -->
   <!-- v1.2 — póliza (número y vigencia) editable arriba de la nómina; el certificado de estudios es una casilla y vale hasta la renovación de la póliza; al renovar avisa cuántos certificados hay que reenviar (Pato 17-09-2026) -->
   <!-- v1.1 — hijo sobre la edad máxima con certificado de estudios vigente sigue en la nómina (fecha de vigencia en la carga, etiqueta ESTUDIANTE, aviso cuando vence) (Pato 17-09-2026) -->
@@ -43,6 +44,7 @@
 
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><a class="nav-link active" href="#" id="tabM" onclick="tab('M');return false"><i class="bi bi-people me-1"></i>Nómina del mes</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabG" onclick="tab('G');return false"><i class="bi bi-cash-coin me-1"></i>Pago del mes</a></li>
     <li class="nav-item"><a class="nav-link" href="#" id="tabH" onclick="tab('H');return false"><i class="bi bi-clock-history me-1"></i>Historial</a></li>
     <li class="nav-item"><a class="nav-link" href="#" id="tabP" onclick="tab('P');return false"><i class="bi bi-sliders me-1"></i>Parámetros</a></li>
   </ul>
@@ -74,6 +76,46 @@
     </div>
   </div>
 
+  <div id="secG" style="display:none">
+    <div class="d-flex gap-3 align-items-end mb-3 flex-wrap">
+      <div><label class="form-label small fw-semibold mb-1">Mes de cobranza</label><input type="month" id="gMes" class="form-control form-control-sm" onchange="cargarPago()"></div>
+      <span id="gEstado"></span>
+    </div>
+    <div class="row g-3">
+      <div class="col-lg-6"><div class="panel h-100">
+        <div class="fw-bold mb-1"><span class="badge bg-primary rounded-pill me-1">1</span> Cupón de pago de la aseguradora</div>
+        <div class="small text-muted mb-2">Baja el cupón desde el portal de MetLife y súbelo. El sistema lee los totales del PDF; si no los reconoce, complétalos a mano.</div>
+        <input type="file" id="gCupon" class="form-control form-control-sm mb-2" accept=".pdf,image/*">
+        <div class="row g-2">
+          <div class="col-4"><label class="form-label small mb-0">Prima período (UF)</label><input id="gUfPer" class="form-control form-control-sm text-end" placeholder="33,27"></div>
+          <div class="col-4"><label class="form-label small mb-0">Ajustes anteriores (UF)</label><input id="gUfAj" class="form-control form-control-sm text-end" placeholder="-1,75"></div>
+          <div class="col-4"><label class="form-label small mb-0">Total (UF)</label><input id="gUfTot" class="form-control form-control-sm text-end" placeholder="31,52"></div>
+          <div class="col-6"><label class="form-label small mb-0">Valor UF de cobro</label><input id="gUf" class="form-control form-control-sm text-end" placeholder="39.841,72"></div>
+          <div class="col-6"><label class="form-label small mb-0">Total a pagar ($)</label><input id="gClp" class="form-control form-control-sm text-end" placeholder="1.255.649"></div>
+        </div>
+        <button class="btn btn-sm btn-primary mt-2" onclick="subirCupon()"><i class="bi bi-upload me-1"></i>Subir cupón y cuadrar</button>
+        <div id="gCuadre" class="mt-3"></div>
+      </div></div>
+      <div class="col-lg-6"><div class="panel h-100">
+        <div class="fw-bold mb-1"><span class="badge bg-primary rounded-pill me-1">2</span> Si no cuadra: nómina de cotización</div>
+        <div class="small text-muted mb-2">Baja la nómina de cotización (Excel) del portal y súbela: el sistema compara con sus titulares y cargas y dice quién quedó fuera.</div>
+        <input type="file" id="gCot" class="form-control form-control-sm mb-2" accept=".xlsx,.xls,.csv">
+        <button class="btn btn-sm btn-outline-primary" onclick="subirCotizacion()"><i class="bi bi-people me-1"></i>Comparar nómina</button>
+        <div id="gDiff" class="mt-3"></div>
+      </div></div>
+      <div class="col-12"><div class="panel">
+        <div class="fw-bold mb-1"><span class="badge bg-primary rounded-pill me-1">3</span> Pago</div>
+        <div id="gPago" class="small text-muted">Sube el cupón para continuar.</div>
+        <div class="d-flex gap-2 mt-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-warning" id="btnAvisos" onclick="enviarAvisos()" style="display:none"><i class="bi bi-envelope me-1"></i>Avisar a los empleados (copia RRHH)</button>
+          <button class="btn btn-sm btn-outline-success" id="btnOk" onclick="okRRHH()" style="display:none"><i class="bi bi-check2-circle me-1"></i>OK de RRHH: pagar igual</button>
+          <button class="btn btn-sm btn-success" id="btnOdp" onclick="emitirOdp()" style="display:none"><i class="bi bi-receipt me-1"></i>Emitir Orden de Pago</button>
+        </div>
+        <div id="gDocs" class="small mt-2"></div>
+      </div></div>
+    </div>
+  </div>
+
   <div id="secH" style="display:none">
     <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Mes</th><th class="text-right">Titulares</th><th class="text-right">Cargas</th><th class="text-right">Descontado a empleados</th><th class="text-right">Total nómina</th><th>Generada</th></tr></thead><tbody id="tbHist"></tbody></table></div>
   </div>
@@ -88,11 +130,13 @@
         <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Prima titular</label><input id="pTit" class="form-control form-control-sm text-end" inputmode="decimal"></div>
         <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Prima por carga</label><input id="pCar" class="form-control form-control-sm text-end" inputmode="decimal"></div>
         <div class="col-md-1"><label class="form-label small fw-semibold mb-1" title="Los hijos mayores de esta edad salen solos de la nómina">Edad máx. hijos</label><input id="pEdad" type="number" class="form-control form-control-sm text-end"></div>
+        <div class="col-md-1"><label class="form-label small fw-semibold mb-1" title="Con certificado de estudios, hasta esta edad">Máx. estudiante</label><input id="pEdadEst" type="number" class="form-control form-control-sm text-end"></div>
+        <div class="col-md-1"><label class="form-label small fw-semibold mb-1" title="Diferencia en UF que se acepta entre el cupón y lo esperado">Tolerancia UF</label><input id="pTol" class="form-control form-control-sm text-end"></div>
         <div class="col-md-2"><label class="form-label small fw-semibold mb-1" title="A quienes ingresaron hasta esta fecha, AutoFácil les paga también el seguro de sus cargas. Después, la carga la paga el empleado.">Empresa paga cargas de contratados hasta</label><input id="pCorte" type="date" class="form-control form-control-sm"></div>
         <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" onclick="guardarParam()"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
       </div>
     </div>
-    <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Rige desde</th><th>Aseguradora</th><th class="text-right">Titular</th><th class="text-right">Carga</th><th>Hijos hasta</th><th>Empresa paga cargas hasta</th><th>Registrado por</th></tr></thead><tbody id="tbParam"></tbody></table></div>
+    <div class="panel" style="padding:0;overflow:auto"><table><thead><tr><th>Rige desde</th><th>Aseguradora</th><th class="text-right">Titular</th><th class="text-right">Carga</th><th>Hijos hasta</th><th>Tolerancia</th><th>Empresa paga cargas hasta</th><th>Registrado por</th></tr></thead><tbody id="tbParam"></tbody></table></div>
   </div>
 
   <div class="foot mt-3"><b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
@@ -104,7 +148,8 @@
       <li><b>Edad máxima de hijos</b> → la carga que la supera queda marcada y fuera de la nómina (la aseguradora la rechaza), salvo que tenga <b>certificado de estudios</b> (casilla en la carga): sigue en la nómina hasta la <b>renovación de la póliza</b> (fecha editable arriba de la nómina) y al renovar sale sola con aviso, hasta que se actualice la vigencia y se reenvíe el certificado.</li>
       <li><b>Póliza</b> (número y vigencia, arriba de la nómina) → hasta cuándo valen los certificados de estudios; sale en el Excel para la aseguradora.</li>
       <li><b>Primas</b> (UF o pesos; la UF es la del día 1 del mes) → monto de la nómina y de los descuentos desde el mes indicado.</li>
-      <li><b>Generar nómina</b> → congela el mes; el pago a la aseguradora se emite en <a href="/ordenes-pago/">Órdenes de Pago</a> con el Excel adjunto. <b>Anular</b> borra la nómina y anula los descuentos del mes (auditado).</li>
+      <li><b>Generar nómina</b> → congela el mes (es lo que el sistema "espera" cobrar). <b>Anular</b> borra la nómina y anula los descuentos del mes (auditado).</li>
+      <li><b>Pago del mes</b> → el cupón de la aseguradora se compara con lo esperado (tolerancia en UF); si no cuadra, la nómina de cotización dice quién quedó fuera (hijo menor de la edad máxima → alerta; hasta la edad de estudiante → pedir certificado; mayor → fuera por edad), se avisa al empleado con copia a RRHH (plantilla en <a href="/mantenedores/correos/">Correos del Sistema</a>) y RRHH puede dar su OK; la <a href="/ordenes-pago/">Orden de Pago</a> a la aseguradora sale con el cupón y la nómina adjuntos.</li>
     </ul>
   </div>
 </div>
@@ -145,7 +190,76 @@ const fMes = document.getElementById('fMes');
 fMes.value = new Date().toISOString().slice(0,7);
 const api = async (url, method, body) => (await fetch('/api/rrhh/remuneraciones/seguro'+url, { method: method||'GET', headers:H, body: body?JSON.stringify(body):undefined })).json();
 
-function tab(t){ ['M','H','P'].forEach(x=>{ document.getElementById('sec'+x).style.display = x===t?'':'none'; document.getElementById('tab'+x).classList.toggle('active', x===t); }); }
+function tab(t){ ['M','G','H','P'].forEach(x=>{ document.getElementById('sec'+x).style.display = x===t?'':'none'; document.getElementById('tab'+x).classList.toggle('active', x===t); }); if (t==='G') { if (!document.getElementById('gMes').value) document.getElementById('gMes').value = fMes.value; cargarPago(); } }
+
+/* ── Pago del mes ── */
+let G = null;
+const b64 = f => new Promise((ok,ko)=>{ const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = ko; r.readAsDataURL(f); });
+const numIn = id => { const v = String(document.getElementById(id).value||'').trim(); return v ? Number(v.replace(/\./g,'').replace(',','.')) : null; };
+const uf4 = v => v==null ? '—' : Number(v).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:4});
+async function cargarPago(){
+  const j = await api('/pago?mes='+document.getElementById('gMes').value); if (!j.success) return alert(j.error);
+  G = j.data; renderPago();
+}
+function renderPago(){
+  const pg = G.pago, e = G.esperado, mes = G.mes;
+  const est = { CUADRA:['#dcfce7','#15803d','CUADRA'], NO_CUADRA:['#fee2e2','#b91c1c','NO CUADRA'], OK_RRHH:['#fef3c7','#92400e','OK DE RRHH — pagar igual'], PAGO_EMITIDO:['#dbeafe','#1d4ed8','ORDEN DE PAGO EMITIDA'] }[pg?.estado] || ['#f1f5f9','#475569','SIN CUPÓN'];
+  document.getElementById('gEstado').innerHTML = `<span class="pill" style="background:${est[0]};color:${est[1]}">${est[2]}</span> <span class="small text-muted ms-2">El sistema espera <b>${uf4(e.uf)} ${e.moneda}</b> (${e.titulares} titulares + ${e.cargas} cargas${e.generada?', nómina generada':', vista previa'})</span>`;
+  ['gUfPer','gUfAj','gUfTot','gUf','gClp'].forEach(id=>document.getElementById(id).value='');
+  if (pg) { document.getElementById('gUfPer').value = uf4(pg.uf_periodo); document.getElementById('gUfAj').value = pg.uf_ajustes!=null?uf4(pg.uf_ajustes):''; document.getElementById('gUfTot').value = uf4(pg.uf_total); document.getElementById('gUf').value = Number(pg.uf_cobro).toLocaleString('es-CL',{minimumFractionDigits:2}); document.getElementById('gClp').value = fmt(pg.total_clp); }
+  document.getElementById('gCuadre').innerHTML = pg ? `<table class="table table-sm mb-0" style="font-size:.8rem"><tbody>
+      <tr><td>Cupón: prima del período</td><td class="text-right num">${uf4(pg.uf_periodo)} UF</td></tr>
+      <tr><td>Sistema: ${e.titulares} titulares + ${e.cargas} cargas</td><td class="text-right num">${uf4(pg.esperado_uf)} UF</td></tr>
+      <tr style="font-weight:700;color:${Math.abs(pg.diferencia_uf)<=G.tolerancia_uf?'#15803d':'#b91c1c'}"><td>Diferencia (tolerancia ${G.tolerancia_uf} UF)</td><td class="text-right num">${pg.diferencia_uf>0?'+':''}${uf4(pg.diferencia_uf)} UF ≈ $${fmt((pg.diferencia_uf||0)*pg.uf_cobro)}</td></tr>
+      <tr><td>Ajustes de períodos anteriores</td><td class="text-right num">${uf4(pg.uf_ajustes)} UF</td></tr>
+      <tr><td>Total a pagar: ${uf4(pg.uf_total)} UF × UF $${Number(pg.uf_cobro).toLocaleString('es-CL',{minimumFractionDigits:2})}</td><td class="text-right num">$${fmt(pg.total_clp)}</td></tr></tbody></table>` : '';
+  const d = pg?.diff;
+  const ACC = { ALERTA:['#fee2e2','#b91c1c','ALERTA'], PEDIR_CERTIFICADO:['#fef3c7','#92400e','PEDIR CERTIFICADO'], FUERA_EDAD:['#f1f5f9','#475569','FUERA POR EDAD'] };
+  document.getElementById('gDiff').innerHTML = d ? `<div class="small mb-2">Nómina de la aseguradora: <b>${d.en_metlife}</b> asegurados vigentes · comparada el ${dmy(d.fecha)}</div>` +
+      (d.fuera.length ? `<div class="fw-semibold small mb-1">Del sistema, fuera de la aseguradora (${d.fuera.length}, ≈ ${uf4(d.prima_fuera_uf)} UF):</div><table style="font-size:.78rem"><tbody>${d.fuera.map(f=>{ const a = ACC[f.accion]||ACC.ALERTA; return `<tr><td>${esc(f.titular)}</td><td>${esc(f.nombre)} <span class="text-muted">(${esc(f.relacion.toLowerCase())}${f.edad!=null?', '+f.edad+' años':''})</span></td><td><span class="pill" style="background:${a[0]};color:${a[1]}">${a[2]}</span></td><td class="text-muted">${esc(f.motivo)}</td></tr>`; }).join('')}</tbody></table>` : '<div class="small text-success">Todos los del sistema están en la aseguradora.</div>') +
+      (d.sobran.length ? `<div class="fw-semibold small mt-2 mb-1">En la aseguradora pero no en el sistema (${d.sobran.length}):</div><div class="small text-muted">${d.sobran.map(x=>esc(x.nombre)+(x.relacion?' ('+esc(x.relacion)+')':'')).join(' · ')}</div>` : '') +
+      (pg.avisos_at ? `<div class="small text-success mt-2"><i class="bi bi-envelope-check"></i> Avisos enviados el ${String(pg.avisos_at).slice(0,10)}</div>` : '') : '';
+  const puedeOdp = pg && ['CUADRA','OK_RRHH'].includes(pg.estado);
+  document.getElementById('btnAvisos').style.display = d && d.fuera.some(f=>f.relacion!=='TITULAR') && pg.estado!=='PAGO_EMITIDO' ? '' : 'none';
+  document.getElementById('btnOk').style.display = pg && pg.estado==='NO_CUADRA' ? '' : 'none';
+  document.getElementById('btnOdp').style.display = puedeOdp ? '' : 'none';
+  document.getElementById('gPago').innerHTML = !pg ? 'Sube el cupón para continuar.' : pg.estado==='PAGO_EMITIDO' ? `Orden de pago <b>${esc(pg.odp_numero)}</b> emitida a la aseguradora por <b>$${fmt(pg.total_clp)}</b> con el cupón adjunto. Se paga por el flujo normal de <a href="/ordenes-pago/">Órdenes de Pago</a>.` :
+    pg.estado==='OK_RRHH' ? `RRHH autorizó pagar sin cuadrar: <i>${esc(pg.ok_motivo)}</i> (${esc(pg.ok_por)}, ${String(pg.ok_at).slice(0,10)}). Emite la orden por $${fmt(pg.total_clp)}.` :
+    pg.estado==='CUADRA' ? `El cupón cuadra con el sistema. Emite la orden de pago por <b>$${fmt(pg.total_clp)}</b>.` : `El cupón <b>no cuadra</b>. Compara la nómina de cotización para ver quién quedó fuera, avisa a los empleados y, para no demorar el pago, RRHH puede dar su OK.`;
+  document.getElementById('gDocs').innerHTML = pg?.docs?.length ? 'Adjuntos: ' + pg.docs.map(x=>`<a href="#" onclick="verDoc(${x.id});return false"><i class="bi bi-paperclip"></i>${esc(x.nombre)}</a>`).join(' · ') : '';
+}
+async function verDoc(id){
+  const r = await fetch('/api/postventa/factura-doc/'+id,{headers:H}); if (!r.ok) return alert('No se pudo abrir el adjunto');
+  const u = URL.createObjectURL(await r.blob()); window.open(u,'_blank');
+}
+async function subirCupon(){
+  const f = document.getElementById('gCupon').files[0];
+  const body = { mes: document.getElementById('gMes').value, uf_periodo: numIn('gUfPer'), uf_ajustes: numIn('gUfAj'), uf_total: numIn('gUfTot'), uf_cobro: numIn('gUf'), total_clp: numIn('gClp') };
+  if (f) { body.archivo_nombre = f.name; body.mime = f.type; body.archivo_data = await b64(f); }
+  else if (!(body.uf_periodo && body.uf_cobro && body.total_clp)) return alert('Sube el cupón o completa los totales a mano');
+  const j = await api('/cupon','POST',body); if (!j.success) return alert(j.error);
+  cargarPago();
+}
+async function subirCotizacion(){
+  const f = document.getElementById('gCot').files[0]; if (!f) return alert('Elige el Excel de la nómina de cotización');
+  const j = await api('/cotizacion','POST',{ mes: document.getElementById('gMes').value, archivo_nombre: f.name, mime: f.type, archivo_data: await b64(f) }); if (!j.success) return alert(j.error);
+  cargarPago();
+}
+async function enviarAvisos(){
+  if (!confirm('¿Enviar a cada empleado el aviso de su familiar fuera del seguro, con copia a RRHH?')) return;
+  const j = await api('/avisos','POST',{ mes: document.getElementById('gMes').value }); if (!j.success) return alert(j.error);
+  alert('Enviados: '+(j.data.enviados.join(', ')||'ninguno')+(j.data.fallidos.length?'\nNo enviados: '+j.data.fallidos.join(', '):'')); cargarPago();
+}
+async function okRRHH(){
+  const motivo = prompt('Motivo del OK para pagar aunque no cuadre (queda en la orden y en auditoría):'); if (motivo==null) return;
+  const j = await api('/ok-rrhh','POST',{ mes: document.getElementById('gMes').value, motivo }); if (!j.success) return alert(j.error);
+  cargarPago();
+}
+async function emitirOdp(){
+  if (!confirm(`¿Emitir la Orden de Pago a la aseguradora por $${fmt(G.pago.total_clp)}?`)) return;
+  const j = await api('/emitir-odp','POST',{ mes: document.getElementById('gMes').value }); if (!j.success) return alert(j.error);
+  alert('Emitida '+j.data.odp_numero); cargarPago();
+}
 
 async function cargar(){
   const j = await api('?mes='+fMes.value); if (!j.success) { alert(j.error); return; }
@@ -193,11 +307,12 @@ function render(){
       </tr>`).join('')).join('') || '<tr><td colspan="8" class="text-center text-muted py-3">Sin colaboradores</td></tr>';
   }
   document.getElementById('tbHist').innerHTML = (D.historial||[]).map(h=>`<tr><td>${mesTxt(h.mes)}</td><td class="text-right">${h.titulares}</td><td class="text-right">${h.cargas}</td><td class="text-right">$${fmt(h.empleado)}</td><td class="text-right num">$${fmt(h.total)}</td><td>${String(h.generado_at||'').slice(0,10)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-muted text-center py-2">Aún no hay nóminas generadas</td></tr>';
-  document.getElementById('tbParam').innerHTML = (D.params||[]).map(x=>{ const m = x.moneda==='UF'?'UF ':'$'; return `<tr><td>${esc(x.mes_desde)}</td><td>${esc(x.aseguradora)}</td><td class="text-right num">${m}${Number(x.prima_titular).toLocaleString('es-CL')}</td><td class="text-right num">${m}${Number(x.prima_carga).toLocaleString('es-CL')}</td><td>${x.edad_max_hijo} años</td><td>${dmy(x.corte_cargas_empresa)}</td><td>${esc(x.creado_por||'')}</td></tr>`; }).join('') || '<tr><td colspan="7" class="text-muted text-center py-2">Sin parámetros: carga el primero</td></tr>';
+  document.getElementById('tbParam').innerHTML = (D.params||[]).map(x=>{ const m = x.moneda==='UF'?'UF ':'$'; return `<tr><td>${esc(x.mes_desde)}</td><td>${esc(x.aseguradora)}</td><td class="text-right num">${m}${Number(x.prima_titular).toLocaleString('es-CL')}</td><td class="text-right num">${m}${Number(x.prima_carga).toLocaleString('es-CL')}</td><td>${x.edad_max_hijo} años (est. ${x.edad_max_estudiante||27})</td><td>${Number(x.tolerancia_uf||0.05)} UF</td><td>${dmy(x.corte_cargas_empresa)}</td><td>${esc(x.creado_por||'')}</td></tr>`; }).join('') || '<tr><td colspan="8" class="text-muted text-center py-2">Sin parámetros: carga el primero</td></tr>';
   if (!document.getElementById('pMes').value) {
     document.getElementById('pMes').value = fMes.value; document.getElementById('pAseg').value = p.aseguradora||'METLIFE'; document.getElementById('pMon').value = p.moneda||'UF';
     document.getElementById('pTit').value = p.prima_titular ? String(p.prima_titular).replace('.',',') : ''; document.getElementById('pCar').value = p.prima_carga ? String(p.prima_carga).replace('.',',') : '';
     document.getElementById('pEdad').value = p.edad_max_hijo||23; document.getElementById('pCorte').value = p.corte_cargas_empresa||'';
+    document.getElementById('pEdadEst').value = p.edad_max_estudiante||27; document.getElementById('pTol').value = String(p.tolerancia_uf??0.05).replace('.',',');
   }
   document.getElementById('dcRel').innerHTML = (D.relaciones||[]).map(r=>`<option>${r}</option>`).join('');
 }
@@ -267,7 +382,7 @@ async function guardarPoliza(){
 async function guardarParam(){
   const n = id => Number(String(document.getElementById(id).value).replace(/\./g,'').replace(',','.'));
   const body = { mes_desde: document.getElementById('pMes').value, aseguradora: document.getElementById('pAseg').value, moneda: document.getElementById('pMon').value,
-    prima_titular: n('pTit'), prima_carga: n('pCar'), edad_max_hijo: Number(document.getElementById('pEdad').value), corte_cargas_empresa: document.getElementById('pCorte').value||null };
+    prima_titular: n('pTit'), prima_carga: n('pCar'), edad_max_hijo: Number(document.getElementById('pEdad').value), edad_max_estudiante: Number(document.getElementById('pEdadEst').value), tolerancia_uf: n('pTol'), corte_cargas_empresa: document.getElementById('pCorte').value||null };
   const j = await api('/param','PUT',body); if (!j.success) return alert(j.error);
   document.getElementById('pMes').value=''; cargar();
 }
