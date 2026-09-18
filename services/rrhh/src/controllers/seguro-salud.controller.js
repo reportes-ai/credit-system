@@ -383,7 +383,9 @@ const nominaXlsx = async (req, res) => {
    lo que el sistema espera (titulares + cargas × prima). Si no cuadra: alerta, se carga la nómina de
    cotización para ver quién quedó fuera (hijo < edad máx → alerta; entre edad máx y edad estudiante →
    pedir certificado; mayor → fuera por edad), se avisa al empleado con copia a RRHH, y RRHH puede dar
-   su OK para no demorar el pago. La ODP se emite con el cupón (y la nómina) adjuntos. */
+   su OK para no demorar el pago. La ODP se emite con el cupón y la nómina adjuntos.
+   La nómina de cotización se sube SIEMPRE (aunque cuadre): una suma puede cuadrar por casualidad
+   (uno que sobra y uno que falta se anulan) y sin la nómina nadie lo ve. */
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
 const numCL = s => { const t = String(s || '').replace(/\$/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.'); const n = Number(t); return isNaN(n) ? null : n; };
 
@@ -605,7 +607,8 @@ const emitirOdp = async (req, res) => {
     const pago = await pagoDe(mes);
     if (!pago) return fail(res, 'Sube primero el cupón', 400);
     if (pago.estado === 'PAGO_EMITIDO') return fail(res, `La orden ${pago.odp_numero} ya fue emitida`, 400);
-    if (!['CUADRA', 'OK_RRHH'].includes(pago.estado)) return fail(res, 'El cupón no cuadra: carga la nómina de cotización y pide el OK de RRHH, o corrige la nómina', 400);
+    if (!pago.diff) return fail(res, 'Falta la nómina de cotización de la aseguradora: se sube siempre junto con el cupón (Pato 17-09-2026)', 400);
+    if (!['CUADRA', 'OK_RRHH'].includes(pago.estado)) return fail(res, 'El cupón no cuadra: revisa quién quedó fuera y pide el OK de RRHH, o corrige la nómina', 400);
     const p = await paramDe(mes), pol = await polizaVigente();
     const aseg = p.aseguradora || 'METLIFE';
     let [[prov]] = await pool.query('SELECT id, nombre, rut FROM proveedores WHERE UPPER(nombre) LIKE ? ORDER BY activo DESC, id LIMIT 1', ['%' + aseg + '%']);
