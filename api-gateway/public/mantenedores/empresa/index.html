@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Datos de la Empresa — Mantenedores</title>
-  <!-- v1.3 — País más ancho. v1.2 — País. v1.1 — al guardar invalida la caché de sesión de /js/empresa.js. v1.0 — mantenedor nuevo: razón social, RUT, giro, domicilio, representante legal, contacto, CCAF y mutual en una sola fuente (shared/empresa.js) -->
+  <!-- v1.4 — RUTs con puntos y guion (rut-core). v1.3 — País más ancho. v1.2 — País. v1.1 — al guardar invalida la caché de sesión de /js/empresa.js. v1.0 — mantenedor nuevo: razón social, RUT, giro, domicilio, representante legal, contacto, CCAF y mutual en una sola fuente (shared/empresa.js) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -34,7 +34,7 @@
     <h5><i class="bi bi-card-heading"></i> Identificación</h5>
     <div class="row">
       <div class="col-md-6"><div class="fld"><label>Razón social *</label><input id="razon_social" placeholder="AUTOFÁCIL SpA"></div></div>
-      <div class="col-md-3"><div class="fld"><label>RUT *</label><input id="rut" placeholder="76545638-K"><div class="hint">Sin puntos, con guion.</div></div></div>
+      <div class="col-md-3"><div class="fld"><label>RUT *</label><input id="rut" placeholder="76.545.638-K" onblur="fmtRutInput(this)"><div class="hint">Se formatea solo.</div></div></div>
       <div class="col-md-3"><div class="fld"><label>Nombre de fantasía</label><input id="nombre_fantasia" placeholder="AutoFácil Crédito Automotriz"></div></div>
       <div class="col-md-8"><div class="fld"><label>Giro</label><input id="giro" placeholder="Corretaje de créditos automotrices"></div></div>
       <div class="col-md-4"><div class="fld"><label>Actividad económica (código SII)</label><input id="actividad_economica" placeholder="661901"><div class="hint">Ver <a href="/mantenedores/actividades-economicas/">Actividades Económicas</a>.</div></div></div>
@@ -58,7 +58,7 @@
     <h5><i class="bi bi-person-vcard"></i> Representante legal</h5>
     <div class="row">
       <div class="col-md-7"><div class="fld"><label>Nombre</label><input id="representante"><div class="hint">Firma contratos, anexos y finiquitos cuando no se elige otro firmante en cada documento.</div></div></div>
-      <div class="col-md-3"><div class="fld"><label>RUT</label><input id="rut_representante"></div></div>
+      <div class="col-md-3"><div class="fld"><label>RUT</label><input id="rut_representante" placeholder="12.345.678-9" onblur="fmtRutInput(this)"></div></div>
     </div>
   </div>
 
@@ -86,15 +86,18 @@
 </div>
 <div class="toast" id="toast">✓ Guardado</div>
 <script src="/js/auth-guard.js"></script>
+<script src="/js/rut-core.js"></script>
 <script>
   const token=sessionStorage.getItem('token'), yo=JSON.parse(sessionStorage.getItem('usuario')||'null');
   if(!token||!yo) location.href='/login.html';
   const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
   const CAMPOS=['razon_social','nombre_fantasia','rut','giro','actividad_economica','domicilio','comuna','ciudad','pais','representante','rut_representante','telefono','email','web','ccaf','mutual','sucursal_mutual'];
+  function fmtRutInput(el){ if(!el||!el.value.trim()) return; el.value=AF_RUT.formatear(el.value); }   // motor único rut-core
   async function cargar(){
     const j=await(await fetch('/api/empresa',{headers:H})).json(); if(!j.success) return alert(j.error);
     const d=j.data||{};
     CAMPOS.forEach(k=>{ const el=document.getElementById(k); if(el) el.value=d[k]??''; });
+    fmtRutInput(document.getElementById('rut')); fmtRutInput(document.getElementById('rut_representante'));
     document.getElementById('meta').textContent=d.updated_at?`Última modificación: ${new Date(d.updated_at).toLocaleString('es-CL')} · ${d.updated_by||''}`:'';
   }
   async function guardar(){
