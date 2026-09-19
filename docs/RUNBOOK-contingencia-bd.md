@@ -613,3 +613,12 @@ las 00:00 y las 17:30 pueden estar una hora atrás (solo auditoría y logs, no f
 *Guía para no técnicos también disponible dentro del sistema:*
 **Mantenedores → Definiciones → "Respaldo de la Base de Datos"**.
 *Detalle técnico:* **Mantenedores → Documentación → Técnica → Seguridad y operación**.
+
+## 12. Respaldo al disco externo (si muere el laptop)
+
+`pwsh -File scripts\respaldo-externo.ps1` con el SSD externo conectado crea `D:\RESPALDO_AUTOFACIL\<fecha>\`
+con: bundle git + zip del árbol de `credit-system`, `.env` local, mysqldump de la BD (mismos flags que
+`backup-bd.yml`), memoria de Claude Code, los proyectos sin remote de `Documents\` y la carpeta DOCUMENTACION,
+más `INSTRUCCIONES_RESTAURACION.md` y `MANIFIESTO.txt` (SHA-256). Nunca borra respaldos anteriores.
+Lo que NO va ahí porque ya vive fuera del laptop: GitHub, TiDB + Action nocturno, Render (secretos), OneDrive.
+Última corrida: 18-09-2026 (238 MB). Correrlo al menos una vez al mes.
