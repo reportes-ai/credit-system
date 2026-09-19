@@ -43,6 +43,7 @@ function ZipSinBasura($origen, $zip) {
 $dc = Join-Path $dest 'codigo'; New-Item -ItemType Directory -Force $dc | Out-Null
 Paso "Bundle git de credit-system (todo el historial)…"
 git -C $Repo bundle create (Join-Path $dc 'credit-system.bundle') --all 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $dc 'credit-system.bundle'))) { Paso "  ⚠ el bundle git falló (el zip del árbol igual se genera)" }
 $commit = git -C $Repo rev-parse --short HEAD
 $pend   = (git -C $Repo status --porcelain | Measure-Object).Count
 Paso "  HEAD $commit · $pend archivo(s) sin commitear"
@@ -62,15 +63,18 @@ if ($md) {
   $env_ = @{}; Get-Content (Join-Path $Repo '.env') | Where-Object { $_ -match '^\s*([A-Z_]+)\s*=\s*(.*)$' } | ForEach-Object { $env_[$Matches[1]] = $Matches[2].Trim().Trim('"') }
   $sql = Join-Path $db ("{0}_{1}.sql" -f $env_['DB_NAME'], $fecha)
   Paso "mysqldump de $($env_['DB_NAME'])@$($env_['DB_HOST'])…"
-  $env:MYSQL_PWD = $env_['DB_PASSWORD']
-  & $md.FullName -h $env_['DB_HOST'] -P ($env_['DB_PORT'] ?? '4000') -u $env_['DB_USER'] `
-      --ssl-mode=REQUIRED --skip-lock-tables --quick --no-tablespaces --set-gtid-purged=OFF --column-statistics=0 `
-      --result-file=$sql $env_['DB_NAME']
-  $env:MYSQL_PWD = $null
-  if ((Get-Content $sql -Tail 1) -match 'Dump completed') {
-    Compress-Archive -Path $sql -DestinationPath ($sql + '.zip') -CompressionLevel Optimal; Remove-Item $sql
-    Paso "  dump completo: $([math]::Round((Get-Item ($sql + '.zip')).Length/1MB,1)) MB"
-  } else { Paso "  ⚠ el dump NO terminó completo (revisar)" }
+  # Un dump fallido NO debe cortar el respaldo: memoria, proyectos y documentación van igual
+  try {
+    $env:MYSQL_PWD = $env_['DB_PASSWORD']
+    & $md.FullName -h $env_['DB_HOST'] -P ($env_['DB_PORT'] ?? '4000') -u $env_['DB_USER'] `
+        --ssl-mode=REQUIRED --skip-lock-tables --quick --no-tablespaces --set-gtid-purged=OFF --column-statistics=0 `
+        --result-file=$sql $env_['DB_NAME']
+    if ((Test-Path $sql) -and ((Get-Content $sql -Tail 1) -match 'Dump completed')) {
+      Compress-Archive -Path $sql -DestinationPath ($sql + '.zip') -CompressionLevel Optimal; Remove-Item $sql
+      Paso "  dump completo: $([math]::Round((Get-Item ($sql + '.zip')).Length/1MB,1)) MB"
+    } else { Paso "  ⚠ el dump NO terminó completo (revisar; el GitHub Action backup-bd.yml tiene el de anoche)" }
+  } catch { Paso "  ⚠ mysqldump falló: $($_.Exception.Message) — el respaldo sigue sin la BD" }
+  finally { $env:MYSQL_PWD = $null }
 } else { Paso "mysqldump no encontrado: la BD queda respaldada por el GitHub Action backup-bd.yml (30 días)" }
 
 # 4. Memoria de Claude
@@ -100,7 +104,8 @@ if (Test-Path $doc) { Compress-Archive -Path (Join-Path $doc '*') -DestinationPa
 2. Código: ``git clone https://github.com/reportes-ai/credit-system.git`` (GitHub es la fuente).
    Sin internet o sin GitHub: ``git clone codigo\credit-system.bundle credit-system``.
    El zip codigo\credit-system-codigo.zip es el árbol de trabajo tal cual (incluye lo no commiteado).
-3. Copiar credenciales\.env a la raíz del repo. Luego ``npm install`` y ``MOTORES=off npm start``.
+3. Copiar credenciales\.env a la raíz del repo. Luego ``npm install`` y arrancar con los motores apagados:
+   PowerShell ``$env:MOTORES='off'; npm start`` · Git Bash / Mac ``MOTORES=off npm start``.
    NUNCA levantar el servidor local con motores contra la base de producción.
 4. Base de datos: producción sigue viva en TiDB Cloud; no hay que restaurar nada.
    Si hubiera que reconstruirla: base-datos\*.sql.zip (o el artefacto del GitHub Action backup-bd.yml, 30 días;
