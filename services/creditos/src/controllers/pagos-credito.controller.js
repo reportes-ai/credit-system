@@ -219,7 +219,7 @@ const getById = async (req, res) => {
    desarrollo congelada (cuotas_credito.interes / amortizacion). Imputación legal (art. 1595 CC):
    lo abonado a una cuota paga primero su interés y después capital; lo ya pagado de esa cuota en
    transacciones anteriores se descuenta primero del interés. Sin calendario → todo a capital. */
-async function separarCapitalInteres(id_credito, pagos, trxActual) {
+async function separarCapitalInteres(id_credito, pagos, trxActual, excluirIdPago) {
   const nums = [...new Set(pagos.map(p => Number(p.numero_cuota)).filter(n => n > 0))];
   let capital = 0, interes = 0;
   if (!nums.length) return { capital: 0, interes: 0 };
@@ -227,7 +227,8 @@ async function separarCapitalInteres(id_credito, pagos, trxActual) {
   const [prev] = await pool.query(
     `SELECT numero_cuota, COALESCE(SUM(monto_cuota),0) pagado FROM pagos_credito
       WHERE id_credito=? AND estado_pago='PAGADO' AND numero_cuota IN (?) AND (numero_transaccion IS NULL OR numero_transaccion < ?)   -- solo lo pagado ANTES de esta transacción
-      GROUP BY numero_cuota`, [id_credito, nums, trxActual || Number.MAX_SAFE_INTEGER]);
+        AND id_pago <> ?
+      GROUP BY numero_cuota`, [id_credito, nums, trxActual || Number.MAX_SAFE_INTEGER, excluirIdPago || 0]);
   const intRest = new Map(cal.map(c => [Number(c.numero_cuota), Number(c.interes) || 0]));
   for (const p of prev) { const n = Number(p.numero_cuota); if (intRest.has(n)) intRest.set(n, Math.max(0, intRest.get(n) - Number(p.pagado))); }
   for (const p of pagos) {
@@ -237,6 +238,17 @@ async function separarCapitalInteres(id_credito, pagos, trxActual) {
     interes += i; capital += m - i;
   }
   return { capital, interes };
+}
+
+/* Banco REAL del asiento: la cuenta contable de la cuenta bancaria del depósito (mantenedor
+   Cuentas Bancarias) reemplaza al banco genérico 1101090 de la regla. Sin cuenta → default. */
+async function reemplazoBanco(idCuenta) {
+  if (!idCuenta) return { reemplazos: null, banco: null };
+  try {
+    const [[cb]] = await pool.query('SELECT banco, cuenta_contable FROM cuentas_bancarias WHERE id_cuenta=?', [idCuenta]);
+    if (cb && cb.cuenta_contable) return { reemplazos: { '1101090': cb.cuenta_contable }, banco: cb.banco, cuenta: cb.cuenta_contable };
+  } catch (_) {}
+  return { reemplazos: null, banco: null };
 }
 
 /* ─── POST registrar pago ────────────────────────────────────────────────── */
@@ -268,6 +280,8 @@ const create = async (req, res) => {
     const imTot = (f && f.mora   != null) ? f.mora   : ((interes_mora_total    != null) ? parseFloat(interes_mora_total)    || 0 : parseFloat(interes_mora)    || 0);
     const gcTot = (f && f.gastos != null) ? f.gastos : ((gastos_cobranza_total != null) ? parseFloat(gastos_cobranza_total) || 0 : parseFloat(gastos_cobranza) || 0);
 
+    // Capital vs interés ANTES de insertar (el desglose mira lo pagado previamente de esa cuota)
+    const ci = await separarCapitalInteres(id_credito, [{ numero_cuota, monto_cuota }]).catch(() => ({ capital: Math.round(parseFloat(monto_cuota) || 0), interes: 0 }));
     const [r] = await pool.query(
       `INSERT INTO pagos_credito
          (id_credito, numero_cuota, fecha_vencimiento, monto_cuota,
@@ -290,6 +304,18 @@ const create = async (req, res) => {
       detalle: `Cuota N°${numero_cuota} pagada — Total: $${Math.round(tp).toLocaleString('es-CL')}`,
       meta: { numero_cuota, monto_cuota: parseFloat(monto_cuota)||0, interes_mora: parseFloat(interes_mora)||0, gastos_cobranza: parseFloat(gastos_cobranza)||0, total_pagado: tp, fecha_pago: fecha_pago || null },
     });
+    // Máxima 4: el pago individual también se contabiliza (misma regla PAGO_CAJA, sin transacción)
+    if ((estado_pago || 'PAGADO') === 'PAGADO') try {
+      const [[cd]] = await pool.query('SELECT COALESCE(CAST(num_op AS CHAR), numero_credito) n FROM creditos WHERE id=?', [id_credito]);
+      const bco = await reemplazoBanco(parseInt(id_cuenta_bancaria) || null);
+      const mC = Math.round(parseFloat(monto_cuota) || 0), mM = Math.round(parseFloat(interes_mora) || 0), mG = Math.round(parseFloat(gastos_cobranza) || 0);
+      require('../../../contabilidad/src/motor-asientos').contabilizar({
+        evento: 'PAGO_CAJA', fecha: fecha_pago || undefined, ref: `PAGO-${r.insertId}`,
+        glosa: `Pago cuota N°${numero_cuota} · OP ${cd?.n || id_credito}`, num_op: cd?.n || null, reemplazos: bco.reemplazos,
+        montos: { recibido: mC + mM + mG, total: mC + mM + mG, cuota: mC, capital: mC - ci.interes, interes: ci.interes, mora: mM, gastos: mG },
+        detalle: ['OP ' + (cd?.n || id_credito), bco.banco].filter(Boolean).join(' · '),
+      }).catch(() => {});
+    } catch (_) {}
     auditar({ req, accion: 'PAGAR', modulo: 'pagos', entidad: 'pago', entidad_id: r.insertId,
       detalle: `Registró pago de cuota N°${numero_cuota} (crédito ${id_credito}) — $${Math.round(tp).toLocaleString('es-CL')}`,
       meta: { id_credito, numero_cuota, total_pagado: tp } });
@@ -519,19 +545,15 @@ const createBatch = async (req, res) => {
          cuenta bancaria con cuenta contable asignada (mantenedor Cuentas
          Bancarias), esa reemplaza al banco genérico de la regla PAGO_CAJA.
          Efectivo/tarjeta/cheque (sin cuenta) quedan con el default de la regla. */
-      let reemplazos = null, bancoTxt = null;
-      if (idCuentaInt) {
-        try {
-          const [[cb]] = await pool.query('SELECT banco, cuenta_contable FROM cuentas_bancarias WHERE id_cuenta=?', [idCuentaInt]);
-          if (cb && cb.cuenta_contable) { reemplazos = { '1101090': cb.cuenta_contable }; bancoTxt = cb.banco; }
-        } catch (_) {}
-      }
+      const { reemplazos, banco: bancoTxt } = await reemplazoBanco(idCuentaInt);
+      // Banco = lo RECIBIDO; el saldo a favor usado y el exceso van contra 2102290 (Saldos a favor de clientes)
+      const tot = Math.round(mCuota + mMora + mGastos), usado = Math.round(saldoNecesario);
       const ci = await separarCapitalInteres(id_credito, pagos, numero_transaccion);
       require('../../../contabilidad/src/motor-asientos').contabilizar({
         evento: 'PAGO_CAJA', fecha: fecha_pago || undefined,
         glosa: `Pago en ${cajaNombre || 'caja'} — ${pagos.length} cuota(s) · OP ${numOpTxt}`,
         ref: `TRX-${String(numero_transaccion).padStart(6, '0')}`,
-        montos: { total: mCuota + mMora + mGastos, cuota: mCuota, capital: mCuota - ci.interes, interes: ci.interes, mora: mMora, gastos: mGastos },
+        montos: { recibido: tot + exceso - usado, saldo_favor: usado, exceso, total: tot, cuota: mCuota, capital: mCuota - ci.interes, interes: ci.interes, mora: mMora, gastos: mGastos },
         num_op: numOpTxt, reemplazos,
         // Va a la glosa de CADA línea: "Recaudación caja · Caja 2 · OP 68520 · Banco de Chile"
         detalle: [cajaNombre, 'OP ' + numOpTxt, bancoTxt].filter(Boolean).join(' · '),
@@ -815,6 +837,10 @@ const reversar = async (req, res) => {
       }
     }
 
+    // Desglose del pago que se reversa (antes de marcarlo): mismo motor que al pagarlo
+    const ciRev = await separarCapitalInteres(pago.id_credito, [pago], pago.numero_transaccion, pago.id_pago)
+      .catch(() => ({ capital: Math.round(parseFloat(pago.monto_cuota) || 0), interes: 0 }));
+
     // 3. Marcar como REVERSADO
     const reversado_por = [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || null;
     await conn.query(
@@ -880,6 +906,21 @@ const reversar = async (req, res) => {
 
     await conn.commit();
 
+    /* Máxima 4: contra-asiento de la reversa. Con transacción la plata queda como saldo a favor del
+       cliente (se acaba de abonar a cuentas_transitorias) → 2102290; sin transacción, vuelve al banco del pago. */
+    try {
+      const [[cd]] = await pool.query('SELECT COALESCE(CAST(num_op AS CHAR), numero_credito) n FROM creditos WHERE id=?', [pago.id_credito]);
+      let reemplazos = null;
+      if (!pago.numero_transaccion) { const b = await reemplazoBanco(pago.id_cuenta_bancaria); reemplazos = { '2102290': b.cuenta || '1101090' }; }
+      const mC = Math.round(parseFloat(pago.monto_cuota) || 0), mM = Math.round(parseFloat(pago.interes_mora) || 0), mG = Math.round(parseFloat(pago.gastos_cobranza) || 0);
+      require('../../../contabilidad/src/motor-asientos').contabilizar({
+        evento: 'REVERSA_PAGO_CAJA', ref: `REV-${pago.id_pago}`, num_op: cd?.n || null, reemplazos,
+        glosa: `Reversa pago cuota N°${pago.numero_cuota} · OP ${cd?.n || pago.id_credito}${pago.numero_transaccion ? ' · TRX-' + String(pago.numero_transaccion).padStart(6, '0') : ''} — ${comentario.trim()}`.slice(0, 300),
+        montos: { total: mC + mM + mG, capital: mC - ciRev.interes, interes: ciRev.interes, mora: mM, gastos: mG },
+        detalle: 'OP ' + (cd?.n || pago.id_credito),
+      }).catch(() => {});
+    } catch (_) {}
+
     // Auditoría
     try {
       audit.registrar({
@@ -939,4 +980,4 @@ const enviarComprobanteTrx = async (req, res) => {
   }
 };
 
-module.exports = { getByCredito, getCalendario, getById, create, createBatch, remove, reversar, prepagoInfo, prepagar, cobranzaFullMap, enviarComprobanteTrx, separarCapitalInteres };
+module.exports = { getByCredito, getCalendario, getById, create, createBatch, remove, reversar, prepagoInfo, prepagar, cobranzaFullMap, enviarComprobanteTrx, separarCapitalInteres, reemplazoBanco };

@@ -17,7 +17,7 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../shared/config/database');
 const DESC_PREPAGO = 'Se dispara al saldar completo un crédito en Caja. Campos: total (lo cobrado), capital (capital de cuotas vigentes + capital de cuotas en mora), interes (interés de cuotas en mora + interés corriente a la fecha), mora (interés de mora), comision (comisión de prepago), gastos (gastos de cobranza), cuota (capital+interés).';
-const DESC_PAGO_CAJA = 'Se dispara al registrar un pago de cuotas en Caja. Campos: total (lo cobrado), capital (amortización de las cuotas, según la tabla de desarrollo), interes (interés corriente de las cuotas; en pagos parciales se imputa primero al interés), cuota (capital+interés), mora (interés de mora), gastos (gastos de cobranza).';
+const DESC_PAGO_CAJA = 'Se dispara al registrar un pago de cuotas en Caja. Campos: recibido (lo que entró a caja/banco), saldo_favor (saldo a favor del cliente aplicado), exceso (lo recibido de más, queda como saldo a favor), total (lo cobrado), capital (amortización de las cuotas, según la tabla de desarrollo), interes (interés corriente de las cuotas; en pagos parciales se imputa primero al interés), cuota (capital+interés), mora (interés de mora), gastos (gastos de cobranza).';
 
 /* ── Migración ─────────────────────────────────────────────────────────────── */
 require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
@@ -60,11 +60,20 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
     // venían de AVSOFT obligaban a reeditar la regla cada enero).
     const R = [
       ['PAGO_CAJA', 'Pago de cuotas en Caja', DESC_PAGO_CAJA, 'INGRESO', 1, [
-        ['1101090', 'DEBE', 'total', 'Recaudación caja'],
+        ['1101090', 'DEBE', 'recibido', 'Recaudación caja'],
+        ['2102290', 'DEBE', 'saldo_favor', 'Saldo a favor aplicado al pago'],
+        ['2102290', 'HABER', 'exceso', 'Pago en exceso a saldo a favor'],
         ['1104010', 'HABER', 'capital', 'Abono a contratos (capital)'],
         ['3001010', 'HABER', 'interes', 'Interés corriente'],
         ['3001040', 'HABER', 'mora', 'Interés de mora'],
         ['3001020', 'HABER', 'gastos', 'Gastos de cobranza'],
+      ]],
+      ['REVERSA_PAGO_CAJA', 'Reversa de pago de cuota en Caja', 'Se dispara al reversar un pago de cuota en Caja: anula lo que abonó el pago. El monto vuelve como saldo a favor del cliente (2102290); si el pago no tenía transacción, al banco del pago. Campos: total, capital, interes, mora, gastos.', 'TRASPASO', 1, [
+        ['1104010', 'DEBE', 'capital', 'Reversa: capital'],
+        ['3001010', 'DEBE', 'interes', 'Reversa: interés corriente'],
+        ['3001040', 'DEBE', 'mora', 'Reversa: interés de mora'],
+        ['3001020', 'DEBE', 'gastos', 'Reversa: gastos de cobranza'],
+        ['2102290', 'HABER', 'total', 'Reversa: vuelve como saldo a favor'],
       ]],
       ['RECLASIF_INTERES_CARTERA', 'Reclasificación interés corriente cartera propia', 'Traspasa a resultado el interés corriente que un asiento anterior abonó a Contratos Propios (PAGO_CAJA previo a v259.8). Campos: interes.', 'TRASPASO', 1, [
         ['1104010', 'DEBE', 'interes', 'Reclasificación: interés abonado a contratos'],
@@ -243,6 +252,20 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         console.log('[contabilidad] PAGO_CAJA: capital e interés corriente separados');
       }
     } catch (e) { console.error('[contabilidad parche pago caja]', e.message); }
+    /* Saldos a favor de clientes (21-09-2026): el pago en Caja puede usar saldo a favor o dejar un
+       exceso, y la reversa devuelve lo pagado como saldo a favor. Cuenta de pasivo propia (no estaba en
+       el plan AVSOFT). PAGO_CAJA: banco = lo RECIBIDO; saldo usado y exceso contra 2102290. */
+    try {
+      await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2102290','SALDOS A FAVOR DE CLIENTES','PASIVO',1)");
+      const [[bco]] = await pool.query("SELECT id FROM ctb_reglas_lineas WHERE evento='PAGO_CAJA' AND cuenta='1101090' AND lado='DEBE' AND campo='total' LIMIT 1");
+      const [[ya]] = await pool.query("SELECT COUNT(*) n FROM ctb_reglas_lineas WHERE evento='PAGO_CAJA' AND campo='saldo_favor'");
+      if (bco && !ya.n) {
+        await pool.query("UPDATE ctb_reglas_lineas SET campo='recibido' WHERE id=?", [bco.id]);
+        await pool.query("INSERT INTO ctb_reglas_lineas (evento, cuenta, lado, campo, glosa) VALUES ('PAGO_CAJA','2102290','DEBE','saldo_favor','Saldo a favor aplicado al pago'), ('PAGO_CAJA','2102290','HABER','exceso','Pago en exceso a saldo a favor')");
+        await pool.query("UPDATE ctb_reglas SET descripcion=? WHERE evento='PAGO_CAJA'", [DESC_PAGO_CAJA]);
+        console.log('[contabilidad] PAGO_CAJA: recibido / saldo a favor / exceso');
+      }
+    } catch (e) { console.error('[contabilidad parche saldo a favor]', e.message); }
     // Mismo parche para PREPAGO: capital / interés corriente / mora / comisión, cada uno a su cuenta.
     try {
       const [[vieja]] = await pool.query(
