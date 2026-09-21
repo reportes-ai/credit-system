@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.5 — botón Vista previa contrato en Vender (con las operaciones marcadas y el texto según responsabilidad); Anexo I individualiza cada crédito (deudor, pagaré, vehículo, otorgamiento, monto, tasa, plazo, cuota, vencimientos, capital, precio). v2.4 — pestañas Compradores (razón social, RUT, giro, domicilio, representantes, personería, contacto) y Contratos de cesión (textos SIN/CON responsabilidad editables con marcadores, generación por comprador+fecha con Anexo I e impresión). v2.3 —Cobrar en Stock Vendido: ingreso de fondos del comprador contra la cuenta bancaria del depósito (COBRO_VENTA_CARTERA); una venta cobrada no se deshace. v2.2 — asiento contable de la venta y de su reversa (VENTA_CARTERA / REVERSA_VENTA_CARTERA). v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
+<!-- v2.6 — impresión tamaño oficio, más espacio para firmas, Anexo 1 en hoja aparte con fechas y RUT en una línea (Pato). v2.5 — botón Vista previa contrato en Vender (con las operaciones marcadas y el texto según responsabilidad); Anexo I individualiza cada crédito (deudor, pagaré, vehículo, otorgamiento, monto, tasa, plazo, cuota, vencimientos, capital, precio). v2.4 — pestañas Compradores (razón social, RUT, giro, domicilio, representantes, personería, contacto) y Contratos de cesión (textos SIN/CON responsabilidad editables con marcadores, generación por comprador+fecha con Anexo I e impresión). v2.3 —Cobrar en Stock Vendido: ingreso de fondos del comprador contra la cuenta bancaria del depósito (COBRO_VENTA_CARTERA); una venta cobrada no se deshace. v2.2 — asiento contable de la venta y de su reversa (VENTA_CARTERA / REVERSA_VENTA_CARTERA). v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -233,11 +233,17 @@
   .contrato .sub { text-align:center; font-size:.78rem; color:#64748b; margin-bottom:14px; }
   .contrato p { text-align:justify; margin:0 0 10px; }
   .contrato h3 { font-size:.95rem; font-weight:800; margin:18px 0 8px; text-align:center; }
-  .contrato table.anexo { font-size:.74rem; border:1px solid #cbd5e1; } .contrato table.anexo th, .contrato table.anexo td { border:1px solid #e2e8f0; padding:4px 6px; }
-  .contrato table.anexo td.num { text-align:right; } .contrato table.anexo tr.tot td { font-weight:800; background:#f8fafc; }
-  .contrato .firmas { display:flex; gap:40px; justify-content:space-around; margin:46px 0 24px; text-align:center; font-size:.82rem; }
-  .contrato .firmas .linea { border-top:1px solid #111; width:220px; margin:0 auto 6px; }
-  @media print { body * { visibility:hidden; } #printArea, #printArea * { visibility:visible; } #printArea { position:absolute; inset:0; padding:24px; } dialog { box-shadow:none; max-width:none; width:auto; } }
+  .contrato .anexo-pag { page-break-before:always; break-before:page; margin-top:24px; }
+  .contrato .anexo-sub { text-align:center; font-size:.72rem; color:#475569; margin-bottom:8px; }
+  .contrato table.anexo { font-size:.6rem; border:1px solid #cbd5e1; width:100%; border-collapse:collapse; }
+  .contrato table.anexo th, .contrato table.anexo td { border:1px solid #e2e8f0; padding:3px 4px; vertical-align:middle; line-height:1.2; }
+  .contrato table.anexo th { font-size:.55rem; text-transform:uppercase; background:#f8fafc; white-space:nowrap; }
+  .contrato table.anexo td.num, .contrato table.anexo td.nw { white-space:nowrap; } .contrato table.anexo td.num { text-align:right; }
+  .contrato table.anexo tr.tot td { font-weight:800; background:#f8fafc; }
+  .contrato .firmas { display:flex; gap:40px; justify-content:space-around; margin:110px 0 40px; text-align:center; font-size:.82rem; page-break-inside:avoid; }
+  .contrato .firmas .linea { border-top:1px solid #111; width:240px; margin:0 auto 8px; }
+  @page { size: legal; margin: 2cm 2cm 2cm 2.2cm; }   /* tamaño oficio */
+  @media print { body * { visibility:hidden; } #printArea, #printArea * { visibility:visible; } #printArea { position:absolute; inset:0; padding:0; } dialog { box-shadow:none; max-width:none; width:auto; } .contrato .marca { display:none; } }
 </style>
 <dialog id="dlgCobro" style="border:none;border-radius:14px;padding:0;max-width:460px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
   <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:12px 18px;font-weight:700">Ingreso de fondos del comprador</div>
