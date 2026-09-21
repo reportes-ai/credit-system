@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.10 — precio de recompra descontado a la fecha de la cuota o a la de cesión si ya estaba vencida: desde la primera cuota pendiente coincide con el precio de cesión. v2.9 — contrato en Arial y RUT con puntos y guión. v2.8 — Anexo 2: la columna Precio de recompra solo va en contratos con responsabilidad. v2.7 — Anexo 2: una hoja por crédito con individualización, tabla de desarrollo (amortización, interés, total, vencimiento, saldo, estado) y precio de recompra por cuota (misma fórmula del precio de venta, a la fecha de esa cuota). v2.6 — impresión tamaño oficio, más espacio para firmas, Anexo 1 en hoja aparte con fechas y RUT en una línea (Pato). v2.5 — botón Vista previa contrato en Vender (con las operaciones marcadas y el texto según responsabilidad); Anexo I individualiza cada crédito (deudor, pagaré, vehículo, otorgamiento, monto, tasa, plazo, cuota, vencimientos, capital, precio). v2.4 — pestañas Compradores (razón social, RUT, giro, domicilio, representantes, personería, contacto) y Contratos de cesión (textos SIN/CON responsabilidad editables con marcadores, generación por comprador+fecha con Anexo I e impresión). v2.3 —Cobrar en Stock Vendido: ingreso de fondos del comprador contra la cuenta bancaria del depósito (COBRO_VENTA_CARTERA); una venta cobrada no se deshace. v2.2 — asiento contable de la venta y de su reversa (VENTA_CARTERA / REVERSA_VENTA_CARTERA). v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
+<!-- v2.11 — impresión del contrato en ventana propia (dentro del diálogo el navegador ignoraba los saltos de hoja): cada anexo y cada crédito del Anexo 2 en hoja aparte, encabezado de tabla repetido; salto visible en la vista previa. v2.10 — precio de recompra descontado a la fecha de la cuota o a la de cesión si ya estaba vencida: desde la primera cuota pendiente coincide con el precio de cesión. v2.9 — contrato en Arial y RUT con puntos y guión. v2.8 — Anexo 2: la columna Precio de recompra solo va en contratos con responsabilidad. v2.7 — Anexo 2: una hoja por crédito con individualización, tabla de desarrollo (amortización, interés, total, vencimiento, saldo, estado) y precio de recompra por cuota (misma fórmula del precio de venta, a la fecha de esa cuota). v2.6 — impresión tamaño oficio, más espacio para firmas, Anexo 1 en hoja aparte con fechas y RUT en una línea (Pato). v2.5 — botón Vista previa contrato en Vender (con las operaciones marcadas y el texto según responsabilidad); Anexo I individualiza cada crédito (deudor, pagaré, vehículo, otorgamiento, monto, tasa, plazo, cuota, vencimientos, capital, precio). v2.4 — pestañas Compradores (razón social, RUT, giro, domicilio, representantes, personería, contacto) y Contratos de cesión (textos SIN/CON responsabilidad editables con marcadores, generación por comprador+fecha con Anexo I e impresión). v2.3 —Cobrar en Stock Vendido: ingreso de fondos del comprador contra la cuenta bancaria del depósito (COBRO_VENTA_CARTERA); una venta cobrada no se deshace. v2.2 — asiento contable de la venta y de su reversa (VENTA_CARTERA / REVERSA_VENTA_CARTERA). v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -222,7 +222,7 @@
 </dialog>
 <dialog id="dlgContrato" style="border:none;border-radius:14px;padding:0;max-width:1000px;width:96%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
   <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:12px 18px;font-weight:700;display:flex;align-items:center;gap:10px"><span id="ctTitulo" style="flex:1">Contrato</span>
-    <button class="btn btn-sm btn-light" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+    <button class="btn btn-sm btn-light" onclick="imprimirContrato()"><i class="bi bi-printer me-1"></i>Imprimir</button>
     <button class="btn btn-sm btn-light" onclick="dlgContrato.close()"><i class="bi bi-x-lg"></i></button></div>
   <div style="padding:20px 26px;max-height:78vh;overflow:auto"><div id="printArea"></div></div>
 </dialog>
@@ -245,7 +245,32 @@
   .contrato .firmas { display:flex; gap:40px; justify-content:space-around; margin:110px 0 40px; text-align:center; font-size:.82rem; page-break-inside:avoid; }
   .contrato .firmas .linea { border-top:1px solid #111; width:240px; margin:0 auto 8px; }
   @page { size: legal; margin: 2cm 2cm 2cm 2.2cm; }   /* tamaño oficio */
-  @media print { body * { visibility:hidden; } #printArea, #printArea * { visibility:visible; } #printArea { position:absolute; inset:0; padding:0; } dialog { box-shadow:none; max-width:none; width:auto; } .contrato .marca { display:none; } }
+  /* En la vista previa el salto de hoja se ve como una línea punteada con rótulo */
+  .contrato .anexo-pag { border-top:2px dashed #94a3b8; padding-top:14px; position:relative; }
+  .contrato .anexo-pag::before { content:'— nueva hoja —'; position:absolute; top:-9px; left:50%; transform:translateX(-50%); background:#fff; color:#94a3b8; font-size:.62rem; padding:0 8px; }
+</style>
+<style id="cssContratoPrint">
+  /* Estilos que viajan a la ventana de impresión (tamaño oficio, un anexo por hoja) */
+  @page { size: legal; margin: 2cm 2cm 2cm 2.2cm; }
+  body { margin:0; }
+  .contrato { font-family:Arial,Helvetica,sans-serif; font-size:10.5pt; line-height:1.5; color:#111; }
+  .contrato .marca { text-align:center; color:#b91c1c; font-weight:800; letter-spacing:2px; font-size:9pt; border:2px dashed #b91c1c; padding:4px; margin-bottom:10px; }
+  .contrato h2 { text-align:center; font-size:13pt; font-weight:800; margin:0 0 2px; }
+  .contrato .sub { text-align:center; font-size:9pt; color:#64748b; margin-bottom:14px; }
+  .contrato p { text-align:justify; margin:0 0 10px; }
+  .contrato h3 { font-size:11.5pt; font-weight:800; margin:0 0 8px; text-align:center; }
+  .contrato .anexo-pag { page-break-before:always; break-before:page; }
+  .contrato .anexo-sub { text-align:center; font-size:8.5pt; color:#475569; margin-bottom:8px; }
+  .contrato table { border-collapse:collapse; width:100%; }
+  .contrato table.ficha { font-size:8.5pt; margin-bottom:10px; } .contrato table.ficha th { text-align:left; background:#f1f5f9; font-size:7.5pt; text-transform:uppercase; padding:3px 6px; border:1px solid #cbd5e1; width:12%; } .contrato table.ficha td { padding:3px 6px; border:1px solid #cbd5e1; }
+  .contrato table.anexo { font-size:7.2pt; border:1px solid #cbd5e1; }
+  .contrato table.anexo th, .contrato table.anexo td { border:1px solid #cbd5e1; padding:2px 4px; vertical-align:middle; line-height:1.2; }
+  .contrato table.anexo th { font-size:6.6pt; text-transform:uppercase; background:#f1f5f9; white-space:nowrap; }
+  .contrato table.anexo thead { display:table-header-group; } .contrato table.anexo tr { page-break-inside:avoid; }
+  .contrato table.anexo td.num, .contrato table.anexo td.nw { white-space:nowrap; } .contrato table.anexo td.num { text-align:right; }
+  .contrato table.anexo tr.tot td { font-weight:800; background:#f1f5f9; } .contrato table.anexo tr.pag td { color:#94a3b8; }
+  .contrato .firmas { display:flex; gap:40px; justify-content:space-around; margin:110px 0 40px; text-align:center; font-size:10pt; page-break-inside:avoid; }
+  .contrato .firmas .linea { border-top:1px solid #111; width:240px; margin:0 auto 8px; }
 </style>
 <dialog id="dlgCobro" style="border:none;border-radius:14px;padding:0;max-width:460px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
   <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:12px 18px;font-weight:700">Ingreso de fondos del comprador</div>
@@ -464,6 +489,15 @@ async function previaContrato(){
   const j = await fetch('/api/venta-cartera/contratos/previa', { method:'POST', headers:H, body: JSON.stringify({ comprador, fecha: $('vFecha').value || undefined, resp: $('vResp').checked, ventas }) }).then(r=>r.json()).catch(()=>({}));
   if (!j.success) return alert(j.error||'Error');
   mostrarContrato(j.data, true);
+}
+/* Imprime en una ventana propia: dentro del <dialog> el navegador ignora los saltos de hoja */
+function imprimirContrato(){
+  const w = window.open('', '_blank');
+  if (!w) return alert('El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes para este sitio.');
+  w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${esc($('ctTitulo').textContent)}</title><style>${$('cssContratoPrint').textContent}</style></head><body>${$('printArea').innerHTML}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); }, 400);
 }
 function mostrarContrato(d, previa){
   $('ctTitulo').textContent = (previa ? 'VISTA PREVIA — ' : '') + d.titulo;
