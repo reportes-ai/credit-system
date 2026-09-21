@@ -134,4 +134,24 @@ router.post('/bitacora-cierres/:mes/analizar', verifyToken, requireFunc('ctb_bit
 // Dashboard de Contabilidad (pirámide del CFO: proceso → obligaciones → resultado)
 router.get('/dashboard', verifyToken, requireFunc('ctb_dashboard', 'ctb_directorio', 'ctb_cierre_mes'), ctrl.dashboardCtb);
 
+// Devengo mensual de intereses de la cartera propia (motor automático + vista previa / generación manual)
+const dev = require('../devengo-intereses');
+router.get('/devengo-intereses', verifyToken, requireFunc('ctb_comprobantes', 'ctb_cierre_mes'), async (req, res) => {
+  try {
+    const pool = require('../../../../shared/config/database');
+    const [meses] = await pool.query('SELECT * FROM ctb_devengo_meses ORDER BY mes DESC LIMIT 36');
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : null;
+    res.json({ success: true, data: { meses, previa: mes ? await dev.calcular(mes) : null }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+});
+router.post('/devengo-intereses/:mes', verifyToken, requireFunc('ctb_comprobantes', 'ctb_cierre_mes'), async (req, res) => {
+  try {
+    const u = req.usuario || {};
+    const r = await dev.generar(req.params.mes, [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email);
+    require('../../../../shared/audit').auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'devengo_intereses', entidad_id: req.params.mes,
+      detalle: `Devengo de intereses ${req.params.mes}: $${r.total} en ${r.creditos} crédito(s), ${r.suspendidos.length} suspendido(s)` });
+    res.json({ success: true, data: r, error: null });
+  } catch (e) { res.status(400).json({ success: false, data: null, error: e.message }); }
+});
+
 module.exports = router;

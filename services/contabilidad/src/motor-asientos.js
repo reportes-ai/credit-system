@@ -65,15 +65,21 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['2102290', 'HABER', 'exceso', 'Pago en exceso a saldo a favor'],
         ['1104010', 'HABER', 'capital', 'Abono a contratos (capital)'],
         ['3001010', 'HABER', 'interes', 'Interés corriente'],
+        ['1104120', 'HABER', 'interes_dev', 'Interés devengado cobrado'],
         ['3001040', 'HABER', 'mora', 'Interés de mora'],
         ['3001020', 'HABER', 'gastos', 'Gastos de cobranza'],
       ]],
       ['REVERSA_PAGO_CAJA', 'Reversa de pago de cuota en Caja', 'Se dispara al reversar un pago de cuota en Caja: anula lo que abonó el pago. El monto vuelve como saldo a favor del cliente (2102290); si el pago no tenía transacción, al banco del pago. Campos: total, capital, interes, mora, gastos.', 'TRASPASO', 1, [
         ['1104010', 'DEBE', 'capital', 'Reversa: capital'],
         ['3001010', 'DEBE', 'interes', 'Reversa: interés corriente'],
+        ['1104120', 'DEBE', 'interes_dev', 'Reversa: interés devengado'],
         ['3001040', 'DEBE', 'mora', 'Reversa: interés de mora'],
         ['3001020', 'DEBE', 'gastos', 'Reversa: gastos de cobranza'],
         ['2102290', 'HABER', 'total', 'Reversa: vuelve como saldo a favor'],
+      ]],
+      ['DEVENGO_INTERESES', 'Devengo mensual de intereses cartera propia', 'Se dispara al cerrar cada mes (motor devengo-intereses): interés corriente ganado en el mes por los créditos AutoFácil que no están en devengo suspendido (más de 90 días de mora). Campos: total.', 'TRASPASO', 1, [
+        ['1104120', 'DEBE', 'total', 'Intereses devengados por cobrar'],
+        ['3001010', 'HABER', 'total', 'Interés corriente devengado'],
       ]],
       ['RECLASIF_INTERES_CARTERA', 'Reclasificación interés corriente cartera propia', 'Traspasa a resultado el interés corriente que un asiento anterior abonó a Contratos Propios (PAGO_CAJA previo a v259.8). Campos: interes.', 'TRASPASO', 1, [
         ['1104010', 'DEBE', 'interes', 'Reclasificación: interés abonado a contratos'],
@@ -83,6 +89,7 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['1101090', 'DEBE', 'total', 'Recaudación prepago'],
         ['1104010', 'HABER', 'capital', 'Abono a contratos (capital)'],
         ['3001010', 'HABER', 'interes', 'Interés corriente'],
+        ['1104120', 'HABER', 'interes_dev', 'Interés devengado cobrado'],
         ['3001040', 'HABER', 'mora', 'Interés de mora'],
         ['3001090', 'HABER', 'comision', 'Comisión de prepago'],
         ['3001020', 'HABER', 'gastos', 'Gastos de cobranza'],
@@ -266,6 +273,16 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         console.log('[contabilidad] PAGO_CAJA: recibido / saldo a favor / exceso');
       }
     } catch (e) { console.error('[contabilidad parche saldo a favor]', e.message); }
+    /* Devengo de intereses (21-09-2026): cuenta de activo propia y línea `interes_dev` en los eventos
+       de cobro/reversa — el interés que ya se devengó se cobra contra 1104120, no otra vez a resultado. */
+    try {
+      await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('1104120','INTERESES DEVENGADOS POR COBRAR','ACTIVO',1)");
+      for (const [ev, lado, glosa] of [['PAGO_CAJA', 'HABER', 'Interés devengado cobrado'], ['PREPAGO', 'HABER', 'Interés devengado cobrado'], ['REVERSA_PAGO_CAJA', 'DEBE', 'Reversa: interés devengado']]) {
+        const [[ya]] = await pool.query("SELECT COUNT(*) n FROM ctb_reglas_lineas WHERE evento=? AND campo='interes_dev'", [ev]);
+        const [[hay]] = await pool.query('SELECT COUNT(*) n FROM ctb_reglas WHERE evento=?', [ev]);
+        if (hay.n && !ya.n) await pool.query("INSERT INTO ctb_reglas_lineas (evento, cuenta, lado, campo, glosa) VALUES (?, '1104120', ?, 'interes_dev', ?)", [ev, lado, glosa]);
+      }
+    } catch (e) { console.error('[contabilidad parche devengo]', e.message); }
     // Mismo parche para PREPAGO: capital / interés corriente / mora / comisión, cada uno a su cuenta.
     try {
       const [[vieja]] = await pool.query(

@@ -222,7 +222,8 @@ const getById = async (req, res) => {
 async function separarCapitalInteres(id_credito, pagos, trxActual, excluirIdPago) {
   const nums = [...new Set(pagos.map(p => Number(p.numero_cuota)).filter(n => n > 0))];
   let capital = 0, interes = 0;
-  if (!nums.length) return { capital: 0, interes: 0 };
+  const porCuota = [];
+  if (!nums.length) return { capital: 0, interes: 0, porCuota };
   const [cal] = await pool.query('SELECT numero_cuota, interes FROM cuotas_credito WHERE id_credito=? AND numero_cuota IN (?)', [id_credito, nums]);
   const [prev] = await pool.query(
     `SELECT numero_cuota, COALESCE(SUM(monto_cuota),0) pagado FROM pagos_credito
@@ -236,8 +237,9 @@ async function separarCapitalInteres(id_credito, pagos, trxActual, excluirIdPago
     const i = Math.min(m, Math.round(intRest.get(n) || 0));
     intRest.set(n, (intRest.get(n) || 0) - i);
     interes += i; capital += m - i;
+    if (i) porCuota.push({ numero_cuota: n, interes: i });
   }
-  return { capital, interes };
+  return { capital, interes, porCuota };
 }
 
 /* Banco REAL del asiento: la cuenta contable de la cuenta bancaria del depósito (mantenedor
@@ -309,10 +311,11 @@ const create = async (req, res) => {
       const [[cd]] = await pool.query('SELECT COALESCE(CAST(num_op AS CHAR), numero_credito) n FROM creditos WHERE id=?', [id_credito]);
       const bco = await reemplazoBanco(parseInt(id_cuenta_bancaria) || null);
       const mC = Math.round(parseFloat(monto_cuota) || 0), mM = Math.round(parseFloat(interes_mora) || 0), mG = Math.round(parseFloat(gastos_cobranza) || 0);
+      const imp = await require('../../../contabilidad/src/devengo-intereses').imputarInteres(id_credito, ci.porCuota || [], `PAGO-${r.insertId}`);
       require('../../../contabilidad/src/motor-asientos').contabilizar({
         evento: 'PAGO_CAJA', fecha: fecha_pago || undefined, ref: `PAGO-${r.insertId}`,
         glosa: `Pago cuota N°${numero_cuota} · OP ${cd?.n || id_credito}`, num_op: cd?.n || null, reemplazos: bco.reemplazos,
-        montos: { recibido: mC + mM + mG, total: mC + mM + mG, cuota: mC, capital: mC - ci.interes, interes: ci.interes, mora: mM, gastos: mG },
+        montos: { recibido: mC + mM + mG, total: mC + mM + mG, cuota: mC, capital: mC - ci.interes, interes: imp.ingreso, interes_dev: imp.devengado, mora: mM, gastos: mG },
         detalle: ['OP ' + (cd?.n || id_credito), bco.banco].filter(Boolean).join(' · '),
       }).catch(() => {});
     } catch (_) {}
@@ -549,11 +552,13 @@ const createBatch = async (req, res) => {
       // Banco = lo RECIBIDO; el saldo a favor usado y el exceso van contra 2102290 (Saldos a favor de clientes)
       const tot = Math.round(mCuota + mMora + mGastos), usado = Math.round(saldoNecesario);
       const ci = await separarCapitalInteres(id_credito, pagos, numero_transaccion);
+      // Devengo: el interés ya devengado se cobra contra 1104120; solo el resto es ingreso
+      const imp = await require('../../../contabilidad/src/devengo-intereses').imputarInteres(id_credito, ci.porCuota, `TRX-${String(numero_transaccion).padStart(6, '0')}`);
       require('../../../contabilidad/src/motor-asientos').contabilizar({
         evento: 'PAGO_CAJA', fecha: fecha_pago || undefined,
         glosa: `Pago en ${cajaNombre || 'caja'} — ${pagos.length} cuota(s) · OP ${numOpTxt}`,
         ref: `TRX-${String(numero_transaccion).padStart(6, '0')}`,
-        montos: { recibido: tot + exceso - usado, saldo_favor: usado, exceso, total: tot, cuota: mCuota, capital: mCuota - ci.interes, interes: ci.interes, mora: mMora, gastos: mGastos },
+        montos: { recibido: tot + exceso - usado, saldo_favor: usado, exceso, total: tot, cuota: mCuota, capital: mCuota - ci.interes, interes: imp.ingreso, interes_dev: imp.devengado, mora: mMora, gastos: mGastos },
         num_op: numOpTxt, reemplazos,
         // Va a la glosa de CADA línea: "Recaudación caja · Caja 2 · OP 68520 · Banco de Chile"
         detalle: [cajaNombre, 'OP ' + numOpTxt, bancoTxt].filter(Boolean).join(' · '),
@@ -757,12 +762,18 @@ const prepagar = async (req, res) => {
     // Capital (1104010) vs interés corriente (3001010) con la tabla de desarrollo, igual que PAGO_CAJA.
     try {
       const ci = await separarCapitalInteres(id_credito, cont.moraRows, trx);
-      const capital = cont.capVig + ci.capital, interes = ci.interes + cont.intCorr;
+      const capital = cont.capVig + ci.capital;
+      // El interés corriente a la fecha corresponde al período de la primera cuota vigente (la que el devengo ya fue reconociendo)
+      const primeraVig = (d.detalle || []).find(q => !q.en_mora);
+      const filasInt = [...ci.porCuota, ...(cont.intCorr && primeraVig ? [{ numero_cuota: primeraVig.numero_cuota, interes: cont.intCorr }] : [])];
+      const imp = await require('../../../contabilidad/src/devengo-intereses').imputarInteres(id_credito, filasInt, `TRX-${String(trx).padStart(6, '0')}`);
+      const sinCuota = cont.intCorr && !primeraVig ? cont.intCorr : 0;   // sin cuota vigente a la cual imputarlo: ingreso directo
+      const interes = imp.ingreso + sinCuota, interes_dev = imp.devengado;
       await require('../../../contabilidad/src/motor-asientos').contabilizar({
         evento: 'PREPAGO', fecha: fp,
         glosa: `Prepago crédito ${num_op} — ${pp.nombre || ''}`.trim().slice(0, 300),
         ref: `TRX-${String(trx).padStart(6, '0')}`, num_op, rut: pp.rut || null,
-        montos: { total: Math.round(totalCobrado), capital, interes, cuota: capital + interes, mora: cont.mora, comision: cont.comision, gastos: cont.gastos },
+        montos: { total: Math.round(totalCobrado), capital, interes, interes_dev, cuota: capital + interes + interes_dev, mora: cont.mora, comision: cont.comision, gastos: cont.gastos },
       });
     } catch (_) {}
     auditar({ req, accion: 'PAGAR', modulo: 'pagos', entidad: 'prepago', entidad_id: trx,
@@ -913,10 +924,14 @@ const reversar = async (req, res) => {
       let reemplazos = null;
       if (!pago.numero_transaccion) { const b = await reemplazoBanco(pago.id_cuenta_bancaria); reemplazos = { '2102290': b.cuenta || '1101090' }; }
       const mC = Math.round(parseFloat(pago.monto_cuota) || 0), mM = Math.round(parseFloat(pago.interes_mora) || 0), mG = Math.round(parseFloat(pago.gastos_cobranza) || 0);
+      // Deshace la imputación del devengo de ESE pago (qué parte fue devengado y qué parte ingreso)
+      const refPago = pago.numero_transaccion ? `TRX-${String(pago.numero_transaccion).padStart(6, '0')}` : `PAGO-${pago.id_pago}`;
+      const rev = await require('../../../contabilidad/src/devengo-intereses').revertirImputacion(pago.id_credito, pago.numero_cuota, refPago);
+      const intIng = rev ? rev.ingreso : ciRev.interes, intDev = rev ? rev.devengado : 0;
       require('../../../contabilidad/src/motor-asientos').contabilizar({
         evento: 'REVERSA_PAGO_CAJA', ref: `REV-${pago.id_pago}`, num_op: cd?.n || null, reemplazos,
         glosa: `Reversa pago cuota N°${pago.numero_cuota} · OP ${cd?.n || pago.id_credito}${pago.numero_transaccion ? ' · TRX-' + String(pago.numero_transaccion).padStart(6, '0') : ''} — ${comentario.trim()}`.slice(0, 300),
-        montos: { total: mC + mM + mG, capital: mC - ciRev.interes, interes: ciRev.interes, mora: mM, gastos: mG },
+        montos: { total: mC + mM + mG, capital: mC - intIng - intDev, interes: intIng, interes_dev: intDev, mora: mM, gastos: mG },
         detalle: 'OP ' + (cd?.n || pago.id_credito),
       }).catch(() => {});
     } catch (_) {}
