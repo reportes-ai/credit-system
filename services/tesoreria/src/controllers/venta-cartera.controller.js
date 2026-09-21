@@ -47,6 +47,78 @@ require('../../../../shared/migrate').enFila('venta-cartera', async () => {
   } catch (e) { console.error('[venta-cartera migration]', e.message); }
 });
 
+/* ── Parámetros de precio (Pato 21-09-2026) ───────────────────────────────
+   Precio = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), igual que
+   AutoFin nos paga la colocación (motor único rentabilidad-core.precioVentaCartera). Un spread
+   distinto según venda con o sin responsabilidad. Referencia: lo que pagaría AutoFin SIN
+   responsabilidad = VP al costo de fondo del mantenedor Tasas (tasa tramo − spread tramo). */
+const core = require('../../../../api-gateway/public/js/rentabilidad-core');
+const PARAM_DEF = { spread_sin_resp: 0.67, spread_con_resp: 0.67 };   // % mensual; default = spread AutoFin
+require('../../../../shared/migrate').enFila('venta-cartera-param', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS venta_cartera_param (
+    clave VARCHAR(40) PRIMARY KEY, valor DECIMAL(8,4) NOT NULL, updated_by VARCHAR(150) NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
+  for (const [k, v] of Object.entries(PARAM_DEF)) await pool.query('INSERT IGNORE INTO venta_cartera_param (clave, valor) VALUES (?,?)', [k, v]);
+  for (const col of ['tasa_descuento DECIMAL(8,4) NULL', 'precio_ref_autofin DECIMAL(15,0) NULL'])
+    await pool.query(`ALTER TABLE cartera_ventas ADD COLUMN ${col}`).catch(() => {});
+});
+async function parametros() {
+  const [rows] = await pool.query('SELECT clave, valor, updated_by, updated_at FROM venta_cartera_param');
+  const p = { ...PARAM_DEF };
+  for (const r of rows) p[r.clave] = +r.valor;
+  return p;
+}
+exports.getParametros = async (req, res) => {
+  try { res.json({ success: true, data: await parametros(), error: null }); } catch (e) { errSrv(res, e, 'venta-cartera parametros'); }
+};
+exports.putParametros = async (req, res) => {
+  try {
+    const b = req.body || {}, antes = await parametros();
+    const usuario = ((req.usuario.nombre || '') + ' ' + (req.usuario.apellido || '')).trim() || req.usuario.email || '';
+    for (const k of Object.keys(PARAM_DEF)) {
+      const v = parseFloat(b[k]);
+      if (!isFinite(v) || v < 0 || v > 10) return res.status(400).json({ success: false, data: null, error: `${k}: debe ser un % mensual entre 0 y 10` });
+      await pool.query('INSERT INTO venta_cartera_param (clave, valor, updated_by) VALUES (?,?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor), updated_by=VALUES(updated_by)', [k, v, usuario]);
+    }
+    const desp = await parametros();
+    require('../../../../shared/audit').auditar({ req, accion: 'EDITAR', modulo: 'tesoreria', entidad: 'venta_cartera_param',
+      detalle: `Spread venta de cartera: sin resp. ${antes.spread_sin_resp}% → ${desp.spread_sin_resp}% · con resp. ${antes.spread_con_resp}% → ${desp.spread_con_resp}%` });
+    res.json({ success: true, data: desp, error: null });
+  } catch (e) { errSrv(res, e, 'venta-cartera parametros'); }
+};
+
+/* Precios por op a una fecha: VP sin/con responsabilidad + referencia AutoFin sin responsabilidad. */
+async function preciosDe(ops, fechaISO) {
+  if (!ops.length) return {};
+  const p = await parametros();
+  const { cargarTasas, getTasaByFecha } = require('../../../creditos/src/utils/recalcular-mes');
+  const tasas = await cargarTasas();
+  const tv = getTasaByFecha(fechaISO, tasas);
+  const [[um]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='umbral_uf_tramo'");
+  const umbral = um ? +um.valor || 200 : 200;
+  let uf = null; try { uf = await require('../../../../shared/uf').getUF(new Date(fechaISO + 'T12:00:00')); } catch (_) {}
+  const [cuotas] = await pool.query(
+    `SELECT num_op, valor_cuota, DATE_FORMAT(fecha_vencimiento,'%Y-%m-%d') fecha_vencimiento FROM cuotas_credito
+      WHERE num_op IN (?) AND fecha_pago IS NULL AND estado_cuota<>'PAGADA' ORDER BY num_op, numero_cuota`, [ops.map(o => o.num_op)]);
+  const out = {};
+  for (const o of ops) {
+    const qs = cuotas.filter(q => q.num_op === o.num_op);
+    const tc = core.normTasaMensualPct(o.tascli_real) / 100;                    // fracción mensual
+    const tSin = Math.max(0, tc - p.spread_sin_resp / 100), tCon = Math.max(0, tc - p.spread_con_resp / 100);
+    let ref = null, tRef = null;
+    if (tv) {
+      const mayor = core.esMayor200({ montoCap: o.monto_financiado, uf, umbralUf: umbral });
+      tRef = ((mayor ? +tv.tasa_mensual_mayor - +tv.spread_mayor : +tv.tasa_mensual_menor - +tv.spread_menor) || 0) / 100;
+      ref = core.precioVentaCartera(qs, tRef, fechaISO);
+    }
+    out[o.num_op] = { tasa_credito: +(tc * 100).toFixed(4), tasa_sin_resp: +(tSin * 100).toFixed(4), tasa_con_resp: +(tCon * 100).toFixed(4),
+      precio_sin_resp: tc > 0 ? core.precioVentaCartera(qs, tSin, fechaISO) : null,
+      precio_con_resp: tc > 0 ? core.precioVentaCartera(qs, tCon, fechaISO) : null,
+      ref_autofin: ref, tasa_ref: tRef != null ? +(tRef * 100).toFixed(4) : null, suma_cuotas: qs.reduce((s, q) => s + (+q.valor_cuota || 0), 0) };
+  }
+  return out;
+}
+
 const errSrv = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
 const catDe = v => v.con_responsabilidad && v.con_administracion ? 'RESP_ADM' : v.con_responsabilidad ? 'RESP' : v.con_administracion ? 'ADM' : 'SIN_MARCAS';
 
@@ -73,13 +145,15 @@ exports.elegibles = async (req, res) => {
         AND UPPER(COALESCE(c.estado_cartera,'')) NOT IN ('PREPAGADO','PAGADO','CASTIGADO','ANULADO')   -- sin saldo: nada que vender
         AND (c.credito_vendido_a IS NULL OR c.credito_vendido_a='' OR UPPER(c.credito_vendido_a)='NO VENDIDO')   -- marca de la migración = vendible
       ORDER BY c.num_op DESC LIMIT 2000`);
+    const fecha = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.fecha)) ? req.query.fecha : require('../../../../shared/fecha-chile').hoyISO();
     const caps = await capitalesVigentes(ops.map(o => o.num_op));
+    const precios = await preciosDe(ops, fecha);
     const data = ops.map(o => {
-      const k = caps[o.num_op] || {};
+      const k = caps[o.num_op] || {}, pr = precios[o.num_op] || {};
       return { ...o, capital_vigente: +k.capital || null, cuotas_pendientes: k.cuotas_pend != null ? +k.cuotas_pend : null,
-               precio_motor: +k.capital || null };
+               ...pr, precio_motor: pr.precio_sin_resp ?? +k.capital ?? null };
     });
-    res.json({ success: true, data, error: null });
+    res.json({ success: true, data, fecha, parametros: await parametros(), error: null });
   } catch (e) { errSrv(res, e, 'venta-cartera elegibles'); }
 };
 
@@ -102,16 +176,20 @@ exports.vender = async (req, res) => {
       const idc = parseInt(v.id_credito); const precio = Math.round(+v.precio_venta);
       if (!idc || !(precio > 0)) { errores.push(`Crédito ${v.id_credito}: precio inválido`); continue; }
       const [[cr]] = await pool.query(
-        "SELECT id, num_op FROM creditos WHERE id=? AND financiera='AUTOFACIL' AND (credito_vendido_a IS NULL OR credito_vendido_a='' OR UPPER(credito_vendido_a)='NO VENDIDO') AND UPPER(COALESCE(estado_cartera,'')) NOT IN ('PREPAGADO','PAGADO','CASTIGADO','ANULADO')", [idc]);
+        "SELECT id, num_op, tascli_real, monto_financiado FROM creditos WHERE id=? AND financiera='AUTOFACIL' AND (credito_vendido_a IS NULL OR credito_vendido_a='' OR UPPER(credito_vendido_a)='NO VENDIDO') AND UPPER(COALESCE(estado_cartera,'')) NOT IN ('PREPAGADO','PAGADO','CASTIGADO','ANULADO')", [idc]);
       if (!cr) { errores.push(`Crédito ${v.id_credito}: no elegible o ya vendido`); continue; }
       const caps = await capitalesVigentes([cr.num_op]);
       const cap = caps[cr.num_op] ? +caps[cr.num_op].capital : null;
+      // Precio del motor a la fecha de venta (según responsabilidad) y referencia AutoFin: quedan como snapshot
+      const pr = (await preciosDe([cr], fecha))[cr.num_op] || {};
+      const pm = resp ? pr.precio_con_resp : pr.precio_sin_resp;
+      const td = resp ? pr.tasa_con_resp : pr.tasa_sin_resp;
       try {
         await pool.query(`INSERT INTO cartera_ventas
           (id_credito, num_op, comprador, fecha_venta, capital_venta, precio_motor, precio_venta,
-           con_administracion, con_responsabilidad, usuario)
-          VALUES (?,?,?,?,?,?,?,?,?,?)`,
-          [cr.id, cr.num_op, comprador, fecha, cap, cap, precio, adm, resp, usuario]);
+           con_administracion, con_responsabilidad, usuario, tasa_descuento, precio_ref_autofin)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [cr.id, cr.num_op, comprador, fecha, cap, pm ?? cap, precio, adm, resp, usuario, td ?? null, pr.ref_autofin ?? null]);
         await pool.query("UPDATE creditos SET credito_vendido_a=? WHERE id=?", [comprador, cr.id]);
         vendidas++;
       } catch (e) { errores.push(`Op ${cr.num_op}: ${e.code === 'ER_DUP_ENTRY' ? 'ya vendida' : e.message}`); }

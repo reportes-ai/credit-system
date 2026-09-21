@@ -93,6 +93,25 @@
     return Math.round(pv - mc);
   }
 
+  // PRECIO DE VENTA DE CARTERA (21-09-2026): valor presente de las cuotas PENDIENTES de la
+  // tabla congelada, descontadas a `tasaMensual` (fracción) por los días reales desde
+  // `fechaBase` (base 30). Misma lógica con que AutoFin nos paga la colocación (VP al costo
+  // de fondo = tasa − spread), pero sobre las cuotas que faltan y no sobre una anualidad
+  // teórica. Cuotas ya vencidas e impagas no se capitalizan (factor 1).
+  // cuotas: [{ valor_cuota, fecha_vencimiento:'AAAA-MM-DD' }]
+  function precioVentaCartera(cuotas, tasaMensual, fechaBase) {
+    const r = +tasaMensual || 0;
+    const base = fechaBase ? new Date(String(fechaBase).slice(0, 10) + 'T00:00:00') : new Date();
+    let vp = 0;
+    for (const q of cuotas || []) {
+      const v = +q.valor_cuota || 0; if (!(v > 0)) continue;
+      const venc = q.fecha_vencimiento ? new Date(String(q.fecha_vencimiento).slice(0, 10) + 'T00:00:00') : base;
+      const dias = Math.max(0, Math.round((venc - base) / 86400000));
+      vp += r > 0 ? v / Math.pow(1 + r, dias / 30) : v;
+    }
+    return Math.round(vp);
+  }
+
   // MONTO CAPITALIZADO (07-09-2026): AutoFin calcula su comisión sobre el monto
   // financiado MÁS los intereses de los días que van más allá del mes de gracia hasta
   // la primera cuota (capitalización compuesta a la tasa cliente, base 30 días).
@@ -151,6 +170,7 @@
     valorPresenteAnualidad,
     tablaDesarrollo,
     ingresoColocacionAutoFin,
+    precioVentaCartera,
     montoCapitalizado,
     diasEntreFechas,
     ingresoColocacionUAC,

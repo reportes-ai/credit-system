@@ -4,6 +4,8 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 const ctrl = require('../controllers/venta-cartera.controller');
 
+router.get('/parametros', verifyToken, requireFunc('venta_cartera'), ctrl.getParametros);
+router.put('/parametros', verifyToken, requireFunc('venta_cartera'), ctrl.putParametros);
 router.get('/elegibles',  verifyToken, requireFunc('venta_cartera'), ctrl.elegibles);
 router.post('/vender',    verifyToken, requireFunc('venta_cartera'), ctrl.vender);
 router.delete('/:id',     verifyToken, requireFunc('venta_cartera'), ctrl.deshacer);
