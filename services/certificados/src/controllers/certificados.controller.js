@@ -326,7 +326,7 @@ const buscarCarta = async (req, res) => {
    interés corriente + comisión de prepago. Devuelve también el DETALLE por cuota
    (para que el pago en caja registre cuota por cuota). Lo usan el certificado
    CERT_DEUDA_PREPAGO y el endpoint de prepago en caja — NO duplicar (máxima #1). */
-async function calcularPrepago(num_op) {
+async function calcularPrepago(num_op, fechaCorte) {   // fechaCorte (AAAA-MM-DD, opcional): liquidar a esa fecha (ej. remate judicial)
   const ctx = await ctxCredito(num_op);
   if (!ctx) throw { code: 404, msg: 'No se encontró el crédito.' };
   const { c, cuotas, pagado } = ctx;
@@ -386,7 +386,7 @@ async function calcularPrepago(num_op) {
     };
   };
   const hoyISO = hoyChile();
-  const liq = await liquidar(hoyISO);
+  const liq = await liquidar(/^\d{4}-\d{2}-\d{2}$/.test(fechaCorte || '') ? fechaCorte : hoyISO);
   const proyeccion = [];
   for (const f of await proxDiasHabiles(hoyISO, 3)) proyeccion.push({ fecha: f, total: (await liquidar(f)).saldo_insoluto });
   return { rut: c.rut, nombre: c.nombre, num_op, credito: c, datos: { ...liq, tasa_mensual: tasaMes, proyeccion } };
