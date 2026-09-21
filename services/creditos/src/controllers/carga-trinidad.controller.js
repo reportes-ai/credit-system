@@ -479,7 +479,12 @@ async function aplicarCanal(mapaCanal, log) {
   const idsSet = new Set(ids);
   let complementados = 0, sinMatch = 0, omitidosCerrado = 0, erroresSQL = 0; let primerError = null;
   const cerradoCache = {};
-  const MONTOS = ['seguro_cesantia', 'seguro_rdh', 'seguro_rep_menor', 'gps'];
+  /* El Informe Canal NO trae montos de seguros ni de GPS: SeguroCesantia, SeguroRDH,
+     SeguroReparacionMenor y GPS son marcas 0/1 ("tiene / no tiene"), verificado en todos
+     los Canal de ago-sep 2026. Desde bf31dd68 (08-09) se aplicaban como monto y el 21-09
+     dejaron 195 ops con prima $1. Los montos salen de la carta/pagaré y de la digitación.
+     Queda la lista vacía y el piso de abajo como defensa si alguien vuelve a agregarlas. */
+  const MONTOS = [];
   const primaMin = await require('./digitacion-faltantes.controller').refrescarPrimaMin();
   let primasBasura = 0;
   // rut_cliente ya NO existe en creditos (homologación: el cliente vive via id_cliente)
