@@ -42,7 +42,9 @@ require('../../../../shared/migrate').enFila('rrhh-ingresos', async () => {
   )`);
   // Ficha completa pendiente (se vuelca a rh_fichas al aprobar) + documentos del postulante contratado
   await pool.query('ALTER TABLE rh_ingresos ADD COLUMN ficha JSON NULL').catch(() => {});
-  await pool.query('ALTER TABLE rh_ingresos ADD COLUMN hijos JSON NULL').catch(() => {});   // familia → rh_cargas al aprobar
+  await pool.query('ALTER TABLE rh_ingresos ADD COLUMN hijos JSON NULL').catch(() => {});
+  // El correo corporativo lo crea y lo informa el Administrador al aprobar: nace vacío
+  await pool.query('ALTER TABLE rh_ingresos MODIFY email VARCHAR(150) NULL').catch(() => {});   // familia → rh_cargas al aprobar
   await pool.query(`CREATE TABLE IF NOT EXISTS rh_ingreso_docs (
     id INT AUTO_INCREMENT PRIMARY KEY, id_ingreso INT NOT NULL, tipo VARCHAR(60) NOT NULL,
     nombre_archivo VARCHAR(255) NOT NULL, mime_type VARCHAR(120) NULL, archivo_data LONGBLOB NULL,
@@ -89,7 +91,7 @@ async function campana(ids, titulo, mensaje, clave) {
 const idsAdmin = async () => (await pool.query(
   `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE p.nombre='Administrador' AND u.estado='activo'`))[0].map(r => r.id_usuario);
 const ficha = s => `<p style="margin:0 0 12px"><b>${s.nombre} ${s.apellido}${s.apellido_materno ? ' ' + s.apellido_materno : ''}</b> · RUT ${s.rut}<br>
-  Cargo: <b>${s.cargo || ''}</b> · Ingreso: ${String(s.fecha_ingreso || '').slice(0, 10)}<br>Correo corporativo: ${s.email}</p>`;
+  Cargo: <b>${s.cargo || ''}</b> · Ingreso: ${String(s.fecha_ingreso || '').slice(0, 10)}<br>Correo corporativo: ${s.email || 'lo crea el Administrador al aprobar'}</p>`;
 const correosAdmin = async () => (await pool.query(
   `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
     WHERE p.nombre='Administrador' AND u.estado='activo' AND u.email LIKE '%@%'`))[0].map(r => r.email);
@@ -134,7 +136,7 @@ exports.crear = async (req, res) => {
     const t = (v, n) => String(v ?? '').trim().slice(0, n);
     const d = {
       rut: RUT.normalizar(t(b.rut, 15)) || '', nombre: t(b.nombre, 80), apellido: t(b.apellido, 80),
-      apellido_materno: t(b.apellido_materno, 80) || null, email: t(b.email, 150).toLowerCase(),
+      apellido_materno: t(b.apellido_materno, 80) || null, email: null,   // lo informa el Administrador al aprobar
       telefono: t(b.telefono, 30) || null, sexo: ['M', 'F'].includes(b.sexo) ? b.sexo : null,
       fecha_nacimiento: /^\d{4}-\d{2}-\d{2}$/.test(b.fecha_nacimiento || '') ? b.fecha_nacimiento : null,
       fecha_ingreso: /^\d{4}-\d{2}-\d{2}$/.test(b.fecha_ingreso || '') ? b.fecha_ingreso : null,
@@ -145,7 +147,6 @@ exports.crear = async (req, res) => {
     };
     if (!d.rut || !RUT.validar(d.rut)) return fail(res, 'RUT inválido', 400);
     if (!d.nombre || !d.apellido) return fail(res, 'Nombre y apellido son obligatorios', 400);
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email)) return fail(res, 'Correo corporativo inválido (ahí llegan el usuario y la clave)', 400);
     if (!d.fecha_ingreso) return fail(res, 'Fecha de ingreso obligatoria', 400);
     if (!d.id_supervisor) return fail(res, 'El supervisor es obligatorio: es quien aprueba la contratación', 400);
     const [[pf]] = await pool.query('SELECT nombre FROM perfiles WHERE id_perfil=?', [d.id_perfil]);
@@ -153,10 +154,10 @@ exports.crear = async (req, res) => {
     d.cargo = pf.nombre;
     const [[sup]] = await pool.query(`SELECT id_usuario, email, nombre, apellido FROM usuarios WHERE id_usuario=? AND estado='activo'`, [d.id_supervisor]);
     if (!sup) return fail(res, 'Supervisor no válido', 400);
-    const [[dupU]] = await pool.query('SELECT id_usuario FROM usuarios WHERE rut=? OR email=? LIMIT 1', [d.rut, d.email]);
-    if (dupU) return fail(res, 'Ya existe un usuario con ese RUT o correo', 409);
-    const [[dupI]] = await pool.query(`SELECT id FROM rh_ingresos WHERE (rut=? OR email=?) AND estado IN ('PEND_SUPERVISOR','PEND_ADMIN') LIMIT 1`, [d.rut, d.email]);
-    if (dupI) return fail(res, `Ya hay una solicitud en curso (#${dupI.id}) para ese RUT o correo`, 409);
+    const [[dupU]] = await pool.query('SELECT id_usuario FROM usuarios WHERE rut=? LIMIT 1', [d.rut]);
+    if (dupU) return fail(res, 'Ya existe un usuario con ese RUT', 409);
+    const [[dupI]] = await pool.query(`SELECT id FROM rh_ingresos WHERE rut=? AND estado IN ('PEND_SUPERVISOR','PEND_ADMIN') LIMIT 1`, [d.rut]);
+    if (dupI) return fail(res, `Ya hay una solicitud en curso (#${dupI.id}) para ese RUT`, 409);
 
     const fi = {};
     const src = b.ficha && typeof b.ficha === 'object' ? b.ficha : {};
@@ -200,6 +201,13 @@ exports.aprobar = async (req, res) => {
 
     if (s.estado === 'PEND_ADMIN') {
       if (!(await esAdmin(yo))) return fail(res, 'Solo un Administrador aprueba esta etapa', 403);
+      // El Administrador crea la casilla corporativa y la informa aquí: ahí llegan usuario y clave
+      const email = String(req.body?.email || '').trim().toLowerCase().slice(0, 150);
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(res, 'Ingresa el correo corporativo que creaste: ahí llegan el usuario y la clave', 400);
+      const [[dupE]] = await pool.query('SELECT id_usuario FROM usuarios WHERE email=? LIMIT 1', [email]);
+      if (dupE) return fail(res, 'Ese correo ya pertenece a otro usuario', 409);
+      await pool.query('UPDATE rh_ingresos SET email=? WHERE id=?', [email, id]);
+      s.email = email;
       const [u] = await pool.query(`UPDATE rh_ingresos SET estado='CREANDO' WHERE id=? AND estado='PEND_ADMIN'`, [id]);
       if (u.affectedRows !== 1) return fail(res, 'La solicitud cambió de estado; recarga', 409);
       let alta;
