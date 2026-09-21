@@ -283,7 +283,9 @@ exports.contratarDesdeCarta = async (req, res) => {
         FROM rh_cartas_oferta WHERE id=?`, [req.usuario.id_usuario, id]);
     await pool.query(`UPDATE rh_cartas_oferta SET estado='CONTRATADA' WHERE id=?`, [id]);
     // Onboarding automático desde la fecha de ingreso (o hoy)
-    try { await crearProceso({ tipo: 'ONBOARDING', persona: c.candidato, rut: c.rut, id_ref: r.insertId,
+    // Si ya nació desde Ingreso de Colaboradores, no se abre un segundo onboarding para la misma persona
+    const [[onbYa]] = await pool.query("SELECT id FROM rh_onb_procesos WHERE tipo='ONBOARDING' AND rut=? AND estado='ABIERTO' LIMIT 1", [c.rut || '']);
+    if (!onbYa) try { await crearProceso({ tipo: 'ONBOARDING', persona: c.candidato, rut: c.rut, id_ref: r.insertId,
       fecha_base: require('../../../../shared/fecha-chile').isoDeBD(c.fecha_ingreso) || require('../../../../shared/fecha-chile').hoyISO(),
       creado_por: req.usuario.id_usuario }); } catch (e) { console.error('[onb auto]', e.message); }
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'rh_contrato', entidad_id: r.insertId, detalle: `Contrato desde carta oferta #${id} (${c.candidato})` });

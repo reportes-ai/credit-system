@@ -62,13 +62,14 @@ require('../../../../shared/migrate').enFila('rrhh-ingresos', async () => {
     const falta = DOC_TIPOS.filter(t => !act.includes(t));
     if (falta.length) await pool.query("UPDATE rh_config SET valor=? WHERE clave='doc_tipos'", [[...act, ...falta].join(',')]);
   }
-  /* Tarjeta en el landing de RRHH, para TODOS los perfiles: cualquiera puede ser supervisor y
-     aprobar desde aquí; el listado muestra a cada uno solo lo suyo (RRHH/Admin ven todo). */
-  const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_ingresos' LIMIT 1");
-  if (!ex) {
-    const [r] = await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500002,'Ingreso de Colaboradores','rh_ingresos','/recursos-humanos/ingresos/','bi-person-plus')");
-    await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) SELECT id_perfil, ?, 1 FROM perfiles', [r.insertId]);
-  }
+});
+/* Sin card propia (Pato 21-09-2026): se entra por el botón de Colaboradores o por el link del aviso.
+   Se retira la funcionalidad rh_ingresos que creaba la card. */
+require('../../../../shared/migrate').migrar('rrhh-ingresos-sin-card', async () => {
+  const [[f]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_ingresos' LIMIT 1");
+  if (!f) return;
+  await pool.query('DELETE FROM permisos_perfil WHERE id_funcionalidad=?', [f.id_funcionalidad]);
+  await pool.query('DELETE FROM funcionalidades WHERE id_funcionalidad=?', [f.id_funcionalidad]);
 });
 
 const esAdmin = async id => {
@@ -264,13 +265,21 @@ exports.aprobar = async (req, res) => {
           SELECT ?, tipo, nombre_archivo, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes, subido_por FROM rh_ingreso_docs WHERE id_ingreso=?`, [alta.id_usuario, id]);
         await pool.query('DELETE FROM rh_ingreso_docs WHERE id_ingreso=?', [id]);
       } catch (e) { console.error('[ingresos docs]', e.message); }
+      // Onboarding: mismo motor que el contrato (plantilla con responsables y plazos + recordatorio de vencidas)
+      let onb = null;
+      try {
+        const [[ya]] = await pool.query("SELECT id FROM rh_onb_procesos WHERE tipo='ONBOARDING' AND rut=? AND estado='ABIERTO' LIMIT 1", [s.rut]);
+        if (ya) { onb = ya.id; await pool.query('UPDATE rh_onb_procesos SET id_usuario=? WHERE id=?', [alta.id_usuario, ya.id]); }
+        else onb = await require('./contratos.controller')._crearProcesoOnb({ tipo: 'ONBOARDING', persona: `${s.nombre} ${s.apellido}`, rut: s.rut,
+          id_usuario: alta.id_usuario, fecha_base: s.fecha_ingreso, creado_por: yo });
+      } catch (e) { console.error('[ingresos onboarding]', e.message); }
       auditar({ req, accion: 'APROBAR', modulo: 'rrhh', entidad: 'rh_ingreso', entidad_id: id,
         detalle: `Administrador aprobó ingreso de ${s.nombre} ${s.apellido}: usuario #${alta.id_usuario} creado${alta.envio.ok ? ' y correo enviado' : ' (correo NO enviado)'}` });
       const [[cr]] = await pool.query('SELECT email FROM usuarios WHERE id_usuario=?', [s.creado_por]);
       avisar(cr?.email, `✅ Contratación aprobada — ${s.nombre} ${s.apellido}`,
         `<p style="margin:0 0 12px">La contratación quedó aprobada y el usuario está creado${alta.envio.ok ? '; el colaborador recibió su usuario y clave por correo' : '. <b>El correo con la clave NO salió</b>: pide al Administrador que la entregue'}.</p>${ficha(s)}
          <p style="margin:0">Completa su ficha (previsión, sueldo, cuenta de pago) en RRHH › Colaboradores.</p>`);
-      campana([s.creado_por, s.id_supervisor], `Contratación aprobada: ${s.nombre} ${s.apellido}`, alta.envio.ok ? 'Usuario creado; el colaborador recibió su usuario y clave por correo.' : 'Usuario creado, pero el correo con la clave NO salió.', `ing_ok_${id}`);
+      campana([s.creado_por, s.id_supervisor], `Contratación aprobada: ${s.nombre} ${s.apellido}`, (alta.envio.ok ? 'Usuario creado; el colaborador recibió su usuario y clave por correo.' : 'Usuario creado, pero el correo con la clave NO salió.') + (onb ? ' Se abrió su onboarding (RRHH › Contratos › Onboarding).' : ''), `ing_ok_${id}`);
       return ok(res, { estado: 'APROBADA', id_usuario: alta.id_usuario, correo_enviado: alta.envio.ok,
         clave_temporal: alta.envio.ok ? null : alta.claveTemporal, correo_error: alta.envio.ok ? null : alta.envio.error });
     }
