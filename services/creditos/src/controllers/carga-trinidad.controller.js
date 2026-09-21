@@ -480,6 +480,8 @@ async function aplicarCanal(mapaCanal, log) {
   let complementados = 0, sinMatch = 0, omitidosCerrado = 0, erroresSQL = 0; let primerError = null;
   const cerradoCache = {};
   const MONTOS = ['seguro_cesantia', 'seguro_rdh', 'seguro_rep_menor', 'gps'];
+  const primaMin = await require('./digitacion-faltantes.controller').refrescarPrimaMin();
+  let primasBasura = 0;
   // rut_cliente ya NO existe en creditos (homologación: el cliente vive via id_cliente)
   const TEXTOS = ['tipo_vehiculo', 'marca', 'modelo'];
   // Tasa y plazo del Canal: fill-only (nunca pisan lo digitado). El recálculo posterior
@@ -515,7 +517,15 @@ async function aplicarCanal(mapaCanal, log) {
       /* La última información manda (08-09-2026): seguros, vehículo y tasa se PISAN con
          el Canal cuando difieren (meses abiertos). El PLAZO sigue fill-only: se deriva de
          fechas y es ±1 ambiguo, lo digitado manda. */
-      if (!cerrado) for (const c of MONTOS) if ((f[c] || 0) > 0 && Math.abs(Number(r[c] || 0) - Number(f[c])) > 1) { sets.push(`${c} = ?`); vals.push(f[c]); }
+      /* Piso de primas (motor único de la cola de digitación): una prima sobre $0 pero bajo
+         `prima_minima_valida` NO es un monto sino basura del archivo (el 21-09-2026 el Informe
+         Canal trajo las primas como 1 = "tiene seguro" y pisó 195 operaciones jul-sep con $1).
+         Esos valores no pisan nada; se cuentan y se avisan en el log de la carga. */
+      if (!cerrado) for (const c of MONTOS) {
+        if (!((f[c] || 0) > 0) || Math.abs(Number(r[c] || 0) - Number(f[c])) <= 1) continue;
+        if (c !== 'gps' && Number(f[c]) < primaMin) { primasBasura++; continue; }
+        sets.push(`${c} = ?`); vals.push(f[c]);
+      }
       for (const c of TEXTOS) if (f[c] && normStr(r[c]) !== normStr(f[c])) { sets.push(`${c} = ?`); vals.push(f[c]); }
       if (!cerrado && (f.tascli_real || 0) > 0 && Math.abs(Number(r.tascli_real || 0) - Number(f.tascli_real)) > 0.0005) { sets.push('tascli_real = ?'); vals.push(f.tascli_real); }
       if ((f.plazo || 0) > 0 && !(Number(r.plazo) > 0)) { sets.push('plazo = ?'); vals.push(f.plazo); }
@@ -557,6 +567,7 @@ async function aplicarCanal(mapaCanal, log) {
   }
   if (complementados) log.push(`📎 Informe Canal: ${complementados} créditos complementados (vehículo/tasa/plazo/cuota/seguros)`);
   if (omitidosCerrado) log.push(`⏭ Informe Canal: ${omitidosCerrado} omitidos por mes cerrado (solo montos)`);
+  if (primasBasura) log.push(`🔴 Informe Canal: ${primasBasura} primas de seguro bajo $${primaMin.toLocaleString('es-CL')} NO se aplicaron (el archivo trae 1/0 u otro valor que no es monto) — revisar el export de AutoFin`);
   if (erroresSQL) { log.push(`🔴 Informe Canal: ${erroresSQL} filas con ERROR SQL — ${primerError}`); console.error('[aplicarCanal]', erroresSQL, 'errores;', primerError); }
   // Alerta clara si NADA se complementó teniendo archivo con datos (antes fallaba en silencio)
   if (!complementados && !omitidosCerrado && ids.length) log.push('⚠ Informe Canal: 0 complementados — revisar encabezados/IDs del archivo');
