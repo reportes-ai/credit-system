@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ingreso de Colaboradores — AutoFácil</title>
-  <!-- v1.1 — todos los campos de la ficha (personales, cónyuge, emergencia, previsión y pago, cargas) + subir Curriculum, Carta oferta, Contrato, Título, Cédula e Informe comercial; al aprobar pasan a la ficha y a la Carpeta Digital. v1.0 — Ingreso de colaboradores: RRHH registra la contratación (cargo = perfil de Business Suite, supervisor), aprueba el supervisor, aprueba el Administrador y se crea el usuario con correo de usuario y clave (Pato 21-09-2026) -->
+  <!-- v1.2 — hijos y cargas en el formulario, con fecha de nacimiento y ocupación obligatorias (Seguro de Salud); al aprobar van a rh_cargas por el motor único guardarCargas. v1.1 — todos los campos de la ficha (personales, cónyuge, emergencia, previsión y pago, cargas) + subir Curriculum, Carta oferta, Contrato, Título, Cédula e Informe comercial; al aprobar pasan a la ficha y a la Carpeta Digital. v1.0 — Ingreso de colaboradores: RRHH registra la contratación (cargo = perfil de Business Suite, supervisor), aprueba el supervisor, aprueba el Administrador y se crea el usuario con correo de usuario y clave (Pato 21-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -22,7 +22,7 @@
     .PEND_SUPERVISOR { background:#fef3c7; color:#92400e; } .PEND_ADMIN { background:#e0e7ff; color:#3730a3; }
     .APROBADA { background:#dcfce7; color:#15803d; } .RECHAZADA { background:#fee2e2; color:#b91c1c; } .CREANDO { background:#f1f5f9; color:#475569; }
     .empty { text-align:center; color:#9ca3af; padding:26px 0; }
-    dialog { border:none; border-radius:16px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:900px; width:96%; }
+    dialog { border:none; border-radius:16px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:1180px; width:96%; }
     dialog::backdrop { background:rgba(15,23,42,.55); }
     .dlg-head { background:linear-gradient(135deg,#012d70,#0255c5); color:#fff; padding:14px 20px; font-weight:700; display:flex; justify-content:space-between; align-items:center; }
     .dlg-body { padding:16px 20px; max-height:72vh; overflow-y:auto; }
@@ -142,7 +142,8 @@
       <div class="fld"><label>Cargas inválidas</label><input type="number" data-f="cargas_invalidas"></div>
       <div class="fld"><label>Años trabajados antes de AutoFácil (máx 10)</label><input type="number" data-f="anos_trabajados_previos"></div>
     </div>
-    <div style="font-size:.74rem;color:#64748b;margin-top:4px">Los hijos se registran en la ficha del colaborador una vez aprobado (lista única para Previred y Seguro de Salud).</div>
+    <div class="sec">Hijos y cargas familiares <button type="button" class="btn-ghost" style="padding:2px 10px;font-size:.74rem;margin-left:8px" onclick="agregarHijo()"><i class="bi bi-plus-lg me-1"></i>Agregar</button> <span style="font-size:.72rem;color:#64748b;font-weight:400;margin-left:8px;text-transform:none">Fecha de nacimiento y ocupación las pide el Seguro de Salud</span></div>
+    <div id="hijosBox"></div>
     <div class="fld" style="margin-top:10px"><label>Observaciones</label><input data-f="observaciones"></div>
     <div class="sec">Documentos</div>
     <div id="docsBox" class="grid3"></div>
@@ -155,6 +156,7 @@
   </div>
 </dialog>
 <div class="toast" id="toast"></div>
+<datalist id="ocupaciones"><option>ESTUDIANTE</option><option>TRABAJADOR DEPENDIENTE</option><option>TRABAJADOR INDEPENDIENTE</option><option>DUEÑA/O DE CASA</option><option>CESANTE</option><option>JUBILADO/A</option><option>MENOR DE EDAD (NO ESTUDIA)</option></datalist>
 
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -202,6 +204,7 @@ async function nuevo(){
     <label class="btn-ghost" style="display:block;text-align:center;padding:6px 10px;font-size:.8rem;cursor:pointer;text-transform:none;color:#374151;margin:0"><i class="bi bi-upload me-1"></i><span>Subir ${esc(t.toLowerCase())}</span>
     <input type="file" data-tipo="${esc(t)}" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="this.previousElementSibling.textContent=this.files[0]?.name||'Subir'"></label></div>`).join('');
   document.querySelectorAll('.wPF').forEach(w=>w.style.display='none');
+  document.getElementById('hijosBox').innerHTML = HIJOS_VACIO;
   dlg.showModal();
 }
 async function guardar(){
@@ -209,6 +212,8 @@ async function guardar(){
   const body = {}; ['rut','nombre','apellido','apellido_materno','sexo','fecha_nacimiento','id_perfil','id_supervisor','fecha_ingreso','tipo_contrato','jornada','centro_costo','email','telefono'].forEach(k=>body[k]=g(k));
   body.ficha = {};
   dlg.querySelectorAll('[data-f]').forEach(el => { let v = el.value.trim(); if (el.dataset.clp) v = v.replace(/\D/g,''); if (v !== '') body.ficha[el.dataset.f] = v; });
+  body.hijos = leerHijos();
+  if (body.hijos.some(h => !h.fecha_nacimiento || !h.ocupacion)) return alert('Cada hijo o carga necesita fecha de nacimiento y ocupación (las pide el Seguro de Salud)');
   const files = [...dlg.querySelectorAll('input[type=file][data-tipo]')].filter(f=>f.files[0]);
   if (files.some(f=>f.files[0].size > 8*1024*1024)) return alert('Hay un archivo de más de 8 MB');
   const b = document.getElementById('bGuardar'); b.disabled = true;
@@ -225,6 +230,35 @@ async function guardar(){
     dlg.close(); cargar();
     if (malos.length) alert('Solicitud creada, pero no se subieron:\n' + malos.join('\n')); else toast('✓ Enviada al supervisor para aprobación');
   } finally { b.disabled = false; }
+}
+/* Hijos y cargas: mismas columnas que la ficha (fuente única rh_cargas al aprobar) */
+const HIJOS_VACIO = '<div style="font-size:.8rem;color:#94a3b8;margin-bottom:6px">Sin hijos ni cargas.</div>';
+function agregarHijo(){
+  const box = document.getElementById('hijosBox');
+  if (!box.querySelector('.hijo-row')) box.innerHTML = '';
+  box.insertAdjacentHTML('beforeend', `<div class="hijo-row" style="display:grid;grid-template-columns:1.1fr 1.5fr 1.1fr 1.1fr 1fr 1.1fr .7fr 1.3fr auto;gap:8px 10px;align-items:end;margin-bottom:8px">
+    <div class="fld"><label>Relación</label><select class="h_rel"><option>HIJO</option><option>CONYUGE</option><option>CONVIVIENTE CIVIL</option><option>OTRO</option></select></div>
+    <div class="fld"><label>Nombres</label><input class="h_nombre"></div>
+    <div class="fld"><label>Ap. paterno</label><input class="h_pat"></div>
+    <div class="fld"><label>Ap. materno</label><input class="h_mat"></div>
+    <div class="fld"><label>RUT</label><input class="h_rut"></div>
+    <div class="fld"><label>Nacimiento *</label><input type="date" class="h_fnac"></div>
+    <div class="fld"><label>Sexo</label><select class="h_sexo"><option value="">—</option><option>F</option><option>M</option></select></div>
+    <div class="fld"><label>Ocupación *</label><input class="h_ocup" list="ocupaciones" placeholder="ESTUDIANTE…"></div>
+    <button type="button" class="btn-mini no" style="margin-bottom:6px" onclick="this.closest('.hijo-row').remove()"><i class="bi bi-trash"></i></button>
+    <div style="grid-column:1 / -1;display:flex;gap:18px;font-size:.78rem;color:#334155;margin-top:-4px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="h_carga" style="width:auto"> Carga familiar (Previred)</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="h_seguro" style="width:auto" checked> Seguro de salud</label>
+    </div></div>`);
+  box.lastElementChild.querySelector('.h_nombre').focus();
+}
+function leerHijos(){
+  const q = (r,c) => r.querySelector(c).value.trim();
+  return [...document.querySelectorAll('#hijosBox .hijo-row')].map(r => ({
+    relacion:q(r,'.h_rel'), nombres:q(r,'.h_nombre'), apellido_paterno:q(r,'.h_pat'), apellido_materno:q(r,'.h_mat'),
+    rut:q(r,'.h_rut'), fecha_nacimiento:q(r,'.h_fnac'), sexo:q(r,'.h_sexo'), ocupacion:q(r,'.h_ocup'),
+    es_carga: r.querySelector('.h_carga').checked ? 1 : 0, en_seguro: r.querySelector('.h_seguro').checked ? 1 : 0,
+  })).filter(h => h.nombres || h.rut || h.fecha_nacimiento);
 }
 async function verDoc(id){
   const r = await fetch('/api/rrhh/ingresos/docs/'+id, { headers:H });

@@ -42,6 +42,7 @@ require('../../../../shared/migrate').enFila('rrhh-ingresos', async () => {
   )`);
   // Ficha completa pendiente (se vuelca a rh_fichas al aprobar) + documentos del postulante contratado
   await pool.query('ALTER TABLE rh_ingresos ADD COLUMN ficha JSON NULL').catch(() => {});
+  await pool.query('ALTER TABLE rh_ingresos ADD COLUMN hijos JSON NULL').catch(() => {});   // familia → rh_cargas al aprobar
   await pool.query(`CREATE TABLE IF NOT EXISTS rh_ingreso_docs (
     id INT AUTO_INCREMENT PRIMARY KEY, id_ingreso INT NOT NULL, tipo VARCHAR(60) NOT NULL,
     nombre_archivo VARCHAR(255) NOT NULL, mime_type VARCHAR(120) NULL, archivo_data LONGBLOB NULL,
@@ -153,6 +154,8 @@ exports.crear = async (req, res) => {
     if (d.tipo_contrato) fi.tipo_contrato = d.tipo_contrato;
     if (d.jornada) fi.jornada = d.jornada;
     d.ficha = JSON.stringify(fi);
+    // Hijos y cargas: se guardan tal cual y al aprobar los normaliza el motor único guardarCargas (ficha.controller)
+    d.hijos = JSON.stringify((Array.isArray(b.hijos) ? b.hijos : []).slice(0, 20).map(({ id, ...h }) => h));
     const cols = Object.keys(d);
     const [r] = await pool.query(`INSERT INTO rh_ingresos (${cols.join(', ')}, creado_por) VALUES (${cols.map(() => '?').join(', ')}, ?)`,
       [...cols.map(k => d[k]), req.usuario.id_usuario]);
@@ -206,6 +209,10 @@ exports.aprobar = async (req, res) => {
           ON DUPLICATE KEY UPDATE ${ks.map(k => `${k}=VALUES(${k})`).join(', ')}`,
           [alta.id_usuario, ...ks.map(k => fi[k]), 'Ingreso de colaboradores']);
       } catch (e) { console.error('[ingresos ficha]', e.message); }
+      try {
+        let hj = s.hijos || []; if (typeof hj === 'string') hj = JSON.parse(hj);
+        if (hj.length) await FC.guardarCargas(alta.id_usuario, hj, 'Ingreso de colaboradores');
+      } catch (e) { console.error('[ingresos hijos]', e.message); }
       // Documentos de la solicitud → Carpeta Digital del colaborador (mismo objeto en el bucket, se mueve la fila)
       try {
         await pool.query(`INSERT INTO rh_documentos (id_usuario, tipo, nombre_archivo, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes, subido_por)

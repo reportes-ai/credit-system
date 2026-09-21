@@ -95,6 +95,10 @@ require('../../../../shared/migrate').migrar('rrhh-seguro-certificado-fecha', as
   await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_enviado_at DATE NULL');   // cuándo se envió el certificado a la aseguradora
   await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS certificado_aviso_at DATE NULL');     // cuándo se le pidió al colaborador (un mes antes de la edad máxima)
 });
+// Ocupación de cada carga (estudiante, trabaja, etc.): la pide la aseguradora (Pato 21-09-2026)
+require('../../../../shared/migrate').migrar('rrhh-cargas-ocupacion', async () => {
+  await pool.query('ALTER TABLE rh_cargas ADD COLUMN IF NOT EXISTS ocupacion VARCHAR(80) NULL');
+});
 require('../../../../shared/migrate').migrar('rrhh-seguro-pago', async () => {
   await pool.query('ALTER TABLE rh_seguro_param ADD COLUMN IF NOT EXISTS edad_max_estudiante INT NOT NULL DEFAULT 27');
   await pool.query('ALTER TABLE rh_seguro_param ADD COLUMN IF NOT EXISTS tolerancia_uf DECIMAL(8,4) NOT NULL DEFAULT 0.05');

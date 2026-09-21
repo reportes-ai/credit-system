@@ -276,7 +276,7 @@ async function armarFicha(idUsuario, conSueldo, soloVisibles) {
      certificado_estudios). rh_hijos quedó vacía y en desuso. */
   const [hijos] = await pool.query(
     `SELECT id, TRIM(CONCAT_WS(' ', nombres, apellido_paterno, apellido_materno)) nombre, nombres, apellido_paterno, apellido_materno, rut,
-            DATE_FORMAT(fecha_nacimiento,'%Y-%m-%d') fecha_nacimiento, sexo, relacion, es_carga, en_seguro, certificado_estudios,
+            DATE_FORMAT(fecha_nacimiento,'%Y-%m-%d') fecha_nacimiento, sexo, relacion, ocupacion, es_carga, en_seguro, certificado_estudios,
             DATE_FORMAT(certificado_enviado_at,'%Y-%m-%d') certificado_enviado_at
        FROM rh_cargas WHERE id_usuario=? AND activo=1 ORDER BY FIELD(relacion,'CONYUGE','CONVIVIENTE CIVIL','HIJO','OTRO'), fecha_nacimiento, id`, [idUsuario]);
   // UF del día para mostrar el plan Isapre (pactado en UF) también en pesos
@@ -326,28 +326,7 @@ const putFicha = async (req, res) => {
     // Familia: viene el arreglo entero desde la ficha. Las filas con id se ACTUALIZAN (conservan las
     // marcas del seguro), las nuevas se insertan y las que ya no vienen se dan de baja (activo=0),
     // nunca se borran: las nóminas del seguro ya generadas las referencian.
-    if (Array.isArray(b.hijos)) {
-      const REL = ['CONYUGE', 'CONVIVIENTE CIVIL', 'HIJO', 'OTRO'];
-      const hijos = b.hijos
-        .map(h => ({ id: Number(h.id) || null, nombres: String(h.nombres ?? h.nombre ?? '').trim().slice(0, 120),
-                     apellido_paterno: String(h.apellido_paterno || '').trim().slice(0, 80) || null, apellido_materno: String(h.apellido_materno || '').trim().slice(0, 80) || null,
-                     rut: String(h.rut || '').trim().toUpperCase().slice(0, 15) || null,
-                     fecha_nacimiento: /^\d{4}-\d{2}-\d{2}$/.test(String(h.fecha_nacimiento || '')) ? h.fecha_nacimiento : null,
-                     sexo: ['M', 'F'].includes(String(h.sexo || '').toUpperCase()) ? String(h.sexo).toUpperCase() : null,
-                     relacion: REL.includes(String(h.relacion || '').toUpperCase()) ? String(h.relacion).toUpperCase() : 'HIJO',
-                     es_carga: h.es_carga ? 1 : 0, en_seguro: h.en_seguro === undefined ? 1 : (h.en_seguro ? 1 : 0), certificado_estudios: h.certificado_estudios ? 1 : 0,
-                     certificado_enviado_at: /^\d{4}-\d{2}-\d{2}$/.test(String(h.certificado_enviado_at || '')) ? h.certificado_enviado_at : null }))
-        .filter(h => h.nombres || h.rut || h.fecha_nacimiento)
-        .slice(0, 20);
-      const quedan = hijos.map(h => h.id).filter(Boolean);
-      await pool.query(`UPDATE rh_cargas SET activo=0, en_seguro=0, updated_at=NOW() WHERE id_usuario=? AND activo=1 ${quedan.length ? 'AND id NOT IN (?)' : ''}`, quedan.length ? [objetivo, quedan] : [objetivo]);
-      for (const h of hijos) {
-        if (h.id) await pool.query(`UPDATE rh_cargas SET nombres=?, apellido_paterno=?, apellido_materno=?, rut=?, fecha_nacimiento=?, sexo=?, relacion=?, es_carga=?, en_seguro=?, certificado_estudios=?, certificado_enviado_at=?, updated_at=NOW() WHERE id=? AND id_usuario=?`,
-          [h.nombres || null, h.apellido_paterno, h.apellido_materno, h.rut, h.fecha_nacimiento, h.sexo, h.relacion, h.es_carga, h.en_seguro, h.certificado_estudios, h.certificado_enviado_at, h.id, objetivo]);
-        else await pool.query(`INSERT INTO rh_cargas (id_usuario, nombres, apellido_paterno, apellido_materno, rut, fecha_nacimiento, sexo, relacion, es_carga, en_seguro, certificado_estudios, certificado_enviado_at, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          [objetivo, h.nombres || null, h.apellido_paterno, h.apellido_materno, h.rut, h.fecha_nacimiento, h.sexo, h.relacion, h.es_carga, h.en_seguro, h.certificado_estudios, h.certificado_enviado_at, 'Ficha']);
-      }
-    }
+    if (Array.isArray(b.hijos)) await guardarCargas(objetivo, b.hijos, 'Ficha');
     // Identidad (usuarios) solo RRHH
     if (rrhh) {
       const setsU = [], valsU = [];
@@ -359,6 +338,33 @@ const putFicha = async (req, res) => {
     ok(res, { ok: true });
   } catch (e) { console.error('[rrhh putFicha]', e.message); fail(res, 'Error interno del servidor'); }
 };
+
+/* Motor único de la familia (rh_cargas): lo usan la ficha y el Ingreso de Colaboradores.
+   Llega el arreglo entero; con id se actualiza, sin id se inserta, los que no vienen se dan de baja. */
+async function guardarCargas(objetivo, lista, creadoPor) {
+  const REL = ['CONYUGE', 'CONVIVIENTE CIVIL', 'HIJO', 'OTRO'];
+  const hijos = lista
+    .map(h => ({ id: Number(h.id) || null, nombres: String(h.nombres ?? h.nombre ?? '').trim().slice(0, 120),
+                 apellido_paterno: String(h.apellido_paterno || '').trim().slice(0, 80) || null, apellido_materno: String(h.apellido_materno || '').trim().slice(0, 80) || null,
+                 rut: String(h.rut || '').trim().toUpperCase().slice(0, 15) || null,
+                 fecha_nacimiento: /^\d{4}-\d{2}-\d{2}$/.test(String(h.fecha_nacimiento || '')) ? h.fecha_nacimiento : null,
+                 sexo: ['M', 'F'].includes(String(h.sexo || '').toUpperCase()) ? String(h.sexo).toUpperCase() : null,
+                 relacion: REL.includes(String(h.relacion || '').toUpperCase()) ? String(h.relacion).toUpperCase() : 'HIJO',
+                 ocupacion: String(h.ocupacion || '').trim().toUpperCase().slice(0, 80) || null,   // la pide el Seguro de Salud
+                 es_carga: h.es_carga ? 1 : 0, en_seguro: h.en_seguro === undefined ? 1 : (h.en_seguro ? 1 : 0), certificado_estudios: h.certificado_estudios ? 1 : 0,
+                 certificado_enviado_at: /^\d{4}-\d{2}-\d{2}$/.test(String(h.certificado_enviado_at || '')) ? h.certificado_enviado_at : null }))
+    .filter(h => h.nombres || h.rut || h.fecha_nacimiento)
+    .slice(0, 20);
+  const quedan = hijos.map(h => h.id).filter(Boolean);
+  await pool.query(`UPDATE rh_cargas SET activo=0, en_seguro=0, updated_at=NOW() WHERE id_usuario=? AND activo=1 ${quedan.length ? 'AND id NOT IN (?)' : ''}`, quedan.length ? [objetivo, quedan] : [objetivo]);
+  for (const h of hijos) {
+    if (h.id) await pool.query(`UPDATE rh_cargas SET nombres=?, apellido_paterno=?, apellido_materno=?, rut=?, fecha_nacimiento=?, sexo=?, relacion=?, ocupacion=?, es_carga=?, en_seguro=?, certificado_estudios=?, certificado_enviado_at=?, updated_at=NOW() WHERE id=? AND id_usuario=?`,
+      [h.nombres || null, h.apellido_paterno, h.apellido_materno, h.rut, h.fecha_nacimiento, h.sexo, h.relacion, h.ocupacion, h.es_carga, h.en_seguro, h.certificado_estudios, h.certificado_enviado_at, h.id, objetivo]);
+    else await pool.query(`INSERT INTO rh_cargas (id_usuario, nombres, apellido_paterno, apellido_materno, rut, fecha_nacimiento, sexo, relacion, ocupacion, es_carga, en_seguro, certificado_estudios, certificado_enviado_at, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [objetivo, h.nombres || null, h.apellido_paterno, h.apellido_materno, h.rut, h.fecha_nacimiento, h.sexo, h.relacion, h.ocupacion, h.es_carga, h.en_seguro, h.certificado_estudios, h.certificado_enviado_at, creadoPor || 'Ficha']);
+  }
+  return hijos.length;
+}
 
 /* ── Colaboradores (RRHH): lista con resumen ───────────────────────────────── */
 const listarColaboradores = async (req, res) => {
@@ -575,4 +581,4 @@ require('../../../../shared/migrate').enFila('rrhh-directorio-config', async () 
   } catch (e) { console.error('[rrhh-directorio-config migration]', e.message); }
 });
 
-module.exports = { CAMPOS_CONTACTO, CAMPOS_LABORAL, docTipos, getFicha, putFicha, listarColaboradores, directorio, organigrama, directorioConfig, guardarDirectorioConfig, subirDoc, descargarDoc, eliminarDoc, crearDocTipo, visibleDoc };
+module.exports = { CAMPOS_CONTACTO, CAMPOS_LABORAL, docTipos, guardarCargas, getFicha, putFicha, listarColaboradores, directorio, organigrama, directorioConfig, guardarDirectorioConfig, subirDoc, descargarDoc, eliminarDoc, crearDocTipo, visibleDoc };

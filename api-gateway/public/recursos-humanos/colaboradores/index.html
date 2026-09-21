@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v2.9 — Cargo se elige de la lista de perfiles de Business Suite (viva) + campo Supervisor (usuarios.id_supervisor); botones Nuevo colaborador y Solicitudes de ingreso (Pato 21-09-2026). v2.8 —fecha de envío del certificado de estudios en Hijos y cargas. v2.7 — sección Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, sexo, carga Previred, seguro de salud y certificado de estudios; se conserva la fila al guardar (Pato 17-09-2026). v2.6 — montos con $ y puntos (sueldo, colación, movilización) y casilla Tarjeta Edenred. v2.5 — colación y movilización mensuales en Previsión y pago (fuente única de la liquidación). v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
+  <!-- v2.10 — Ocupación en Hijos y cargas (la pide el Seguro de Salud). v2.9 — Cargo se elige de la lista de perfiles de Business Suite (viva) + campo Supervisor (usuarios.id_supervisor); botones Nuevo colaborador y Solicitudes de ingreso (Pato 21-09-2026). v2.8 —fecha de envío del certificado de estudios en Hijos y cargas. v2.7 — sección Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, sexo, carga Previred, seguro de salud y certificado de estudios; se conserva la fila al guardar (Pato 17-09-2026). v2.6 — montos con $ y puntos (sueldo, colación, movilización) y casilla Tarjeta Edenred. v2.5 — colación y movilización mensuales en Previsión y pago (fuente única de la liquidación). v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -74,6 +74,7 @@
   </div>
 </dialog>
 <div class="toast" id="toast"></div>
+<datalist id="ocupaciones"><option>ESTUDIANTE</option><option>TRABAJADOR DEPENDIENTE</option><option>TRABAJADOR INDEPENDIENTE</option><option>DUEÑA/O DE CASA</option><option>CESANTE</option><option>JUBILADO/A</option><option>MENOR DE EDAD (NO ESTUDIA)</option></datalist>
 
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -242,7 +243,7 @@ async function abrir(id){
 function filaHijo(h={}){
   const rel = h.relacion||'HIJO';
   const opt = v => `<option ${rel===v?'selected':''}>${v}</option>`;
-  return `<div class="hijo-row" data-id="${h.id||''}" style="display:grid;grid-template-columns:1.1fr 1.6fr 1.1fr 1.1fr 1fr 1.1fr .7fr auto;gap:8px 12px;align-items:end;margin-bottom:8px">
+  return `<div class="hijo-row" data-id="${h.id||''}" style="display:grid;grid-template-columns:1.1fr 1.6fr 1.1fr 1.1fr 1fr 1.1fr .7fr 1.2fr auto;gap:8px 12px;align-items:end;margin-bottom:8px">
     <div class="fld"><label>Relación</label><select class="h_rel">${opt('HIJO')}${opt('CONYUGE')}${opt('CONVIVIENTE CIVIL')}${opt('OTRO')}</select></div>
     <div class="fld"><label>Nombres</label><input class="h_nombre" value="${esc(h.nombres||h.nombre||'')}"></div>
     <div class="fld"><label>Apellido paterno</label><input class="h_pat" value="${esc(h.apellido_paterno||'')}"></div>
@@ -250,6 +251,7 @@ function filaHijo(h={}){
     <div class="fld"><label>RUT</label><input class="h_rut" value="${esc(h.rut||'')}"></div>
     <div class="fld"><label>Nacimiento</label><input type="date" class="h_fnac" value="${esc(h.fecha_nacimiento||'')}"></div>
     <div class="fld"><label>Sexo</label><select class="h_sexo"><option value="">—</option><option value="F" ${h.sexo==='F'?'selected':''}>F</option><option value="M" ${h.sexo==='M'?'selected':''}>M</option></select></div>
+    <div class="fld"><label>Ocupación</label><input class="h_ocup" list="ocupaciones" value="${esc(h.ocupacion||'')}" placeholder="ESTUDIANTE…"></div>
     <button class="btn-mini del" style="margin-bottom:6px" title="Quitar (se da de baja; las nóminas del seguro ya generadas la conservan)" onclick="this.closest('.hijo-row').remove()"><i class="bi bi-trash"></i></button>
     <div style="grid-column:1 / -1;display:flex;gap:18px;font-size:.78rem;color:#334155;margin-top:-4px;margin-bottom:4px">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="h_carga" ${h.es_carga?'checked':''}> Carga familiar (Previred)</label>
@@ -280,6 +282,7 @@ function leerHijos(){
     rut: r.querySelector('.h_rut').value.trim(),
     fecha_nacimiento: r.querySelector('.h_fnac').value,
     sexo: r.querySelector('.h_sexo').value,
+    ocupacion: r.querySelector('.h_ocup').value.trim(),
     es_carga: r.querySelector('.h_carga').checked ? 1 : 0,
     en_seguro: r.querySelector('.h_seguro').checked ? 1 : 0,
     certificado_estudios: r.querySelector('.h_cert').checked ? 1 : 0,
