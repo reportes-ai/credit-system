@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.4 — pestañas Compradores (razón social, RUT, giro, domicilio, representantes, personería, contacto) y Contratos de cesión (textos SIN/CON responsabilidad editables con marcadores, generación por comprador+fecha con Anexo I e impresión). v2.3 —Cobrar en Stock Vendido: ingreso de fondos del comprador contra la cuenta bancaria del depósito (COBRO_VENTA_CARTERA); una venta cobrada no se deshace. v2.2 — asiento contable de la venta y de su reversa (VENTA_CARTERA / REVERSA_VENTA_CARTERA). v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
+<!-- v2.5 — botón Vista previa contrato en Vender (con las operaciones marcadas y el texto según responsabilidad); Anexo I individualiza cada crédito (deudor, pagaré, vehículo, otorgamiento, monto, tasa, plazo, cuota, vencimientos, capital, precio). v2.4 — pestañas Compradores (razón social, RUT, giro, domicilio, representantes, personería, contacto) y Contratos de cesión (textos SIN/CON responsabilidad editables con marcadores, generación por comprador+fecha con Anexo I e impresión). v2.3 —Cobrar en Stock Vendido: ingreso de fondos del comprador contra la cuenta bancaria del depósito (COBRO_VENTA_CARTERA); una venta cobrada no se deshace. v2.2 — asiento contable de la venta y de su reversa (VENTA_CARTERA / REVERSA_VENTA_CARTERA). v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -114,6 +114,7 @@
         <div class="form-check" style="margin-bottom:4px"><input class="form-check-input" type="checkbox" id="vAdm" onchange="aplicarPrecios()"><label class="form-check-label" for="vAdm" style="font-size:.85rem">Con Administración <span class="muted">(cobranza y recaudación nuestra)</span></label></div>
         <div class="form-check" style="margin-bottom:4px"><input class="form-check-input" type="checkbox" id="vResp" onchange="aplicarPrecios()"><label class="form-check-label" for="vResp" style="font-size:.85rem">Con Responsabilidad <span class="muted">(recourse)</span></label></div>
         <div id="vInfo" class="muted" style="font-size:.76rem;max-width:420px"></div>
+        <button class="btn btn-sm btn-outline-primary" onclick="previaContrato()"><i class="bi bi-file-earmark-text me-1"></i>Vista previa contrato</button>
         <button class="btn btn-sm btn-success" onclick="vender()"><i class="bi bi-bag-check me-1"></i>Vender seleccionadas</button>
       </div>
       <div style="overflow:auto">
@@ -227,6 +228,7 @@
 </dialog>
 <style>
   .contrato { font-family:Georgia,'Times New Roman',serif; font-size:.9rem; line-height:1.55; color:#111; }
+  .contrato .marca { text-align:center; color:#b91c1c; font-weight:800; letter-spacing:2px; font-size:.8rem; border:2px dashed #b91c1c; padding:4px; margin-bottom:10px; }
   .contrato h2 { text-align:center; font-size:1.05rem; font-weight:800; margin:0 0 2px; }
   .contrato .sub { text-align:center; font-size:.78rem; color:#64748b; margin-bottom:14px; }
   .contrato p { text-align:justify; margin:0 0 10px; }
@@ -445,12 +447,25 @@ async function guardarTexto(){
   const m = $('txMsg'); if (!j.success) { m.style.color='#b91c1c'; m.textContent = j.error||'Error'; return; }
   m.style.color='#16a34a'; m.textContent = '✓ Texto guardado'; TX[TX_TIPO] = { ...(TX[TX_TIPO]||{}), titulo:$('txTitulo').value, texto:$('txTexto').value };
 }
+/* Vista previa del contrato con las operaciones marcadas, ANTES de vender (con responsabilidad → texto con responsabilidad) */
+async function previaContrato(){
+  const sel = [...document.querySelectorAll('#vBody input[type=checkbox]:checked')].filter(c=>c.dataset.i!=null);
+  if (!sel.length) return alert('Marca al menos una operación.');
+  const comprador = $('vComprador').value.trim(); if (!comprador) return alert('Indica el comprador.');
+  const ventas = sel.map(c => { const i = +c.dataset.i; return { id_credito: ELE[i].id, precio_venta: numIn($('precio'+i).value) }; });
+  const j = await fetch('/api/venta-cartera/contratos/previa', { method:'POST', headers:H, body: JSON.stringify({ comprador, fecha: $('vFecha').value || undefined, resp: $('vResp').checked, ventas }) }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) return alert(j.error||'Error');
+  mostrarContrato(j.data, true);
+}
+function mostrarContrato(d, previa){
+  $('ctTitulo').textContent = (previa ? 'VISTA PREVIA — ' : '') + d.titulo;
+  $('printArea').innerHTML = `<div class="contrato">${previa ? '<div class="marca">VISTA PREVIA — SIN VALOR CONTRACTUAL</div>' : ''}<h2>${esc(d.titulo)}</h2><div class="sub">${esc(d.comprador.razon_social)} · ${d.ventas} crédito(s) · ${fmt(d.precio)}</div>${d.html}</div>`;
+  dlgContrato.showModal();
+}
 async function verContrato(comprador, fecha, resp){
   const j = await fetch(`/api/venta-cartera/contratos/generar?comprador=${encodeURIComponent(comprador)}&fecha=${fecha}&resp=${resp}`, { headers:H }).then(r=>r.json()).catch(()=>({}));
   if (!j.success) return alert(j.error||'Error');
-  $('ctTitulo').textContent = j.data.titulo;
-  $('printArea').innerHTML = `<div class="contrato"><h2>${esc(j.data.titulo)}</h2><div class="sub">${esc(j.data.comprador.razon_social)} · ${j.data.ventas} crédito(s) · ${fmt(j.data.precio)}</div>${j.data.html}</div>`;
-  dlgContrato.showModal();
+  mostrarContrato(j.data, false);
 }
 
 /* Ingreso de fondos del comprador: misma cuenta bancaria del depósito que usa Caja */

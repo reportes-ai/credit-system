@@ -112,12 +112,42 @@ exports.contrato = async (req, res) => {
     const resp = req.query.resp === '1' ? 1 : 0;
     if (!comprador || !fecha) return fail(res, 'Faltan comprador y fecha', 400);
     const [ventas] = await pool.query(
-      `SELECT v.*, COALESCE(cl.nombre_completo,'') cliente, COALESCE(cl.rut,'') rut_cliente, c.marca, c.modelo, c.patente, c.plazo, c.cuota, c.tascli_real
+      `SELECT v.id_credito, v.num_op, v.precio_venta, v.capital_venta, v.con_responsabilidad ${SEL_CRED}
          FROM cartera_ventas v JOIN creditos c ON c.id=v.id_credito LEFT JOIN clientes cl ON cl.id_cliente=c.id_cliente
         WHERE v.comprador=? AND v.fecha_venta=? AND v.con_responsabilidad=? ORDER BY v.num_op`, [comprador, fecha, resp]);
     if (!ventas.length) return fail(res, 'No hay ventas para ese comprador, fecha y tipo', 404);
+    ok(res, await armarContrato(comprador, fecha, resp, ventas));
+  } catch (e) { fail(res, e.code ? e.msg : e.message, e.code || 500); }
+};
+
+/* POST /contratos/previa { comprador, fecha, resp, ventas:[{id_credito, precio_venta}] } — antes de vender */
+exports.previa = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const comprador = String(b.comprador || '').trim().toUpperCase();
+    const fecha = /^\d{4}-\d{2}-\d{2}$/.test(String(b.fecha)) ? b.fecha : require('../../../../shared/fecha-chile').hoyISO();
+    const resp = b.resp ? 1 : 0;
+    const sel = (Array.isArray(b.ventas) ? b.ventas : []).map(v => ({ id: parseInt(v.id_credito) || 0, precio: Math.round(+v.precio_venta || 0) })).filter(v => v.id);
+    if (!comprador || !sel.length) return fail(res, 'Falta el comprador o las operaciones', 400);
+    const [creds] = await pool.query(
+      `SELECT c.id id_credito, c.num_op ${SEL_CRED},
+              (SELECT ROUND(SUM(CASE WHEN q.fecha_pago IS NULL THEN COALESCE(q.amortizacion,0) ELSE 0 END)) FROM cuotas_credito q WHERE q.num_op=c.num_op) capital_venta
+         FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente=c.id_cliente WHERE c.id IN (?) ORDER BY c.num_op`, [sel.map(v => v.id)]);
+    const ventas = creds.map(c => ({ ...c, precio_venta: sel.find(v => v.id === c.id_credito)?.precio || 0, con_responsabilidad: resp }));
+    ok(res, { ...(await armarContrato(comprador, fecha, resp, ventas)), previa: true });
+  } catch (e) { fail(res, e.code ? e.msg : e.message, e.code || 500); }
+};
+
+const SEL_CRED = `, COALESCE(cl.nombre_completo,'') cliente, COALESCE(cl.rut,'') rut_cliente, c.marca, c.modelo, c.anio, c.patente, c.plazo, c.cuota, c.tascli_real,
+  c.monto_financiado, DATE_FORMAT(c.fecha_otorgado,'%d-%m-%Y') fecha_otorgado,
+  (SELECT COUNT(*) FROM cuotas_credito q WHERE q.num_op=c.num_op AND q.fecha_pago IS NULL) cuotas_pendientes,
+  (SELECT DATE_FORMAT(MIN(q.fecha_vencimiento),'%d-%m-%Y') FROM cuotas_credito q WHERE q.num_op=c.num_op AND q.fecha_pago IS NULL) prox_venc,
+  (SELECT DATE_FORMAT(MAX(q.fecha_vencimiento),'%d-%m-%Y') FROM cuotas_credito q WHERE q.num_op=c.num_op) ult_venc`;
+
+/* Arma el contrato (motor único de vista previa y contrato definitivo) */
+async function armarContrato(comprador, fecha, resp, ventas) {
     const [[cp]] = await pool.query('SELECT * FROM cartera_compradores WHERE nombre_corto=?', [comprador]);
-    if (!cp) return fail(res, `El comprador ${comprador} no está en el mantenedor de Compradores: complétalo primero`, 400);
+    if (!cp) throw { code: 400, msg: `El comprador ${comprador} no está en el mantenedor de Compradores: complétalo primero` };
     let reps = []; try { reps = typeof cp.representantes === 'string' ? JSON.parse(cp.representantes) : (cp.representantes || []); } catch (_) {}
     const [[tx]] = await pool.query('SELECT * FROM cartera_contratos_texto WHERE tipo=?', [resp ? 'CON_RESP' : 'SIN_RESP']);
     const emp = await datosEmpresa();
@@ -125,9 +155,11 @@ exports.contrato = async (req, res) => {
     try { const [[c]] = await pool.query("SELECT banco, numero_cuenta FROM cuentas_bancarias WHERE activo=1 ORDER BY id_cuenta LIMIT 1"); cta = c; } catch (_) {}
     const precio = ventas.reduce((s, v) => s + Math.round(+v.precio_venta || 0), 0);
     const repTxt = reps.map(r => `don/doña ${r.nombre}${r.nacionalidad ? ', ' + r.nacionalidad : ''}${r.estado_civil ? ', ' + r.estado_civil : ''}${r.profesion ? ', ' + r.profesion : ''}${r.cedula ? ', Cédula Nacional de Identidad N° ' + r.cedula : ''}`).join(', y ');
-    const anexo = `<table class="anexo"><thead><tr><th>N°</th><th>Operación</th><th>Deudor</th><th>RUT</th><th>Vehículo</th><th>Patente</th><th>Cuotas pend.</th><th>Capital insoluto</th><th>Precio</th></tr></thead><tbody>${
-      ventas.map((v, i) => `<tr><td>${i + 1}</td><td>${v.num_op}</td><td>${esc(v.cliente)}</td><td>${esc(v.rut_cliente)}</td><td>${esc([v.marca, v.modelo].filter(Boolean).join(' '))}</td><td>${esc(v.patente || '')}</td><td>${v.cuotas_pendientes ?? ''}</td><td class="num">${CLP(v.capital_venta)}</td><td class="num">${CLP(v.precio_venta)}</td></tr>`).join('')
-    }<tr class="tot"><td colspan="7">TOTAL (${ventas.length} crédito${ventas.length === 1 ? '' : 's'})</td><td class="num">${CLP(ventas.reduce((s, v) => s + (+v.capital_venta || 0), 0))}</td><td class="num">${CLP(precio)}</td></tr></tbody></table>`;
+    // Anexo I: cada crédito individualizado (deudor, pagaré/operación, vehículo, condiciones y saldo)
+    const anexo = `<table class="anexo"><thead><tr><th>N°</th><th>Operación / Pagaré</th><th>Deudor</th><th>RUT</th><th>Vehículo</th><th>Patente</th><th>Otorgado</th><th>Monto original</th><th>Tasa mens.</th><th>Plazo</th><th>Valor cuota</th><th>Cuotas pend.</th><th>Próx. venc.</th><th>Últ. venc.</th><th>Capital insoluto</th><th>Precio cesión</th></tr></thead><tbody>${
+      ventas.map((v, i) => `<tr><td>${i + 1}</td><td>${v.num_op}</td><td>${esc(v.cliente)}</td><td>${esc(v.rut_cliente)}</td><td>${esc([v.marca, v.modelo, v.anio].filter(Boolean).join(' '))}</td><td>${esc(v.patente || '')}</td><td>${esc(v.fecha_otorgado || '')}</td><td class="num">${CLP(v.monto_financiado)}</td><td class="num">${v.tascli_real != null ? (+v.tascli_real).toLocaleString('es-CL', { maximumFractionDigits: 3 }) + '%' : ''}</td><td>${v.plazo || ''}</td><td class="num">${CLP(v.cuota)}</td><td>${v.cuotas_pendientes ?? ''}</td><td>${esc(v.prox_venc || '')}</td><td>${esc(v.ult_venc || '')}</td><td class="num">${CLP(v.capital_venta)}</td><td class="num">${CLP(v.precio_venta)}</td></tr>`).join('')
+    }<tr class="tot"><td colspan="14">TOTAL (${ventas.length} crédito${ventas.length === 1 ? '' : 's'})</td><td class="num">${CLP(ventas.reduce((s, v) => s + (+v.capital_venta || 0), 0))}</td><td class="num">${CLP(precio)}</td></tr></tbody></table>
+    <p style="font-size:.78rem;margin-top:8px">Los créditos individualizados constan en pagarés suscritos a la orden de ${esc(emp.razon_social || '')}, con la tabla de desarrollo de cada uno (composición de cada cuota en interés corriente, amortización y saldo insoluto) que se acompaña como parte integrante de este Anexo.</p>`;
     const firmas = `<div class="firmas"><div><div class="linea"></div>${esc(emp.representante || '')}<br>pp ${esc(emp.razon_social || '')}</div>${reps.map(r => `<div><div class="linea"></div>${esc(r.nombre)}<br>pp ${esc(cp.razon_social)}</div>`).join('') || `<div><div class="linea"></div>pp ${esc(cp.razon_social)}</div>`}</div>`;
     const map = {
       CIUDAD: emp.ciudad || 'Santiago', FECHA_LARGA: fechaLarga(fecha),
@@ -145,9 +177,8 @@ exports.contrato = async (req, res) => {
     html = html.replace(/\{\{(\w+)\}\}/g, (m, k) => k === 'FIRMAS' ? firmas : k === 'ANEXO_I' ? anexo : (k in map ? esc(map[k]) : m));
     if (!/\{\{ANEXO_I\}\}/.test(tx.texto)) html += `<h3>ANEXO I — Individualización de créditos y garantías cedidas</h3>${anexo}`;
     if (!/\{\{FIRMAS\}\}/.test(tx.texto)) html = html.replace(/<h3>ANEXO I/, firmas + '<h3>ANEXO I');
-    ok(res, { titulo: tx.titulo, html, comprador: cp, ventas: ventas.length, precio, fecha, resp });
-  } catch (e) { fail(res, e.message); }
-};
+    return { titulo: tx.titulo, html, comprador: cp, ventas: ventas.length, precio, fecha, resp };
+}
 
 /* Grupos de ventas (comprador + fecha + responsabilidad) para el botón "Contrato" */
 exports.grupos = async (req, res) => {

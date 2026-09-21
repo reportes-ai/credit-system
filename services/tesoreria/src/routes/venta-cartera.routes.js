@@ -11,6 +11,7 @@ router.post('/compradores',       verifyToken, requireFunc('venta_cartera'), ces
 router.get('/contratos/textos',   verifyToken, requireFunc('venta_cartera'), ces.textos);
 router.put('/contratos/textos/:tipo', verifyToken, requireFunc('venta_cartera'), ces.guardarTexto);
 router.get('/contratos/grupos',   verifyToken, requireFunc('venta_cartera'), ces.grupos);
+router.post('/contratos/previa',  verifyToken, requireFunc('venta_cartera'), ces.previa);
 router.get('/contratos/generar',  verifyToken, requireFunc('venta_cartera'), ces.contrato);
 router.get('/parametros', verifyToken, requireFunc('venta_cartera'), ctrl.getParametros);
 router.put('/parametros', verifyToken, requireFunc('venta_cartera'), ctrl.putParametros);
