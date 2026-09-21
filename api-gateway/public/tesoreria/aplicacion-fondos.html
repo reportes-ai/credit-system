@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — motivos REMATE JUDICIAL y DACIÓN EN PAGO. v1.1 — Monto recibido + renegociado: los descuentos se calculan solos con el ORDEN DE PRELACIÓN (motor único prelacion-core.js, default = Excel de cobranza); pestaña Orden de prelación editable con registro de cambios (Pato 21-09-2026). v1.0 -->
+<!-- v1.3 — descuento automático de honorarios no supera el monto (el exceso rebaja el IVA). v1.2 — motivos REMATE JUDICIAL y DACIÓN EN PAGO. v1.1 — Monto recibido + renegociado: los descuentos se calculan solos con el ORDEN DE PRELACIÓN (motor único prelacion-core.js, default = Excel de cobranza); pestaña Orden de prelación editable con registro de cambios (Pato 21-09-2026). v1.0 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -271,7 +271,7 @@ function recalc(){
     const r = AF_PRELACION.aplicar(deudas, CAT.prelacion, disp);
     filas.forEach(tr => {
       const m = montoDe(tr), d = r.items[tr.dataset.key].descuento;
-      tr.querySelector('.iDcto').value = d.toLocaleString('es-CL');
+      tr.querySelector('.iDcto').value = Math.min(d,m).toLocaleString('es-CL');   // lo que excede el monto rebaja el IVA (igual que el servidor)
       tr.querySelector('.iPct').value = m>0 ? (Math.min(d,m)/m*100).toLocaleString('es-CL',{maximumFractionDigits:1}) : 0;
     });
     document.getElementById('fDevol').value = r.devolucion.toLocaleString('es-CL');

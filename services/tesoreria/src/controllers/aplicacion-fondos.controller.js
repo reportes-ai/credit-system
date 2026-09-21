@@ -175,10 +175,12 @@ exports.crear = async (req, res) => {
     const items = ITEMS.map(def => {
       const it = itemsIn[def.key] || {};
       const monto = R(it.monto);
+      let ivaMonto = def.iva ? R(it.iva_monto) : 0;
       let dcto = auto ? prel.items[def.key].descuento : R(it.dcto_monto);
-      if (!auto && dcto > monto) dcto = monto;
+      // En automático el descuento viene sobre monto+IVA: la parte que excede el monto rebaja el IVA
+      if (auto && dcto > monto) { ivaMonto = Math.max(0, ivaMonto - (dcto - monto)); dcto = monto; }
+      if (dcto > monto) dcto = monto;
       if (dcto < 0) dcto = 0;
-      const ivaMonto = def.iva ? R(it.iva_monto) : 0;
       const aPagar = Math.max(0, monto - dcto + ivaMonto);
       totalDeuda += monto; totalRecibido += aPagar; totalDcto += dcto;
       return { key: def.key, label: def.label, monto, dcto_monto: dcto,
