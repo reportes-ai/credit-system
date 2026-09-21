@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.3 — Cobrar en Stock Vendido: ingreso de fondos del comprador contra la cuenta bancaria del depósito (COBRO_VENTA_CARTERA); una venta cobrada no se deshace. v2.2 — asiento contable de la venta y de su reversa (VENTA_CARTERA / REVERSA_VENTA_CARTERA). v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
+<!-- v2.4 — pestañas Compradores (razón social, RUT, giro, domicilio, representantes, personería, contacto) y Contratos de cesión (textos SIN/CON responsabilidad editables con marcadores, generación por comprador+fecha con Anexo I e impresión). v2.3 —Cobrar en Stock Vendido: ingreso de fondos del comprador contra la cuenta bancaria del depósito (COBRO_VENTA_CARTERA); una venta cobrada no se deshace. v2.2 — asiento contable de la venta y de su reversa (VENTA_CARTERA / REVERSA_VENTA_CARTERA). v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -55,6 +55,54 @@
     <div class="tab" id="tabBtnStock" onclick="tab('stock')"><i class="bi bi-clipboard-data me-1"></i>Stock Vendido</div>
     <div class="tab" id="tabBtnCuotas" onclick="tab('cuotas')"><i class="bi bi-calendar-week me-1"></i>Cuotas del Mes (Responsabilidad)</div>
     <div class="tab" id="tabBtnParam" onclick="tab('param')"><i class="bi bi-sliders me-1"></i>Parámetros de Precio</div>
+    <div class="tab" id="tabBtnComp" onclick="tab('comp')"><i class="bi bi-building me-1"></i>Compradores</div>
+    <div class="tab" id="tabBtnContr" onclick="tab('contr')"><i class="bi bi-file-earmark-text me-1"></i>Contratos de cesión</div>
+  </div>
+
+  <!-- ══ COMPRADORES ══ -->
+  <div id="tabComp" style="display:none">
+    <div class="card-x">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h6 style="font-weight:800;color:var(--navy-dark);margin:0">Compradores de cartera</h6>
+        <button class="btn btn-sm btn-primary" onclick="editarComprador()"><i class="bi bi-plus-lg me-1"></i>Nuevo comprador</button>
+      </div>
+      <div class="muted" style="font-size:.78rem;margin-bottom:8px">El <b>nombre corto</b> es el que se escribe como Comprador al vender; de aquí salen la razón social, el domicilio y los representantes que van en el contrato de cesión.</div>
+      <table><thead><tr><th>Nombre corto</th><th>Razón social</th><th>RUT</th><th>Domicilio</th><th>Representantes</th><th>Contacto</th><th>Activo</th><th></th></tr></thead>
+        <tbody id="compBody"><tr><td colspan="8" class="muted">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ CONTRATOS DE CESIÓN ══ -->
+  <div id="tabContr" style="display:none">
+    <div class="card-x">
+      <h6 style="font-weight:800;color:var(--navy-dark)">Generar contrato</h6>
+      <div class="muted" style="font-size:.78rem;margin-bottom:8px">Un contrato por comprador, fecha de venta y tipo (con o sin responsabilidad); el Anexo I lista las operaciones vendidas ese día.</div>
+      <table><thead><tr><th>Fecha</th><th>Comprador</th><th>Tipo</th><th>Créditos</th><th>Precio</th><th></th></tr></thead>
+        <tbody id="grpBody"><tr><td colspan="6" class="muted">Cargando…</td></tr></tbody></table>
+    </div>
+    <div class="card-x">
+      <h6 style="font-weight:800;color:var(--navy-dark)">Textos de los contratos (editables)</h6>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-sm btn-outline-primary" id="txBtnSIN_RESP" onclick="verTexto('SIN_RESP')">Sin responsabilidad</button>
+        <button class="btn btn-sm btn-outline-primary" id="txBtnCON_RESP" onclick="verTexto('CON_RESP')">Con responsabilidad</button>
+      </div>
+      <div><label style="font-size:.68rem;text-transform:uppercase;color:#6b7280;font-weight:700">Título</label><input id="txTitulo" class="form-control form-control-sm" style="max-width:600px"></div>
+      <div style="margin-top:8px"><label style="font-size:.68rem;text-transform:uppercase;color:#6b7280;font-weight:700">Texto (párrafos separados por una línea en blanco; los marcadores {{…}} se rellenan solos)</label>
+        <textarea id="txTexto" class="form-control" style="font-family:Georgia,serif;font-size:.85rem;min-height:420px"></textarea></div>
+      <div style="margin-top:8px;display:flex;gap:10px;align-items:center">
+        <button class="btn btn-sm btn-success" onclick="guardarTexto()"><i class="bi bi-check-lg me-1"></i>Guardar texto</button>
+        <span id="txMsg" style="font-size:.82rem"></span>
+      </div>
+      <details style="margin-top:10px;font-size:.78rem"><summary style="cursor:pointer;font-weight:700;color:var(--navy-dark)">Marcadores disponibles</summary>
+        <table style="margin-top:6px;max-width:900px"><tbody id="marcBody"></tbody></table></details>
+    </div>
+    <div class="card-x" style="background:#f8fafc;border-left:4px solid var(--navy)">
+      <h6 style="font-weight:800;color:var(--navy-dark)"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</h6>
+      <ul style="font-size:.82rem;margin:0;padding-left:18px">
+        <li><b>Compradores</b> → comparecencia, domicilio, representantes y personería del cesionario en cada contrato generado; el nombre corto debe coincidir con el Comprador de la venta.</li>
+        <li><b>Textos</b> → todos los contratos que se generen desde ahora (los ya impresos no cambian). Los datos del cedente salen de <a href="/mantenedores/empresa/">Datos de la Empresa</a> y la cuenta de pago de <a href="/mantenedores/cuentas-bancarias/">Cuentas Bancarias</a>.</li>
+      </ul>
+    </div>
   </div>
 
   <!-- ══ VENDER ══ -->
@@ -144,6 +192,51 @@
   </div>
 </div>
 
+<dialog id="dlgComp" style="border:none;border-radius:14px;padding:0;max-width:980px;width:96%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:12px 18px;font-weight:700">Comprador de cartera</div>
+  <div style="padding:16px 18px;max-height:76vh;overflow:auto">
+    <input type="hidden" id="cpId">
+    <div class="filtro-bar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div><label>Nombre corto * (Comprador en Vender)</label><input id="cpCorto" class="form-control form-control-sm" style="text-transform:uppercase"></div>
+      <div style="grid-column:span 2"><label>Razón social *</label><input id="cpRazon" class="form-control form-control-sm"></div>
+      <div><label>RUT</label><input id="cpRut" class="form-control form-control-sm"></div>
+      <div style="grid-column:span 2"><label>Giro</label><input id="cpGiro" class="form-control form-control-sm"></div>
+      <div><label>Domicilio</label><input id="cpDom" class="form-control form-control-sm"></div>
+      <div><label>Comuna</label><input id="cpComuna" class="form-control form-control-sm"></div>
+      <div><label>Ciudad</label><input id="cpCiudad" class="form-control form-control-sm"></div>
+      <div><label>Correo notificaciones</label><input id="cpEmail" class="form-control form-control-sm"></div>
+      <div><label>Atención (contacto)</label><input id="cpAten" class="form-control form-control-sm"></div>
+      <div><label>Teléfono</label><input id="cpTel" class="form-control form-control-sm"></div>
+      <div style="grid-column:1/-1"><label>Personería (escritura, fecha, notaría)</label><input id="cpPers" class="form-control form-control-sm" placeholder="escritura pública de fecha … otorgada en la notaría de Santiago de don …"></div>
+    </div>
+    <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center"><label style="font-size:.68rem;text-transform:uppercase;color:#6b7280;font-weight:700">Representantes legales</label>
+      <button class="btn btn-sm btn-outline-primary" onclick="$('cpReps').insertAdjacentHTML('beforeend', filaRep())"><i class="bi bi-plus-lg me-1"></i>Agregar</button></div>
+    <div id="cpReps" style="margin-top:6px"></div>
+    <div class="form-check" style="margin-top:8px"><input class="form-check-input" type="checkbox" id="cpActivo" checked><label class="form-check-label" for="cpActivo" style="font-size:.85rem">Activo</label></div>
+  </div>
+  <div style="padding:10px 18px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn btn-sm btn-light" onclick="dlgComp.close()">Cancelar</button>
+    <button class="btn btn-sm btn-success" onclick="guardarComprador()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+  </div>
+</dialog>
+<dialog id="dlgContrato" style="border:none;border-radius:14px;padding:0;max-width:1000px;width:96%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:12px 18px;font-weight:700;display:flex;align-items:center;gap:10px"><span id="ctTitulo" style="flex:1">Contrato</span>
+    <button class="btn btn-sm btn-light" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+    <button class="btn btn-sm btn-light" onclick="dlgContrato.close()"><i class="bi bi-x-lg"></i></button></div>
+  <div style="padding:20px 26px;max-height:78vh;overflow:auto"><div id="printArea"></div></div>
+</dialog>
+<style>
+  .contrato { font-family:Georgia,'Times New Roman',serif; font-size:.9rem; line-height:1.55; color:#111; }
+  .contrato h2 { text-align:center; font-size:1.05rem; font-weight:800; margin:0 0 2px; }
+  .contrato .sub { text-align:center; font-size:.78rem; color:#64748b; margin-bottom:14px; }
+  .contrato p { text-align:justify; margin:0 0 10px; }
+  .contrato h3 { font-size:.95rem; font-weight:800; margin:18px 0 8px; text-align:center; }
+  .contrato table.anexo { font-size:.74rem; border:1px solid #cbd5e1; } .contrato table.anexo th, .contrato table.anexo td { border:1px solid #e2e8f0; padding:4px 6px; }
+  .contrato table.anexo td.num { text-align:right; } .contrato table.anexo tr.tot td { font-weight:800; background:#f8fafc; }
+  .contrato .firmas { display:flex; gap:40px; justify-content:space-around; margin:46px 0 24px; text-align:center; font-size:.82rem; }
+  .contrato .firmas .linea { border-top:1px solid #111; width:220px; margin:0 auto 6px; }
+  @media print { body * { visibility:hidden; } #printArea, #printArea * { visibility:visible; } #printArea { position:absolute; inset:0; padding:24px; } dialog { box-shadow:none; max-width:none; width:auto; } }
+</style>
 <dialog id="dlgCobro" style="border:none;border-radius:14px;padding:0;max-width:460px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
   <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:12px 18px;font-weight:700">Ingreso de fondos del comprador</div>
   <div style="padding:16px 18px">
@@ -174,12 +267,14 @@ const CATP = { RESP_ADM:'both', RESP:'resp', ADM:'adm', SIN_MARCAS:'plain' };
 let ELE = [];
 
 function tab(t){
-  ['Vender','Stock','Cuotas','Param'].forEach(x => {
+  ['Vender','Stock','Cuotas','Param','Comp','Contr'].forEach(x => {
     $('tab'+x).style.display = (x.toLowerCase()===t) ? '' : 'none';
     $('tabBtn'+x).classList.toggle('active', x.toLowerCase()===t);
   });
   if (t==='vender') cargarElegibles();
   if (t==='param') cargarParam();
+  if (t==='comp') cargarCompradores();
+  if (t==='contr') { cargarGrupos(); cargarTextos(); }
   if (t==='stock') cargarStock();
   if (t==='cuotas'){ if(!$('cMes').value) $('cMes').value = new Date().toISOString().slice(0,7); cargarCuotas(); }
 }
@@ -284,6 +379,80 @@ async function cargarStock(){
     options:{ plugins:{ legend:{ display:false } }, scales:{ y:{ ticks:{ callback:v=>'$'+Number(v).toLocaleString('es-CL') } } } } });
 }
 
+/* ══ Compradores ══ */
+let COMP = [];
+async function cargarCompradores(){
+  const j = await fetch('/api/venta-cartera/compradores', { headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) { $('compBody').innerHTML = `<tr><td colspan="8">${esc(j.error||'Sin acceso')}</td></tr>`; return; }
+  COMP = j.data || [];
+  $('compBody').innerHTML = COMP.map(c => `<tr>
+    <td><b>${esc(c.nombre_corto)}</b></td><td>${esc(c.razon_social)}</td><td>${esc(c.rut||'—')}</td>
+    <td>${esc([c.domicilio,c.comuna,c.ciudad].filter(Boolean).join(', ')||'—')}</td>
+    <td style="font-size:.76rem">${(c.representantes||[]).map(r=>esc(r.nombre)+(r.cedula?' ('+esc(r.cedula)+')':'')).join('<br>')||'—'}</td>
+    <td style="font-size:.76rem">${esc(c.atencion||'')}${c.email?'<br>'+esc(c.email):''}</td>
+    <td>${c.activo?'<span class="pill adm">Sí</span>':'<span class="pill plain">No</span>'}</td>
+    <td><button class="btn btn-sm btn-outline-primary" onclick="editarComprador(${c.id})"><i class="bi bi-pencil"></i></button></td></tr>`).join('') || '<tr><td colspan="8" class="muted">Sin compradores.</td></tr>';
+  // datalist del campo Comprador en Vender
+  $('dlComp').innerHTML = COMP.filter(c=>c.activo).map(c=>`<option>${esc(c.nombre_corto)}</option>`).join('');
+}
+function filaRep(r={}){
+  return `<div class="rep" style="display:grid;grid-template-columns:2fr 1fr 1fr 1.2fr 1fr auto;gap:6px;margin-bottom:6px">
+    <input class="form-control form-control-sm r_nombre" placeholder="Nombre completo" value="${esc(r.nombre||'')}">
+    <input class="form-control form-control-sm r_nac" placeholder="Nacionalidad" value="${esc(r.nacionalidad||'chileno')}">
+    <input class="form-control form-control-sm r_ec" placeholder="Estado civil" value="${esc(r.estado_civil||'')}">
+    <input class="form-control form-control-sm r_prof" placeholder="Profesión" value="${esc(r.profesion||'')}">
+    <input class="form-control form-control-sm r_ced" placeholder="Cédula" value="${esc(r.cedula||'')}">
+    <button class="btn btn-sm btn-outline-danger" onclick="this.closest('.rep').remove()"><i class="bi bi-x"></i></button></div>`;
+}
+function editarComprador(id){
+  const c = COMP.find(x=>x.id===id) || {};
+  $('cpId').value = c.id||''; $('cpCorto').value = c.nombre_corto||''; $('cpRazon').value = c.razon_social||''; $('cpRut').value = c.rut||'';
+  $('cpGiro').value = c.giro||''; $('cpDom').value = c.domicilio||''; $('cpComuna').value = c.comuna||''; $('cpCiudad').value = c.ciudad||'';
+  $('cpPers').value = c.personeria||''; $('cpEmail').value = c.email||''; $('cpAten').value = c.atencion||''; $('cpTel').value = c.telefono||'';
+  $('cpActivo').checked = c.activo == null ? true : !!c.activo;
+  $('cpReps').innerHTML = (c.representantes||[]).map(filaRep).join('') || filaRep();
+  dlgComp.showModal();
+}
+async function guardarComprador(){
+  const reps = [...document.querySelectorAll('#cpReps .rep')].map(d => ({ nombre:d.querySelector('.r_nombre').value, nacionalidad:d.querySelector('.r_nac').value, estado_civil:d.querySelector('.r_ec').value, profesion:d.querySelector('.r_prof').value, cedula:d.querySelector('.r_ced').value }));
+  const body = { id:$('cpId').value||null, nombre_corto:$('cpCorto').value, razon_social:$('cpRazon').value, rut:$('cpRut').value, giro:$('cpGiro').value, domicilio:$('cpDom').value, comuna:$('cpComuna').value, ciudad:$('cpCiudad').value, personeria:$('cpPers').value, email:$('cpEmail').value, atencion:$('cpAten').value, telefono:$('cpTel').value, activo:$('cpActivo').checked, representantes:reps };
+  const j = await fetch('/api/venta-cartera/compradores', { method:'POST', headers:H, body:JSON.stringify(body) }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) return alert(j.error||'Error');
+  dlgComp.close(); cargarCompradores();
+}
+
+/* ══ Contratos de cesión ══ */
+let TX = {}, TX_TIPO = 'SIN_RESP';
+async function cargarGrupos(){
+  const j = await fetch('/api/venta-cartera/contratos/grupos', { headers:H }).then(r=>r.json()).catch(()=>({}));
+  $('grpBody').innerHTML = (j.data||[]).map(g => `<tr><td>${g.fecha}</td><td><b>${esc(g.comprador)}</b></td><td>${g.resp?'<span class="pill resp">Con responsabilidad</span>':'<span class="pill plain">Sin responsabilidad</span>'}</td><td>${g.n}</td><td>${fmt(g.precio)}</td>
+    <td><button class="btn btn-sm btn-primary" onclick="verContrato('${esc(g.comprador)}','${g.fecha}',${g.resp?1:0})"><i class="bi bi-printer me-1"></i>Contrato</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">Sin ventas registradas.</td></tr>';
+}
+async function cargarTextos(){
+  const j = await fetch('/api/venta-cartera/contratos/textos', { headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) return;
+  TX = Object.fromEntries((j.data.textos||[]).map(t=>[t.tipo,t]));
+  $('marcBody').innerHTML = (j.data.marcadores||[]).map(([m,d])=>`<tr><td><code>${esc(m)}</code></td><td>${esc(d)}</td></tr>`).join('');
+  verTexto(TX_TIPO);
+}
+function verTexto(t){
+  TX_TIPO = t; const x = TX[t]||{};
+  ['SIN_RESP','CON_RESP'].forEach(k => $('txBtn'+k).classList.toggle('btn-primary', k===t) || $('txBtn'+k).classList.toggle('btn-outline-primary', k!==t));
+  $('txTitulo').value = x.titulo||''; $('txTexto').value = x.texto||''; $('txMsg').textContent = x.updated_by ? `Última edición: ${esc(x.updated_by)} · ${String(x.updated_at).slice(0,16).replace('T',' ')}` : '';
+}
+async function guardarTexto(){
+  const j = await fetch('/api/venta-cartera/contratos/textos/'+TX_TIPO, { method:'PUT', headers:H, body:JSON.stringify({ titulo:$('txTitulo').value, texto:$('txTexto').value }) }).then(r=>r.json()).catch(()=>({}));
+  const m = $('txMsg'); if (!j.success) { m.style.color='#b91c1c'; m.textContent = j.error||'Error'; return; }
+  m.style.color='#16a34a'; m.textContent = '✓ Texto guardado'; TX[TX_TIPO] = { ...(TX[TX_TIPO]||{}), titulo:$('txTitulo').value, texto:$('txTexto').value };
+}
+async function verContrato(comprador, fecha, resp){
+  const j = await fetch(`/api/venta-cartera/contratos/generar?comprador=${encodeURIComponent(comprador)}&fecha=${fecha}&resp=${resp}`, { headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) return alert(j.error||'Error');
+  $('ctTitulo').textContent = j.data.titulo;
+  $('printArea').innerHTML = `<div class="contrato"><h2>${esc(j.data.titulo)}</h2><div class="sub">${esc(j.data.comprador.razon_social)} · ${j.data.ventas} crédito(s) · ${fmt(j.data.precio)}</div>${j.data.html}</div>`;
+  dlgContrato.showModal();
+}
+
 /* Ingreso de fondos del comprador: misma cuenta bancaria del depósito que usa Caja */
 let VENTAS = [], CUENTAS = null;
 async function cobrar(id){
@@ -329,6 +498,7 @@ async function cargarCuotas(){
 }
 
 cargarElegibles();
+cargarCompradores();   // llena el datalist de Comprador
 </script>
 <script>
   window.AF_TOPNAV = {
