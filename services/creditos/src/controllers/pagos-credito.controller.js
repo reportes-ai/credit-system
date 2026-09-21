@@ -226,8 +226,8 @@ async function separarCapitalInteres(id_credito, pagos, trxActual) {
   const [cal] = await pool.query('SELECT numero_cuota, interes FROM cuotas_credito WHERE id_credito=? AND numero_cuota IN (?)', [id_credito, nums]);
   const [prev] = await pool.query(
     `SELECT numero_cuota, COALESCE(SUM(monto_cuota),0) pagado FROM pagos_credito
-      WHERE id_credito=? AND estado_pago='PAGADO' AND numero_cuota IN (?) AND (numero_transaccion IS NULL OR numero_transaccion<>?)
-      GROUP BY numero_cuota`, [id_credito, nums, trxActual || 0]);
+      WHERE id_credito=? AND estado_pago='PAGADO' AND numero_cuota IN (?) AND (numero_transaccion IS NULL OR numero_transaccion < ?)   -- solo lo pagado ANTES de esta transacción
+      GROUP BY numero_cuota`, [id_credito, nums, trxActual || Number.MAX_SAFE_INTEGER]);
   const intRest = new Map(cal.map(c => [Number(c.numero_cuota), Number(c.interes) || 0]));
   for (const p of prev) { const n = Number(p.numero_cuota); if (intRest.has(n)) intRest.set(n, Math.max(0, intRest.get(n) - Number(p.pagado))); }
   for (const p of pagos) {
@@ -673,8 +673,13 @@ const prepagar = async (req, res) => {
     const detalle = d.detalle || [];
     const gSum = detalle.reduce((s, q) => s + _r2(q.gastos_cobranza), 0);
     const mSum = detalle.reduce((s, q) => s + _r2(q.interes_mora), 0);
-    const cSum = detalle.reduce((s, q) => s + _r2(q.valor_cuota), 0);
+    /* Capital a saldar por cuota: en mora se debe la cuota completa (capital + interés vencido);
+       vigente (futura) solo su AMORTIZACIÓN — el interés futuro no se cobra (lo reemplazan el interés
+       corriente a la fecha y la comisión de prepago). Mismo criterio que calcularPrepago (Cfull). */
+    const capDe = q => q.en_mora ? _r2(q.valor_cuota) : _r2(q.amortizacion);
+    const cSum = detalle.reduce((s, q) => s + capDe(q), 0);
     let totalCobrado = 0;
+    const cont = { capVig: 0, moraRows: [], mora: 0, gastos: 0 };   // para el asiento
     const ins = `INSERT INTO pagos_credito
        (id_credito, numero_cuota, fecha_vencimiento, monto_cuota, interes_mora, gastos_cobranza,
         total_pagado, fecha_pago, estado_pago, observacion, registrado_por, id_registrado_por,
@@ -682,19 +687,24 @@ const prepagar = async (req, res) => {
        VALUES (?,?,?,?,?,?,?,?,'PAGADO',?,?,?,?,?,?,?,?,?)`;
 
     for (const q of detalle) {
-      const gFull = _r2(q.gastos_cobranza), mFull = _r2(q.interes_mora), cFull = _r2(q.valor_cuota);
+      const gFull = _r2(q.gastos_cobranza), mFull = _r2(q.interes_mora), cFull = capDe(q);
       const gCond = gSum > 0 ? Math.round(condG * (gFull / gSum)) : 0;
       const mCond = mSum > 0 ? Math.round(condI_mora * (mFull / mSum)) : 0;
       const cCond = cSum > 0 ? Math.round(condC * (cFull / cSum)) : 0;
       const gCol = Math.max(0, gFull - gCond), mCol = Math.max(0, mFull - mCond), cCol = Math.max(0, cFull - cCond);
       const tp = cCol + mCol + gCol;
       totalCobrado += tp;
-      await conn.query(ins, [id_credito, q.numero_cuota, q.fecha_vencimiento || null, _r2(q.valor_cuota),
+      if (q.en_mora) cont.moraRows.push({ numero_cuota: q.numero_cuota, monto_cuota: cCol }); else cont.capVig += cCol;
+      cont.mora += mCol; cont.gastos += gCol;
+      await conn.query(ins, [id_credito, q.numero_cuota, q.fecha_vencimiento || null, cFull,
         mCol, gCol, tp, fp, obs, reg, u.id_usuario || null, idCajaInt, b.origen_fondos || null, idCtaInt, trx, mFull, gFull]);
     }
     // Fila sentinela (numero_cuota = 0): comisión de prepago + interés corriente
     const corrComCol = Math.max(0, corrComTot - condI_corr);
     totalCobrado += corrComCol;
+    // La fila sentinela junta interés corriente (resultado 3001010) y comisión (3001090): se separan en proporción
+    cont.intCorr = corrComTot > 0 ? Math.round(corrComCol * _r2(d.interes_corriente) / corrComTot) : 0;
+    cont.comision = corrComCol - cont.intCorr;
     await conn.query(ins, [id_credito, 0, null, 0, corrComCol, 0, corrComCol, fp,
       'Comisión de prepago + interés corriente', reg, u.id_usuario || null, idCajaInt, b.origen_fondos || null, idCtaInt, trx, corrComTot, 0]);
 
@@ -721,16 +731,16 @@ const prepagar = async (req, res) => {
           WHERE x.id_seguimiento = e.id_seguimiento AND x.etapa NOT IN ('COMISION PENDIENTE','COMISION A PAGAR'))`,
       [id_credito]).catch(e => console.error('[prepago comision pendiente]', e.message));
 
-    // Centralización contable: asiento del prepago con lo efectivamente cobrado (nunca bloquea)
+    // Centralización contable: asiento del prepago con lo efectivamente COBRADO (nunca bloquea).
+    // Capital (1104010) vs interés corriente (3001010) con la tabla de desarrollo, igual que PAGO_CAJA.
     try {
-      const [[sm]] = await pool.query(
-        `SELECT COALESCE(SUM(monto_cuota),0) c, COALESCE(SUM(interes_mora),0) m, COALESCE(SUM(gastos_cobranza),0) g, COALESCE(SUM(total_pagado),0) t
-           FROM pagos_credito WHERE numero_transaccion=? AND estado_pago='PAGADO'`, [trx]);
+      const ci = await separarCapitalInteres(id_credito, cont.moraRows, trx);
+      const capital = cont.capVig + ci.capital, interes = ci.interes + cont.intCorr;
       await require('../../../contabilidad/src/motor-asientos').contabilizar({
         evento: 'PREPAGO', fecha: fp,
         glosa: `Prepago crédito ${num_op} — ${pp.nombre || ''}`.trim().slice(0, 300),
         ref: `TRX-${String(trx).padStart(6, '0')}`, num_op, rut: pp.rut || null,
-        montos: { total: Number(sm.t), cuota: Number(sm.c), mora: Number(sm.m), gastos: Number(sm.g) },
+        montos: { total: Math.round(totalCobrado), capital, interes, cuota: capital + interes, mora: cont.mora, comision: cont.comision, gastos: cont.gastos },
       });
     } catch (_) {}
     auditar({ req, accion: 'PAGAR', modulo: 'pagos', entidad: 'prepago', entidad_id: trx,

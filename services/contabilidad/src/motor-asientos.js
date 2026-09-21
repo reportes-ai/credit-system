@@ -16,6 +16,7 @@
      — la operación de negocio jamás se cae por contabilidad.
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../shared/config/database');
+const DESC_PREPAGO = 'Se dispara al saldar completo un crédito en Caja. Campos: total (lo cobrado), capital (capital de cuotas vigentes + capital de cuotas en mora), interes (interés de cuotas en mora + interés corriente a la fecha), mora (interés de mora), comision (comisión de prepago), gastos (gastos de cobranza), cuota (capital+interés).';
 const DESC_PAGO_CAJA = 'Se dispara al registrar un pago de cuotas en Caja. Campos: total (lo cobrado), capital (amortización de las cuotas, según la tabla de desarrollo), interes (interés corriente de las cuotas; en pagos parciales se imputa primero al interés), cuota (capital+interés), mora (interés de mora), gastos (gastos de cobranza).';
 
 /* ── Migración ─────────────────────────────────────────────────────────────── */
@@ -65,10 +66,16 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['3001040', 'HABER', 'mora', 'Interés de mora'],
         ['3001020', 'HABER', 'gastos', 'Gastos de cobranza'],
       ]],
-      ['PREPAGO', 'Prepago de crédito en Caja', 'Se dispara al saldar completo un crédito en Caja. Campos: total (lo cobrado), cuota (capital+interés de cuotas), mora (interés de mora + comisión de prepago), gastos (gastos de cobranza).', 'INGRESO', 1, [
+      ['RECLASIF_INTERES_CARTERA', 'Reclasificación interés corriente cartera propia', 'Traspasa a resultado el interés corriente que un asiento anterior abonó a Contratos Propios (PAGO_CAJA previo a v259.8). Campos: interes.', 'TRASPASO', 1, [
+        ['1104010', 'DEBE', 'interes', 'Reclasificación: interés abonado a contratos'],
+        ['3001010', 'HABER', 'interes', 'Interés corriente reclasificado'],
+      ]],
+      ['PREPAGO', 'Prepago de crédito en Caja', DESC_PREPAGO, 'INGRESO', 1, [
         ['1101090', 'DEBE', 'total', 'Recaudación prepago'],
-        ['1104010', 'HABER', 'cuota', 'Abono a contratos'],
-        ['3001090', 'HABER', 'mora', 'Ingresos por prepago'],
+        ['1104010', 'HABER', 'capital', 'Abono a contratos (capital)'],
+        ['3001010', 'HABER', 'interes', 'Interés corriente'],
+        ['3001040', 'HABER', 'mora', 'Interés de mora'],
+        ['3001090', 'HABER', 'comision', 'Comisión de prepago'],
         ['3001020', 'HABER', 'gastos', 'Gastos de cobranza'],
       ]],
       ['ODP_PAGADA', 'Orden de Pago pagada', 'Se dispara al marcar PAGADA una Orden de Pago a proveedor. Campos: monto (total de la orden).', 'EGRESO', 1, [
@@ -236,6 +243,19 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         console.log('[contabilidad] PAGO_CAJA: capital e interés corriente separados');
       }
     } catch (e) { console.error('[contabilidad parche pago caja]', e.message); }
+    // Mismo parche para PREPAGO: capital / interés corriente / mora / comisión, cada uno a su cuenta.
+    try {
+      const [[vieja]] = await pool.query(
+        "SELECT id FROM ctb_reglas_lineas WHERE evento='PREPAGO' AND cuenta='1104010' AND campo='cuota' LIMIT 1");
+      const [[yaCom]] = await pool.query("SELECT COUNT(*) n FROM ctb_reglas_lineas WHERE evento='PREPAGO' AND campo='comision'");
+      if (vieja && !yaCom.n) {
+        await pool.query("UPDATE ctb_reglas_lineas SET campo='capital', glosa='Abono a contratos (capital)' WHERE id=?", [vieja.id]);
+        await pool.query("UPDATE ctb_reglas_lineas SET campo='comision', glosa='Comisión de prepago' WHERE evento='PREPAGO' AND cuenta='3001090' AND campo='mora'");
+        await pool.query("INSERT INTO ctb_reglas_lineas (evento, cuenta, lado, campo, glosa) VALUES ('PREPAGO','3001010','HABER','interes','Interés corriente'), ('PREPAGO','3001040','HABER','mora','Interés de mora')");
+        await pool.query("UPDATE ctb_reglas SET descripcion=? WHERE evento='PREPAGO'", [DESC_PREPAGO]);
+        console.log('[contabilidad] PREPAGO: capital, interés, mora y comisión separados');
+      }
+    } catch (e) { console.error('[contabilidad parche prepago]', e.message); }
     console.log('[contabilidad] motor de asientos listo');
   } catch (e) { console.error('[contabilidad-motor migration]', e.message); }
 });
