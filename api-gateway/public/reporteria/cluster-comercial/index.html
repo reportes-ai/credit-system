@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — AÑO/MES por creditos.mes (mes de atribución, como el Dashboard de ventas); la semana por día de otorgamiento. v1.1 -->
+<!-- v1.3 — columna DESDE/HASTA con las fechas medidas en cada semana (vista y Excel); página a ancho completo. v1.2 — AÑO/MES por creditos.mes (mes de atribución, como el Dashboard de ventas); la semana por día de otorgamiento. v1.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,7 +10,7 @@
 <style>
   :root { --navy:#012d70; --accent:#0141A2; --sky:#009AFE; }
   * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
-  .wrap { max-width:1000px; margin:24px auto; padding:0 20px 60px; }
+  .wrap { max-width:1400px; margin:24px auto; padding:0 20px 60px; }
   .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:20px; display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
   .banner > i { font-size:2.4rem; opacity:.85; }
   .banner h2 { margin:0 0 3px; font-size:1.25rem; font-weight:700; }
@@ -25,9 +25,9 @@
   .panel h5 .badge3d { margin-left:auto; background:#eff6ff; color:var(--accent); border-radius:8px; padding:2px 9px; font-size:.65rem; font-weight:800; letter-spacing:.06em; }
   table { border-collapse:collapse; font-size:.78rem; width:100%; }
   th { background:#f0f4f8; color:#6b7280; padding:7px 10px; text-align:right; font-size:.68rem; text-transform:uppercase; position:sticky; top:0; white-space:nowrap; }
-  th:nth-child(-n+2) { text-align:left; }
+  th:nth-child(-n+2), th:nth-child(6), th:nth-child(7) { text-align:left; }
   td { padding:5px 10px; border-bottom:1px solid #f1f5f9; text-align:right; white-space:nowrap; }
-  td:nth-child(-n+2) { text-align:left; }
+  td:nth-child(-n+2), td:nth-child(6), td:nth-child(7) { text-align:left; }
   tr.sem-actual td { background:#fffbeb; font-weight:600; }
   .scroll { max-height:62vh; overflow:auto; border:1px solid #e5e7eb; border-radius:8px; }
   .cargando { text-align:center; color:#6b7280; padding:60px 0; font-size:.9rem; }
@@ -72,6 +72,14 @@ function fechaCorte() {
 }
 document.getElementById('fecha-corte').textContent = '🕐 Actualizado al ' + fechaCorte() + ' (día cerrado)';
 
+/* Fechas que mide cada semana: bloques fijos 1-7 · 8-14 · 15-21 · 22-fin de mes (DD-MM-AAAA) */
+function rango(f) {
+  var ini = (f.semana - 1) * 7 + 1;
+  var fin = f.semana === 4 ? new Date(f.anio, f.mes, 0).getDate() : f.semana * 7;
+  var d = function(dia){ return String(dia).padStart(2,'0') + '-' + String(f.mes).padStart(2,'0') + '-' + f.anio; };
+  return [d(ini), d(fin)];
+}
+
 /* Filas en el formato del Excel (mismas columnas que siempre recibió Ecuador) */
 function filasExport() {
   return FILAS.map(function(f, i) {
@@ -81,6 +89,8 @@ function filasExport() {
       'AÑO':     f.anio,
       'MES':     f.mes,
       'SEMANA':  f.semana,
+      'DESDE':   rango(f)[0],
+      'HASTA':   rango(f)[1],
       'PPSTO #': f.ppsto_n,
       'PPSTO $': f.ppsto_m,
       'REAL #':  f.real_n,
@@ -94,11 +104,11 @@ function descargar() {
   if (!filas.length) return;
   var wb = XLSX.utils.book_new();
   var ws = XLSX.utils.json_to_sheet(filas);
-  ws['!cols'] = [{wch:5},{wch:12},{wch:6},{wch:5},{wch:8},{wch:9},{wch:14},{wch:9},{wch:16}];
-  // Formato miles en montos: G = PPSTO $, I = REAL $
+  ws['!cols'] = [{wch:5},{wch:12},{wch:6},{wch:5},{wch:8},{wch:12},{wch:12},{wch:9},{wch:14},{wch:9},{wch:16}];
+  // Formato miles en montos: I = PPSTO $, K = REAL $ (F y G son DESDE/HASTA)
   var range = XLSX.utils.decode_range(ws['!ref']);
   for (var R = range.s.r + 1; R <= range.e.r; R++) {
-    ['G','I'].forEach(function(col) {
+    ['I','K'].forEach(function(col) {
       var addr = col + (R + 1);
       if (ws[addr] && ws[addr].t === 'n') ws[addr].z = '#,##0';
     });
