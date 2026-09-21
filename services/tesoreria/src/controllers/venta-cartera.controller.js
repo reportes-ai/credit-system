@@ -70,7 +70,8 @@ exports.elegibles = async (req, res) => {
       FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente=c.id_cliente
       WHERE c.financiera='AUTOFACIL'
         AND (c.estado_credito='OTORGADO' OR c.estado='OTORGADO')
-        AND (c.credito_vendido_a IS NULL OR c.credito_vendido_a='')
+        AND UPPER(COALESCE(c.estado_cartera,'')) NOT IN ('PREPAGADO','PAGADO','CASTIGADO','ANULADO')   -- sin saldo: nada que vender
+        AND (c.credito_vendido_a IS NULL OR c.credito_vendido_a='' OR UPPER(c.credito_vendido_a)='NO VENDIDO')   -- marca de la migración = vendible
       ORDER BY c.num_op DESC LIMIT 2000`);
     const caps = await capitalesVigentes(ops.map(o => o.num_op));
     const data = ops.map(o => {
@@ -101,7 +102,7 @@ exports.vender = async (req, res) => {
       const idc = parseInt(v.id_credito); const precio = Math.round(+v.precio_venta);
       if (!idc || !(precio > 0)) { errores.push(`Crédito ${v.id_credito}: precio inválido`); continue; }
       const [[cr]] = await pool.query(
-        "SELECT id, num_op FROM creditos WHERE id=? AND financiera='AUTOFACIL' AND (credito_vendido_a IS NULL OR credito_vendido_a='')", [idc]);
+        "SELECT id, num_op FROM creditos WHERE id=? AND financiera='AUTOFACIL' AND (credito_vendido_a IS NULL OR credito_vendido_a='' OR UPPER(credito_vendido_a)='NO VENDIDO') AND UPPER(COALESCE(estado_cartera,'')) NOT IN ('PREPAGADO','PAGADO','CASTIGADO','ANULADO')", [idc]);
       if (!cr) { errores.push(`Crédito ${v.id_credito}: no elegible o ya vendido`); continue; }
       const caps = await capitalesVigentes([cr.num_op]);
       const cap = caps[cr.num_op] ? +caps[cr.num_op].capital : null;
