@@ -18,6 +18,11 @@ const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
 const APP_URL = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');
 const LINK = `${APP_URL}/recursos-humanos/ingresos/`;
+const almacen = require('../../../../shared/almacen-docs');
+const FC = require('./ficha.controller');
+const DOC_TIPOS = ['CURRICULUM', 'CARTA OFERTA', 'CONTRATO', 'TITULO', 'CEDULA DE IDENTIDAD', 'INFORME COMERCIAL'];
+// Campos de la ficha que viajan en la solicitud: los mismos que RRHH edita en Colaboradores (fuente: ficha.controller)
+const camposFicha = () => [...FC.CAMPOS_CONTACTO, ...FC.CAMPOS_LABORAL];
 
 require('../../../../shared/migrate').enFila('rrhh-ingresos', async () => {
   await pool.query(`CREATE TABLE IF NOT EXISTS rh_ingresos (
@@ -35,6 +40,20 @@ require('../../../../shared/migrate').enFila('rrhh-ingresos', async () => {
     id_usuario INT NULL, correo_enviado TINYINT(1) NULL, error_alta VARCHAR(300) NULL,
     INDEX idx_estado (estado), INDEX idx_sup (id_supervisor)
   )`);
+  // Ficha completa pendiente (se vuelca a rh_fichas al aprobar) + documentos del postulante contratado
+  await pool.query('ALTER TABLE rh_ingresos ADD COLUMN ficha JSON NULL').catch(() => {});
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_ingreso_docs (
+    id INT AUTO_INCREMENT PRIMARY KEY, id_ingreso INT NOT NULL, tipo VARCHAR(60) NOT NULL,
+    nombre_archivo VARCHAR(255) NOT NULL, mime_type VARCHAR(120) NULL, archivo_data LONGBLOB NULL,
+    subido_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_ing (id_ingreso))`);
+  for (const q of almacen.sqlColumnas('rh_ingreso_docs')) await pool.query(q).catch(() => {});
+  // Los tipos de la solicitud existen también en el catálogo de la Carpeta Digital (destino al aprobar)
+  const [[cfg]] = await pool.query("SELECT valor FROM rh_config WHERE clave='doc_tipos'");
+  if (cfg) {
+    const act = String(cfg.valor || '').split(',').map(s => s.trim()).filter(Boolean);
+    const falta = DOC_TIPOS.filter(t => !act.includes(t));
+    if (falta.length) await pool.query("UPDATE rh_config SET valor=? WHERE clave='doc_tipos'", [[...act, ...falta].join(',')]);
+  }
   /* Tarjeta en el landing de RRHH, para TODOS los perfiles: cualquiera puede ser supervisor y
      aprobar desde aquí; el listado muestra a cada uno solo lo suyo (RRHH/Admin ven todo). */
   const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_ingresos' LIMIT 1");
@@ -89,7 +108,11 @@ exports.listar = async (req, res) => {
         ${admin || rrhh ? '' : 'WHERE i.id_supervisor = ?'}
         ORDER BY FIELD(i.estado,'PEND_SUPERVISOR','PEND_ADMIN','APROBADA','RECHAZADA'), i.id DESC LIMIT 300`,
       admin || rrhh ? [] : [yo]);
-    ok(res, { ingresos: rows, yo, es_admin: admin, es_rrhh: rrhh });
+    if (rows.length) {
+      const [docs] = await pool.query('SELECT id, id_ingreso, tipo, nombre_archivo FROM rh_ingreso_docs WHERE id_ingreso IN (?) ORDER BY id', [rows.map(r => r.id)]);
+      for (const r of rows) r.docs = docs.filter(x => x.id_ingreso === r.id);
+    }
+    ok(res, { ingresos: rows, yo, es_admin: admin, es_rrhh: rrhh, doc_tipos: DOC_TIPOS });
   } catch (e) { fail(res, e.message); }
 };
 
@@ -124,6 +147,12 @@ exports.crear = async (req, res) => {
     const [[dupI]] = await pool.query(`SELECT id FROM rh_ingresos WHERE (rut=? OR email=?) AND estado IN ('PEND_SUPERVISOR','PEND_ADMIN') LIMIT 1`, [d.rut, d.email]);
     if (dupI) return fail(res, `Ya hay una solicitud en curso (#${dupI.id}) para ese RUT o correo`, 409);
 
+    const fi = {};
+    const src = b.ficha && typeof b.ficha === 'object' ? b.ficha : {};
+    for (const k of camposFicha()) if (k in src && src[k] !== '' && src[k] != null) fi[k] = typeof src[k] === 'string' ? src[k].trim().slice(0, 300) : src[k];
+    if (d.tipo_contrato) fi.tipo_contrato = d.tipo_contrato;
+    if (d.jornada) fi.jornada = d.jornada;
+    d.ficha = JSON.stringify(fi);
     const cols = Object.keys(d);
     const [r] = await pool.query(`INSERT INTO rh_ingresos (${cols.join(', ')}, creado_por) VALUES (${cols.map(() => '?').join(', ')}, ?)`,
       [...cols.map(k => d[k]), req.usuario.id_usuario]);
@@ -167,10 +196,22 @@ exports.aprobar = async (req, res) => {
       }
       await pool.query(`UPDATE rh_ingresos SET estado='APROBADA', admin_por=?, admin_at=NOW(), id_usuario=?, correo_enviado=?, error_alta=NULL WHERE id=?`,
         [yo, alta.id_usuario, alta.envio.ok ? 1 : 0, id]);
-      // Ficha RRHH con lo laboral que ya se conoce (fuente única rh_fichas)
-      await pool.query(`INSERT INTO rh_fichas (id_usuario, tipo_contrato, jornada, updated_by) VALUES (?,?,?,?)
-        ON DUPLICATE KEY UPDATE tipo_contrato=VALUES(tipo_contrato), jornada=VALUES(jornada)`,
-        [alta.id_usuario, s.tipo_contrato, s.jornada, 'Ingreso de colaboradores']).catch(e => console.error('[ingresos ficha]', e.message));
+      // Ficha RRHH completa desde la solicitud (fuente única rh_fichas desde aquí en adelante)
+      try {
+        let fi = s.ficha || {}; if (typeof fi === 'string') fi = JSON.parse(fi);
+        const ks = camposFicha().filter(k => k in fi);
+        if (s.tipo_contrato && !ks.includes('tipo_contrato')) { ks.push('tipo_contrato'); fi.tipo_contrato = s.tipo_contrato; }
+        if (s.jornada && !ks.includes('jornada')) { ks.push('jornada'); fi.jornada = s.jornada; }
+        if (ks.length) await pool.query(`INSERT INTO rh_fichas (id_usuario, ${ks.join(', ')}, updated_by) VALUES (?${', ?'.repeat(ks.length)}, ?)
+          ON DUPLICATE KEY UPDATE ${ks.map(k => `${k}=VALUES(${k})`).join(', ')}`,
+          [alta.id_usuario, ...ks.map(k => fi[k]), 'Ingreso de colaboradores']);
+      } catch (e) { console.error('[ingresos ficha]', e.message); }
+      // Documentos de la solicitud → Carpeta Digital del colaborador (mismo objeto en el bucket, se mueve la fila)
+      try {
+        await pool.query(`INSERT INTO rh_documentos (id_usuario, tipo, nombre_archivo, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes, subido_por)
+          SELECT ?, tipo, nombre_archivo, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes, subido_por FROM rh_ingreso_docs WHERE id_ingreso=?`, [alta.id_usuario, id]);
+        await pool.query('DELETE FROM rh_ingreso_docs WHERE id_ingreso=?', [id]);
+      } catch (e) { console.error('[ingresos docs]', e.message); }
       auditar({ req, accion: 'APROBAR', modulo: 'rrhh', entidad: 'rh_ingreso', entidad_id: id,
         detalle: `Administrador aprobó ingreso de ${s.nombre} ${s.apellido}: usuario #${alta.id_usuario} creado${alta.envio.ok ? ' y correo enviado' : ' (correo NO enviado)'}` });
       const [[cr]] = await pool.query('SELECT email FROM usuarios WHERE id_usuario=?', [s.creado_por]);
@@ -200,5 +241,52 @@ exports.rechazar = async (req, res) => {
     const [[cr]] = await pool.query('SELECT email FROM usuarios WHERE id_usuario=?', [s.creado_por]);
     avisar(cr?.email, `❌ Contratación rechazada — ${s.nombre} ${s.apellido}`, `<p style="margin:0 0 12px">Motivo: <b>${motivo.replace(/</g, '&lt;')}</b></p>${ficha(s)}`);
     ok(res, { estado: 'RECHAZADA' });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* POST /api/rrhh/ingresos/:id/docs { tipo, archivo_nombre, mime_type, archivo_data(base64) } — RRHH, mientras está en curso */
+exports.subirDoc = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { tipo, archivo_nombre, mime_type, archivo_data } = req.body || {};
+    const t = String(tipo || '').toUpperCase();
+    if (!DOC_TIPOS.includes(t) || !archivo_data) return fail(res, 'Tipo y archivo son requeridos', 400);
+    const [[s]] = await pool.query('SELECT estado FROM rh_ingresos WHERE id=?', [id]);
+    if (!s) return fail(res, 'Solicitud no existe', 404);
+    if (!['PEND_SUPERVISOR', 'PEND_ADMIN'].includes(s.estado)) return fail(res, 'La solicitud ya está resuelta: sube el documento en Carpetas Digitales', 409);
+    const buffer = Buffer.from(archivo_data, 'base64');
+    if (buffer.length > 8 * 1024 * 1024) return fail(res, 'Archivo supera 8 MB', 400);   // body JSON tope 12 MB en base64
+    const d = await almacen.colocar({ ambito: 'rrhh-ingresos', clave: id, buffer, mime: mime_type, nombre: archivo_nombre || 'documento' });
+    const u = req.usuario || {};
+    const [r] = await pool.query(`INSERT INTO rh_ingreso_docs (id_ingreso, tipo, nombre_archivo, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes, subido_por) VALUES (?,?,?,?,?,?,?,?,?)`,
+      [id, t, String(archivo_nombre || 'documento').slice(0, 255), mime_type || null, d.blob, d.storage, d.ruta, d.bytes, `${u.nombre || ''} ${u.apellido || ''}`.trim() || null]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'rh_ingreso_doc', entidad_id: r.insertId, detalle: `Subió ${t} a la solicitud de ingreso #${id}` });
+    ok(res, { id: r.insertId });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* GET /api/rrhh/ingresos/docs/:docId — RRHH, Administrador o el supervisor de esa solicitud */
+exports.verDoc = async (req, res) => {
+  try {
+    const yo = req.usuario.id_usuario;
+    const [[d]] = await pool.query(`SELECT d.*, i.id_supervisor FROM rh_ingreso_docs d JOIN rh_ingresos i ON i.id=d.id_ingreso WHERE d.id=?`, [req.params.docId]);
+    if (!d) return fail(res, 'Documento no encontrado', 404);
+    if (Number(d.id_supervisor) !== Number(yo) && !(await esRRHH(yo)) && !(await esAdmin(yo))) return fail(res, 'Sin permiso sobre este documento', 403);
+    res.setHeader('Content-Type', d.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(d.nombre_archivo)}"`);
+    res.send(await almacen.obtener({ ruta: d.doc_ruta, blob: d.archivo_data }));
+  } catch (e) { fail(res, e.message); }
+};
+
+/* DELETE /api/rrhh/ingresos/docs/:docId — RRHH, mientras la solicitud está en curso */
+exports.borrarDoc = async (req, res) => {
+  try {
+    const [[d]] = await pool.query(`SELECT d.id, d.doc_ruta, i.estado FROM rh_ingreso_docs d JOIN rh_ingresos i ON i.id=d.id_ingreso WHERE d.id=?`, [req.params.docId]);
+    if (!d) return fail(res, 'Documento no encontrado', 404);
+    if (!['PEND_SUPERVISOR', 'PEND_ADMIN'].includes(d.estado)) return fail(res, 'La solicitud ya está resuelta', 409);
+    await pool.query('DELETE FROM rh_ingreso_docs WHERE id=?', [d.id]);
+    if (d.doc_ruta) await almacen.borrar(d.doc_ruta).catch(() => {});
+    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'rh_ingreso_doc', entidad_id: d.id, detalle: 'Borró documento de solicitud de ingreso' });
+    ok(res, { ok: true });
   } catch (e) { fail(res, e.message); }
 };

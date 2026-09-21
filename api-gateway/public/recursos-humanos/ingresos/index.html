@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ingreso de Colaboradores — AutoFácil</title>
-  <!-- v1.0 — Ingreso de colaboradores: RRHH registra la contratación (cargo = perfil de Business Suite, supervisor), aprueba el supervisor, aprueba el Administrador y se crea el usuario con correo de usuario y clave (Pato 21-09-2026) -->
+  <!-- v1.1 — todos los campos de la ficha (personales, cónyuge, emergencia, previsión y pago, cargas) + subir Curriculum, Carta oferta, Contrato, Título, Cédula e Informe comercial; al aprobar pasan a la ficha y a la Carpeta Digital. v1.0 — Ingreso de colaboradores: RRHH registra la contratación (cargo = perfil de Business Suite, supervisor), aprueba el supervisor, aprueba el Administrador y se crea el usuario con correo de usuario y clave (Pato 21-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -53,8 +53,8 @@
     </div>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr><th>#</th><th>Persona</th><th>RUT</th><th>Cargo</th><th>Supervisor</th><th>Ingreso</th><th>Estado</th><th>Acción</th></tr></thead>
-        <tbody id="tb"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody>
+        <thead><tr><th>#</th><th>Persona</th><th>RUT</th><th>Cargo</th><th>Supervisor</th><th>Ingreso</th><th>Docs</th><th>Estado</th><th>Acción</th></tr></thead>
+        <tbody id="tb"><tr><td colspan="9" class="empty">Cargando…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -62,7 +62,8 @@
     <ul style="margin:6px 0 0">
       <li><b>Aprobación del Administrador</b> → crea el usuario en <a href="/usuarios/">Usuarios</a> con el perfil elegido como cargo y envía el correo con usuario y clave temporal</li>
       <li><b>Supervisor</b> → queda como jefatura en la ficha (<a href="/recursos-humanos/colaboradores/">Colaboradores</a>), organigrama y aprobaciones de ausencias</li>
-      <li><b>Tipo de contrato y jornada</b> → ficha RRHH, que alimenta <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a></li>
+      <li><b>Campos de la ficha</b> (contrato, previsión, sueldo, pago, cargas, contacto) → se vuelcan a la ficha en <a href="/recursos-humanos/colaboradores/">Colaboradores</a>, que alimenta <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a> y Previred</li>
+      <li><b>Documentos</b> (curriculum, carta oferta, contrato, título, cédula, informe comercial) → pasan a la <a href="/recursos-humanos/documentos-firmados/">Carpeta Digital</a> del colaborador al aprobar</li>
       <li><b>Cargo</b> → lista viva de <a href="/usuarios/">Perfiles</a>: un perfil nuevo aparece solo</li>
     </ul>
   </div>
@@ -89,8 +90,63 @@
       <div class="fld"><label>Jornada</label><select id="i_jornada"><option value=""></option><option>COMPLETA</option><option>PARCIAL</option></select></div>
       <div class="fld"><label>Centro de costo</label><input id="i_centro_costo"></div>
       <div class="fld"><label>Correo corporativo * (usuario)</label><input id="i_email" type="email" placeholder="nombre.apellido@autofacilchile.cl"></div>
-      <div class="fld"><label>Teléfono</label><input id="i_telefono"></div>
+      <div class="fld"><label>Teléfono corporativo</label><input id="i_telefono"></div>
+      <div class="fld"><label>Tipo de renta (comisiones)</label><select data-f="tipo_renta"><option>VARIABLE</option><option>FIJA</option></select></div>
+      <div class="fld"><label>Pensionado (sin AFP, AFC ni SIS)</label><select data-f="pensionado"><option value="0">NO</option><option value="1">SI</option></select></div>
+      <div class="fld wPF" style="display:none"><label>1er vencimiento (plazo fijo)</label><input type="date" data-f="plazo_fijo_venc1"></div>
+      <div class="fld wPF" style="display:none"><label>2do vencimiento (renovación)</label><input type="date" data-f="plazo_fijo_venc2"></div>
     </div>
+    <!-- Campos de la ficha (los mismos de RRHH › Colaboradores): viajan en la solicitud y se vuelcan a la ficha al aprobar -->
+    <div class="sec">Datos personales</div>
+    <div class="grid3">
+      <div class="fld"><label>Estado civil</label><select data-f="estado_civil"><option value=""></option><option>SOLTERO/A</option><option>CASADO/A</option><option>CONVIVIENTE CIVIL</option><option>DIVORCIADO/A</option><option>VIUDO/A</option></select></div>
+      <div class="fld"><label>Nacionalidad</label><input data-f="nacionalidad" value="CHILENA"></div>
+      <div class="fld"><label>Dirección</label><input data-f="direccion"></div>
+      <div class="fld"><label>Comuna</label><input data-f="comuna"></div>
+      <div class="fld"><label>Ciudad</label><input data-f="ciudad"></div>
+      <div class="fld"><label>Email personal</label><input type="email" data-f="email_personal"></div>
+      <div class="fld"><label>Teléfono personal</label><input data-f="telefono_personal"></div>
+    </div>
+    <div class="sec">Cónyuge / conviviente</div>
+    <div class="grid3">
+      <div class="fld"><label>Nombre</label><input data-f="conyuge_nombre"></div>
+      <div class="fld"><label>RUT</label><input data-f="conyuge_rut"></div>
+      <div class="fld"><label>Teléfono</label><input data-f="conyuge_telefono"></div>
+      <div class="fld" style="grid-column:span 2"><label>Dirección</label><input data-f="conyuge_direccion"></div>
+    </div>
+    <div class="sec">Contactos de emergencia</div>
+    <div class="grid3">
+      <div class="fld"><label>Contacto 1 — nombre</label><input data-f="emergencia_nombre"></div>
+      <div class="fld"><label>Contacto 1 — fono</label><input data-f="emergencia_fono"></div><div></div>
+      <div class="fld"><label>Contacto 2 — nombre</label><input data-f="emergencia2_nombre"></div>
+      <div class="fld"><label>Contacto 2 — fono</label><input data-f="emergencia2_fono"></div>
+    </div>
+    <div class="sec">Previsión y pago (confidencial)</div>
+    <div class="grid3">
+      <div class="fld"><label>AFP</label><select data-f="afp" data-cat="afp"></select></div>
+      <div class="fld"><label>Salud (Fonasa / Isapre)</label><select data-f="salud" data-cat="salud"></select></div>
+      <div class="fld"><label>Plan Isapre pactado (UF, vacío si Fonasa)</label><input type="number" step="0.01" data-f="plan_isapre_uf"></div>
+      <div class="fld"><label>Sueldo base</label><input data-f="sueldo_base" data-clp="1" inputmode="numeric" oninput="this.value=fmtCLP(this.value)"></div>
+      <div class="fld"><label>Colación mensual</label><input data-f="colacion" data-clp="1" inputmode="numeric" oninput="this.value=fmtCLP(this.value)"></div>
+      <div class="fld"><label>Movilización mensual</label><input data-f="movilizacion" data-clp="1" inputmode="numeric" oninput="this.value=fmtCLP(this.value)"></div>
+      <div class="fld"><label>Tarjeta Edenred</label><select data-f="edenred"><option value="1">SI</option><option value="0">NO</option></select></div>
+      <div class="fld"><label>Banco (depósito de sueldo)</label><select data-f="banco_pago" data-cat="banco"></select></div>
+      <div class="fld"><label>Tipo de cuenta</label><select data-f="tipo_cuenta_pago"><option value=""></option><option>CUENTA CORRIENTE</option><option>CUENTA VISTA</option><option>CUENTA RUT</option><option>CHEQUERA ELECTRONICA</option></select></div>
+      <div class="fld"><label>N° de cuenta</label><input data-f="num_cuenta_pago"></div>
+    </div>
+    <div class="sec">Cargas familiares (Previred)</div>
+    <div class="grid3">
+      <div class="fld"><label>Tramo asignación familiar</label><select data-f="tramo_asignacion"><option value=""></option><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
+      <div class="fld"><label>Cargas simples — otras</label><input type="number" data-f="cargas_otras"></div>
+      <div class="fld"><label>Cargas maternales</label><input type="number" data-f="cargas_maternales"></div>
+      <div class="fld"><label>Cargas inválidas</label><input type="number" data-f="cargas_invalidas"></div>
+      <div class="fld"><label>Años trabajados antes de AutoFácil (máx 10)</label><input type="number" data-f="anos_trabajados_previos"></div>
+    </div>
+    <div style="font-size:.74rem;color:#64748b;margin-top:4px">Los hijos se registran en la ficha del colaborador una vez aprobado (lista única para Previred y Seguro de Salud).</div>
+    <div class="fld" style="margin-top:10px"><label>Observaciones</label><input data-f="observaciones"></div>
+    <div class="sec">Documentos</div>
+    <div id="docsBox" class="grid3"></div>
+    <div style="font-size:.74rem;color:#64748b;margin-top:4px">Máx. 8 MB por archivo. Al aprobarse pasan solos a la Carpeta Digital del colaborador.</div>
     <p style="font-size:.78rem;color:#64748b;margin:12px 0 0">El usuario NO se crea todavía: primero aprueba el supervisor y después el Administrador. Con la segunda aprobación le llega al correo corporativo su usuario y clave temporal.</p>
   </div>
   <div class="dlg-foot">
@@ -114,7 +170,7 @@ function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.
 let D = null;
 async function cargar(){
   const j = await (await fetch('/api/rrhh/ingresos', { headers:H })).json();
-  if (!j.success) { document.getElementById('tb').innerHTML = `<tr><td colspan="8" class="empty">${esc(j.error)}</td></tr>`; return; }
+  if (!j.success) { document.getElementById('tb').innerHTML = `<tr><td colspan="9" class="empty">${esc(j.error)}</td></tr>`; return; }
   D = j.data;
   document.getElementById('bNuevo').style.display = D.es_rrhh ? '' : 'none';
   const pend = D.ingresos.filter(r => puedo(r)).length;
@@ -123,12 +179,13 @@ async function cargar(){
     <td>${r.id}</td>
     <td style="font-weight:600">${esc([r.nombre,r.apellido,r.apellido_materno].filter(Boolean).join(' '))}<div style="font-size:.72rem;color:#64748b;font-weight:400">${esc(r.email)}</div></td>
     <td>${esc(r.rut)}</td><td>${esc(r.cargo)}</td><td>${esc(r.supervisor||'—')}</td><td>${fD(r.fecha_ingreso)}</td>
+    <td style="font-size:.74rem">${(r.docs||[]).map(d=>`<a href="#" onclick="return verDoc(${d.id})" title="${esc(d.nombre_archivo)}">${esc(d.tipo)}</a>`).join('<br>')||(r.estado==='APROBADA'?'<span style="color:#64748b">en Carpeta Digital</span>':'—')}</td>
     <td><span class="pill ${r.estado}">${ETQ[r.estado]||esc(r.estado)}</span>
       ${r.estado==='RECHAZADA'?`<div style="font-size:.72rem;color:#b91c1c">${esc(r.motivo_rechazo)}</div>`:''}
       ${r.estado==='APROBADA'&&r.correo_enviado===0?'<div style="font-size:.72rem;color:#b91c1c">Correo con la clave no salió</div>':''}
       ${r.error_alta?`<div style="font-size:.72rem;color:#b91c1c">${esc(r.error_alta)}</div>`:''}</td>
     <td>${puedo(r)?`<button class="btn-mini ok" onclick="aprobar(${r.id})"><i class="bi bi-check2"></i> Aprobar</button><button class="btn-mini no" onclick="rechazar(${r.id})"><i class="bi bi-x"></i> Rechazar</button>`:''}</td>
-  </tr>`).join('') : '<tr><td colspan="8" class="empty">Sin solicitudes.</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="9" class="empty">Sin solicitudes.</td></tr>';
 }
 const puedo = r => (r.estado==='PEND_SUPERVISOR' && Number(r.id_supervisor)===Number(D.yo)) || (r.estado==='PEND_ADMIN' && D.es_admin);
 
@@ -137,19 +194,45 @@ async function nuevo(){
   if (!j.success) return alert(j.error||'Sin permiso');
   document.getElementById('i_id_perfil').innerHTML = '<option value=""></option>' + j.data.perfiles.map(p=>`<option value="${p.id_perfil}">${esc(p.nombre)}</option>`).join('');
   document.getElementById('i_id_supervisor').innerHTML = '<option value=""></option>' + j.data.supervisores.map(s=>`<option value="${s.id_usuario}">${esc(s.nombre)}${s.cargo?' — '+esc(s.cargo):''}</option>`).join('');
-  dlg.querySelectorAll('input').forEach(i=>i.value=''); dlg.querySelectorAll('select:not(#i_id_perfil):not(#i_id_supervisor)').forEach(s=>s.value='');
+  let C = { afp:[], salud:[], banco:[] };
+  try { const c = await (await fetch('/api/rrhh/remuneraciones/catalogo', { headers:H })).json(); if (c.success) C = c.data; } catch(_) {}
+  dlg.querySelectorAll('[data-cat]').forEach(s => s.innerHTML = '<option value=""></option>' + (C[s.dataset.cat]||[]).map(r=>`<option>${esc(r.nombre)}</option>`).join(''));
+  dlg.querySelectorAll('input').forEach(i=>i.value=i.defaultValue); dlg.querySelectorAll('select:not(#i_id_perfil):not(#i_id_supervisor)').forEach(s=>s.selectedIndex=0);
+  document.getElementById('docsBox').innerHTML = (D.doc_tipos||[]).map(t=>`<div class="fld"><label>${esc(t)}</label>
+    <label class="btn-ghost" style="display:block;text-align:center;padding:6px 10px;font-size:.8rem;cursor:pointer;text-transform:none;color:#374151;margin:0"><i class="bi bi-upload me-1"></i><span>Subir ${esc(t.toLowerCase())}</span>
+    <input type="file" data-tipo="${esc(t)}" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="this.previousElementSibling.textContent=this.files[0]?.name||'Subir'"></label></div>`).join('');
+  document.querySelectorAll('.wPF').forEach(w=>w.style.display='none');
   dlg.showModal();
 }
 async function guardar(){
   const g = id => document.getElementById('i_'+id).value.trim();
   const body = {}; ['rut','nombre','apellido','apellido_materno','sexo','fecha_nacimiento','id_perfil','id_supervisor','fecha_ingreso','tipo_contrato','jornada','centro_costo','email','telefono'].forEach(k=>body[k]=g(k));
+  body.ficha = {};
+  dlg.querySelectorAll('[data-f]').forEach(el => { let v = el.value.trim(); if (el.dataset.clp) v = v.replace(/\D/g,''); if (v !== '') body.ficha[el.dataset.f] = v; });
+  const files = [...dlg.querySelectorAll('input[type=file][data-tipo]')].filter(f=>f.files[0]);
+  if (files.some(f=>f.files[0].size > 8*1024*1024)) return alert('Hay un archivo de más de 8 MB');
   const b = document.getElementById('bGuardar'); b.disabled = true;
   try {
     const j = await (await fetch('/api/rrhh/ingresos', { method:'POST', headers:HJ, body:JSON.stringify(body) })).json();
     if (!j.success) return alert(j.error||'No se pudo registrar');
-    dlg.close(); toast('✓ Enviada al supervisor para aprobación'); cargar();
+    const malos = [];
+    for (const f of files) {
+      const file = f.files[0];
+      const b64 = await new Promise((ok,ko)=>{ const r=new FileReader(); r.onload=()=>ok(String(r.result).split(',')[1]); r.onerror=ko; r.readAsDataURL(file); });
+      const u = await (await fetch(`/api/rrhh/ingresos/${j.data.id}/docs`, { method:'POST', headers:HJ, body:JSON.stringify({ tipo:f.dataset.tipo, archivo_nombre:file.name, mime_type:file.type, archivo_data:b64 }) })).json().catch(()=>({}));
+      if (!u.success) malos.push(`${f.dataset.tipo}: ${u.error||'error'}`);
+    }
+    dlg.close(); cargar();
+    if (malos.length) alert('Solicitud creada, pero no se subieron:\n' + malos.join('\n')); else toast('✓ Enviada al supervisor para aprobación');
   } finally { b.disabled = false; }
 }
+async function verDoc(id){
+  const r = await fetch('/api/rrhh/ingresos/docs/'+id, { headers:H });
+  if (!r.ok) { alert('No se pudo abrir'); return false; }
+  window.open(URL.createObjectURL(await r.blob()), '_blank'); return false;
+}
+const fmtCLP = v => { const n = String(v||'').replace(/\D/g,''); return n ? '$'+Number(n).toLocaleString('es-CL') : ''; };
+document.getElementById('i_tipo_contrato').addEventListener('change', e => document.querySelectorAll('.wPF').forEach(w=>w.style.display = e.target.value==='PLAZO FIJO' ? '' : 'none'));
 async function aprobar(id){
   const r = D.ingresos.find(x=>x.id===id);
   const msg = r.estado==='PEND_ADMIN' ? `¿Aprobar el ingreso de ${r.nombre} ${r.apellido}? Se crea el usuario y se le envía la clave a ${r.email}.` : `¿Apruebas la contratación de ${r.nombre} ${r.apellido}? Después pasa al Administrador.`;

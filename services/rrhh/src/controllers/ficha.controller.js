@@ -575,4 +575,4 @@ require('../../../../shared/migrate').enFila('rrhh-directorio-config', async () 
   } catch (e) { console.error('[rrhh-directorio-config migration]', e.message); }
 });
 
-module.exports = { getFicha, putFicha, listarColaboradores, directorio, organigrama, directorioConfig, guardarDirectorioConfig, subirDoc, descargarDoc, eliminarDoc, crearDocTipo, visibleDoc };
+module.exports = { CAMPOS_CONTACTO, CAMPOS_LABORAL, docTipos, getFicha, putFicha, listarColaboradores, directorio, organigrama, directorioConfig, guardarDirectorioConfig, subirDoc, descargarDoc, eliminarDoc, crearDocTipo, visibleDoc };

@@ -265,6 +265,9 @@ router.get('/colaboradores',       verifyToken, requireFunc('rh_colaboradores', 
 // Listar/aprobar/rechazar no llevan requireFunc: el supervisor no tiene permisos RRHH; la etapa se valida adentro.
 const ing = require('../controllers/ingresos.controller');
 router.get('/ingresos/opciones',      verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), ing.opciones);
+router.get('/ingresos/docs/:docId',   verifyToken, ing.verDoc);   // supervisor/RRHH/Admin se valida adentro
+router.delete('/ingresos/docs/:docId', verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), ing.borrarDoc);
+router.post('/ingresos/:id/docs',     verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), ing.subirDoc);
 router.get('/ingresos',               verifyToken, ing.listar);
 router.post('/ingresos',              verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), ing.crear);
 router.post('/ingresos/:id/aprobar',  verifyToken, ing.aprobar);
