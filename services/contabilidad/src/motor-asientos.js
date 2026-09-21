@@ -77,6 +77,20 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['3001020', 'DEBE', 'gastos', 'Reversa: gastos de cobranza'],
         ['2102290', 'HABER', 'total', 'Reversa: vuelve como saldo a favor'],
       ]],
+      ['VENTA_CARTERA', 'Venta de cartera propia', 'Se dispara al vender un crédito AutoFácil a otra financiera (Tesorería → Venta de Cartera). Campos: precio (precio de venta, por cobrar al comprador), capital (capital vigente que sale de Contratos Propios), interes_dev (interés ya devengado y no cobrado que sale de 1104120), utilidad (precio − capital − interes_dev si es positivo), perdida (si es negativo).', 'TRASPASO', 1, [
+        ['1106020', 'DEBE', 'precio', 'Por cobrar venta de cartera'],
+        ['4001161', 'DEBE', 'perdida', 'Pérdida en venta de cartera'],
+        ['1104010', 'HABER', 'capital', 'Baja de contratos propios (venta)'],
+        ['1104120', 'HABER', 'interes_dev', 'Interés devengado traspasado en la venta'],
+        ['3001060', 'HABER', 'utilidad', 'Utilidad en venta de cartera'],
+      ]],
+      ['REVERSA_VENTA_CARTERA', 'Reversa de venta de cartera propia', 'Se dispara al deshacer una venta (el crédito vuelve a la cartera AutoFácil). Mismos campos que VENTA_CARTERA, invertidos.', 'TRASPASO', 1, [
+        ['1104010', 'DEBE', 'capital', 'Reversa: vuelve a contratos propios'],
+        ['1104120', 'DEBE', 'interes_dev', 'Reversa: interés devengado'],
+        ['3001060', 'DEBE', 'utilidad', 'Reversa: utilidad en venta de cartera'],
+        ['1106020', 'HABER', 'precio', 'Reversa: por cobrar venta de cartera'],
+        ['4001161', 'HABER', 'perdida', 'Reversa: pérdida en venta de cartera'],
+      ]],
       ['DEVENGO_INTERESES', 'Devengo mensual de intereses cartera propia', 'Se dispara al cerrar cada mes (motor devengo-intereses): interés corriente ganado en el mes por los créditos AutoFácil que no están en devengo suspendido (más de 90 días de mora). Campos: total.', 'TRASPASO', 1, [
         ['1104120', 'DEBE', 'total', 'Intereses devengados por cobrar'],
         ['3001010', 'HABER', 'total', 'Interés corriente devengado'],

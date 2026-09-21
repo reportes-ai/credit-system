@@ -59,7 +59,7 @@ require('../../../../shared/migrate').enFila('venta-cartera-param', async () => 
     clave VARCHAR(40) PRIMARY KEY, valor DECIMAL(8,4) NOT NULL, updated_by VARCHAR(150) NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
   for (const [k, v] of Object.entries(PARAM_DEF)) await pool.query('INSERT IGNORE INTO venta_cartera_param (clave, valor) VALUES (?,?)', [k, v]);
-  for (const col of ['tasa_descuento DECIMAL(8,4) NULL', 'precio_ref_autofin DECIMAL(15,0) NULL', 'gastos_venta DECIMAL(15,0) NULL'])
+  for (const col of ['tasa_descuento DECIMAL(8,4) NULL', 'precio_ref_autofin DECIMAL(15,0) NULL', 'gastos_venta DECIMAL(15,0) NULL', 'interes_dev_venta DECIMAL(15,0) NULL'])
     await pool.query(`ALTER TABLE cartera_ventas ADD COLUMN ${col}`).catch(() => {});
 });
 async function parametros() {
@@ -122,6 +122,18 @@ async function preciosDe(ops, fechaISO) {
       ref_autofin: ref, tasa_ref: tRef != null ? +(tRef * 100).toFixed(4) : null, suma_cuotas: qs.reduce((s, q) => s + (+q.valor_cuota || 0), 0) };
   }
   return out;
+}
+
+/* Montos del asiento de venta: precio (por cobrar), capital (sale de 1104010), interés devengado
+   pendiente de cobro (sale de 1104120 — ctb_devengo_intereses menos lo ya aplicado), y la diferencia
+   como utilidad o pérdida (el motor no acepta negativos: van en campos separados). */
+async function montosAsientoVenta(idCredito, precio, capital) {
+  const [[d]] = await pool.query('SELECT COALESCE(SUM(interes),0) m FROM ctb_devengo_intereses WHERE id_credito=?', [idCredito]);
+  const [[a]] = await pool.query("SELECT COALESCE(SUM(monto),0) m FROM ctb_devengo_aplicaciones WHERE id_credito=? AND tipo='DEV' AND reversado=0", [idCredito]);
+  const interes_dev = Math.max(0, Math.round(Number(d.m) - Number(a.m)));
+  const p = Math.round(+precio || 0), c = Math.round(+capital || 0);
+  const dif = p - c - interes_dev;
+  return { precio: p, capital: c, interes_dev, utilidad: Math.max(0, dif), perdida: Math.max(0, -dif) };
 }
 
 const errSrv = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
@@ -197,6 +209,17 @@ exports.vender = async (req, res) => {
           [cr.id, cr.num_op, comprador, fecha, cap, pm ?? cap, precio, adm, resp, usuario, td ?? null, pr.ref_autofin ?? null, pr.gastos_venta ?? null]);
         await pool.query("UPDATE creditos SET credito_vendido_a=? WHERE id=?", [comprador, cr.id]);
         vendidas++;
+        // Máxima 4: asiento de la venta (nunca bloquea). Lo devengado y no cobrado de la op sale con ella.
+        try {
+          const [[idv]] = await pool.query('SELECT id FROM cartera_ventas WHERE id_credito=?', [cr.id]);
+          const montos = await montosAsientoVenta(cr.id, precio, cap);
+          await pool.query('UPDATE cartera_ventas SET interes_dev_venta=? WHERE id=?', [montos.interes_dev, idv.id]);
+          require('../../../contabilidad/src/motor-asientos').contabilizar({
+            evento: 'VENTA_CARTERA', fecha, ref: `VC-${idv.id}`, num_op: String(cr.num_op), montos,
+            glosa: `Venta de cartera op ${cr.num_op} a ${comprador}${resp ? ' con responsabilidad' : adm ? ' con administración' : ''}`,
+            detalle: `${comprador} · OP ${cr.num_op}`,
+          }).catch(() => {});
+        } catch (e) { console.error('[venta-cartera asiento]', e.message); }
       } catch (e) { errores.push(`Op ${cr.num_op}: ${e.code === 'ER_DUP_ENTRY' ? 'ya vendida' : e.message}`); }
     }
     res.json({ success: true, data: { vendidas, errores }, error: null });
@@ -206,10 +229,20 @@ exports.vender = async (req, res) => {
 /* ── DELETE /api/venta-cartera/:id — deshacer una venta ──────────────────── */
 exports.deshacer = async (req, res) => {
   try {
-    const [[v]] = await pool.query('SELECT id, id_credito FROM cartera_ventas WHERE id=?', [parseInt(req.params.id) || 0]);
+    const [[v]] = await pool.query('SELECT id, id_credito, num_op, comprador, precio_venta, capital_venta, interes_dev_venta FROM cartera_ventas WHERE id=?', [parseInt(req.params.id) || 0]);
     if (!v) return res.status(404).json({ success: false, data: null, error: 'Venta no encontrada' });
     await pool.query("UPDATE creditos SET credito_vendido_a=NULL WHERE id=?", [v.id_credito]);
     await pool.query('DELETE FROM cartera_ventas WHERE id=?', [v.id]);
+    // Contra-asiento con los mismos montos que se asentaron al vender (foto en la fila)
+    try {
+      const precio = Math.round(+v.precio_venta || 0), capital = Math.round(+v.capital_venta || 0), interes_dev = Math.round(+v.interes_dev_venta || 0);
+      const dif = precio - capital - interes_dev;
+      require('../../../contabilidad/src/motor-asientos').contabilizar({
+        evento: 'REVERSA_VENTA_CARTERA', ref: `RVC-${v.id}`, num_op: String(v.num_op),
+        montos: { precio, capital, interes_dev, utilidad: Math.max(0, dif), perdida: Math.max(0, -dif) },
+        glosa: `Reversa venta de cartera op ${v.num_op} (${v.comprador})`, detalle: `${v.comprador} · OP ${v.num_op}`,
+      }).catch(() => {});
+    } catch (e) { console.error('[venta-cartera reversa asiento]', e.message); }
     res.json({ success: true, data: { id: v.id }, error: null });
   } catch (e) { errSrv(res, e, 'venta-cartera deshacer'); }
 };

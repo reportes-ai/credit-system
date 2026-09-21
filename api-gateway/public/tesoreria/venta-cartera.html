@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
+<!-- v2.2 — asiento contable de la venta y de su reversa (VENTA_CARTERA / REVERSA_VENTA_CARTERA). v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -96,6 +96,7 @@
       <h6 style="font-weight:800;color:var(--navy-dark)"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</h6>
       <ul style="font-size:.82rem;margin:0;padding-left:18px">
         <li><b>Spreads (sin resp. / con administración / con resp.+adm.) y gastos de venta</b> → precio propuesto en la pestaña <a href="#" onclick="tab('vender');return false">Vender</a> (tasa de descuento y precio del motor); las ventas ya registradas guardan su tasa y precio como foto.</li>
+        <li><b>Vender / Deshacer</b> → asiento automático en <a href="/contabilidad/">Contabilidad</a> (regla <code>VENTA_CARTERA</code>, editable en Reglas de Centralización): DEBE 1106020 Por cobrar venta de cartera por el precio; HABER 1104010 Contratos Propios por el capital vigente y 1104120 por el interés devengado no cobrado; la diferencia va a 3001060 Ingresos por venta de contratos o a 4001161 Gastos por ventas de cartera. Deshacer genera el contra-asiento.</li>
         <li><b>Referencia AutoFin sin responsabilidad</b> → sale del mantenedor <a href="/mantenedores/tasas/">Tasas</a> (tasa del tramo − spread del tramo a la fecha de venta) y de la <a href="/mantenedores/uf/">UF</a> para el tramo de 200 UF; no se edita aquí.</li>
       </ul>
     </div>
