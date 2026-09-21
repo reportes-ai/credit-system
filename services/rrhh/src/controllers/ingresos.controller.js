@@ -78,6 +78,16 @@ async function avisar(to, subject, cuerpo) {
     await enviarCorreo({ to, subject, html: envolverHTML ? envolverHTML(html) : html });
   } catch (e) { console.error('[rrhh ingresos aviso]', e.message); }
 }
+// Campanita (además del correo): mismo motor de notificaciones que el resto de RRHH
+async function campana(ids, titulo, mensaje, clave) {
+  try {
+    ids = [...new Set((ids || []).filter(Boolean).map(Number))]; if (!ids.length) return;
+    const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+    await notificar(ids, { tipo: 'RRHH', prioridad: 'alta', sonar: true, titulo, mensaje, href: '/recursos-humanos/ingresos/', clave });
+  } catch (e) { console.error('[rrhh ingresos campana]', e.message); }
+}
+const idsAdmin = async () => (await pool.query(
+  `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE p.nombre='Administrador' AND u.estado='activo'`))[0].map(r => r.id_usuario);
 const ficha = s => `<p style="margin:0 0 12px"><b>${s.nombre} ${s.apellido}${s.apellido_materno ? ' ' + s.apellido_materno : ''}</b> · RUT ${s.rut}<br>
   Cargo: <b>${s.cargo || ''}</b> · Ingreso: ${String(s.fecha_ingreso || '').slice(0, 10)}<br>Correo corporativo: ${s.email}</p>`;
 const correosAdmin = async () => (await pool.query(
@@ -164,6 +174,7 @@ exports.crear = async (req, res) => {
     avisar(sup.email, `🧑‍💼 Aprobar contratación — ${d.nombre} ${d.apellido}`,
       `<p style="margin:0 0 12px">Hola ${sup.nombre}, RRHH registró una contratación que queda a tu cargo y necesita <b>tu aprobación</b>:</p>${ficha(d)}
        <p style="margin:0">Después de ti la aprueba el Administrador y recién ahí se crea el usuario.</p>`);
+    campana([sup.id_usuario], `Aprobar contratación: ${d.nombre} ${d.apellido}`, `RRHH registró el ingreso de ${d.nombre} ${d.apellido} (${d.cargo}) a tu cargo. Falta tu aprobación.`, `ing_sup_${r.insertId}`);
     ok(res, { id: r.insertId });
   } catch (e) { fail(res, e.message); }
 };
@@ -182,6 +193,8 @@ exports.aprobar = async (req, res) => {
       auditar({ req, accion: 'APROBAR', modulo: 'rrhh', entidad: 'rh_ingreso', entidad_id: id, detalle: `Supervisor aprobó ingreso de ${s.nombre} ${s.apellido}` });
       avisar(await correosAdmin(), `🧑‍💼 Contratación por aprobar — ${s.nombre} ${s.apellido}`,
         `<p style="margin:0 0 12px">El supervisor ya aprobó esta contratación. Falta la <b>aprobación del Administrador</b> para crear el usuario:</p>${ficha(s)}`);
+      campana(await idsAdmin(), `Contratación por aprobar: ${s.nombre} ${s.apellido}`, `El supervisor aprobó el ingreso de ${s.nombre} ${s.apellido} (${s.cargo}). Falta la aprobación del Administrador para crear el usuario.`, `ing_adm_${id}`);
+      campana([s.creado_por], `Supervisor aprobó: ${s.nombre} ${s.apellido}`, 'La contratación pasó al Administrador.', `ing_sup_ok_${id}`);
       return ok(res, { estado: 'PEND_ADMIN' });
     }
 
@@ -225,6 +238,7 @@ exports.aprobar = async (req, res) => {
       avisar(cr?.email, `✅ Contratación aprobada — ${s.nombre} ${s.apellido}`,
         `<p style="margin:0 0 12px">La contratación quedó aprobada y el usuario está creado${alta.envio.ok ? '; el colaborador recibió su usuario y clave por correo' : '. <b>El correo con la clave NO salió</b>: pide al Administrador que la entregue'}.</p>${ficha(s)}
          <p style="margin:0">Completa su ficha (previsión, sueldo, cuenta de pago) en RRHH › Colaboradores.</p>`);
+      campana([s.creado_por, s.id_supervisor], `Contratación aprobada: ${s.nombre} ${s.apellido}`, alta.envio.ok ? 'Usuario creado; el colaborador recibió su usuario y clave por correo.' : 'Usuario creado, pero el correo con la clave NO salió.', `ing_ok_${id}`);
       return ok(res, { estado: 'APROBADA', id_usuario: alta.id_usuario, correo_enviado: alta.envio.ok,
         clave_temporal: alta.envio.ok ? null : alta.claveTemporal, correo_error: alta.envio.ok ? null : alta.envio.error });
     }
@@ -247,6 +261,7 @@ exports.rechazar = async (req, res) => {
     auditar({ req, accion: 'RECHAZAR', modulo: 'rrhh', entidad: 'rh_ingreso', entidad_id: id, detalle: `Rechazó ingreso de ${s.nombre} ${s.apellido}: ${motivo}` });
     const [[cr]] = await pool.query('SELECT email FROM usuarios WHERE id_usuario=?', [s.creado_por]);
     avisar(cr?.email, `❌ Contratación rechazada — ${s.nombre} ${s.apellido}`, `<p style="margin:0 0 12px">Motivo: <b>${motivo.replace(/</g, '&lt;')}</b></p>${ficha(s)}`);
+    campana([s.creado_por, s.estado === 'PEND_ADMIN' ? s.id_supervisor : null], `Contratación rechazada: ${s.nombre} ${s.apellido}`, `Motivo: ${motivo}`, `ing_rech_${id}`);
     ok(res, { estado: 'RECHAZADA' });
   } catch (e) { fail(res, e.message); }
 };

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ingreso de Colaboradores — AutoFácil</title>
-  <!-- v1.2 — hijos y cargas en el formulario, con fecha de nacimiento y ocupación obligatorias (Seguro de Salud); al aprobar van a rh_cargas por el motor único guardarCargas. v1.1 — todos los campos de la ficha (personales, cónyuge, emergencia, previsión y pago, cargas) + subir Curriculum, Carta oferta, Contrato, Título, Cédula e Informe comercial; al aprobar pasan a la ficha y a la Carpeta Digital. v1.0 — Ingreso de colaboradores: RRHH registra la contratación (cargo = perfil de Business Suite, supervisor), aprueba el supervisor, aprueba el Administrador y se crea el usuario con correo de usuario y clave (Pato 21-09-2026) -->
+  <!-- v1.3 — nota del flujo al pie del formulario; avisos también por campanita. v1.2 — hijos y cargas en el formulario, con fecha de nacimiento y ocupación obligatorias (Seguro de Salud); al aprobar van a rh_cargas por el motor único guardarCargas. v1.1 — todos los campos de la ficha (personales, cónyuge, emergencia, previsión y pago, cargas) + subir Curriculum, Carta oferta, Contrato, Título, Cédula e Informe comercial; al aprobar pasan a la ficha y a la Carpeta Digital. v1.0 — Ingreso de colaboradores: RRHH registra la contratación (cargo = perfil de Business Suite, supervisor), aprueba el supervisor, aprueba el Administrador y se crea el usuario con correo de usuario y clave (Pato 21-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -148,9 +148,9 @@
     <div class="sec">Documentos</div>
     <div id="docsBox" class="grid3"></div>
     <div style="font-size:.74rem;color:#64748b;margin-top:4px">Máx. 8 MB por archivo. Al aprobarse pasan solos a la Carpeta Digital del colaborador.</div>
-    <p style="font-size:.78rem;color:#64748b;margin:12px 0 0">El usuario NO se crea todavía: primero aprueba el supervisor y después el Administrador. Con la segunda aprobación le llega al correo corporativo su usuario y clave temporal.</p>
   </div>
-  <div class="dlg-foot">
+  <div class="dlg-foot" style="align-items:center">
+    <div style="flex:1;font-size:.76rem;color:#64748b;line-height:1.35"><i class="bi bi-info-circle me-1"></i>El usuario NO se crea todavía: primero aprueba el supervisor y después el Administrador. Con la segunda aprobación se crea el correo corporativo, donde le llegará su usuario y clave temporal.</div>
     <button class="btn-ghost" onclick="dlg.close()">Cancelar</button>
     <button class="btn-navy" id="bGuardar" onclick="guardar()"><i class="bi bi-send me-1"></i>Enviar a aprobación</button>
   </div>
