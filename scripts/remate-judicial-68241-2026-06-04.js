@@ -12,6 +12,7 @@
  *    asiento CASTIGO (DEBE 1104050 / HABER 1104020).
  *
  * Uso (MOTORES=off): node scripts/remate-judicial-68241-2026-06-04.js [--aplicar]
+ * REEMPLAZADO por scripts/remate-68241-prelacion-2026-09-21.js (orden de prelación del mantenedor). No volver a correr.
  */
 const pool = require('../shared/config/database');
 const { calcularPrepago } = require('../services/certificados/src/controllers/certificados.controller');
