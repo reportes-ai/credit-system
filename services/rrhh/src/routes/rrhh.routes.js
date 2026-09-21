@@ -261,6 +261,14 @@ router.get('/organigrama',         verifyToken, requireFunc('rh_directorio', 'rh
 router.get('/directorio/config',   verifyToken, requireFunc('rh_directorio_config'), ficha.directorioConfig);
 router.put('/directorio/config',   verifyToken, requireFunc('rh_directorio_config'), ficha.guardarDirectorioConfig);
 router.get('/colaboradores',       verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), ficha.listarColaboradores);
+// Ingreso de colaboradores: RRHH registra → supervisor aprueba → Administrador aprueba → nace el usuario.
+// Listar/aprobar/rechazar no llevan requireFunc: el supervisor no tiene permisos RRHH; la etapa se valida adentro.
+const ing = require('../controllers/ingresos.controller');
+router.get('/ingresos/opciones',      verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), ing.opciones);
+router.get('/ingresos',               verifyToken, ing.listar);
+router.post('/ingresos',              verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), ing.crear);
+router.post('/ingresos/:id/aprobar',  verifyToken, ing.aprobar);
+router.post('/ingresos/:id/rechazar', verifyToken, ing.rechazar);
 router.get('/ficha',               verifyToken, ficha.getFicha);
 router.get('/ficha/:id',           verifyToken, ficha.getFicha);
 router.put('/ficha/:id',           verifyToken, ficha.putFicha);

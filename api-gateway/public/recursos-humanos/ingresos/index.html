@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ingreso de Colaboradores — AutoFácil</title>
+  <!-- v1.0 — Ingreso de colaboradores: RRHH registra la contratación (cargo = perfil de Business Suite, supervisor), aprueba el supervisor, aprueba el Administrador y se crea el usuario con correo de usuario y clave (Pato 21-09-2026) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .main { padding:24px 28px; max-width:1360px; margin:0 auto; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.2rem; opacity:.85; } .banner h2 { font-weight:700; margin:0; font-size:1.2rem; } .banner p { margin:2px 0 0; opacity:.85; font-size:.85rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 20px; margin-bottom:16px; }
+    table { width:100%; border-collapse:collapse; font-size:.83rem; }
+    th { background:#f8fafc; color:#475569; font-size:.7rem; text-transform:uppercase; padding:8px 10px; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+    td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .pill { border-radius:10px; padding:2px 9px; font-size:.7rem; font-weight:700; white-space:nowrap; }
+    .PEND_SUPERVISOR { background:#fef3c7; color:#92400e; } .PEND_ADMIN { background:#e0e7ff; color:#3730a3; }
+    .APROBADA { background:#dcfce7; color:#15803d; } .RECHAZADA { background:#fee2e2; color:#b91c1c; } .CREANDO { background:#f1f5f9; color:#475569; }
+    .empty { text-align:center; color:#9ca3af; padding:26px 0; }
+    dialog { border:none; border-radius:16px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:900px; width:96%; }
+    dialog::backdrop { background:rgba(15,23,42,.55); }
+    .dlg-head { background:linear-gradient(135deg,#012d70,#0255c5); color:#fff; padding:14px 20px; font-weight:700; display:flex; justify-content:space-between; align-items:center; }
+    .dlg-body { padding:16px 20px; max-height:72vh; overflow-y:auto; }
+    .dlg-foot { padding:12px 20px; border-top:1px solid #eef2f7; display:flex; justify-content:flex-end; gap:10px; }
+    .sec { font-size:.72rem; font-weight:800; text-transform:uppercase; color:#0141A2; margin:14px 0 8px; border-bottom:1px solid #eef2f7; padding-bottom:4px; }
+    .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:10px 16px; } @media(max-width:760px){ .grid3{grid-template-columns:1fr;} .main{padding:16px;} }
+    .fld label { font-size:.66rem; font-weight:700; text-transform:uppercase; color:#94a3b8; display:block; margin-bottom:2px; }
+    .fld input, .fld select { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:6px 10px; font-size:.84rem; box-sizing:border-box; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:8px 18px; font-weight:700; font-size:.85rem; cursor:pointer; }
+    .btn-ghost { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:9px; padding:8px 14px; font-weight:600; font-size:.85rem; cursor:pointer; }
+    .btn-mini { border:none; border-radius:7px; padding:4px 10px; font-size:.74rem; font-weight:700; cursor:pointer; margin-right:4px; }
+    .btn-mini.ok { background:#dcfce7; color:#15803d; } .btn-mini.no { background:#fee2e2; color:#b91c1c; }
+    .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.86rem; z-index:3000; display:none; }
+    .flujo { font-size:.8rem; color:#475569; margin:0 0 10px; }
+    .afecta { background:#f8fafc; border-left:4px solid #0141A2; border-radius:10px; padding:12px 16px; font-size:.8rem; color:#334155; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Colaboradores',href:'/recursos-humanos/colaboradores/'},{label:'Ingreso de Colaboradores',icon:'bi-person-plus',current:true}]};</script>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-person-plus"></i><div><h2>Ingreso de Colaboradores</h2><p>RRHH registra la contratación → aprueba el supervisor → aprueba el Administrador → se crea el usuario y le llega su clave por correo.</p></div></div>
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">
+      <div style="font-weight:700;color:#012d70" id="resumen">—</div>
+      <button class="btn-navy" id="bNuevo" style="display:none" onclick="nuevo()"><i class="bi bi-person-plus me-1"></i>Nuevo colaborador</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>#</th><th>Persona</th><th>RUT</th><th>Cargo</th><th>Supervisor</th><th>Ingreso</th><th>Estado</th><th>Acción</th></tr></thead>
+        <tbody id="tb"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="afecta"><b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este proceso</b>
+    <ul style="margin:6px 0 0">
+      <li><b>Aprobación del Administrador</b> → crea el usuario en <a href="/usuarios/">Usuarios</a> con el perfil elegido como cargo y envía el correo con usuario y clave temporal</li>
+      <li><b>Supervisor</b> → queda como jefatura en la ficha (<a href="/recursos-humanos/colaboradores/">Colaboradores</a>), organigrama y aprobaciones de ausencias</li>
+      <li><b>Tipo de contrato y jornada</b> → ficha RRHH, que alimenta <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a></li>
+      <li><b>Cargo</b> → lista viva de <a href="/usuarios/">Perfiles</a>: un perfil nuevo aparece solo</li>
+    </ul>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <div class="dlg-head"><span>Nuevo colaborador</span><button class="btn-ghost" style="padding:4px 10px" onclick="dlg.close()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="dlg-body">
+    <div class="sec">Persona</div>
+    <div class="grid3">
+      <div class="fld"><label>RUT *</label><input id="i_rut" placeholder="12.345.678-9"></div>
+      <div class="fld"><label>Nombres *</label><input id="i_nombre"></div>
+      <div class="fld"><label>Apellido paterno *</label><input id="i_apellido"></div>
+      <div class="fld"><label>Apellido materno</label><input id="i_apellido_materno"></div>
+      <div class="fld"><label>Sexo</label><select id="i_sexo"><option value=""></option><option>M</option><option>F</option></select></div>
+      <div class="fld"><label>Fecha de nacimiento</label><input id="i_fecha_nacimiento" type="date"></div>
+    </div>
+    <div class="sec">Contratación</div>
+    <div class="grid3">
+      <div class="fld"><label>Cargo (perfil Business Suite) *</label><select id="i_id_perfil"></select></div>
+      <div class="fld"><label>Supervisor * (aprueba)</label><select id="i_id_supervisor"></select></div>
+      <div class="fld"><label>Fecha de ingreso *</label><input id="i_fecha_ingreso" type="date"></div>
+      <div class="fld"><label>Tipo de contrato</label><select id="i_tipo_contrato"><option value=""></option><option>INDEFINIDO</option><option>PLAZO FIJO</option><option>HONORARIOS</option><option>PRACTICA</option></select></div>
+      <div class="fld"><label>Jornada</label><select id="i_jornada"><option value=""></option><option>COMPLETA</option><option>PARCIAL</option></select></div>
+      <div class="fld"><label>Centro de costo</label><input id="i_centro_costo"></div>
+      <div class="fld"><label>Correo corporativo * (usuario)</label><input id="i_email" type="email" placeholder="nombre.apellido@autofacilchile.cl"></div>
+      <div class="fld"><label>Teléfono</label><input id="i_telefono"></div>
+    </div>
+    <p style="font-size:.78rem;color:#64748b;margin:12px 0 0">El usuario NO se crea todavía: primero aprueba el supervisor y después el Administrador. Con la segunda aprobación le llega al correo corporativo su usuario y clave temporal.</p>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn-ghost" onclick="dlg.close()">Cancelar</button>
+    <button class="btn-navy" id="bGuardar" onclick="guardar()"><i class="bi bi-send me-1"></i>Enviar a aprobación</button>
+  </div>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'), yoS = JSON.parse(sessionStorage.getItem('usuario')||'null');
+if (!token||!yoS) location.href='/login.html';
+const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'application/json' };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const fD = s => s ? new Date(String(s).slice(0,10)+'T12:00:00').toLocaleDateString('es-CL') : '—';
+const dlg = document.getElementById('dlg');
+const ETQ = { PEND_SUPERVISOR:'Espera supervisor', PEND_ADMIN:'Espera Administrador', APROBADA:'Aprobada · usuario creado', RECHAZADA:'Rechazada', CREANDO:'Creando usuario…' };
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',3000); }
+
+let D = null;
+async function cargar(){
+  const j = await (await fetch('/api/rrhh/ingresos', { headers:H })).json();
+  if (!j.success) { document.getElementById('tb').innerHTML = `<tr><td colspan="8" class="empty">${esc(j.error)}</td></tr>`; return; }
+  D = j.data;
+  document.getElementById('bNuevo').style.display = D.es_rrhh ? '' : 'none';
+  const pend = D.ingresos.filter(r => puedo(r)).length;
+  document.getElementById('resumen').textContent = `${D.ingresos.length} solicitudes · ${pend} esperan tu aprobación`;
+  document.getElementById('tb').innerHTML = D.ingresos.length ? D.ingresos.map(r => `<tr>
+    <td>${r.id}</td>
+    <td style="font-weight:600">${esc([r.nombre,r.apellido,r.apellido_materno].filter(Boolean).join(' '))}<div style="font-size:.72rem;color:#64748b;font-weight:400">${esc(r.email)}</div></td>
+    <td>${esc(r.rut)}</td><td>${esc(r.cargo)}</td><td>${esc(r.supervisor||'—')}</td><td>${fD(r.fecha_ingreso)}</td>
+    <td><span class="pill ${r.estado}">${ETQ[r.estado]||esc(r.estado)}</span>
+      ${r.estado==='RECHAZADA'?`<div style="font-size:.72rem;color:#b91c1c">${esc(r.motivo_rechazo)}</div>`:''}
+      ${r.estado==='APROBADA'&&r.correo_enviado===0?'<div style="font-size:.72rem;color:#b91c1c">Correo con la clave no salió</div>':''}
+      ${r.error_alta?`<div style="font-size:.72rem;color:#b91c1c">${esc(r.error_alta)}</div>`:''}</td>
+    <td>${puedo(r)?`<button class="btn-mini ok" onclick="aprobar(${r.id})"><i class="bi bi-check2"></i> Aprobar</button><button class="btn-mini no" onclick="rechazar(${r.id})"><i class="bi bi-x"></i> Rechazar</button>`:''}</td>
+  </tr>`).join('') : '<tr><td colspan="8" class="empty">Sin solicitudes.</td></tr>';
+}
+const puedo = r => (r.estado==='PEND_SUPERVISOR' && Number(r.id_supervisor)===Number(D.yo)) || (r.estado==='PEND_ADMIN' && D.es_admin);
+
+async function nuevo(){
+  const j = await (await fetch('/api/rrhh/ingresos/opciones', { headers:H })).json();
+  if (!j.success) return alert(j.error||'Sin permiso');
+  document.getElementById('i_id_perfil').innerHTML = '<option value=""></option>' + j.data.perfiles.map(p=>`<option value="${p.id_perfil}">${esc(p.nombre)}</option>`).join('');
+  document.getElementById('i_id_supervisor').innerHTML = '<option value=""></option>' + j.data.supervisores.map(s=>`<option value="${s.id_usuario}">${esc(s.nombre)}${s.cargo?' — '+esc(s.cargo):''}</option>`).join('');
+  dlg.querySelectorAll('input').forEach(i=>i.value=''); dlg.querySelectorAll('select:not(#i_id_perfil):not(#i_id_supervisor)').forEach(s=>s.value='');
+  dlg.showModal();
+}
+async function guardar(){
+  const g = id => document.getElementById('i_'+id).value.trim();
+  const body = {}; ['rut','nombre','apellido','apellido_materno','sexo','fecha_nacimiento','id_perfil','id_supervisor','fecha_ingreso','tipo_contrato','jornada','centro_costo','email','telefono'].forEach(k=>body[k]=g(k));
+  const b = document.getElementById('bGuardar'); b.disabled = true;
+  try {
+    const j = await (await fetch('/api/rrhh/ingresos', { method:'POST', headers:HJ, body:JSON.stringify(body) })).json();
+    if (!j.success) return alert(j.error||'No se pudo registrar');
+    dlg.close(); toast('✓ Enviada al supervisor para aprobación'); cargar();
+  } finally { b.disabled = false; }
+}
+async function aprobar(id){
+  const r = D.ingresos.find(x=>x.id===id);
+  const msg = r.estado==='PEND_ADMIN' ? `¿Aprobar el ingreso de ${r.nombre} ${r.apellido}? Se crea el usuario y se le envía la clave a ${r.email}.` : `¿Apruebas la contratación de ${r.nombre} ${r.apellido}? Después pasa al Administrador.`;
+  if (!confirm(msg)) return;
+  const j = await (await fetch(`/api/rrhh/ingresos/${id}/aprobar`, { method:'POST', headers:HJ })).json();
+  if (!j.success) { alert(j.error||'No se pudo aprobar'); return cargar(); }
+  if (j.data.estado==='APROBADA') {
+    if (j.data.correo_enviado) toast(`✓ Usuario creado · clave enviada a ${r.email}`);
+    else alert(`Usuario creado, pero el correo NO salió (${j.data.correo_error||'error'}).\nClave temporal para entregar en persona: ${j.data.clave_temporal}`);
+  } else toast('✓ Aprobada · pasa al Administrador');
+  cargar();
+}
+async function rechazar(id){
+  const motivo = prompt('Motivo del rechazo:'); if (!motivo || !motivo.trim()) return;
+  const j = await (await fetch(`/api/rrhh/ingresos/${id}/rechazar`, { method:'POST', headers:HJ, body:JSON.stringify({ motivo }) })).json();
+  if (!j.success) return alert(j.error||'No se pudo rechazar');
+  toast('Solicitud rechazada'); cargar();
+}
+cargar().then(()=>{ if (new URLSearchParams(location.search).get('nuevo') && D?.es_rrhh) nuevo(); });
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

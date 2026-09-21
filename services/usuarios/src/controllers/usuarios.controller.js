@@ -406,12 +406,37 @@ const createUsuario = async (req, res) => {
       return res.status(403).json({ success: false, data: null, error: 'No puedes asignar ese perfil: tiene permisos que tú no tienes' });
     }
 
+    const r = await altaUsuario(req.body, req);
+    res.status(201).json({
+      success: true,
+      data: {
+        id_usuario: r.id_usuario, rut, nombre, apellido, email, id_perfil, estado: 'activo',
+        correo_enviado: r.envio.ok,
+        clave_temporal: r.envio.ok ? null : r.claveTemporal,
+        correo_error: r.envio.ok ? null : r.envio.error
+      },
+      error: null
+    });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ success: false, data: null, error: 'El RUT o email ya están registrados' });
+    }
+    res.status(500).json({ success: false, data: null, error: error.message });
+  }
+};
+
+/* Motor único del alta: INSERT + autoasignación de ejecutivo + auditoría + correo con la clave.
+   Lo usan el mantenedor de Usuarios (createUsuario) y el Ingreso de Colaboradores de RRHH
+   (aprobación final del Administrador). Las validaciones quedan en cada llamador. */
+async function altaUsuario(b, req) {
+    const { rut, nombre, apellido, apellido_materno, centro_costo, email, id_perfil, id_supervisor, telefono, fecha_ingreso, fecha_nacimiento, cargo, sexo } = b;
+    const jdCrear = String(b.jefatura_desde || '').trim();
     // La clave se genera automáticamente y se envía por correo; el usuario debe cambiarla en su primer ingreso.
     const claveTemporal = generarClaveTemporal();
     const passwordHash = await bcrypt.hash(claveTemporal, 10);
     const [result] = await pool.query(
       'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, fecha_ingreso, fecha_nacimiento, cargo, sexo, externo, jefatura_desde, debe_cambiar_clave, password_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())',
-      [RUT.normalizar(rut) || rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, req.body.externo ? 1 : 0, jdCrear || null]
+      [RUT.normalizar(rut) || rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, b.externo ? 1 : 0, jdCrear || null]
     );
 
     // Un ejecutivo se ve a SÍ MISMO en Revisión de Comisiones: la asignación propia nace con
@@ -432,24 +457,8 @@ const createUsuario = async (req, res) => {
     // Enviar la clave temporal por correo. Si falla, se devuelve para entrega manual (no aborta la creación).
     const c = correoClave(nombre, email, claveTemporal, false);
     const envio = await enviarCorreo({ to: email, subject: c.subject, html: c.html, text: c.text });
-
-    res.status(201).json({
-      success: true,
-      data: {
-        id_usuario: result.insertId, rut, nombre, apellido, email, id_perfil, estado: 'activo',
-        correo_enviado: envio.ok,
-        clave_temporal: envio.ok ? null : claveTemporal,
-        correo_error: envio.ok ? null : envio.error
-      },
-      error: null
-    });
-  } catch (error) {
-    if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ success: false, data: null, error: 'El RUT o email ya están registrados' });
-    }
-    res.status(500).json({ success: false, data: null, error: error.message });
-  }
-};
+    return { id_usuario: result.insertId, envio, claveTemporal };
+}
 
 const updateUsuario = async (req, res) => {
   try {
@@ -782,4 +791,4 @@ const getSexos = async (_req, res) => {
   } catch (e) { console.error('[sexos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, eliminarDefinitivo, reactivarUsuario, resetClave, desbloquearUsuario, getPermisosUsuario, updatePermisosUsuario, getEjecutivosUsuario, updateEjecutivosUsuario, misEjecutivos, getSexos };
+module.exports = { altaUsuario, getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, eliminarDefinitivo, reactivarUsuario, resetClave, desbloquearUsuario, getPermisosUsuario, updatePermisosUsuario, getEjecutivosUsuario, updateEjecutivosUsuario, misEjecutivos, getSexos };

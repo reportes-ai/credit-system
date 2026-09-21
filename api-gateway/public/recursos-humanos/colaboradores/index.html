@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v2.8 — fecha de envío del certificado de estudios en Hijos y cargas. v2.7 — sección Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, sexo, carga Previred, seguro de salud y certificado de estudios; se conserva la fila al guardar (Pato 17-09-2026). v2.6 — montos con $ y puntos (sueldo, colación, movilización) y casilla Tarjeta Edenred. v2.5 — colación y movilización mensuales en Previsión y pago (fuente única de la liquidación). v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
+  <!-- v2.9 — Cargo se elige de la lista de perfiles de Business Suite (viva) + campo Supervisor (usuarios.id_supervisor); botones Nuevo colaborador y Solicitudes de ingreso (Pato 21-09-2026). v2.8 —fecha de envío del certificado de estudios en Hijos y cargas. v2.7 — sección Hijos y cargas familiares (fuente única rh_cargas): relación, apellidos, sexo, carga Previred, seguro de salud y certificado de estudios; se conserva la fila al guardar (Pato 17-09-2026). v2.6 — montos con $ y puntos (sueldo, colación, movilización) y casilla Tarjeta Edenred. v2.5 — colación y movilización mensuales en Previsión y pago (fuente única de la liquidación). v2.4 — Plazo fijo: 1er y 2do vencimiento en la ficha (vencido el último sin desvinculación pasa solo a INDEFINIDO, motor diario + aviso 30 días antes). v2.3 — bandera Pensionado en la ficha (sin AFP, AFC ni SIS en la liquidación). v2.2 — AFP, Salud y Banco se eligen del catálogo con código (mantenedor Indicadores de Remuneraciones), sin texto libre. v2.1 — Tipo de renta (VARIABLE comisiona / FIJA no comisiona) en la ficha laboral. v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -49,7 +49,11 @@
   <div class="panel">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">
       <div style="font-weight:700;color:#012d70" id="resumen">—</div>
-      <input id="q" placeholder="Buscar nombre, RUT, cargo…" oninput="render()" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;width:300px;max-width:60%">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <a class="btn-ghost" style="text-decoration:none" href="/recursos-humanos/ingresos/"><i class="bi bi-hourglass-split me-1"></i>Solicitudes de ingreso</a>
+        <a class="btn-navy" style="text-decoration:none" href="/recursos-humanos/ingresos/?nuevo=1"><i class="bi bi-person-plus me-1"></i>Nuevo colaborador</a>
+        <input id="q" placeholder="Buscar nombre, RUT, cargo…" oninput="render()" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;width:300px;max-width:60%">
+      </div>
     </div>
     <div style="overflow-x:auto">
       <table>
@@ -123,19 +127,27 @@ async function catalogo(){
   try { const j = await (await fetch('/api/rrhh/remuneraciones/catalogo', { headers:H })).json(); if (j.success) CAT = j.data; } catch(_) {}
   return CAT || { afp:[], salud:[], banco:[] };
 }
+/* Cargos = perfiles de Business Suite (lista viva: un perfil nuevo aparece solo) y supervisores = usuarios activos */
+let OP = { perfiles:[], supervisores:[] };
+async function opciones(){
+  if (OP.perfiles.length) return OP;
+  try { const j = await (await fetch('/api/rrhh/ingresos/opciones', { headers:H })).json(); if (j.success) OP = j.data; } catch(_) {}
+  return OP;
+}
 // Lista del catálogo + el valor actual si no está (fichas antiguas), para no perderlo al guardar
 const opsCat = (lista, val) => { const n = (lista||[]).map(r=>r.nombre); if (val && !n.includes(val)) n.push(val); return n; };
 async function abrir(id){
   const j = await (await fetch('/api/rrhh/ficha/'+id, { headers:H })).json();
   if (!j.success) return alert(j.error||'Error');
-  const C = await catalogo();
+  const C = await catalogo(); await opciones();
   FICHA = j.data;
   const u = FICHA.usuario, f = FICHA.ficha || {};
   document.getElementById('dTitulo').textContent = [u.nombre,u.apellido,u.apellido_materno].filter(Boolean).join(' ') + (u.rut?' · '+u.rut:'');
   document.getElementById('dBody').innerHTML = `
     <div class="sec">Datos laborales</div>
     <div class="grid3">
-      ${inp('f_cargo','Cargo',u.cargo)}
+      ${sel('f_cargo','Cargo (perfil Business Suite)',u.cargo,opsCat(OP.perfiles,u.cargo))}
+      <div class="fld"><label>Supervisor</label><select id="f_id_supervisor"><option value=""></option>${OP.supervisores.filter(s=>s.id_usuario!==u.id_usuario).map(s=>`<option value="${s.id_usuario}"${s.id_usuario===u.id_supervisor?' selected':''}>${esc(s.nombre)}</option>`).join('')}</select></div>
       ${inp('f_fecha_ingreso','Fecha de ingreso',iso(u.fecha_ingreso),'date',1)}
       ${inp('f_centro_costo','Centro de costo',u.centro_costo)}
       ${sel('f_tipo_contrato','Tipo de contrato',f.tipo_contrato,['INDEFINIDO','PLAZO FIJO','HONORARIOS','PRACTICA'],1)}
@@ -279,7 +291,7 @@ async function guardarFicha(){
   const g = id => document.getElementById(id)?.value.trim() ?? '';
   const num = id => { const v = String(document.getElementById(id)?.value ?? '').replace(/\D/g,''); return v === '' ? '' : Number(v); };   // campos con $ → número
   const body = {
-    cargo:g('f_cargo'), fecha_ingreso:g('f_fecha_ingreso'), centro_costo:g('f_centro_costo'),
+    cargo:g('f_cargo'), ...(OP.supervisores.length ? { id_supervisor:g('f_id_supervisor') } : {}), fecha_ingreso:g('f_fecha_ingreso'), centro_costo:g('f_centro_costo'),
     fecha_nacimiento:g('f_fecha_nacimiento'), sexo:g('f_sexo'), telefono:g('f_telefono'),
     tipo_contrato:g('f_tipo_contrato'), plazo_fijo_venc1:g('f_plazo_fijo_venc1'), plazo_fijo_venc2:g('f_plazo_fijo_venc2'), jornada:g('f_jornada'), tipo_renta:g('f_tipo_renta')||'VARIABLE', pensionado:g('f_pensionado')==='SI'?1:0,
     estado_civil:g('f_estado_civil'), nacionalidad:g('f_nacionalidad'),

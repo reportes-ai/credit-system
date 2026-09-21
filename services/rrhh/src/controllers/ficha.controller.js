@@ -246,12 +246,12 @@ const CAMPOS_LABORAL = ['tipo_contrato', 'plazo_fijo_venc1', 'plazo_fijo_venc2',
   'banco_pago', 'tipo_cuenta_pago', 'num_cuenta_pago', 'observaciones',
   'tramo_asignacion', 'cargas_otras', 'cargas_maternales', 'cargas_invalidas', 'anos_trabajados_previos'];
 // Identidad en usuarios que RRHH puede actualizar desde la ficha
-const CAMPOS_USUARIO = ['cargo', 'fecha_ingreso', 'fecha_nacimiento', 'sexo', 'telefono', 'centro_costo'];
+const CAMPOS_USUARIO = ['cargo', 'id_supervisor', 'fecha_ingreso', 'fecha_nacimiento', 'sexo', 'telefono', 'centro_costo'];
 
 async function armarFicha(idUsuario, conSueldo, soloVisibles) {
   const [[u]] = await pool.query(
     `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.apellido_materno, u.email, u.telefono,
-            u.cargo, u.sexo, u.fecha_ingreso, u.fecha_nacimiento, u.centro_costo, u.estado,
+            u.cargo, u.id_supervisor, u.sexo, u.fecha_ingreso, u.fecha_nacimiento, u.centro_costo, u.estado,
             p.nombre AS perfil,
             TRIM(CONCAT_WS(' ', s.nombre, s.apellido)) AS supervisor
        FROM usuarios u
