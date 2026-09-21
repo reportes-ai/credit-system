@@ -53,7 +53,7 @@ require('../../../../shared/migrate').enFila('cesion-cartera', async () => {
     tipo VARCHAR(12) PRIMARY KEY, titulo VARCHAR(200) NOT NULL, texto MEDIUMTEXT NOT NULL,
     updated_by VARCHAR(150) NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
   await pool.query("INSERT IGNORE INTO cartera_compradores (nombre_corto, razon_social, activo) VALUES ('CFC','CORPORACION FINANCIERA CFC',1)");
-  await pool.query(`UPDATE cartera_contratos_texto SET texto=REPLACE(REPLACE(texto,'"Anexo I"','"Anexo 1"'),'Anexo I ','Anexo 1 ')`).catch(() => {});
+  await pool.query(`UPDATE cartera_contratos_texto SET texto=REPLACE(REPLACE(REPLACE(REPLACE(texto,'"Anexo I"','"Anexo 1"'),'Anexo I ','Anexo 1 '),'Anexo I;','Anexo 1;'),'Anexo I,','Anexo 1,')`).catch(() => {});
   for (const t of TIPOS) {
     const [[ya]] = await pool.query('SELECT tipo FROM cartera_contratos_texto WHERE tipo=?', [t]);
     if (!ya) await pool.query('INSERT INTO cartera_contratos_texto (tipo, titulo, texto) VALUES (?,?,?)', [t, t === 'CON_RESP' ? 'CONTRATO DE CESIÓN DE CRÉDITOS CON RESPONSABILIDAD' : 'CONTRATO DE CESIÓN DE CRÉDITOS', TEXTO_BASE(t === 'CON_RESP')]);
