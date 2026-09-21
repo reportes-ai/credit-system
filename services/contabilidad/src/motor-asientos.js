@@ -16,6 +16,7 @@
      — la operación de negocio jamás se cae por contabilidad.
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../shared/config/database');
+const DESC_PAGO_CAJA = 'Se dispara al registrar un pago de cuotas en Caja. Campos: total (lo cobrado), capital (amortización de las cuotas, según la tabla de desarrollo), interes (interés corriente de las cuotas; en pagos parciales se imputa primero al interés), cuota (capital+interés), mora (interés de mora), gastos (gastos de cobranza).';
 
 /* ── Migración ─────────────────────────────────────────────────────────────── */
 require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
@@ -57,9 +58,10 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
     // el período contable, no cuentas distintas (las 'FACTURAS POR PAGAR 20XX' que
     // venían de AVSOFT obligaban a reeditar la regla cada enero).
     const R = [
-      ['PAGO_CAJA', 'Pago de cuotas en Caja', 'Se dispara al registrar un pago de cuotas en Caja. Campos: total (lo cobrado), cuota (capital+interés de cuotas), mora (interés de mora), gastos (gastos de cobranza).', 'INGRESO', 1, [
+      ['PAGO_CAJA', 'Pago de cuotas en Caja', DESC_PAGO_CAJA, 'INGRESO', 1, [
         ['1101090', 'DEBE', 'total', 'Recaudación caja'],
-        ['1104010', 'HABER', 'cuota', 'Abono a contratos'],
+        ['1104010', 'HABER', 'capital', 'Abono a contratos (capital)'],
+        ['3001010', 'HABER', 'interes', 'Interés corriente'],
         ['3001040', 'HABER', 'mora', 'Interés de mora'],
         ['3001020', 'HABER', 'gastos', 'Gastos de cobranza'],
       ]],
@@ -219,6 +221,21 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         console.log('[contabilidad] COMISION_PARQUES: arriendo y comisión separados');
       }
     } catch (e) { console.error('[contabilidad parche parques]', e.message); }
+    /* Parche idempotente (21-09-2026): PAGO_CAJA abonaba la cuota COMPLETA (capital + interés) a
+       Contratos Propios y el interés corriente nunca llegaba a resultado. Se separa con la tabla de
+       desarrollo (cuotas_credito.interes / amortizacion): capital → 1104010, interés → 3001010.
+       Solo si la regla conserva la línea default 1104010/cuota (si el Administrador la editó, no se toca). */
+    try {
+      const [[vieja]] = await pool.query(
+        "SELECT id FROM ctb_reglas_lineas WHERE evento='PAGO_CAJA' AND cuenta='1104010' AND campo='cuota' LIMIT 1");
+      const [[yaInt]] = await pool.query("SELECT COUNT(*) n FROM ctb_reglas_lineas WHERE evento='PAGO_CAJA' AND campo='interes'");
+      if (vieja && !yaInt.n) {
+        await pool.query("UPDATE ctb_reglas_lineas SET campo='capital', glosa='Abono a contratos (capital)' WHERE id=?", [vieja.id]);
+        await pool.query("INSERT INTO ctb_reglas_lineas (evento, cuenta, lado, campo, glosa) VALUES ('PAGO_CAJA','3001010','HABER','interes','Interés corriente')");
+        await pool.query("UPDATE ctb_reglas SET descripcion=? WHERE evento='PAGO_CAJA'", [DESC_PAGO_CAJA]);
+        console.log('[contabilidad] PAGO_CAJA: capital e interés corriente separados');
+      }
+    } catch (e) { console.error('[contabilidad parche pago caja]', e.message); }
     console.log('[contabilidad] motor de asientos listo');
   } catch (e) { console.error('[contabilidad-motor migration]', e.message); }
 });

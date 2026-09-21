@@ -215,6 +215,30 @@ const getById = async (req, res) => {
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
+/* Capital vs interés corriente de lo abonado a cuotas (para la contabilidad). Fuente: la tabla de
+   desarrollo congelada (cuotas_credito.interes / amortizacion). Imputación legal (art. 1595 CC):
+   lo abonado a una cuota paga primero su interés y después capital; lo ya pagado de esa cuota en
+   transacciones anteriores se descuenta primero del interés. Sin calendario → todo a capital. */
+async function separarCapitalInteres(id_credito, pagos, trxActual) {
+  const nums = [...new Set(pagos.map(p => Number(p.numero_cuota)).filter(n => n > 0))];
+  let capital = 0, interes = 0;
+  if (!nums.length) return { capital: 0, interes: 0 };
+  const [cal] = await pool.query('SELECT numero_cuota, interes FROM cuotas_credito WHERE id_credito=? AND numero_cuota IN (?)', [id_credito, nums]);
+  const [prev] = await pool.query(
+    `SELECT numero_cuota, COALESCE(SUM(monto_cuota),0) pagado FROM pagos_credito
+      WHERE id_credito=? AND estado_pago='PAGADO' AND numero_cuota IN (?) AND (numero_transaccion IS NULL OR numero_transaccion<>?)
+      GROUP BY numero_cuota`, [id_credito, nums, trxActual || 0]);
+  const intRest = new Map(cal.map(c => [Number(c.numero_cuota), Number(c.interes) || 0]));
+  for (const p of prev) { const n = Number(p.numero_cuota); if (intRest.has(n)) intRest.set(n, Math.max(0, intRest.get(n) - Number(p.pagado))); }
+  for (const p of pagos) {
+    const m = Math.round(parseFloat(p.monto_cuota) || 0), n = Number(p.numero_cuota);
+    const i = Math.min(m, Math.round(intRest.get(n) || 0));
+    intRest.set(n, (intRest.get(n) || 0) - i);
+    interes += i; capital += m - i;
+  }
+  return { capital, interes };
+}
+
 /* ─── POST registrar pago ────────────────────────────────────────────────── */
 const create = async (req, res) => {
   try {
@@ -502,11 +526,12 @@ const createBatch = async (req, res) => {
           if (cb && cb.cuenta_contable) { reemplazos = { '1101090': cb.cuenta_contable }; bancoTxt = cb.banco; }
         } catch (_) {}
       }
+      const ci = await separarCapitalInteres(id_credito, pagos, numero_transaccion);
       require('../../../contabilidad/src/motor-asientos').contabilizar({
         evento: 'PAGO_CAJA', fecha: fecha_pago || undefined,
         glosa: `Pago en ${cajaNombre || 'caja'} — ${pagos.length} cuota(s) · OP ${numOpTxt}`,
         ref: `TRX-${String(numero_transaccion).padStart(6, '0')}`,
-        montos: { total: mCuota + mMora + mGastos, cuota: mCuota, mora: mMora, gastos: mGastos },
+        montos: { total: mCuota + mMora + mGastos, cuota: mCuota, capital: mCuota - ci.interes, interes: ci.interes, mora: mMora, gastos: mGastos },
         num_op: numOpTxt, reemplazos,
         // Va a la glosa de CADA línea: "Recaudación caja · Caja 2 · OP 68520 · Banco de Chile"
         detalle: [cajaNombre, 'OP ' + numOpTxt, bancoTxt].filter(Boolean).join(' · '),
@@ -904,4 +929,4 @@ const enviarComprobanteTrx = async (req, res) => {
   }
 };
 
-module.exports = { getByCredito, getCalendario, getById, create, createBatch, remove, reversar, prepagoInfo, prepagar, cobranzaFullMap, enviarComprobanteTrx };
+module.exports = { getByCredito, getCalendario, getById, create, createBatch, remove, reversar, prepagoInfo, prepagar, cobranzaFullMap, enviarComprobanteTrx, separarCapitalInteres };
