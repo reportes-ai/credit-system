@@ -125,8 +125,12 @@ exports.clusterComercial = async (req, res) => {
   try {
     const [ppsto] = await pool.query('SELECT anio, mes, semana, unidades, monto FROM ppsto_cluster');
     const [real] = await pool.query(`
-      SELECT YEAR(fecha_otorgado)  AS anio,
-             MONTH(fecha_otorgado) AS mes,
+      /* AÑO y MES por creditos.mes (mes de atribución, igual que el Dashboard de ventas —
+         regla 2.7: hasta jul-26 el mes contable ajustado manda; desde ago-26 sigue al curse).
+         La SEMANA sale del día de otorgamiento. Antes iba todo por fecha_otorgado y junio/julio
+         2026 no cuadraban con el Dashboard (2 ops cursadas en junio atribuidas a julio). */
+      SELECT YEAR(mes)  AS anio,
+             MONTH(mes) AS mes,
              LEAST(4, FLOOR((DAY(fecha_otorgado)-1)/7) + 1) AS semana,
              COUNT(*) AS n,
              COALESCE(SUM(monto_financiado),0) AS monto
