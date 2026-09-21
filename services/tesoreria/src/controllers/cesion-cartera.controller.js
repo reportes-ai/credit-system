@@ -220,7 +220,10 @@ async function armarAnexo2(ventas, fecha, resp, emp, cp) {
     const filas = qs.map((q, k) => {
       const pag = !!(q.fecha_pago || q.estado_cuota === 'PAGADA');
       // Recompra estando esta cuota impaga: VP de esta cuota y las siguientes al vencimiento de esta cuota
-      const recompra = pag ? null : core.precioVentaCartera(qs.slice(k).map(x => ({ valor_cuota: x.valor_cuota, fecha_vencimiento: x.venc })), r, q.venc) + gastos;
+      // Fecha base: el vencimiento de la cuota, o la fecha de venta si la cuota ya estaba vencida al vender
+      // (así la recompra desde la primera cuota pendiente coincide con el precio de cesión).
+      const base = q.venc && q.venc > fecha ? q.venc : fecha;
+      const recompra = pag ? null : core.precioVentaCartera(qs.slice(k).map(x => ({ valor_cuota: x.valor_cuota, fecha_vencimiento: x.venc })), r, base) + gastos;
       return `<tr${pag ? ' class="pag"' : ''}><td>${q.numero_cuota}</td><td class="nw">${q.venc_txt || ''}</td><td class="num">${CLP(q.amortizacion)}</td><td class="num">${CLP(q.interes)}</td><td class="num">${CLP(q.valor_cuota)}</td><td class="num">${CLP(q.saldo_insoluto)}</td><td class="nw">${pag ? 'Pagada ' + (q.pago_txt || '') : 'Pendiente'}</td>${resp ? `<td class="num">${recompra != null ? CLP(recompra) : '—'}</td>` : ''}</tr>`;
     }).join('');
     html += `<div class="anexo-pag"><h3>ANEXO 2 — Individualización del crédito ${i + 1} de ${ventas.length}: operación N° ${v.num_op}</h3>
@@ -233,7 +236,7 @@ async function armarAnexo2(ventas, fecha, resp, emp, cp) {
         <tr><th>Precio de cesión</th><td>${CLP(v.precio_venta)}</td><th>Tasa de descuento</th><td>${pct(tasa)}</td><th>Responsabilidad</th><td>${resp ? 'Con responsabilidad (recompra a los 91 días de mora)' : 'Sin responsabilidad'}</td></tr>
       </tbody></table>
       <table class="anexo"><thead><tr><th>N°</th><th>Vencimiento</th><th>Amortización a capital</th><th>Interés corriente</th><th>Total cuota</th><th>Saldo insoluto</th><th>Estado</th>${resp ? '<th>Precio de recompra</th>' : ''}</tr></thead><tbody>${filas}</tbody></table>
-      ${resp ? `<p style="font-size:.72rem;margin-top:6px"><b>Precio de recompra:</b> monto al que AutoFácil recompra la operación si el deudor deja impaga la cuota indicada y las siguientes: valor presente de esa cuota y de todas las posteriores, descontadas a la tasa de descuento de esta cesión (${pct(tasa)} mensual) a la fecha de vencimiento de la cuota${gastos ? ', más ' + CLP(gastos) + ' de gastos por operación' : ''}. Es la misma fórmula con que se fijó el precio de cesión.</p>` : ''}</div>`;
+      ${resp ? `<p style="font-size:.72rem;margin-top:6px"><b>Precio de recompra:</b> monto al que AutoFácil recompra la operación si el deudor deja impaga la cuota indicada y las siguientes: valor presente de esa cuota y de todas las posteriores, descontadas a la tasa de descuento de esta cesión (${pct(tasa)} mensual) a la fecha de vencimiento de la cuota (o a la fecha de cesión si ya estaba vencida)${gastos ? ', más ' + CLP(gastos) + ' de gastos por operación' : ''}. Es la misma fórmula con que se fijó el precio de cesión.</p>` : ''}</div>`;
   });
   return html;
 }
