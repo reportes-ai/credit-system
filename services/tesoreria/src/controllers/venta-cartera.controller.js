@@ -59,7 +59,8 @@ require('../../../../shared/migrate').enFila('venta-cartera-param', async () => 
     clave VARCHAR(40) PRIMARY KEY, valor DECIMAL(8,4) NOT NULL, updated_by VARCHAR(150) NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
   for (const [k, v] of Object.entries(PARAM_DEF)) await pool.query('INSERT IGNORE INTO venta_cartera_param (clave, valor) VALUES (?,?)', [k, v]);
-  for (const col of ['tasa_descuento DECIMAL(8,4) NULL', 'precio_ref_autofin DECIMAL(15,0) NULL', 'gastos_venta DECIMAL(15,0) NULL', 'interes_dev_venta DECIMAL(15,0) NULL'])
+  for (const col of ['tasa_descuento DECIMAL(8,4) NULL', 'precio_ref_autofin DECIMAL(15,0) NULL', 'gastos_venta DECIMAL(15,0) NULL', 'interes_dev_venta DECIMAL(15,0) NULL',
+                     'fecha_cobro DATE NULL', 'monto_cobrado DECIMAL(15,0) NULL', 'id_cuenta_bancaria INT NULL', 'cobrado_por VARCHAR(150) NULL'])
     await pool.query(`ALTER TABLE cartera_ventas ADD COLUMN ${col}`).catch(() => {});
 });
 async function parametros() {
@@ -226,11 +227,43 @@ exports.vender = async (req, res) => {
   } catch (e) { errSrv(res, e, 'venta-cartera vender'); }
 };
 
+/* ── POST /api/venta-cartera/:id/cobrar { fecha, id_cuenta_bancaria, monto } ─
+   Ingreso de fondos del comprador: DEBE banco real del depósito / HABER 1106020.
+   Un cobro por venta (por el total); mismo banco que Caja (cuentas_bancarias.cuenta_contable). */
+exports.cobrar = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const [[v]] = await pool.query('SELECT * FROM cartera_ventas WHERE id=?', [parseInt(req.params.id) || 0]);
+    if (!v) return res.status(404).json({ success: false, data: null, error: 'Venta no encontrada' });
+    if (v.fecha_cobro) return res.status(409).json({ success: false, data: null, error: 'Esta venta ya está cobrada' });
+    const idCta = parseInt(b.id_cuenta_bancaria) || null;
+    if (!idCta) return res.status(400).json({ success: false, data: null, error: 'Indica la cuenta bancaria donde entraron los fondos' });
+    const monto = Math.round(+b.monto || 0);
+    if (!(monto > 0)) return res.status(400).json({ success: false, data: null, error: 'Monto inválido' });
+    const fecha = /^\d{4}-\d{2}-\d{2}$/.test(String(b.fecha)) ? b.fecha : require('../../../../shared/fecha-chile').hoyISO();
+    const usuario = ((req.usuario.nombre || '') + ' ' + (req.usuario.apellido || '')).trim() || req.usuario.email || '';
+    const [u] = await pool.query('UPDATE cartera_ventas SET fecha_cobro=?, monto_cobrado=?, id_cuenta_bancaria=?, cobrado_por=? WHERE id=? AND fecha_cobro IS NULL', [fecha, monto, idCta, usuario, v.id]);
+    if (u.affectedRows !== 1) return res.status(409).json({ success: false, data: null, error: 'La venta cambió; recarga' });
+    const { reemplazoBanco } = require('../../../creditos/src/controllers/pagos-credito.controller');   // mismo banco real que Caja
+    const bco = await reemplazoBanco(idCta);
+    const id = await require('../../../contabilidad/src/motor-asientos').contabilizar({
+      evento: 'COBRO_VENTA_CARTERA', fecha, ref: `CVC-${v.id}`, num_op: String(v.num_op), reemplazos: bco.reemplazos,
+      montos: { monto }, glosa: `Cobro venta de cartera op ${v.num_op} — ${v.comprador}`,
+      detalle: [v.comprador, 'OP ' + v.num_op, bco.banco].filter(Boolean).join(' · '),
+    });
+    require('../../../../shared/audit').auditar({ req, accion: 'PAGAR', modulo: 'tesoreria', entidad: 'cartera_ventas', entidad_id: v.id,
+      detalle: `Cobro venta de cartera op ${v.num_op} (${v.comprador}): $${monto.toLocaleString('es-CL')} el ${fecha}${bco.banco ? ' en ' + bco.banco : ''}${id ? ' · asiento #' + id : ''}` });
+    res.json({ success: true, data: { id: v.id, fecha, monto, id_comprobante: id, diferencia: monto - Math.round(+v.precio_venta || 0) }, error: null });
+  } catch (e) { errSrv(res, e, 'venta-cartera cobrar'); }
+};
+
 /* ── DELETE /api/venta-cartera/:id — deshacer una venta ──────────────────── */
 exports.deshacer = async (req, res) => {
   try {
     const [[v]] = await pool.query('SELECT id, id_credito, num_op, comprador, precio_venta, capital_venta, interes_dev_venta FROM cartera_ventas WHERE id=?', [parseInt(req.params.id) || 0]);
     if (!v) return res.status(404).json({ success: false, data: null, error: 'Venta no encontrada' });
+    const [[cob]] = await pool.query('SELECT fecha_cobro FROM cartera_ventas WHERE id=?', [v.id]);
+    if (cob && cob.fecha_cobro) return res.status(409).json({ success: false, data: null, error: 'La venta ya fue cobrada: no se puede deshacer' });
     await pool.query("UPDATE creditos SET credito_vendido_a=NULL WHERE id=?", [v.id_credito]);
     await pool.query('DELETE FROM cartera_ventas WHERE id=?', [v.id]);
     // Contra-asiento con los mismos montos que se asentaron al vender (foto en la fila)

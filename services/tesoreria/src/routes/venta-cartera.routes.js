@@ -8,6 +8,7 @@ router.get('/parametros', verifyToken, requireFunc('venta_cartera'), ctrl.getPar
 router.put('/parametros', verifyToken, requireFunc('venta_cartera'), ctrl.putParametros);
 router.get('/elegibles',  verifyToken, requireFunc('venta_cartera'), ctrl.elegibles);
 router.post('/vender',    verifyToken, requireFunc('venta_cartera'), ctrl.vender);
+router.post('/:id/cobrar', verifyToken, requireFunc('venta_cartera'), ctrl.cobrar);   // ingreso de fondos del comprador
 router.delete('/:id',     verifyToken, requireFunc('venta_cartera'), ctrl.deshacer);
 router.get('/stock',      verifyToken, requireFunc('venta_cartera'), ctrl.stock);
 router.get('/cuotas-mes', verifyToken, requireFunc('venta_cartera'), ctrl.cuotasMes);

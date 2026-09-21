@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.2 — asiento contable de la venta y de su reversa (VENTA_CARTERA / REVERSA_VENTA_CARTERA). v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
+<!-- v2.3 — Cobrar en Stock Vendido: ingreso de fondos del comprador contra la cuenta bancaria del depósito (COBRO_VENTA_CARTERA); una venta cobrada no se deshace. v2.2 — asiento contable de la venta y de su reversa (VENTA_CARTERA / REVERSA_VENTA_CARTERA). v2.1 — tres spreads (sin resp. / con administración / con resp.+adm.; responsabilidad implica administración), gastos de venta por operación sumados al precio, precio de venta en pesos. v2.0 — Precio de venta = VP de las cuotas pendientes descontadas a (tasa del crédito − spread), como AutoFin paga la colocación (motor único rentabilidad-core.precioVentaCartera); pestaña Parámetros de Precio (spread sin/con responsabilidad); referencia precio AutoFin sin responsabilidad (Pato 21-09-2026). v1.0 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -96,7 +96,8 @@
       <h6 style="font-weight:800;color:var(--navy-dark)"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</h6>
       <ul style="font-size:.82rem;margin:0;padding-left:18px">
         <li><b>Spreads (sin resp. / con administración / con resp.+adm.) y gastos de venta</b> → precio propuesto en la pestaña <a href="#" onclick="tab('vender');return false">Vender</a> (tasa de descuento y precio del motor); las ventas ya registradas guardan su tasa y precio como foto.</li>
-        <li><b>Vender / Deshacer</b> → asiento automático en <a href="/contabilidad/">Contabilidad</a> (regla <code>VENTA_CARTERA</code>, editable en Reglas de Centralización): DEBE 1106020 Por cobrar venta de cartera por el precio; HABER 1104010 Contratos Propios por el capital vigente y 1104120 por el interés devengado no cobrado; la diferencia va a 3001060 Ingresos por venta de contratos o a 4001161 Gastos por ventas de cartera. Deshacer genera el contra-asiento.</li>
+        <li><b>Vender / Deshacer</b> → asiento automático en <a href="/contabilidad/">Contabilidad</a> (regla <code>VENTA_CARTERA</code>, editable en Reglas de Centralización): DEBE 1106020 Por cobrar venta de cartera por el precio; HABER 1104010 Contratos Propios por el capital vigente y 1104120 por el interés devengado no cobrado; la diferencia va a 3001060 Ingresos por venta de contratos o a 4001161 Gastos por ventas de cartera. Deshacer genera el contra-asiento (solo mientras no esté cobrada).</li>
+        <li><b>Cobrar (Stock Vendido)</b> → ingreso de fondos del comprador: DEBE banco de la cuenta elegida (<a href="/mantenedores/cuentas-bancarias/">Cuentas Bancarias</a>, igual que Caja) / HABER 1106020 (regla <code>COBRO_VENTA_CARTERA</code>).</li>
         <li><b>Referencia AutoFin sin responsabilidad</b> → sale del mantenedor <a href="/mantenedores/tasas/">Tasas</a> (tasa del tramo − spread del tramo a la fecha de venta) y de la <a href="/mantenedores/uf/">UF</a> para el tramo de 200 UF; no se edita aquí.</li>
       </ul>
     </div>
@@ -119,7 +120,7 @@
     <div class="card-x" style="overflow:auto">
       <h6 style="font-weight:800;color:var(--navy-dark)">Detalle de operaciones vendidas</h6>
       <table>
-        <thead><tr><th>N° Op</th><th>Cliente</th><th>Comprador</th><th>Fecha venta</th><th>Categoría</th><th>Capital venta</th><th>Precio venta</th><th>Capital vigente</th><th>Cuotas pend.</th><th></th></tr></thead>
+        <thead><tr><th>N° Op</th><th>Cliente</th><th>Comprador</th><th>Fecha venta</th><th>Categoría</th><th>Capital venta</th><th>Precio venta</th><th>Capital vigente</th><th>Cuotas pend.</th><th>Cobro</th><th></th></tr></thead>
         <tbody id="sBody"></tbody>
       </table>
     </div>
@@ -143,6 +144,23 @@
   </div>
 </div>
 
+<dialog id="dlgCobro" style="border:none;border-radius:14px;padding:0;max-width:460px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:12px 18px;font-weight:700">Ingreso de fondos del comprador</div>
+  <div style="padding:16px 18px">
+    <div id="cbOp" style="font-size:.85rem;font-weight:700;color:#012d70;margin-bottom:10px"></div>
+    <input type="hidden" id="cbId">
+    <div class="filtro-bar" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label>Fecha</label><input type="date" id="cbFecha" class="form-control form-control-sm"></div>
+      <div><label>Monto recibido $</label><input type="text" inputmode="numeric" id="cbMonto" class="form-control form-control-sm" oninput="this.value=fmtIn(this.value)"></div>
+      <div style="grid-column:1/-1"><label>Cuenta bancaria del depósito</label><select id="cbCuenta" class="form-select form-select-sm"></select></div>
+    </div>
+    <div class="muted" style="font-size:.74rem;margin-top:6px">Asiento: banco de la cuenta elegida contra Cuentas por Cobrar Venta de Cartera (1106020).</div>
+  </div>
+  <div style="padding:10px 18px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn btn-sm btn-light" onclick="dlgCobro.close()">Cancelar</button>
+    <button class="btn btn-sm btn-success" onclick="confirmarCobro()"><i class="bi bi-check-lg me-1"></i>Registrar cobro</button>
+  </div>
+</dialog>
 <script src="/js/auth-guard.js"></script>
 <script src="/js/chart.umd.min.js"></script>
 <script>
@@ -249,8 +267,10 @@ async function cargarStock(){
     <tr><td><b>${v.num_op}</b></td><td>${esc(v.cliente)}</td><td>${esc(v.comprador)}</td>
     <td>${String(v.fecha_venta).slice(0,10)}</td><td><span class="pill ${CATP[v.categoria]}">${CATL[v.categoria]}</span></td>
     <td>${fmt(v.capital_venta)}</td><td>${fmt(v.precio_venta)}</td><td>${fmt(v.capital_vigente)}</td><td>${v.cuotas_pendientes ?? '—'}</td>
-    <td><button class="btn btn-sm btn-outline-danger" onclick="deshacer(${v.id})" title="Deshacer venta"><i class="bi bi-arrow-counterclockwise"></i></button></td></tr>`).join('')
-    || '<tr><td colspan="10" class="muted">Sin ventas registradas.</td></tr>';
+    <td>${v.fecha_cobro ? `<span style="color:#166534">✓ ${String(v.fecha_cobro).slice(0,10)} · ${fmt(v.monto_cobrado)}</span>` : `<button class="btn btn-sm btn-outline-success" onclick="cobrar(${v.id})"><i class="bi bi-cash-coin me-1"></i>Cobrar</button>`}</td>
+    <td>${v.fecha_cobro ? '' : `<button class="btn btn-sm btn-outline-danger" onclick="deshacer(${v.id})" title="Deshacer venta"><i class="bi bi-arrow-counterclockwise"></i></button>`}</td></tr>`).join('')
+    || '<tr><td colspan="11" class="muted">Sin ventas registradas.</td></tr>';
+  VENTAS = d.ventas || [];
   // Gráficos
   const cats = Object.keys(d.porCategoria);
   if (CH1) CH1.destroy();
@@ -264,6 +284,28 @@ async function cargarStock(){
     options:{ plugins:{ legend:{ display:false } }, scales:{ y:{ ticks:{ callback:v=>'$'+Number(v).toLocaleString('es-CL') } } } } });
 }
 
+/* Ingreso de fondos del comprador: misma cuenta bancaria del depósito que usa Caja */
+let VENTAS = [], CUENTAS = null;
+async function cobrar(id){
+  const v = VENTAS.find(x => x.id === id); if (!v) return;
+  if (!CUENTAS) CUENTAS = ((await fetch('/api/cuentas-bancarias', { headers:H }).then(r=>r.json()).catch(()=>({}))).data || []).filter(c => c.activo);
+  if (!CUENTAS.length) return alert('No hay cuentas bancarias activas en el mantenedor Cuentas Bancarias.');
+  $('cbOp').textContent = `OP ${v.num_op} · ${v.comprador} · precio ${fmt(v.precio_venta)}`;
+  $('cbCuenta').innerHTML = CUENTAS.map(c => `<option value="${c.id_cuenta}">${esc(c.banco || c.razon_social)}${c.nombre ? ' ('+esc(c.nombre)+')' : ''} — ${esc(c.numero_cuenta)}</option>`).join('');
+  $('cbFecha').value = new Date().toISOString().slice(0,10);
+  $('cbMonto').value = fmtIn(v.precio_venta);
+  $('cbId').value = id;
+  dlgCobro.showModal();
+}
+async function confirmarCobro(){
+  const id = +$('cbId').value, monto = numIn($('cbMonto').value);
+  if (!(monto > 0)) return alert('Monto inválido');
+  const j = await fetch(`/api/venta-cartera/${id}/cobrar`, { method:'POST', headers:H, body: JSON.stringify({ fecha: $('cbFecha').value, id_cuenta_bancaria: +$('cbCuenta').value, monto }) }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) return alert(j.error || 'Error');
+  dlgCobro.close();
+  if (j.data.diferencia) alert(`Cobro registrado. Ojo: el monto difiere del precio de venta en ${fmt(j.data.diferencia)}; la diferencia queda en Cuentas por Cobrar Venta de Cartera.`);
+  cargarStock();
+}
 async function deshacer(id){
   if (!confirm('¿Deshacer esta venta? La operación vuelve a la cartera AutoFácil.')) return;
   const j = await fetch('/api/venta-cartera/'+id, { method:'DELETE', headers:H }).then(r=>r.json()).catch(()=>({}));

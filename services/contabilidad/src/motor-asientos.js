@@ -84,6 +84,10 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['1104120', 'HABER', 'interes_dev', 'Interés devengado traspasado en la venta'],
         ['3001060', 'HABER', 'utilidad', 'Utilidad en venta de cartera'],
       ]],
+      ['COBRO_VENTA_CARTERA', 'Cobro al comprador de cartera vendida', 'Se dispara al registrar el ingreso de fondos del comprador (Tesorería → Venta de Cartera → Stock Vendido → Cobrar). El banco es la cuenta bancaria del depósito (mantenedor Cuentas Bancarias), como en Caja. Campos: monto.', 'INGRESO', 1, [
+        ['1101090', 'DEBE', 'monto', 'Ingreso de fondos venta de cartera'],
+        ['1106020', 'HABER', 'monto', 'Cobro por cobrar venta de cartera'],
+      ]],
       ['REVERSA_VENTA_CARTERA', 'Reversa de venta de cartera propia', 'Se dispara al deshacer una venta (el crédito vuelve a la cartera AutoFácil). Mismos campos que VENTA_CARTERA, invertidos.', 'TRASPASO', 1, [
         ['1104010', 'DEBE', 'capital', 'Reversa: vuelve a contratos propios'],
         ['1104120', 'DEBE', 'interes_dev', 'Reversa: interés devengado'],
