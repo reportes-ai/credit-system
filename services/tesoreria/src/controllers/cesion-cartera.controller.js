@@ -220,7 +220,7 @@ async function armarAnexo2(ventas, fecha, resp, emp, cp) {
       const pag = !!(q.fecha_pago || q.estado_cuota === 'PAGADA');
       // Recompra estando esta cuota impaga: VP de esta cuota y las siguientes al vencimiento de esta cuota
       const recompra = pag ? null : core.precioVentaCartera(qs.slice(k).map(x => ({ valor_cuota: x.valor_cuota, fecha_vencimiento: x.venc })), r, q.venc) + gastos;
-      return `<tr${pag ? ' class="pag"' : ''}><td>${q.numero_cuota}</td><td class="nw">${q.venc_txt || ''}</td><td class="num">${CLP(q.amortizacion)}</td><td class="num">${CLP(q.interes)}</td><td class="num">${CLP(q.valor_cuota)}</td><td class="num">${CLP(q.saldo_insoluto)}</td><td class="nw">${pag ? 'Pagada ' + (q.pago_txt || '') : 'Pendiente'}</td><td class="num">${recompra != null ? CLP(recompra) : '—'}</td></tr>`;
+      return `<tr${pag ? ' class="pag"' : ''}><td>${q.numero_cuota}</td><td class="nw">${q.venc_txt || ''}</td><td class="num">${CLP(q.amortizacion)}</td><td class="num">${CLP(q.interes)}</td><td class="num">${CLP(q.valor_cuota)}</td><td class="num">${CLP(q.saldo_insoluto)}</td><td class="nw">${pag ? 'Pagada ' + (q.pago_txt || '') : 'Pendiente'}</td>${resp ? `<td class="num">${recompra != null ? CLP(recompra) : '—'}</td>` : ''}</tr>`;
     }).join('');
     html += `<div class="anexo-pag"><h3>ANEXO 2 — Individualización del crédito ${i + 1} de ${ventas.length}: operación N° ${v.num_op}</h3>
       <div class="anexo-sub">Contrato de cesión ${esc(emp.razon_social || '')} → ${esc(cp.razon_social)} · ${fechaLarga(fecha)}</div>
@@ -229,10 +229,10 @@ async function armarAnexo2(ventas, fecha, resp, emp, cp) {
         <tr><th>Vehículo</th><td>${esc([v.marca, v.modelo, v.anio].filter(Boolean).join(' '))}</td><th>Patente</th><td>${esc(v.patente || '')}</td><th>Fecha de otorgamiento</th><td>${esc(v.fecha_otorgado || '')}</td></tr>
         <tr><th>Monto original</th><td>${CLP(v.monto_financiado)}</td><th>Tasa mensual</th><td>${pct(v.tascli_real)}</td><th>Plazo</th><td>${v.plazo || ''} cuotas de ${CLP(v.cuota)}</td></tr>
         <tr><th>Cuotas pagadas</th><td>${pagadas.length}</td><th>Cuotas pendientes</th><td>${qs.length - pagadas.length}</td><th>Capital insoluto</th><td>${CLP(v.capital_venta)}</td></tr>
-        <tr><th>Precio de cesión</th><td>${CLP(v.precio_venta)}</td><th>Tasa de descuento</th><td>${pct(tasa)}</td><th>Gastos por operación</th><td>${CLP(gastos)}</td></tr>
+        <tr><th>Precio de cesión</th><td>${CLP(v.precio_venta)}</td><th>Tasa de descuento</th><td>${pct(tasa)}</td><th>Responsabilidad</th><td>${resp ? 'Con responsabilidad (recompra a los 91 días de mora)' : 'Sin responsabilidad'}</td></tr>
       </tbody></table>
-      <table class="anexo"><thead><tr><th>N°</th><th>Vencimiento</th><th>Amortización a capital</th><th>Interés corriente</th><th>Total cuota</th><th>Saldo insoluto</th><th>Estado</th><th>Precio de recompra</th></tr></thead><tbody>${filas}</tbody></table>
-      <p style="font-size:.72rem;margin-top:6px"><b>Precio de recompra:</b> monto al que AutoFácil recompra la operación si el deudor deja impaga la cuota indicada y las siguientes: valor presente de esa cuota y de todas las posteriores, descontadas a la tasa de descuento de esta cesión (${pct(tasa)} mensual) a la fecha de vencimiento de la cuota${gastos ? ', más ' + CLP(gastos) + ' de gastos por operación' : ''}. Es la misma fórmula con que se fijó el precio de cesión.</p></div>`;
+      <table class="anexo"><thead><tr><th>N°</th><th>Vencimiento</th><th>Amortización a capital</th><th>Interés corriente</th><th>Total cuota</th><th>Saldo insoluto</th><th>Estado</th>${resp ? '<th>Precio de recompra</th>' : ''}</tr></thead><tbody>${filas}</tbody></table>
+      ${resp ? `<p style="font-size:.72rem;margin-top:6px"><b>Precio de recompra:</b> monto al que AutoFácil recompra la operación si el deudor deja impaga la cuota indicada y las siguientes: valor presente de esa cuota y de todas las posteriores, descontadas a la tasa de descuento de esta cesión (${pct(tasa)} mensual) a la fecha de vencimiento de la cuota${gastos ? ', más ' + CLP(gastos) + ' de gastos por operación' : ''}. Es la misma fórmula con que se fijó el precio de cesión.</p>` : ''}</div>`;
   });
   return html;
 }
