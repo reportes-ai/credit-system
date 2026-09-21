@@ -37,6 +37,7 @@ const MARCADORES = [
   ['{{PRECIO}}', 'Precio total de la cesión (suma de las ventas)'], ['{{PRECIO_PALABRAS}}', 'Precio en palabras'],
   ['{{CUENTA_BANCARIA}}', 'Cuenta bancaria del cedente donde se paga (número, banco)'], ['{{N_CREDITOS}}', 'Cantidad de créditos cedidos'],
   ['{{FIRMAS}}', 'Bloque de firmas'], ['{{ANEXO_I}}', 'Anexo 1: tabla con las operaciones cedidas (va en hoja aparte)'],
+  ['{{ANEXO_II}}', 'Anexo 2: una hoja por crédito con su individualización, tabla de desarrollo y precio de recompra por cuota'],
 ];
 
 require('../../../../shared/migrate').enFila('cesion-cartera', async () => {
@@ -162,6 +163,8 @@ async function armarContrato(comprador, fecha, resp, ventas) {
     }<tr class="tot"><td colspan="14">TOTAL (${ventas.length} crédito${ventas.length === 1 ? '' : 's'})</td><td class="num">${CLP(ventas.reduce((s, v) => s + (+v.capital_venta || 0), 0))}</td><td class="num">${CLP(precio)}</td></tr></tbody></table>
     <p style="font-size:.78rem;margin-top:8px">Los créditos individualizados constan en pagarés suscritos a la orden de ${esc(emp.razon_social || '')}, con la tabla de desarrollo de cada uno (composición de cada cuota en interés corriente, amortización y saldo insoluto) que se acompaña como parte integrante de este Anexo.</p></div>`;
     const firmas = `<div class="firmas"><div><div class="linea"></div>${esc(emp.representante || '')}<br>pp ${esc(emp.razon_social || '')}</div>${reps.map(r => `<div><div class="linea"></div>${esc(r.nombre)}<br>pp ${esc(cp.razon_social)}</div>`).join('') || `<div><div class="linea"></div>pp ${esc(cp.razon_social)}</div>`}</div>`;
+    // Anexo 2: una hoja por crédito — individualización, tabla de desarrollo y precio de recompra por cuota
+    const anexo2 = await armarAnexo2(ventas, fecha, resp, emp, cp);
     const map = {
       CIUDAD: emp.ciudad || 'Santiago', FECHA_LARGA: fechaLarga(fecha),
       CEDENTE_RAZON: emp.razon_social || '', CEDENTE_RUT: emp.rut_formateado || '', CEDENTE_GIRO: emp.giro || '',
@@ -175,9 +178,10 @@ async function armarContrato(comprador, fecha, resp, ventas) {
       CUENTA_BANCARIA: cta ? `número ${cta.numero_cuenta}, abierta a nombre de ${emp.razon_social}, en el ${cta.banco}` : '____________',
     };
     let html = esc(tx.texto).split(/\n{2,}|\r\n\r\n/).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
-    html = html.replace(/\{\{(\w+)\}\}/g, (m, k) => k === 'FIRMAS' ? firmas : k === 'ANEXO_I' ? anexo : (k in map ? esc(map[k]) : m));
+    html = html.replace(/\{\{(\w+)\}\}/g, (m, k) => k === 'FIRMAS' ? firmas : k === 'ANEXO_I' ? anexo : k === 'ANEXO_II' ? anexo2 : (k in map ? esc(map[k]) : m));
     if (!/\{\{FIRMAS\}\}/.test(tx.texto)) html += firmas;
     if (!/\{\{ANEXO_I\}\}/.test(tx.texto)) html += anexo;
+    if (!/\{\{ANEXO_II\}\}/.test(tx.texto)) html += anexo2;
     return { titulo: tx.titulo, html, comprador: cp, ventas: ventas.length, precio, fecha, resp };
 }
 
@@ -189,6 +193,49 @@ exports.grupos = async (req, res) => {
     ok(res, rows);
   } catch (e) { fail(res, e.message); }
 };
+
+/* Anexo 2: por cada crédito, individualización + tabla de desarrollo completa (amortización, interés
+   corriente, total cuota, vencimiento, saldo) + PRECIO DE RECOMPRA por cuota: lo que AutoFácil paga si
+   debe recomprar la operación estando esa cuota impaga = VP de esa cuota y las siguientes, a la misma
+   tasa de descuento de la venta (tasa del crédito − spread) y a la fecha de vencimiento de esa cuota
+   (motor único rentabilidad-core.precioVentaCartera), más los gastos de venta del parámetro. */
+async function armarAnexo2(ventas, fecha, resp, emp, cp) {
+  const core = require('../../../../api-gateway/public/js/rentabilidad-core');
+  const vc = require('./venta-cartera.controller');
+  const [ops] = await pool.query('SELECT id, num_op, tascli_real, monto_financiado FROM creditos WHERE id IN (?)', [ventas.map(v => v.id_credito)]);
+  const precios = await vc.preciosDe(ops, fecha);
+  const [cuotas] = await pool.query(
+    `SELECT num_op, numero_cuota, DATE_FORMAT(fecha_vencimiento,'%Y-%m-%d') venc, DATE_FORMAT(fecha_vencimiento,'%d-%m-%Y') venc_txt,
+            amortizacion, interes, valor_cuota, saldo_insoluto, estado_cuota, fecha_pago, DATE_FORMAT(fecha_pago,'%d-%m-%Y') pago_txt
+       FROM cuotas_credito WHERE num_op IN (?) ORDER BY num_op, numero_cuota`, [ventas.map(v => v.num_op)]);
+  const pct = v => v == null ? '' : (+v).toLocaleString('es-CL', { maximumFractionDigits: 3 }) + '%';
+  let html = '';
+  ventas.forEach((v, i) => {
+    const pr = precios[v.num_op] || {};
+    const tasa = resp ? pr.tasa_con_resp : pr.tasa_con_adm != null && v.con_administracion ? pr.tasa_con_adm : pr.tasa_sin_resp;
+    const r = (tasa || 0) / 100, gastos = pr.gastos_venta || 0;
+    const qs = cuotas.filter(q => q.num_op === v.num_op);
+    const pagadas = qs.filter(q => q.fecha_pago || q.estado_cuota === 'PAGADA');
+    const filas = qs.map((q, k) => {
+      const pag = !!(q.fecha_pago || q.estado_cuota === 'PAGADA');
+      // Recompra estando esta cuota impaga: VP de esta cuota y las siguientes al vencimiento de esta cuota
+      const recompra = pag ? null : core.precioVentaCartera(qs.slice(k).map(x => ({ valor_cuota: x.valor_cuota, fecha_vencimiento: x.venc })), r, q.venc) + gastos;
+      return `<tr${pag ? ' class="pag"' : ''}><td>${q.numero_cuota}</td><td class="nw">${q.venc_txt || ''}</td><td class="num">${CLP(q.amortizacion)}</td><td class="num">${CLP(q.interes)}</td><td class="num">${CLP(q.valor_cuota)}</td><td class="num">${CLP(q.saldo_insoluto)}</td><td class="nw">${pag ? 'Pagada ' + (q.pago_txt || '') : 'Pendiente'}</td><td class="num">${recompra != null ? CLP(recompra) : '—'}</td></tr>`;
+    }).join('');
+    html += `<div class="anexo-pag"><h3>ANEXO 2 — Individualización del crédito ${i + 1} de ${ventas.length}: operación N° ${v.num_op}</h3>
+      <div class="anexo-sub">Contrato de cesión ${esc(emp.razon_social || '')} → ${esc(cp.razon_social)} · ${fechaLarga(fecha)}</div>
+      <table class="ficha"><tbody>
+        <tr><th>Deudor</th><td>${esc(v.cliente)}</td><th>RUT</th><td>${esc(v.rut_cliente)}</td><th>Operación / Pagaré</th><td>${v.num_op}</td></tr>
+        <tr><th>Vehículo</th><td>${esc([v.marca, v.modelo, v.anio].filter(Boolean).join(' '))}</td><th>Patente</th><td>${esc(v.patente || '')}</td><th>Fecha de otorgamiento</th><td>${esc(v.fecha_otorgado || '')}</td></tr>
+        <tr><th>Monto original</th><td>${CLP(v.monto_financiado)}</td><th>Tasa mensual</th><td>${pct(v.tascli_real)}</td><th>Plazo</th><td>${v.plazo || ''} cuotas de ${CLP(v.cuota)}</td></tr>
+        <tr><th>Cuotas pagadas</th><td>${pagadas.length}</td><th>Cuotas pendientes</th><td>${qs.length - pagadas.length}</td><th>Capital insoluto</th><td>${CLP(v.capital_venta)}</td></tr>
+        <tr><th>Precio de cesión</th><td>${CLP(v.precio_venta)}</td><th>Tasa de descuento</th><td>${pct(tasa)}</td><th>Gastos por operación</th><td>${CLP(gastos)}</td></tr>
+      </tbody></table>
+      <table class="anexo"><thead><tr><th>N°</th><th>Vencimiento</th><th>Amortización a capital</th><th>Interés corriente</th><th>Total cuota</th><th>Saldo insoluto</th><th>Estado</th><th>Precio de recompra</th></tr></thead><tbody>${filas}</tbody></table>
+      <p style="font-size:.72rem;margin-top:6px"><b>Precio de recompra:</b> monto al que AutoFácil recompra la operación si el deudor deja impaga la cuota indicada y las siguientes: valor presente de esa cuota y de todas las posteriores, descontadas a la tasa de descuento de esta cesión (${pct(tasa)} mensual) a la fecha de vencimiento de la cuota${gastos ? ', más ' + CLP(gastos) + ' de gastos por operación' : ''}. Es la misma fórmula con que se fijó el precio de cesión.</p></div>`;
+  });
+  return html;
+}
 
 /* ── utilidades ──────────────────────────────────────────────────────────── */
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];

@@ -69,6 +69,7 @@ async function parametros() {
   for (const r of rows) p[r.clave] = +r.valor;
   return p;
 }
+exports.preciosDe = (ops, fecha) => preciosDe(ops, fecha);   // lo usa el contrato de cesión (Anexo 2: precio de recompra)
 exports.getParametros = async (req, res) => {
   try { res.json({ success: true, data: await parametros(), error: null }); } catch (e) { errSrv(res, e, 'venta-cartera parametros'); }
 };
