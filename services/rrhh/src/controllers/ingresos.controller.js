@@ -35,6 +35,13 @@ require('../../../../shared/migrate').enFila('rrhh-ingresos', async () => {
     id_usuario INT NULL, correo_enviado TINYINT(1) NULL, error_alta VARCHAR(300) NULL,
     INDEX idx_estado (estado), INDEX idx_sup (id_supervisor)
   )`);
+  /* Tarjeta en el landing de RRHH, para TODOS los perfiles: cualquiera puede ser supervisor y
+     aprobar desde aquí; el listado muestra a cada uno solo lo suyo (RRHH/Admin ven todo). */
+  const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_ingresos' LIMIT 1");
+  if (!ex) {
+    const [r] = await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500002,'Ingreso de Colaboradores','rh_ingresos','/recursos-humanos/ingresos/','bi-person-plus')");
+    await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) SELECT id_perfil, ?, 1 FROM perfiles', [r.insertId]);
+  }
 });
 
 const esAdmin = async id => {
