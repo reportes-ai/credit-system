@@ -34,7 +34,7 @@ const ITEMS = [
   { key: 'honorarios',        label: 'HONORARIOS', iva: true, manual: true },
   { key: 'gastos_procesales', label: 'GASTOS PROCESALES', manual: true },
 ];
-const MOTIVOS = ['AVENIMIENTO JUDICIAL', 'RENEGOCIACIÓN', 'PREPAGO NEGOCIADO', 'CONDONACIÓN COMERCIAL', 'OTRO'];
+const MOTIVOS = ['AVENIMIENTO JUDICIAL', 'REMATE JUDICIAL', 'DACIÓN EN PAGO', 'RENEGOCIACIÓN', 'PREPAGO NEGOCIADO', 'CONDONACIÓN COMERCIAL', 'OTRO'];
 const FLUJO = ['HECHO', 'REVISADO', 'APROBADO', 'PROCESADO'];
 const PRELACION = require('../../../../api-gateway/public/js/prelacion-core');   // motor único (mismo que la pantalla)
 
