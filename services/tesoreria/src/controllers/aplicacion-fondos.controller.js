@@ -10,6 +10,9 @@
    - Flujo de firmas del formulario: HECHO → REVISADO → APROBADO → PROCESADO
      (cada etapa estampa usuario + fecha). PROCESADO no registra pagos:
      el pago/prepago real se hace en Caja (motor de prepago compartido).
+   - MONTO RECIBIDO (21-09-2026): se digita lo recibido (+ renegociado) y los descuentos salen
+     solos del motor de prelación (api-gateway/public/js/prelacion-core.js) en el ORDEN DE
+     PRELACIÓN del mantenedor (tabla prelacion_pagos; default = Excel de cobranza).
    ───────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
@@ -33,6 +36,16 @@ const ITEMS = [
 ];
 const MOTIVOS = ['AVENIMIENTO JUDICIAL', 'RENEGOCIACIÓN', 'PREPAGO NEGOCIADO', 'CONDONACIÓN COMERCIAL', 'OTRO'];
 const FLUJO = ['HECHO', 'REVISADO', 'APROBADO', 'PROCESADO'];
+const PRELACION = require('../../../../api-gateway/public/js/prelacion-core');   // motor único (mismo que la pantalla)
+
+/* Orden de prelación vigente (mantenedor). Se completa con los ítems que falten, al final. */
+async function ordenPrelacion() {
+  try {
+    const [rows] = await pool.query('SELECT concepto FROM prelacion_pagos ORDER BY orden, concepto');
+    const o = rows.map(r => r.concepto).filter(k => ITEMS.some(i => i.key === k));
+    return [...o, ...ITEMS.map(i => i.key).filter(k => !o.includes(k))];
+  } catch (_) { return PRELACION.ORDEN_DEFAULT; }
+}
 
 /* ── Migración ──────────────────────────────────────────────────────────── */
 require('../../../../shared/migrate').enFila('aplicacion-fondos', async () => {
@@ -78,12 +91,38 @@ require('../../../../shared/migrate').enFila('aplicacion-fondos', async () => {
         await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idF]);
       }
     }
+    // Orden de prelación (Pato 21-09-2026): default = columna H del Excel de cobranza
+    await pool.query(`CREATE TABLE IF NOT EXISTS prelacion_pagos (
+      concepto VARCHAR(40) PRIMARY KEY, orden INT NOT NULL,
+      updated_by VARCHAR(150) NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
+    const [[np]] = await pool.query('SELECT COUNT(*) n FROM prelacion_pagos');
+    if (!np.n) for (const [i, k] of PRELACION.ORDEN_DEFAULT.entries())
+      await pool.query('INSERT IGNORE INTO prelacion_pagos (concepto, orden) VALUES (?,?)', [k, i + 1]);
+    for (const col of ['monto_recibido DECIMAL(15,2) NULL', 'monto_renegociado DECIMAL(15,2) NULL'])
+      await pool.query(`ALTER TABLE aplicaciones_fondos ADD COLUMN ${col}`).catch(() => {});
     console.log('[aplicacion-fondos] módulo listo');
   } catch (e) { console.error('[aplicacion-fondos migration]', e.message); }
 });
 
 /* ── GET /api/aplicacion-fondos/catalogo ────────────────────────────────── */
-exports.catalogo = (req, res) => ok(res, { items: ITEMS, motivos: MOTIVOS, flujo: FLUJO });
+exports.catalogo = async (req, res) => ok(res, { items: ITEMS, motivos: MOTIVOS, flujo: FLUJO, prelacion: await ordenPrelacion() });
+
+/* ── PUT /api/aplicacion-fondos/prelacion { orden:[keys] } — mantenedor del orden ── */
+exports.guardarPrelacion = async (req, res) => {
+  try {
+    const orden = Array.isArray(req.body?.orden) ? req.body.orden.map(String) : [];
+    const keys = ITEMS.map(i => i.key);
+    if (orden.length !== keys.length || !keys.every(k => orden.includes(k))) return fail(res, 'El orden debe incluir cada ítem una sola vez.', 400);
+    const antes = await ordenPrelacion();
+    const quien = nombreUsuario(req.usuario || req.user);
+    for (const [i, k] of orden.entries())
+      await pool.query('INSERT INTO prelacion_pagos (concepto, orden, updated_by) VALUES (?,?,?) ON DUPLICATE KEY UPDATE orden=VALUES(orden), updated_by=VALUES(updated_by)', [k, i + 1, quien]);
+    const lbl = k => ITEMS.find(i => i.key === k)?.label || k;
+    auditar({ req, accion: 'EDITAR', modulo: 'tesoreria', entidad: 'prelacion_pagos', entidad_id: 'orden',
+      detalle: `Orden de prelación: ${antes.map(lbl).join(' → ')}  ⇒  ${orden.map(lbl).join(' → ')}` });
+    ok(res, { prelacion: orden });
+  } catch (e) { console.error('[aplic-fondos prelacion]', e); fail(res, 'Error interno del servidor'); }
+};
 
 /* ── GET /api/aplicacion-fondos/op/:num_op — deuda por ítem (motor único) ── */
 exports.deudaOp = async (req, res) => {
@@ -125,12 +164,19 @@ exports.crear = async (req, res) => {
     if (!b.num_op) return fail(res, 'Falta la operación.', 400);
     if (!MOTIVOS.includes(b.motivo)) return fail(res, 'Motivo inválido.', 400);
     const itemsIn = b.items || {};
+    /* Con MONTO RECIBIDO (+ renegociado) los descuentos NO se digitan: salen del motor de prelación
+       (lo que el monto no alcanza a cubrir de cada ítem, en el orden del mantenedor). Sin monto
+       recibido se respetan los descuentos digitados (modo manual, como antes). */
+    const recibido = R(b.monto_recibido), reneg = R(b.monto_renegociado);
+    const auto = recibido + reneg > 0;
+    const prel = auto ? PRELACION.aplicar(Object.fromEntries(ITEMS.map(d => [d.key, R(itemsIn[d.key]?.monto) + (d.iva ? R(itemsIn[d.key]?.iva_monto) : 0)])),
+      await ordenPrelacion(), recibido + reneg) : null;
     let totalDeuda = 0, totalRecibido = 0, totalDcto = 0;
     const items = ITEMS.map(def => {
       const it = itemsIn[def.key] || {};
       const monto = R(it.monto);
-      let dcto = R(it.dcto_monto);
-      if (dcto > monto) dcto = monto;
+      let dcto = auto ? prel.items[def.key].descuento : R(it.dcto_monto);
+      if (!auto && dcto > monto) dcto = monto;
       if (dcto < 0) dcto = 0;
       const ivaMonto = def.iva ? R(it.iva_monto) : 0;
       const aPagar = Math.max(0, monto - dcto + ivaMonto);
@@ -139,7 +185,7 @@ exports.crear = async (req, res) => {
         dcto_pct: monto > 0 ? +(dcto / monto).toFixed(6) : 0, iva_monto: ivaMonto, a_pagar: aPagar };
     });
     if (!totalDeuda) return fail(res, 'El formulario no tiene montos.', 400);
-    const devolucion = Math.max(0, R(b.devolucion_cliente));
+    const devolucion = auto ? prel.devolucion : Math.max(0, R(b.devolucion_cliente));
 
     const [[m]] = await pool.query("SELECT IFNULL(MAX(CAST(SUBSTRING(correlativo,5) AS UNSIGNED)),0) n FROM aplicaciones_fondos");
     const correlativo = 'APF-' + String(m.n + 1).padStart(4, '0');
@@ -147,12 +193,12 @@ exports.crear = async (req, res) => {
     const u = req.usuario || req.user || {};
     const [r] = await pool.query(
       `INSERT INTO aplicaciones_fondos (correlativo, num_op, rut, nombre, motivo, abogado, dias_mora, fecha,
-        items, total_deuda, total_recibido, total_descuento, devolucion_cliente, glosa, estado, firmas, created_by, created_nombre)
-       VALUES (?,?,?,?,?,?,?,CURDATE(),?,?,?,?,?,?,'HECHO',?,?,?)`,
+        items, total_deuda, total_recibido, total_descuento, devolucion_cliente, glosa, estado, firmas, created_by, created_nombre, monto_recibido, monto_renegociado)
+       VALUES (?,?,?,?,?,?,?,CURDATE(),?,?,?,?,?,?,'HECHO',?,?,?,?,?)`,
       [correlativo, String(b.num_op).slice(0, 20), (b.rut || '').slice(0, 15) || null, (b.nombre || '').slice(0, 200) || null,
        b.motivo, (b.abogado || '').slice(0, 150) || null, parseInt(b.dias_mora, 10) || 0,
        JSON.stringify(items), totalDeuda, totalRecibido, totalDcto, devolucion,
-       (b.glosa || '').slice(0, 600) || null, JSON.stringify(firmas), u.id_usuario || null, nombreUsuario(u)]);
+       (b.glosa || '').slice(0, 600) || null, JSON.stringify(firmas), u.id_usuario || null, nombreUsuario(u), auto ? recibido : null, auto ? reneg : null]);
     auditar({ req, accion: 'CREAR', modulo: 'tesoreria', entidad: 'aplicacion_fondos', entidad_id: r.insertId,
       detalle: `Aplicación de fondos ${correlativo} OP ${b.num_op} (${b.motivo}): recibe $${totalRecibido.toLocaleString('es-CL')}, condona $${totalDcto.toLocaleString('es-CL')}`, rut: b.rut });
     ok(res, { id: r.insertId, correlativo });

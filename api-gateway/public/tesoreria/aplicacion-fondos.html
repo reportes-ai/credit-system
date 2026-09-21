@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 -->
+<!-- v1.1 — Monto recibido + renegociado: los descuentos se calculan solos con el ORDEN DE PRELACIÓN (motor único prelacion-core.js, default = Excel de cobranza); pestaña Orden de prelación editable con registro de cambios (Pato 21-09-2026). v1.0 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -76,6 +76,7 @@
   <div class="tabs">
     <button class="tab on" data-t="nuevo" onclick="verTab('nuevo')"><i class="bi bi-plus-circle"></i> Nuevo formulario</button>
     <button class="tab" data-t="hist" onclick="verTab('hist')"><i class="bi bi-clock-history"></i> Historial</button>
+    <button class="tab" data-t="prel" id="tabPrel" style="display:none" onclick="verTab('prel')"><i class="bi bi-sort-numeric-down"></i> Orden de prelación</button>
   </div>
 
   <!-- ══ NUEVO ══ -->
@@ -99,11 +100,16 @@
       </div>
       <div class="panel">
         <h5><i class="bi bi-table"></i> Ítems de la deuda y descuentos</h5>
+        <div style="display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:10px;background:#f0f7ff;border-radius:10px;padding:10px 12px">
+          <div><label>Monto recibido $</label><input id="fRecibido" class="it-in" style="width:150px" value="0" oninput="this.value=fmt(this.value);recalc()"></div>
+          <div><label>Monto renegociado $</label><input id="fReneg" class="it-in" style="width:150px" value="0" oninput="this.value=fmt(this.value);recalc()"></div>
+          <div style="font-size:.74rem;color:#475569;max-width:560px"><i class="bi bi-magic"></i> Con monto recibido, el sistema aplica los fondos en el <b>orden de prelación</b> (columna #) y lo que no alcanza a cubrir queda como descuento. Sin monto recibido, los descuentos se digitan a mano.</div>
+        </div>
         <div style="overflow-x:auto"><table id="tblItems"><thead><tr>
-          <th>Ítem</th><th class="num">Deuda $</th><th class="num">Dcto %</th><th class="num">Dcto $</th><th class="num">IVA $</th><th class="num">A pagar $</th></tr></thead>
+          <th>#</th><th>Ítem</th><th class="num">Deuda $</th><th class="num">Dcto %</th><th class="num">Dcto $</th><th class="num">IVA $</th><th class="num">A pagar $</th></tr></thead>
           <tbody></tbody>
           <tfoot><tr style="font-weight:800;background:#f8fafc">
-            <td>TOTALES</td><td class="num" id="tDeuda">—</td><td class="num" id="tPct">—</td>
+            <td></td><td>TOTALES</td><td class="num" id="tDeuda">—</td><td class="num" id="tPct">—</td>
             <td class="num" id="tDcto">—</td><td class="num" id="tIva">—</td><td class="num" id="tPagar">—</td></tr></tfoot>
         </table></div>
         <div style="font-size:.7rem;color:#94a3b8;margin-top:6px"><i class="bi bi-info-circle"></i> % y $ son bidireccionales: al escribir uno se calcula el otro. Los ítems del motor de prepago traen la deuda real al día de hoy; Honorarios y Gastos Procesales se digitan a mano.</div>
@@ -119,6 +125,7 @@
             <div class="res-row"><span>Monto total recibido</span><b class="money" id="rRecibido">—</b></div>
             <div class="res-row"><span>Total descuentos</span><b class="money" id="rDcto">—</b></div>
             <div class="res-row"><span>Devolución cliente $</span><input id="fDevol" class="it-in" value="0" oninput="recalc()"></div>
+            <div style="font-size:.68rem;color:#94a3b8;margin-top:4px">Con monto recibido, la devolución es lo que sobra después del último ítem.</div>
           </div>
         </div>
         <div style="text-align:right;margin-top:12px">
@@ -145,6 +152,23 @@
   </div>
 </div>
 
+  <!-- ══ ORDEN DE PRELACIÓN (mantenedor) ══ -->
+  <div id="tab-prel" style="display:none">
+    <div class="panel">
+      <h5><i class="bi bi-sort-numeric-down"></i> Orden de prelación de pagos</h5>
+      <div style="font-size:.8rem;color:#475569;margin-bottom:10px">El monto recibido se aplica en este orden: primero se cubre completo el ítem 1, con lo que queda el 2, y así. Lo que no alcanza queda como descuento.</div>
+      <table style="max-width:520px"><tbody id="prelBody"></tbody></table>
+      <div style="margin-top:12px"><button class="btnx btn-verde" onclick="guardarPrel()"><i class="bi bi-check-lg"></i> Guardar orden</button> <span id="prelMsg" style="font-size:.8rem;margin-left:8px"></span></div>
+    </div>
+    <div class="panel" style="background:#f8fafc;border-left:4px solid #0141A2">
+      <h5><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h5>
+      <ul style="font-size:.8rem;margin:0;padding-left:18px">
+        <li><b>Orden de prelación</b> → cálculo de descuentos y devolución de cada formulario nuevo de <a href="/tesoreria/aplicacion-fondos">Aplicación de Fondos</a> (avenimientos, renegociaciones, prepagos negociados, remates). Los formularios ya guardados no cambian.</li>
+        <li>Mismo motor (<code>prelacion-core.js</code>) en la pantalla y en el servidor: lo que se ve es lo que se guarda.</li>
+      </ul>
+    </div>
+  </div>
+
 <!-- ── Dialog VER / FIRMAR / IMPRIMIR ── -->
 <dialog id="dlgVer">
   <div class="dlg-head"><i class="bi bi-file-earmark-text"></i><h5 id="vTitulo">Formulario</h5>
@@ -157,6 +181,7 @@
 </dialog>
 
 <script src="/js/auth-guard.js"></script>
+<script src="/js/prelacion-core.js"></script>
 <script>
 const hdrs = (json) => ({ 'Authorization':'Bearer '+sessionStorage.getItem('token'), ...(json?{'Content-Type':'application/json'}:{}) });
 const CLP = v => '$'+Math.round(Number(v)||0).toLocaleString('es-CL');
@@ -177,13 +202,16 @@ let CAT = { items:[], motivos:[], flujo:[] }, OP = null, CUR = null, PUEDE_APROB
   const j = await (await fetch('/api/aplicacion-fondos/catalogo', { headers: hdrs() })).json();
   if (j.success) CAT = j.data;
   document.getElementById('fMotivo').innerHTML = CAT.motivos.map(m=>`<option>${m}</option>`).join('');
+  if (PUEDE_APROBAR) document.getElementById('tabPrel').style.display='';
 })();
 
 function verTab(t){
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   document.getElementById('tab-nuevo').style.display = t==='nuevo'?'':'none';
   document.getElementById('tab-hist').style.display = t==='hist'?'':'none';
+  document.getElementById('tab-prel').style.display = t==='prel'?'':'none';
   if (t==='hist') cargarHist();
+  if (t==='prel') pintarPrel();
 }
 
 /* ══ Nuevo ══ */
@@ -200,9 +228,13 @@ async function buscarOp(){
   document.getElementById('fNombre').value = OP.nombre||'';
   document.getElementById('fOp').value = OP.num_op;
   document.getElementById('fMora').value = OP.dias_mora;
-  document.getElementById('tblItems').querySelector('tbody').innerHTML = CAT.items.map(it=>{
+  const ord = CAT.prelacion || [];
+  const itemsOrd = [...CAT.items].sort((a,b)=>ord.indexOf(a.key)-ord.indexOf(b.key));
+  document.getElementById('fRecibido').value = '0'; document.getElementById('fReneg').value = '0';
+  document.getElementById('tblItems').querySelector('tbody').innerHTML = itemsOrd.map(it=>{
     const monto = OP.items[it.key]||0;
     return `<tr data-key="${it.key}" data-manual="${it.manual?1:0}" data-iva="${it.iva?1:0}">
+      <td style="color:#64748b;font-weight:700">${ord.indexOf(it.key)+1}</td>
       <td><b>${it.label}</b></td>
       <td class="num">${it.manual?`<input class="it-in iMonto" value="0" oninput="recalc()">`:`<span class="iMontoFix" data-v="${monto}">${CLP(monto)}</span>`}</td>
       <td class="num"><input class="it-in iPct" value="0" oninput="desdePct(this)" style="width:80px"></td>
@@ -227,12 +259,30 @@ function desdeMonto(inp){
   tr.querySelector('.iPct').value = monto>0 ? (d/monto*100).toLocaleString('es-CL',{maximumFractionDigits:1}) : 0;
   recalc();
 }
+const fmt = v => { const n = String(v).replace(/\D/g,''); return n ? Number(n).toLocaleString('es-CL') : ''; };
 function recalc(){
+  // Monto recibido → descuentos automáticos por prelación (motor único, mismo que el servidor)
+  const disp = num(document.getElementById('fRecibido').value) + num(document.getElementById('fReneg').value);
+  const auto = disp > 0;
+  const filas = [...document.querySelectorAll('#tblItems tbody tr')];
+  if (auto) {
+    const deudas = {};
+    filas.forEach(tr => deudas[tr.dataset.key] = montoDe(tr) + (tr.dataset.iva==='1' ? num(tr.querySelector('.iIva').value) : 0));
+    const r = AF_PRELACION.aplicar(deudas, CAT.prelacion, disp);
+    filas.forEach(tr => {
+      const m = montoDe(tr), d = r.items[tr.dataset.key].descuento;
+      tr.querySelector('.iDcto').value = d.toLocaleString('es-CL');
+      tr.querySelector('.iPct').value = m>0 ? (Math.min(d,m)/m*100).toLocaleString('es-CL',{maximumFractionDigits:1}) : 0;
+    });
+    document.getElementById('fDevol').value = r.devolucion.toLocaleString('es-CL');
+  }
+  filas.forEach(tr => { tr.querySelector('.iDcto').disabled = auto; tr.querySelector('.iPct').disabled = auto; });
+  document.getElementById('fDevol').disabled = auto;
   let tD=0,tDc=0,tI=0,tP=0;
-  document.querySelectorAll('#tblItems tbody tr').forEach(tr=>{
+  filas.forEach(tr=>{
     const monto = montoDe(tr);
-    const dcto = Math.min(monto, num(tr.querySelector('.iDcto').value));
     const iva = tr.dataset.iva==='1' ? num(tr.querySelector('.iIva').value) : 0;
+    const dcto = Math.min(monto + (auto ? iva : 0), num(tr.querySelector('.iDcto').value));
     const pagar = Math.max(0, monto - dcto + iva);
     tr.querySelector('.iPagar').textContent = CLP(pagar);
     tD+=monto; tDc+=dcto; tI+=iva; tP+=pagar;
@@ -243,7 +293,7 @@ function recalc(){
   document.getElementById('tIva').textContent = CLP(tI);
   document.getElementById('tPagar').textContent = CLP(tP);
   document.getElementById('rDeuda').textContent = CLP(tD);
-  document.getElementById('rRecibido').textContent = CLP(tP);
+  document.getElementById('rRecibido').textContent = CLP(auto ? disp : tP);
   document.getElementById('rDcto').textContent = `${CLP(tDc)} (${tD>0?PCT(tDc/tD):'—'})`;
 }
 async function guardar(){
@@ -255,7 +305,8 @@ async function guardar(){
   });
   const body = { num_op: OP.num_op, rut: OP.rut, nombre: OP.nombre, dias_mora: OP.dias_mora,
     motivo: document.getElementById('fMotivo').value, abogado: document.getElementById('fAbogado').value.trim(),
-    glosa: document.getElementById('fGlosa').value.trim(), devolucion_cliente: num(document.getElementById('fDevol').value), items };
+    glosa: document.getElementById('fGlosa').value.trim(), devolucion_cliente: num(document.getElementById('fDevol').value), items,
+    monto_recibido: num(document.getElementById('fRecibido').value), monto_renegociado: num(document.getElementById('fReneg').value) };
   if (!confirm('¿Guardar el formulario de aplicación de fondos (queda en estado HECHO)?')) return;
   const r = await fetch('/api/aplicacion-fondos', { method:'POST', headers:hdrs(1), body:JSON.stringify(body) });
   const j = await r.json();
@@ -308,7 +359,8 @@ async function abrir(id){
     </tbody></table>
     <table style="margin-top:12px;max-width:520px"><tbody>
       <tr><td><b>MONTO TOTAL PREPAGO</b></td><td class="num">${CLP(CUR.total_deuda)}</td></tr>
-      <tr><td><b>MONTO TOTAL RECIBIDO</b></td><td class="num">${CLP(CUR.total_recibido)}</td></tr>
+      <tr><td><b>MONTO TOTAL RECIBIDO</b></td><td class="num">${CLP(CUR.monto_recibido!=null ? CUR.monto_recibido : CUR.total_recibido)}</td></tr>
+      ${Number(CUR.monto_renegociado)>0?`<tr><td><b>MONTO RENEGOCIADO</b></td><td class="num">${CLP(CUR.monto_renegociado)}</td></tr>`:''}
       <tr><td><b>MONTO TOTAL DESCUENTOS</b></td><td class="num">${CLP(CUR.total_descuento)} (${CUR.total_deuda>0?PCT(CUR.total_descuento/CUR.total_deuda):'—'})</td></tr>
       <tr><td><b>DEVOLUCIÓN CLIENTE</b></td><td class="num">${CLP(CUR.devolucion_cliente)}</td></tr>
     </tbody></table>
@@ -324,6 +376,22 @@ async function abrir(id){
     acc.push(`<button class="btnx btn-rojo" onclick="anular()"><i class="bi bi-x-circle"></i> Anular</button>`);
   document.getElementById('vAcciones').innerHTML = acc.join('');
   dlgVer.showModal();
+}
+/* ══ Orden de prelación (mantenedor) ══ */
+let PREL = [];
+function pintarPrel(){
+  if (!PREL.length) PREL = [...(CAT.prelacion||[])];
+  const lbl = k => (CAT.items.find(i=>i.key===k)||{}).label || k;
+  document.getElementById('prelBody').innerHTML = PREL.map((k,i)=>`<tr><td style="width:40px;font-weight:800;color:#0141A2">${i+1}</td><td><b>${esc(lbl(k))}</b></td>
+    <td style="width:90px;text-align:right"><button class="btnx btn-gris" style="padding:3px 9px" ${i?'':'disabled'} onclick="moverPrel(${i},-1)"><i class="bi bi-arrow-up"></i></button>
+    <button class="btnx btn-gris" style="padding:3px 9px" ${i<PREL.length-1?'':'disabled'} onclick="moverPrel(${i},1)"><i class="bi bi-arrow-down"></i></button></td></tr>`).join('');
+}
+function moverPrel(i,d){ const j=i+d; [PREL[i],PREL[j]]=[PREL[j],PREL[i]]; pintarPrel(); document.getElementById('prelMsg').textContent=''; }
+async function guardarPrel(){
+  const j = await (await fetch('/api/aplicacion-fondos/prelacion', { method:'PUT', headers:hdrs(1), body:JSON.stringify({ orden: PREL }) })).json();
+  const m = document.getElementById('prelMsg');
+  if (!j.success) { m.style.color='#b91c1c'; m.textContent = j.error; return; }
+  CAT.prelacion = j.data.prelacion; m.style.color='#16a34a'; m.textContent = '✓ Orden guardado';
 }
 async function avanzar(){
   const r = await fetch(`/api/aplicacion-fondos/${CUR.id}/avanzar`, { method:'PUT', headers:hdrs() });

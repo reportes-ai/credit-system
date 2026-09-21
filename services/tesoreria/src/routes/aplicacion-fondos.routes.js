@@ -9,6 +9,7 @@ const puede   = requireFunc('aplic_fondos');           // crear / ver
 const aprueba = requireFunc('aplic_fondos_aprobar');   // revisar / aprobar / procesar / anular
 
 router.get('/catalogo',      verifyToken, puede,   c.catalogo);
+router.put('/prelacion',     verifyToken, aprueba, c.guardarPrelacion);   // mantenedor del orden de prelación
 router.get('/op/:num_op',    verifyToken, puede,   c.deudaOp);
 router.get('/',              verifyToken, puede,   c.listar);
 router.post('/',             verifyToken, puede,   c.crear);
