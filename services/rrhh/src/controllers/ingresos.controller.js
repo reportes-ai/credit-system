@@ -22,6 +22,11 @@ const almacen = require('../../../../shared/almacen-docs');
 const FC = require('./ficha.controller');
 const DOC_TIPOS = ['CURRICULUM', 'CARTA OFERTA', 'CONTRATO', 'TITULO', 'CEDULA DE IDENTIDAD', 'INFORME COMERCIAL'];
 // Campos de la ficha que viajan en la solicitud: los mismos que RRHH edita en Colaboradores (fuente: ficha.controller)
+const JORNADAS = ['COMPLETA 5 DIAS', 'COMPLETA 6 DIAS', 'PARCIAL'];   // 6 días → Edenred cuenta sábados
+const OBLIG_FICHA = [['nacionalidad', 'nacionalidad'], ['direccion', 'dirección'], ['comuna', 'comuna'], ['telefono_personal', 'teléfono personal'],
+  ['emergencia_nombre', 'contacto de emergencia'], ['emergencia_fono', 'fono de emergencia'], ['afp', 'AFP'], ['salud', 'salud'],
+  ['sueldo_base', 'sueldo base'], ['banco_pago', 'banco'], ['tipo_cuenta_pago', 'tipo de cuenta'], ['num_cuenta_pago', 'N° de cuenta'],
+  ['tramo_asignacion', 'tramo asignación familiar']];
 const camposFicha = () => [...FC.CAMPOS_CONTACTO, ...FC.CAMPOS_LABORAL];
 
 require('../../../../shared/migrate').enFila('rrhh-ingresos', async () => {
@@ -143,8 +148,24 @@ exports.crear = async (req, res) => {
       id_perfil: parseInt(b.id_perfil, 10) || null, id_supervisor: parseInt(b.id_supervisor, 10) || null,
       centro_costo: t(b.centro_costo, 80) || null,
       tipo_contrato: ['INDEFINIDO', 'PLAZO FIJO', 'HONORARIOS', 'PRACTICA'].includes(b.tipo_contrato) ? b.tipo_contrato : null,
-      jornada: ['COMPLETA', 'PARCIAL'].includes(b.jornada) ? b.jornada : null,
+      jornada: JORNADAS.includes(b.jornada) ? b.jornada : null,
     };
+    // Horario (mismas columnas que Jornada Laboral): obligatorio salvo trabajo por turnos
+    const src0 = b.ficha && typeof b.ficha === 'object' ? b.ficha : {};
+    const porTurnos = Number(src0.por_turnos) === 1;
+    const hhmm = v => /^\d{2}:\d{2}$/.test(String(v || '')) ? String(v) : null;
+    const hIn = hhmm(src0.horario_entrada), hOut = hhmm(src0.horario_salida);
+    // Campos obligatorios de la contratación (Previred/LRE, pago del sueldo y seguro)
+    const falta = [];
+    if (!d.sexo) falta.push('sexo');
+    if (!d.fecha_nacimiento) falta.push('fecha de nacimiento');
+    if (!d.tipo_contrato) falta.push('tipo de contrato');
+    if (!d.jornada) falta.push('jornada');
+    if (!d.centro_costo) falta.push('centro de costo');
+    if (!porTurnos && (!hIn || !hOut)) falta.push('horario de ingreso y salida (o marcar Turnos)');
+    if (d.tipo_contrato === 'PLAZO FIJO' && !src0.plazo_fijo_venc1) falta.push('1er vencimiento del plazo fijo');
+    for (const [k, n] of OBLIG_FICHA) if (!(k === 'afp' && Number(src0.pensionado) === 1) && (src0[k] == null || String(src0[k]).trim() === '')) falta.push(n);   // pensionado: sin AFP
+    if (falta.length) return fail(res, 'Faltan campos obligatorios: ' + falta.join(', '), 400);
     if (!d.rut || !RUT.validar(d.rut)) return fail(res, 'RUT inválido', 400);
     if (!d.nombre || !d.apellido) return fail(res, 'Nombre y apellido son obligatorios', 400);
     if (!d.fecha_ingreso) return fail(res, 'Fecha de ingreso obligatoria', 400);
@@ -164,6 +185,9 @@ exports.crear = async (req, res) => {
     for (const k of camposFicha()) if (k in src && src[k] !== '' && src[k] != null) fi[k] = typeof src[k] === 'string' ? src[k].trim().slice(0, 300) : src[k];
     if (d.tipo_contrato) fi.tipo_contrato = d.tipo_contrato;
     if (d.jornada) fi.jornada = d.jornada;
+    fi.por_turnos = porTurnos ? 1 : 0;
+    if (porTurnos) { delete fi.horario_entrada; delete fi.horario_salida; } else { fi.horario_entrada = hIn + ':00'; fi.horario_salida = hOut + ':00'; }
+    fi.horario_dias = /6 DIAS/.test(d.jornada || '') ? 'LMXJVS' : 'LMXJV';
     d.ficha = JSON.stringify(fi);
     // Hijos y cargas: se guardan tal cual y al aprobar los normaliza el motor único guardarCargas (ficha.controller)
     d.hijos = JSON.stringify((Array.isArray(b.hijos) ? b.hijos : []).slice(0, 20).map(({ id, ...h }) => h));

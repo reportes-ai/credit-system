@@ -101,7 +101,7 @@ async function calcularMes(mes) {
   const ant = mesAnterior(mes);
   const ini = primerDia(mes), fin = ultimoDia(mes);
   const [gente] = await pool.query(
-    `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut, u.cargo, u.centro_costo area, u.fecha_ingreso, u.fecha_baja, f.edenred
+    `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut, u.cargo, u.centro_costo area, u.fecha_ingreso, u.fecha_baja, f.edenred, f.jornada
        FROM usuarios u JOIN rh_fichas f ON f.id_usuario=u.id_usuario
       WHERE (u.estado='activo' OR (u.fecha_baja IS NOT NULL AND u.fecha_baja > ?)) AND COALESCE(f.sueldo_base,0) > 0
         AND COALESCE(f.edenred,1)=1 AND (u.fecha_ingreso IS NULL OR u.fecha_ingreso <= ?)
@@ -114,7 +114,13 @@ async function calcularMes(mes) {
   const [vac] = p.tipos.includes('VACACIONES') ? await pool.query(
     `SELECT id_usuario, 'VACACIONES' tipo, fecha_desde, fecha_hasta, 0 medio_dia FROM rh_vacaciones
       WHERE estado='APROBADA' AND id_usuario IS NOT NULL AND fecha_desde <= ? AND fecha_hasta >= ?`, [ultimoDia(ant), primerDia(ant)]) : [[]];
-  const sabDe = {}; for (const g of gente) sabDe[g.id_usuario] = p.areas.includes(sinTilde(g.area));
+  /* Lunes a sábado: manda la JORNADA de la ficha (Completa 6 días / 5 días, Pato 21-09-2026);
+     si la ficha no la precisa (COMPLETA a secas o vacía) se usa la regla por área del parámetro. */
+  const sabDe = {};
+  for (const g of gente) {
+    const j = String(g.jornada || '').toUpperCase();
+    sabDe[g.id_usuario] = /6 DIAS/.test(j) ? true : /5 DIAS/.test(j) ? false : p.areas.includes(sinTilde(g.area));
+  }
   const [ajs] = await pool.query('SELECT id_usuario, dias, observacion FROM rh_edenred_ajustes WHERE mes=?', [mes]);
   const ajuste = {}; for (const a of ajs) ajuste[a.id_usuario] = a;
   const faltas = {};

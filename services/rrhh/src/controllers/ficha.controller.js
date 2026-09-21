@@ -244,7 +244,8 @@ const CAMPOS_CONTACTO = ['direccion', 'comuna', 'ciudad', 'email_personal', 'tel
   'conyuge_nombre', 'conyuge_rut', 'conyuge_telefono', 'conyuge_direccion', 'conyuge_misma_dir'];
 const CAMPOS_LABORAL = ['tipo_contrato', 'plazo_fijo_venc1', 'plazo_fijo_venc2', 'tipo_renta', 'pensionado', 'jornada', 'afp', 'salud', 'plan_isapre_uf', 'sueldo_base', 'colacion', 'movilizacion', 'edenred',
   'banco_pago', 'tipo_cuenta_pago', 'num_cuenta_pago', 'observaciones',
-  'tramo_asignacion', 'cargas_otras', 'cargas_maternales', 'cargas_invalidas', 'anos_trabajados_previos'];
+  'tramo_asignacion', 'cargas_otras', 'cargas_maternales', 'cargas_invalidas', 'anos_trabajados_previos',
+  'horario_entrada', 'horario_salida', 'por_turnos', 'horario_dias'];   // horario: mismas columnas que Jornada Laboral
 // Identidad en usuarios que RRHH puede actualizar desde la ficha
 const CAMPOS_USUARIO = ['cargo', 'id_supervisor', 'fecha_ingreso', 'fecha_nacimiento', 'sexo', 'telefono', 'centro_costo'];
 
