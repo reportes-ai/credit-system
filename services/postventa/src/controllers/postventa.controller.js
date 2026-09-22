@@ -1210,14 +1210,17 @@ async function marcarComisionAPagar(ids, opts = {}) {
    ANTES del mes en curso (Chile) y sin COMISION A PAGAR ni COMISION PAGADA queda marcada
    con fecha = último día de su mes a las 23:59:59. Idempotente: corre cada 6 h y al
    arrancar, así el 1 de cada mes a primera hora ya está hecho y no depende de que el
-   proceso esté vivo justo a las 23:59 del último día. Con momento INMEDIATO no hace nada. */
+   proceso esté vivo justo a las 23:59 del último día.
+   Con momento INMEDIATO (Pato, 22-09-2026: la cartola lleva todo hasta el día de emisión) es la red
+   de seguridad: toda op con fondos recibidos —también las del mes en curso— que quedó sin COMISION
+   A PAGAR (p.ej. las recibidas mientras regía CIERRE_MES) se marca con la fecha real de los fondos. */
 async function comisionAPagarCierreMes() {
   try {
-    if ((await momentoComisionAPagar()) !== 'CIERRE_MES') return;
+    const inmediato = (await momentoComisionAPagar()) === 'INMEDIATO';
     const hoyCL = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });   // YYYY-MM-DD
-    const iniMes = hoyCL.slice(0, 7) + '-01';
+    const iniMes = inmediato ? '9999-12-31' : hoyCL.slice(0, 7) + '-01';
     const [pend] = await pool.query(`
-      SELECT s.id, DATE_FORMAT(MIN(e.fecha), '%Y-%m') AS mes_fondos
+      SELECT s.id, DATE_FORMAT(MIN(e.fecha), '%Y-%m') AS mes_fondos, MIN(e.fecha) AS fecha_fondos
         FROM postventa_seguimiento s
         JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track='SALDO' AND e.etapa IN ('FONDOS RECIBIDOS','SALDO PRECIO PAGADO')
        WHERE e.fecha < ?
@@ -1225,6 +1228,11 @@ async function comisionAPagarCierreMes() {
          AND NOT EXISTS (SELECT 1 FROM postventa_reversas r WHERE r.id_seguimiento = s.id)
        GROUP BY s.id`, [iniMes]);
     if (!pend.length) return;
+    if (inmediato) {
+      for (const r of pend) await marcarComisionAPagar([r.id], { forzar: true, fecha: r.fecha_fondos || new Date() });
+      console.log(`[postventa comision-a-pagar-cierre-mes] INMEDIATO: ${pend.length} operación(es) puestas al día como COMISION A PAGAR a la fecha de sus fondos`);
+      return;
+    }
     // agrupar por mes de fondos → fecha = último día de ese mes 23:59:59
     const porMes = {};
     for (const r of pend) (porMes[r.mes_fondos] = porMes[r.mes_fondos] || []).push(r.id);
