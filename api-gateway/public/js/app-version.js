@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v260.15';
+const APP_VERSION = 'v260.16';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -879,6 +879,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     d.style.display = abierto ? 'none' : 'block';
     if (!abierto) {
+      /* En "Viendo como" NO se marcan leídas: el token es del otro usuario y le borraríamos el aviso (caso Alvaro, 22-09-2026) */
+      if (sessionStorage.getItem('ver_como') === '1') return;
       try { await fetch('/api/notif/leidas', { method: 'PUT', headers: H }); } catch (e) {}
       unread = 0;
       document.getElementById('afBellCount').style.display = 'none';
