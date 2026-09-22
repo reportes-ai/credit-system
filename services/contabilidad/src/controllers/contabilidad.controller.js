@@ -3301,15 +3301,49 @@ exports.rcvImportar = async (req, res) => {
           cuenta_gasto: d.cuenta_gasto, generar_asiento: !!b.generar_asiento,
           cuenta_iva: b.cuenta_iva, cuenta_cxp: b.cuenta_cxp,
         }, { origen: 'RCV', req });
-        okDocs.push({ num_doc: d.num_doc, rut: d.rut, total: r.total, comprobante: r.comprobante?.numero || null });
+        okDocs.push({ num_doc: d.num_doc, rut: d.rut, total: r.total, comprobante: r.comprobante?.numero || null, periodo });
       } catch (e) {
         errores.push({ num_doc: d.num_doc, rut: d.rut, razon_social: d.razon_social, motivo: e.message });
       }
     }
     if (b.generar_asiento) await setConfigDig({ cta_iva_credito: b.cuenta_iva, cta_cxp: b.cuenta_cxp });
+
+    /* Orden de Pago contra cada documento (Pato, 22-09-2026): misma emisión que Órdenes de Pago →
+       Emitir (motor único crearOrden: proveedor por RUT, correlativo ODP-, correo a Contabilidad).
+       Solo facturas (33/34): una nota de crédito no se paga. Glosa = tipo, folio y proveedor del SII.
+       Si ya existe una ODP viva del mismo RUT y folio, no se duplica. */
+    const odps = [];
+    if (b.generar_odp) {
+      const { crearOrden } = require('../../../ordenes-pago/src/controllers/ordenes-pago.controller');
+      for (const d of okDocs) {
+        const src = lista.find(x => String(x.num_doc) === String(d.num_doc) && rutNorm(x.rut) === rutNorm(d.rut)) || {};
+        const tipo = Number(src.tipo_doc || 33);
+        if (![33, 34].includes(tipo)) continue;
+        try {
+          const [[dup]] = await pool.query(
+            `SELECT numero FROM ordenes_pago WHERE REPLACE(proveedor_rut,'.','')=REPLACE(?,'.','') AND numero_documento=? AND estado<>'ANULADA' LIMIT 1`,
+            [String(d.rut || ''), String(d.num_doc)]);
+          if (dup) { odps.push({ num_doc: d.num_doc, numero: dup.numero, existente: true }); continue; }
+          const tipoDoc = tipo === 34 ? 'Factura Exenta' : 'Factura';
+          const fakeReq = { body: {
+            concepto: `${tipoDoc} N° ${d.num_doc} — ${src.razon_social || ''}`.trim(),
+            proveedor_nombre: src.razon_social || d.rut, proveedor_rut: d.rut,
+            tipo_documento: tipoDoc, numero_documento: String(d.num_doc), fecha_documento: src.fecha_doc || null,
+            monto_base: 'BRUTO', monto_bruto: d.total, metodo_pago: 'Transferencia',
+            observaciones: `Emitida desde el RCV del SII (auxiliar de compras ${d.periodo || b.mes || ''})`,
+          }, usuario: req.usuario, ip: req.ip, headers: req.headers };
+          const out = await new Promise(resolve => {
+            const fakeRes = { status() { return this; }, json(j) { resolve(j); } };
+            crearOrden(fakeReq, fakeRes).catch(e => resolve({ success: false, error: e.message }));
+          });
+          if (out && out.success) odps.push({ num_doc: d.num_doc, numero: out.data.numero });
+          else errores.push({ num_doc: d.num_doc, rut: d.rut, razon_social: src.razon_social, motivo: 'ODP no emitida: ' + (out && out.error || 'error') });
+        } catch (e) { errores.push({ num_doc: d.num_doc, rut: d.rut, razon_social: src.razon_social, motivo: 'ODP no emitida: ' + e.message }); }
+      }
+    }
     auditar({ req, accion: 'IMPORTAR', modulo: 'contabilidad', entidad: 'rcv_a_auxiliar',
-      detalle: `RCV ${b.mes || ''} → auxiliar: ${okDocs.length} ingresados, ${errores.length} con problema${b.generar_asiento ? ' (con asiento)' : ''}` });
-    ok(res, { ingresados: okDocs.length, total: okDocs.reduce((s, d) => s + d.total, 0), errores, docs: okDocs });
+      detalle: `RCV ${b.mes || ''} → auxiliar: ${okDocs.length} ingresados, ${errores.length} con problema${b.generar_asiento ? ' (con asiento)' : ''}${b.generar_odp ? `, ${odps.filter(o => !o.existente).length} ODP emitidas` : ''}` });
+    ok(res, { ingresados: okDocs.length, total: okDocs.reduce((s, d) => s + d.total, 0), errores, docs: okDocs, odps });
   } catch (e) { fail(res, e.message); }
 };
 

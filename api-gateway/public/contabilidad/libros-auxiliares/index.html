@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Auxiliares — AutoFácil</title>
-  <!-- v1.13 — otros impuestos del RCV visibles y al gasto; "Sincronizar SII" refresca el mes que se está mirando; v1.12 — traer del SII: IVA no recuperable visible bajo el IVA (entra al gasto y al total, no al crédito fiscal); v1.11 — traer del SII: los documentos van al libro del período del RCV (no al de emisión) y las notas de crédito 61 también se importan; v1.10 — etiquetas EXENTO y sin cuenta sobrias (contorno gris); v1.9 — KPIs en una línea (FACTURAS: 687), la mitad de alto; v1.8 — botones de carga (AVSOFT/RCV) a la derecha de las pestañas: la barra de filtros queda en una fila y todo sube; v1.7 — resumen mensual como chips horizontales y detalle a ancho completo; v1.6 — columnas fusionadas (proveedor+RUT, emision+vcto, neto+exento con chip EXENTO) y 'sin cuenta' destacado en rojo; v1.5 — vista pulida: resumen mensual a 3 columnas con tooltip y mes filtrado destacado, tipo/folio separados, cebra + hover, encabezado pegado al scroll y suma al pie de lo listado; v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
+  <!-- v1.14 — Traer del SII: casillero para emitir la Orden de Pago de cada factura (glosa y proveedor del SII, motor único de Órdenes de Pago); v1.13 — otros impuestos del RCV visibles y al gasto; "Sincronizar SII" refresca el mes que se está mirando; v1.12 — traer del SII: IVA no recuperable visible bajo el IVA (entra al gasto y al total, no al crédito fiscal); v1.11 — traer del SII: los documentos van al libro del período del RCV (no al de emisión) y las notas de crédito 61 también se importan; v1.10 — etiquetas EXENTO y sin cuenta sobrias (contorno gris); v1.9 — KPIs en una línea (FACTURAS: 687), la mitad de alto; v1.8 — botones de carga (AVSOFT/RCV) a la derecha de las pestañas: la barra de filtros queda en una fila y todo sube; v1.7 — resumen mensual como chips horizontales y detalle a ancho completo; v1.6 — columnas fusionadas (proveedor+RUT, emision+vcto, neto+exento con chip EXENTO) y 'sin cuenta' destacado en rojo; v1.5 — vista pulida: resumen mensual a 3 columnas con tooltip y mes filtrado destacado, tipo/folio separados, cebra + hover, encabezado pegado al scroll y suma al pie de lo listado; v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -467,7 +467,10 @@ async function abrirRcvImportar(){
     <div id="rcvCtasAsiento" class="row g-2 mt-1">
       <div class="col-6"><label class="form-label small mb-1">Cuenta IVA crédito fiscal</label>${selCta('rcvCtaIva', cfg.cta_iva_credito)}</div>
       <div class="col-6"><label class="form-label small mb-1">Cuenta por pagar (proveedores)</label>${selCta('rcvCtaCxp', cfg.cta_cxp, /^2/)}</div>
-    </div>` : '<div class="alert alert-success py-2 small mb-0"><i class="bi bi-check-circle me-1"></i>No hay documentos del SII pendientes de ingresar en este mes.</div>'}
+    </div>
+    <div class="form-check mt-2"><input type="checkbox" class="form-check-input" id="rcvOdp">
+      <label class="form-check-label small fw-semibold" for="rcvOdp">Generar la Orden de Pago de cada documento</label>
+      <div class="small text-muted">Solo facturas (33/34): una ODP por documento con la glosa <i>Factura N° folio — proveedor</i>, RUT y datos del proveedor del SII, por el total. Misma emisión que Órdenes de Pago (correlativo ODP-, proveedor en la base, correo a Contabilidad). Si ya existe una ODP viva con ese RUT y folio, no se duplica.</div></div>` : '<div class="alert alert-success py-2 small mb-0"><i class="bi bi-check-circle me-1"></i>No hay documentos del SII pendientes de ingresar en este mes.</div>'}
     <div class="d-flex justify-content-end gap-2 mt-3">
       <button class="btn btn-sm btn-outline-secondary" onclick="dlgRcv.close()">Cerrar</button>
       ${RCVDOCS.length ? '<button class="btn btn-sm btn-primary" onclick="rcvConfirmar(this)"><i class="bi bi-check-lg me-1"></i>Ingresar al auxiliar</button>' : ''}
@@ -487,14 +490,16 @@ async function rcvConfirmar(btn){
   if (sinCta.length) return alert(`Faltan cuentas de gasto en ${sinCta.length} documento(s): ${sinCta.slice(0,5).map(d=>d.num_doc).join(', ')}…`);
   const asiento = document.getElementById('rcvAsiento').checked;
   if (asiento && (!rcvCtaIva.value || !rcvCtaCxp.value)) return alert('Para generar los asientos hay que definir la cuenta de IVA crédito y la cuenta por pagar.');
-  if (!confirm(`Se ingresarán ${docs.length} documentos al auxiliar${asiento?' con su asiento contable':''}. ¿Continuar?`)) return;
+  const odp = document.getElementById('rcvOdp').checked;
+  if (!confirm(`Se ingresarán ${docs.length} documentos al auxiliar${asiento?' con su asiento contable':''}${odp?' y se emitirá la Orden de Pago de cada factura':''}. ¿Continuar?`)) return;
   btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Ingresando…';
   const r = await fetch('/api/contabilidad/rcv/importar',{method:'POST',headers:H,body:JSON.stringify({
-    mes: fHasta.value, docs, generar_asiento: asiento, cuenta_iva: asiento?rcvCtaIva.value:null, cuenta_cxp: asiento?rcvCtaCxp.value:null })});
+    mes: fHasta.value, docs, generar_asiento: asiento, cuenta_iva: asiento?rcvCtaIva.value:null, cuenta_cxp: asiento?rcvCtaCxp.value:null, generar_odp: odp })});
   const j = await r.json(); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Ingresar al auxiliar';
   if (!j.success) return alert(j.error);
-  const e = j.data.errores || [];
+  const e = j.data.errores || [], od = j.data.odps || [];
   alert(`Ingresados ${j.data.ingresados} documentos por $${fmt(j.data.total)}.` +
+    (od.length ? `\nÓrdenes de pago: ${od.filter(o=>!o.existente).length} emitidas${od.some(o=>o.existente)?`, ${od.filter(o=>o.existente).length} ya existían`:''} (${od.slice(0,8).map(o=>o.numero).join(', ')}${od.length>8?'…':''}).` : '') +
     (e.length ? `\n\nNo entraron ${e.length}:\n` + e.slice(0,10).map(x=>`· ${x.num_doc} ${x.razon_social||''}: ${x.motivo}`).join('\n') : ''));
   dlgRcv.close(); rcvEstadoCargar(); consultar();
 }
