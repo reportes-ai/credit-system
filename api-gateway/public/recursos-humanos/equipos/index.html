@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — botón Reasignar (devolución "Reasignado a…" + entrega al nuevo en un paso; solo usuarios activos) y marca naranja cuando una persona tiene 2 o más equipos. v1.0 — Entrega de Equipos: laptops, celulares y otros (inventario + entrega/devolución por colaborador + acta PDF) y pestaña Texto del acta editable (rh_config acta_eq_*). Reemplaza ENTREGA EQUIPOS.xlsx y el acta Word a mano (Pato, 23-09-2026) -->
+<!-- v1.2 — página full width. v1.1 — botón Reasignar (devolución "Reasignado a…" + entrega al nuevo en un paso; solo usuarios activos) y marca naranja cuando una persona tiene 2 o más equipos. v1.0 — Entrega de Equipos: laptops, celulares y otros (inventario + entrega/devolución por colaborador + acta PDF) y pestaña Texto del acta editable (rh_config acta_eq_*). Reemplaza ENTREGA EQUIPOS.xlsx y el acta Word a mano (Pato, 23-09-2026) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +9,7 @@
 <style>
   :root { --navy:#0141A2; --navy-dark:#012d70; --bg:#f0f4f8; }
   * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:#1e293b; }
-  .main { max-width:1150px; margin:0 auto; padding:24px 20px 70px; }
+  .main { width:100%; margin:0; padding:24px 28px 70px; box-sizing:border-box; }   /* full width (Pato, 23-09-2026) */
   .banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy) 60%,#009AFE); border-radius:16px; color:#fff; padding:20px 26px; margin-bottom:18px; display:flex; gap:14px; align-items:center; }
   .banner i { font-size:2rem; opacity:.85; } .banner h2 { margin:0 0 3px; font-size:1.2rem; } .banner p { margin:0; opacity:.85; font-size:.85rem; }
   .tabs { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
