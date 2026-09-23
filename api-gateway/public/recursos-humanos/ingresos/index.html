@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ingreso de Colaboradores — AutoFácil</title>
-  <!-- v1.6 — botón Ver ficha: el aprobador ve la solicitud completa (contratación, ficha, hijos, documentos) antes de firmar; la aprobación final la da el Administrador o quien tiene el permiso rh_ingresos_aprobar (Gerente de Operaciones y Crédito). v1.5 — Jornada Completa 5 días / 6 días (6 días: Edenred cuenta sábados) / Parcial; horario ingreso-salida con casilla Turnos (no exigible); campos obligatorios marcados y validados en el servidor. v1.4 — correo corporativo bloqueado para RRHH: lo ingresa el Administrador al aprobar (él crea la casilla). v1.3 — nota del flujo al pie del formulario; avisos también por campanita. v1.2 — hijos y cargas en el formulario, con fecha de nacimiento y ocupación obligatorias (Seguro de Salud); al aprobar van a rh_cargas por el motor único guardarCargas. v1.1 — todos los campos de la ficha (personales, cónyuge, emergencia, previsión y pago, cargas) + subir Curriculum, Carta oferta, Contrato, Título, Cédula e Informe comercial; al aprobar pasan a la ficha y a la Carpeta Digital. v1.0 — Ingreso de colaboradores: RRHH registra la contratación (cargo = perfil de Business Suite, supervisor), aprueba el supervisor, aprueba el Administrador y se crea el usuario con correo de usuario y clave (Pato 21-09-2026) -->
+  <!-- v1.7 — RUT con formato en vivo, semáforo del dígito verificador y bloqueo al enviar si el DV no corresponde (rut-core). v1.6 — botón Ver ficha: el aprobador ve la solicitud completa (contratación, ficha, hijos, documentos) antes de firmar; la aprobación final la da el Administrador o quien tiene el permiso rh_ingresos_aprobar (Gerente de Operaciones y Crédito). v1.5 — Jornada Completa 5 días / 6 días (6 días: Edenred cuenta sábados) / Parcial; horario ingreso-salida con casilla Turnos (no exigible); campos obligatorios marcados y validados en el servidor. v1.4 — correo corporativo bloqueado para RRHH: lo ingresa el Administrador al aprobar (él crea la casilla). v1.3 — nota del flujo al pie del formulario; avisos también por campanita. v1.2 — hijos y cargas en el formulario, con fecha de nacimiento y ocupación obligatorias (Seguro de Salud); al aprobar van a rh_cargas por el motor único guardarCargas. v1.1 — todos los campos de la ficha (personales, cónyuge, emergencia, previsión y pago, cargas) + subir Curriculum, Carta oferta, Contrato, Título, Cédula e Informe comercial; al aprobar pasan a la ficha y a la Carpeta Digital. v1.0 — Ingreso de colaboradores: RRHH registra la contratación (cargo = perfil de Business Suite, supervisor), aprueba el supervisor, aprueba el Administrador y se crea el usuario con correo de usuario y clave (Pato 21-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -74,7 +74,7 @@
   <div class="dlg-body">
     <div class="sec">Persona</div>
     <div class="grid3">
-      <div class="fld"><label>RUT *</label><input id="i_rut" placeholder="12.345.678-9"></div>
+      <div class="fld"><label>RUT *</label><input id="i_rut" placeholder="12.345.678-9" maxlength="12" autocomplete="off" oninput="rutEnVivo(this)"><div id="i_rutHint" style="font-size:.72rem;min-height:1em;margin-top:2px"></div></div>
       <div class="fld"><label>Nombres *</label><input id="i_nombre"></div>
       <div class="fld"><label>Apellido paterno *</label><input id="i_apellido"></div>
       <div class="fld"><label>Apellido materno</label><input id="i_apellido_materno"></div>
@@ -219,6 +219,10 @@ async function nuevo(){
 async function guardar(){
   const g = id => document.getElementById('i_'+id).value.trim();
   const body = {}; ['rut','nombre','apellido','apellido_materno','sexo','fecha_nacimiento','id_perfil','id_supervisor','fecha_ingreso','tipo_contrato','jornada','centro_costo','telefono'].forEach(k=>body[k]=g(k));
+  // RUT: dígito verificador y formato canónico (motor único rut-core); el servidor vuelve a validar
+  { const v = body.rut.replace(/[^0-9kK]/g,'').length >= 8 ? AF_RUT.validar(body.rut) : null;
+    if (v !== true) { alert(v === false ? `RUT inválido: el dígito verificador no corresponde (debería ser ${AF_RUT.calcDV(body.rut.replace(/[^0-9kK]/g,'').slice(0,-1))}).` : 'Ingresa el RUT completo con dígito verificador (ej. 12.345.678-9).'); document.getElementById('i_rut').focus(); return; }
+    body.rut = AF_RUT.normalizar(body.rut) || body.rut; }
   body.ficha = {};
   dlg.querySelectorAll('[data-f]').forEach(el => { let v = el.value.trim(); if (el.dataset.clp) v = v.replace(/\D/g,''); if (v !== '') body.ficha[el.dataset.f] = v; });
   body.ficha.por_turnos = document.getElementById('i_turnos').checked ? 1 : 0;
@@ -332,6 +336,19 @@ async function rechazar(id){
 cargar().then(()=>{ if (new URLSearchParams(location.search).get('nuevo') && D?.es_rrhh) nuevo(); });
 </script>
 <script src="/js/topnav.js"></script>
+<script src="/js/rut-core.js"></script>
+<script>
+  // Formato en vivo 12.345.678-9 + semáforo del dígito verificador (mismo patrón que Usuarios, Créditos y DealerNet)
+  function rutEnVivo(inp) {
+    const clean = inp.value.replace(/[^0-9kK]/g, '').toUpperCase().slice(0, 9);
+    inp.value = clean.length >= 2 ? AF_RUT.formatear(clean.slice(0, -1) + '-' + clean.slice(-1)) || clean : clean;
+    const h = document.getElementById('i_rutHint'), v = clean.length >= 8 ? AF_RUT.validar(clean) : null;
+    if (!clean) { h.textContent = ''; inp.style.borderColor = ''; return; }
+    if (v === true) { h.textContent = '✓ RUT válido'; h.style.color = '#059669'; inp.style.borderColor = '#059669'; }
+    else if (v === false) { h.textContent = '✗ Dígito verificador incorrecto (debería ser ' + AF_RUT.calcDV(clean.slice(0, -1)) + ')'; h.style.color = '#dc2626'; inp.style.borderColor = '#dc2626'; }
+    else { h.textContent = 'Ingresa el RUT completo con dígito verificador'; h.style.color = '#9ca3af'; inp.style.borderColor = ''; }
+  }
+</script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
