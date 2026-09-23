@@ -109,7 +109,9 @@ require('../../../../shared/migrate').enFila('campanas', async () => {
                        'link_url VARCHAR(500) NULL', 'boton_texto VARCHAR(80) NULL',
                        /* Velocidad y cupo (Pato, 11-09-2026): correos por minuto y máximo por día de ESTA campaña.
                           El límite del proveedor (Brevo) es global y vive en dashboard_config.mail_cupo_diario. */
-                       'por_minuto INT NOT NULL DEFAULT 30', 'cupo_diario INT NOT NULL DEFAULT 250'])
+                       'por_minuto INT NOT NULL DEFAULT 30', 'cupo_diario INT NOT NULL DEFAULT 250',
+                       /* Posición del flyer respecto al texto (Pato, 23-09-2026: refuerzo con el flyer abajo) */
+                       "imagen_posicion VARCHAR(10) NOT NULL DEFAULT 'ARRIBA'"])
       await pool.query(`ALTER TABLE campanas_masivas ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
     for (const ddl of require('../../../../shared/almacen-docs').sqlColumnas('campanas_masivas'))
       await pool.query(ddl).catch(() => {});
@@ -334,7 +336,7 @@ exports.obtener = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
-const EDITABLES = ['descripcion', 'origen_data', 'campos', 'texto', 'asunto', 'remitente', 'plantilla', 'titulo', 'color_titulo', 'link_url', 'boton_texto', 'por_minuto', 'cupo_diario', 'parametros', 'deciles_control', 'excluir_regiones', 'analizar_ia', 'plantilla_wsp', 'plantilla_wsp_idioma', 'plantilla_wsp_body', 'plantilla_wsp_map'];
+const EDITABLES = ['descripcion', 'origen_data', 'campos', 'texto', 'asunto', 'remitente', 'plantilla', 'titulo', 'color_titulo', 'link_url', 'boton_texto', 'imagen_posicion', 'por_minuto', 'cupo_diario', 'parametros', 'deciles_control', 'excluir_regiones', 'analizar_ia', 'plantilla_wsp', 'plantilla_wsp_idioma', 'plantilla_wsp_body', 'plantilla_wsp_map'];
 exports.actualizar = async (req, res) => {
   try {
     const [[c]] = await pool.query('SELECT estado FROM campanas_masivas WHERE id=?', [req.params.id]);
@@ -349,6 +351,7 @@ exports.actualizar = async (req, res) => {
         v = JSON.stringify(v);
       } else if (['parametros', 'deciles_control', 'excluir_regiones', 'plantilla_wsp_map'].includes(k)) v = JSON.stringify(v ?? null);
       else if (k === 'analizar_ia') v = v ? 1 : 0;
+      else if (k === 'imagen_posicion') v = String(v).toUpperCase() === 'ABAJO' ? 'ABAJO' : 'ARRIBA';
       else if (k === 'por_minuto') v = Math.min(60, Math.max(1, parseInt(v, 10) || 30));
       else if (k === 'cupo_diario') v = Math.max(1, parseInt(v, 10) || 250);
       sets.push(`${k}=?`); vals.push(v);
@@ -610,8 +613,8 @@ function htmlMail(c, dest, opts = {}) {
     ? `<div style="text-align:center;padding:6px 30px 28px"><a href="${link}" style="display:inline-block;background:${azul};color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:14px 34px;border-radius:12px;font-family:Segoe UI,Arial">${c.boton_texto || 'Ver más'}</a></div>`
     : '';
   return `<div style="max-width:620px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;font-family:Segoe UI,Arial,sans-serif">
-    ${head}${img}
-    ${cuerpo ? `<div style="padding:26px 30px;color:#1e293b;font-size:15px;line-height:1.65">${cuerpo}</div>` : ''}${boton}
+    ${head}${c.imagen_posicion === 'ABAJO' ? '' : img}
+    ${cuerpo ? `<div style="padding:26px 30px;color:#1e293b;font-size:15px;line-height:1.65">${cuerpo}</div>` : ''}${c.imagen_posicion === 'ABAJO' ? img : ''}${boton}
     <div style="background:#f8fafc;padding:14px 30px;color:#94a3b8;font-size:11px">${EMPRESA.organizacion} · ${String(EMPRESA.web || '').replace(/^https?:\/\//, '')}${EMPRESA.email ? ' · ' + EMPRESA.email : ''}</div>
   </div>${pixel}`;
 }
@@ -646,6 +649,14 @@ exports.prueba = async (req, res) => {
 };
 
 /* ── Imagen del correo: subir (base64), servir (pública con firma) y quitar ── */
+/* Un flyer puede compartirse entre campañas (ej. refuerzo que reutiliza el de la original):
+   el objeto del bucket se borra solo cuando ninguna otra campaña lo referencia. */
+async function borrarSiNadieLaUsa(ruta) {
+  try {
+    const [[u]] = await pool.query('SELECT COUNT(*) n FROM campanas_masivas WHERE doc_ruta=?', [ruta]);
+    if (!u.n) await require('../../../../shared/almacen-docs').borrar(ruta);
+  } catch (_) { /* no bloquea */ }
+}
 exports.subirImagen = async (req, res) => {
   try {
     const [[c]] = await pool.query('SELECT id, estado, doc_ruta FROM campanas_masivas WHERE id=?', [req.params.id]);
@@ -660,7 +671,7 @@ exports.subirImagen = async (req, res) => {
     const d = await almacen.colocar({ ambito: 'campanas', clave: c.id, buffer, mime, nombre: nombre || 'imagen' });
     await pool.query('UPDATE campanas_masivas SET imagen_nombre=?, imagen_mime=?, imagen_blob=?, doc_storage=?, doc_ruta=?, doc_bytes=? WHERE id=?',
       [nombre || 'imagen', mime, d.blob, d.storage, d.ruta, d.bytes, c.id]);
-    if (rutaVieja && rutaVieja !== d.ruta) almacen.borrar(rutaVieja).catch(() => {});
+    if (rutaVieja && rutaVieja !== d.ruta) borrarSiNadieLaUsa(rutaVieja);
     ok(res, { imagen_url: `${APP_URL}/api/campanas-masivas/imagen/${c.id}-${firmaPixel('img' + c.id)}` });
   } catch (e) { fail(res, e.message); }
 };
@@ -680,7 +691,7 @@ exports.quitarImagen = async (req, res) => {
     if (!c) return fail(res, 'Campaña no existe', 404);
     if (c.estado !== 'BORRADOR') return fail(res, 'Solo se edita una campaña en BORRADOR', 400);
     await pool.query('UPDATE campanas_masivas SET imagen_nombre=NULL, imagen_mime=NULL, imagen_blob=NULL, doc_storage=NULL, doc_ruta=NULL, doc_bytes=NULL WHERE id=?', [c.id]);
-    if (c.doc_ruta) require('../../../../shared/almacen-docs').borrar(c.doc_ruta).catch(() => {});
+    if (c.doc_ruta) borrarSiNadieLaUsa(c.doc_ruta);
     ok(res, { quitada: true });
   } catch (e) { fail(res, e.message); }
 };

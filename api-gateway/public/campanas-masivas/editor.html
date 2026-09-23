@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.13 — refuerzo: alcance "solo leyeron" o "todos los que recibieron"; el selector muestra enviados y leídos por separado. v1.12 — al abrir una campaña con audiencia Dealers o Refuerzo no se muestran los parámetros de clientes. v1.11 — audiencia "Leyeron otra campaña" (refuerzo a los que abrieron el correo de una campaña enviada). v1.10 — correo de prueba a cualquier dirección. v1.9 — correo de prueba, correos por minuto y cupo diario (continúa otro día), universo y estimación de días. v1.8 — imagen del correo (flyer) con link y botón; audiencia Dealers activos por categoría. v1.7 -->
+<!-- v1.14 — posición de la imagen del correo: arriba o abajo del texto. v1.13 — refuerzo: alcance "solo leyeron" o "todos los que recibieron"; el selector muestra enviados y leídos por separado. v1.12 — al abrir una campaña con audiencia Dealers o Refuerzo no se muestran los parámetros de clientes. v1.11 — audiencia "Leyeron otra campaña" (refuerzo a los que abrieron el correo de una campaña enviada). v1.10 — correo de prueba a cualquier dirección. v1.9 — correo de prueba, correos por minuto y cupo diario (continúa otro día), universo y estimación de días. v1.8 — imagen del correo (flyer) con link y botón; audiencia Dealers activos por categoría. v1.7 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -211,7 +211,9 @@
             <div><label class="f">Texto del botón</label><input class="f" id="mBoton" placeholder="¡Inscríbete ahora!" oninput="marcarSucio()"></div>
           </div>
           <img id="imgPrev" style="display:none;max-width:260px;border-radius:8px;border:1px solid #e2e8f0;margin-top:8px">
-          <div class="nota">La imagen va arriba del texto y es clicable; el botón va al final. Si dejas el texto vacío, el correo lleva solo la imagen y el botón.</div>
+          <div style="margin-top:8px"><label class="f">Posición de la imagen</label>
+            <div class="pills"><span class="pill imgpos on" data-p="ARRIBA" onclick="setImgPos('ARRIBA')">⬆ Arriba del texto</span><span class="pill imgpos" data-p="ABAJO" onclick="setImgPos('ABAJO')">⬇ Abajo del texto (antes del botón)</span></div></div>
+          <div class="nota">La imagen es clicable y el botón va al final. Si dejas el texto vacío, el correo lleva solo la imagen y el botón.</div>
         </div>
         <div class="row" style="margin-top:8px">
           <div style="grid-column:span 2">
@@ -363,6 +365,7 @@ async function cargarCampana(){
   document.getElementById('mCupoDiario').value = CAMP.cupo_diario || 250;
   pintarUniverso();
   document.getElementById('mBoton').value = CAMP.boton_texto || '';
+  setImgPos(CAMP.imagen_posicion === 'ABAJO' ? 'ABAJO' : 'ARRIBA', true);
   pintarImagen(CAMP.imagen_url);
   try { const pr = safe(CAMP.parametros) || {}; setAud(['DEALERS','LEIDOS_CAMPANA'].includes(pr.audiencia) ? pr.audiencia : 'CLIENTES', true); if (Array.isArray(pr.categorias) && pr.categorias.length) document.querySelectorAll('.pill.catd').forEach(x => x.classList.toggle('on', pr.categorias.includes(x.dataset.c))); cargarCampOrigen(pr.id_campana_origen); setAlc(pr.alcance === 'RECIBIDOS' ? 'RECIBIDOS' : 'LEIDOS', true); } catch(_) {}
   if (CAMP.remitente) document.getElementById('mRemitente').value = CAMP.remitente;
@@ -454,6 +457,8 @@ function setAud(a, soloUI){
   document.getElementById('paramVta').style.display = (a==='CLIENTES' && ob==='VENTA') ? '' : 'none';
   if (!soloUI) marcarSucio();
 }
+let IMGPOS = 'ARRIBA';
+function setImgPos(p, soloUI){ IMGPOS = p; document.querySelectorAll('.pill.imgpos').forEach(x => x.classList.toggle('on', x.dataset.p === p)); if (!soloUI) marcarSucio(); }
 let ALC = 'LEIDOS';
 function setAlc(a, soloUI){ ALC = a; document.querySelectorAll('.pill.alc').forEach(x => x.classList.toggle('on', x.dataset.a === a)); if (!soloUI) marcarSucio(); }
 /* Campañas ya enviadas del mismo canal, con cuántos leyeron: para la audiencia de refuerzo. */
@@ -516,7 +521,7 @@ async function guardar(){
     asunto: document.getElementById('mAsunto').value, remitente: document.getElementById('mRemitente').value,
     plantilla: window._tpl || 'banner', titulo: document.getElementById('mTitulo').value,
     color_titulo: document.getElementById('mColor').value,
-    link_url: document.getElementById('mLink').value.trim(), boton_texto: document.getElementById('mBoton').value.trim(),
+    link_url: document.getElementById('mLink').value.trim(), boton_texto: document.getElementById('mBoton').value.trim(), imagen_posicion: IMGPOS,
     por_minuto: +document.getElementById('mPorMinuto').value || 30, cupo_diario: +document.getElementById('mCupoDiario').value || 250,
     deciles_control: deciles, excluir_regiones: regionesEx,
     analizar_ia: document.getElementById('chkIA').checked,
