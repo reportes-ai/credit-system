@@ -681,7 +681,16 @@ const popup = async (req, res) => {
     const cfg = await popupConfig();
     if (!cfg || !cfg.dias.includes(dowChile())) return nada();
     const vis = await ejecutivosVisibles(req);
-    if (vis.all || !vis.lista || !vis.lista.length) return nada();      // solo ejecutivos acotados
+    /* Ejecutivos acotados: rinden por lo que ven (lo suyo). Usuarios con ámbito
+       "todos" (jefes/supervisores que TAMBIÉN colocan créditos, ej. Damaris):
+       rinden solo por sus PROPIAS operaciones — nunca por las de su equipo.
+       Quien no coloca créditos no tiene ops a su nombre y no ve el pop-up. */
+    let lista = vis.lista;
+    if (vis.all) {
+      const propio = `${req.usuario.nombre || ''} ${req.usuario.apellido || ''}`.trim();
+      lista = propio ? [propio] : [];
+    }
+    if (!lista || !lista.length) return nada();
     // Espera entre casos: desde el último comentario grabado vía pop-up.
     const [[ult]] = await pool.query(
       'SELECT MAX(created_at) t FROM fundantes_popup_log WHERE id_usuario=?', [req.usuario.id_usuario]);
@@ -701,7 +710,7 @@ const popup = async (req, res) => {
                           WHERE l.id_credito = c.id AND l.id_usuario = ?
                             AND l.created_at > DATE_SUB(NOW(), INTERVAL ? DAY))
        ORDER BY c.fecha_otorgado ASC LIMIT 1`,
-      [FINANCIERAS, vis.lista.map(x => String(x).toUpperCase()), req.usuario.id_usuario, cfg.frecuencia_dias]);
+      [FINANCIERAS, lista.map(x => String(x).toUpperCase()), req.usuario.id_usuario, cfg.frecuencia_dias]);
     if (!op) return nada();
     res.json({ success: true, data: { ...op, min_palabras: cfg.min_palabras }, error: null });
   } catch (e) { console.error('[fundantes popup]', e.message); nada(); }
