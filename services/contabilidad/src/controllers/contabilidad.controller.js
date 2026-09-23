@@ -110,6 +110,18 @@ require('../../../../shared/migrate').enFila('contabilidad-nucleo', async () => 
     console.log('[contabilidad] núcleo contable listo');
   } catch (e) { console.error('[contabilidad migration]', e.message); }
 });
+/* Cerrar ejercicio es una ACCIÓN aparte de ver Estados Financieros (Pato, 23-09-2026: un perfil de
+   consulta como Auditor debe ver los estados sin poder cerrar el año). Se siembra a los perfiles que
+   hoy tienen ctb_estados, salvo los de solo lectura. */
+require('../../../../shared/migrate').enFila('contabilidad-cierre-ejercicio-permiso', async () => {
+  const [[f]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_cierre_ejercicio' LIMIT 1");
+  if (f) return;
+  const [r] = await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003, 'Estados Financieros — cerrar ejercicio', 'ctb_cierre_ejercicio', NULL, NULL)");
+  await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+    SELECT pp.id_perfil, ?, 1 FROM permisos_perfil pp JOIN funcionalidades f2 ON f2.id_funcionalidad=pp.id_funcionalidad
+    JOIN perfiles p ON p.id_perfil=pp.id_perfil WHERE f2.codigo='ctb_estados' AND pp.habilitado=1 AND COALESCE(p.solo_lectura,0)=0`, [r.insertId]);
+  console.log('[contabilidad] permiso ctb_cierre_ejercicio sembrado');
+});
 
 /* ── Plan de cuentas ───────────────────────────────────────────────────────── */
 exports.getCuentas = async (req, res) => {

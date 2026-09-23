@@ -57,7 +57,7 @@ router.get('/libro-mayor-completo', verifyToken, requireFunc('ctb_libros', 'ctb_
 router.get('/balance',      verifyToken, requireFunc('ctb_balance', 'ctb_libros'), ctrl.balance);
 router.get('/balance-general',   verifyToken, requireFunc('ctb_estados', 'ctb_balance', 'ctb_libros'), ctrl.balanceGeneral);
 router.get('/estado-resultados', verifyToken, requireFunc('ctb_estados', 'ctb_balance', 'ctb_libros'), ctrl.estadoResultados);
-router.post('/cierre-ejercicio', verifyToken, requireFunc('ctb_estados'), ctrl.cerrarEjercicio);
+router.post('/cierre-ejercicio', verifyToken, requireFunc('ctb_cierre_ejercicio'), ctrl.cerrarEjercicio);   // acción aparte de ver los estados
 router.get('/cierre-mes',        verifyToken, requireFunc('ctb_cierre_mes', 'ctb_estados', 'ctb_balance', 'ctb_libros'), ctrl.cierreMes);
 router.put('/cierre-mes/comentario',  verifyToken, requireFunc('ctb_cierre_mes', 'ctb_estados'), ctrl.guardarComentario);
 router.post('/cierre-mes/comentario-ia', verifyToken, requireFunc('ctb_cierre_mes', 'ctb_estados'), ctrl.comentarioIA);

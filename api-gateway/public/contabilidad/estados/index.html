@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Estados Financieros — AutoFácil</title>
-  <!-- v1.0 — Fase 3: balance general + estado de resultados -->
+  <!-- v1.1 — "Cerrar ejercicio" es permiso de acción aparte (ctb_cierre_ejercicio): ver los estados no permite cerrar el año. v1.0 — Fase 3: balance general + estado de resultados -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -120,6 +120,15 @@ async function consultar(){
         </tbody></table></div>`;
   }
 }
+// El botón "Cerrar ejercicio" solo para quien tiene el permiso de acción ctb_cierre_ejercicio (el servidor lo exige igual)
+(async () => {
+  try {
+    const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+    const j = await fetch('/api/auth/mis-permisos?_=' + Date.now(), { cache: 'no-store', headers: H }).then(r => r.json());
+    const puede = yo?.perfil === 'Administrador' || (j.funcionalidades || []).includes('ctb_cierre_ejercicio');
+    if (!puede) document.getElementById('btnCierre').style.display = 'none';
+  } catch (_) {}
+})();
 async function cerrarEjercicio(){
   const anio = prompt('Cerrar ejercicio: ¿qué año? (deja en CERO ingresos y gastos del año y lleva la utilidad/pérdida a Resultados Acumulados; se deshace anulando el comprobante)');
   if (!anio) return;
