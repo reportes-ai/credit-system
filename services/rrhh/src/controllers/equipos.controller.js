@@ -338,7 +338,8 @@ async function armarActa(idMov) {
     const [[ent]] = await pool.query("SELECT fecha FROM rh_equipos_mov WHERE id_equipo=? AND accion='ENTREGA' AND id<? ORDER BY id DESC LIMIT 1", [m.id_equipo, m.id]);
     fechaEntrega = ent ? fmtD(ent.fecha) : '';
   }
-  const vars = { nombre: m.nombre || '', rut: m.rut || '', empresa: emp.razon_social || '', rut_empresa: emp.rut_formateado || '', fecha: fmtD(m.fecha), fecha_entrega: fechaEntrega,
+  const RUT = require('../../../../api-gateway/public/js/rut-core');
+  const vars = { nombre: m.nombre || '', rut: m.rut ? RUT.formatear(m.rut) : '', empresa: emp.razon_social || '', rut_empresa: emp.rut_formateado || '', fecha: fmtD(m.fecha), fecha_entrega: fechaEntrega,
     equipo: TIPO_LABEL[e.tipo] || e.tipo, marca: e.marca || '', modelo: e.modelo || '', serie: e.serie || '', observaciones: m.comentario || '' };
   const { generarActaEquiposPDF } = require('../../../../shared/acta-equipos-pdf');
   const buffer = await generarActaEquiposPDF({
