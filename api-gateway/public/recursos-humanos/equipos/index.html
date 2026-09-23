@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 — claves del equipo (cuenta, preguntas, administrador) cifradas en el servidor; botón 🔑 solo para Administrador / permiso rh_equipos_claves, cada lectura auditada. v1.2 — página full width. v1.1 — botón Reasignar (devolución "Reasignado a…" + entrega al nuevo en un paso; solo usuarios activos) y marca naranja cuando una persona tiene 2 o más equipos. v1.0 — Entrega de Equipos: laptops, celulares y otros (inventario + entrega/devolución por colaborador + acta PDF) y pestaña Texto del acta editable (rh_config acta_eq_*). Reemplaza ENTREGA EQUIPOS.xlsx y el acta Word a mano (Pato, 23-09-2026) -->
+<!-- v1.4 — pestaña Personas: historial por colaborador (qué recibió, cuándo lo devolvió, quién lo tiene hoy), incluye ex colaboradores. v1.3 — claves del equipo (cuenta, preguntas, administrador) cifradas en el servidor; botón 🔑 solo para Administrador / permiso rh_equipos_claves, cada lectura auditada. v1.2 — página full width. v1.1 — botón Reasignar (devolución "Reasignado a…" + entrega al nuevo en un paso; solo usuarios activos) y marca naranja cuando una persona tiene 2 o más equipos. v1.0 — Entrega de Equipos: laptops, celulares y otros (inventario + entrega/devolución por colaborador + acta PDF) y pestaña Texto del acta editable (rh_config acta_eq_*). Reemplaza ENTREGA EQUIPOS.xlsx y el acta Word a mano (Pato, 23-09-2026) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -53,7 +53,19 @@
     <button class="on" id="tLAPTOP" onclick="verTab('LAPTOP')"><i class="bi bi-laptop me-1"></i>Laptops<span class="n" id="nLAPTOP">0</span></button>
     <button id="tCELULAR" onclick="verTab('CELULAR')"><i class="bi bi-phone me-1"></i>Celulares<span class="n" id="nCELULAR">0</span></button>
     <button id="tOTRO" onclick="verTab('OTRO')"><i class="bi bi-mouse2 me-1"></i>Otros<span class="n" id="nOTRO">0</span></button>
+    <button id="tPERSONAS" onclick="verTab('PERSONAS')"><i class="bi bi-people me-1"></i>Personas</button>
     <button id="tTEXTO" onclick="verTab('TEXTO')"><i class="bi bi-file-earmark-text me-1"></i>Texto del acta</button>
+  </div>
+
+  <div class="panel" id="pPersonas" style="display:none">
+    <div class="top">
+      <div><b>Historial por persona</b> <span class="muted">¿Qué pasó con el equipo de Juan? Aquí: qué recibió, cuándo lo devolvió y quién lo tiene hoy. Incluye a quienes ya no están en la empresa.</span></div>
+      <input type="search" id="buscarPersona" placeholder="Buscar persona…" oninput="renderPersonas()">
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(260px,1fr) 2fr;gap:18px" id="perGrid">
+      <div><table><thead><tr><th>Persona</th><th>Estado</th><th>Tiene hoy</th></tr></thead><tbody id="tbPersonas"></tbody></table></div>
+      <div id="perDetalle" class="vacio">Elige una persona para ver su historial.</div>
+    </div>
   </div>
 
   <div class="panel" id="pLista">
@@ -172,10 +184,43 @@
   function verTab(t) {
     tab = t;
     document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.id === 't' + t));
-    document.getElementById('pLista').style.display = t === 'TEXTO' ? 'none' : '';
+    document.getElementById('pLista').style.display = (t === 'TEXTO' || t === 'PERSONAS') ? 'none' : '';
     document.getElementById('pTexto').style.display = t === 'TEXTO' ? '' : 'none';
-    if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(t === 'TEXTO' ? 'Texto del acta' : LBL[t]);
-    if (t === 'TEXTO') cargarTextos(); else render();
+    document.getElementById('pPersonas').style.display = t === 'PERSONAS' ? '' : 'none';
+    if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(t === 'TEXTO' ? 'Texto del acta' : t === 'PERSONAS' ? 'Personas' : LBL[t]);
+    if (t === 'TEXTO') cargarTextos(); else if (t === 'PERSONAS') cargarPersonas(); else render();
+  }
+
+  /* ── Personas: historial por colaborador ── */
+  let personas = [], personaSel = null;
+  async function cargarPersonas() {
+    try { personas = await api('/equipos/personas'); } catch (e) { alert(e.message); return; }
+    renderPersonas();
+  }
+  function renderPersonas() {
+    const q = document.getElementById('buscarPersona').value.trim().toLowerCase();
+    const lista = personas.filter(p => !q || [p.nombre, p.rut].join(' ').toLowerCase().includes(q));
+    const key = p => p.id_usuario ? 'u' + p.id_usuario : 'n' + p.nombre;
+    document.getElementById('tbPersonas').innerHTML = lista.map(p => `<tr style="cursor:pointer;${personaSel === key(p) ? 'background:#eef2ff' : ''}" onclick="verPersona(${p.id_usuario || 0}, ${JSON.stringify(p.nombre)})">
+      <td><b>${esc(p.nombre)}</b><div class="muted">${esc(p.rut || '')}</div></td>
+      <td><span class="chip ${p.estado_usuario === 'activo' ? 'c-DISPONIBLE' : 'c-BAJA'}">${p.estado_usuario === 'activo' ? 'ACTIVO' : p.estado_usuario === 'inactivo' ? 'INACTIVO' : 'SIN USUARIO'}</span></td>
+      <td>${p.tiene_hoy ? `<b>${p.tiene_hoy}</b> equipo${p.tiene_hoy > 1 ? 's' : ''}` : '<span class="muted">—</span>'}</td></tr>`).join('') || '<tr><td colspan="3" class="vacio">Nadie coincide</td></tr>';
+  }
+  async function verPersona(idUsuario, nombre) {
+    personaSel = idUsuario ? 'u' + idUsuario : 'n' + nombre; renderPersonas();
+    const det = document.getElementById('perDetalle'); det.className = ''; det.innerHTML = '<div class="vacio">Cargando…</div>';
+    let eqs; try { eqs = await api('/equipos/historial-persona?' + new URLSearchParams(idUsuario ? { id_usuario: idUsuario } : { nombre })); } catch (e) { det.innerHTML = `<div class="vacio">${esc(e.message)}</div>`; return; }
+    if (!eqs.length) { det.innerHTML = '<div class="vacio">Sin equipos registrados.</div>'; return; }
+    det.innerHTML = `<h5 style="margin:0 0 10px">${esc(nombre)} · ${eqs.length} equipo${eqs.length > 1 ? 's' : ''}</h5>` + eqs.map(e => {
+      const hoy = e.estado === 'ASIGNADO' ? `Hoy lo tiene <b>${esc(e.asignado_nombre)}</b>` : e.estado === 'BAJA' ? 'Hoy está <b>dado de baja</b>' : 'Hoy está <b>disponible</b> (sin asignar)';
+      return `<div class="ayuda" style="margin-bottom:12px;border-left-color:${e.estado === 'ASIGNADO' ? '#1d4ed8' : '#94a3b8'}">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div>${descEq(e)}</div><div class="muted">${hoy}</div></div>
+        <table style="margin-top:8px"><tbody>${e.movs.map(m => `<tr style="${m.es_persona ? 'font-weight:700' : 'color:#64748b'}">
+          <td style="white-space:nowrap;width:90px">${fmtD(m.fecha)}</td>
+          <td style="width:110px"><span class="chip ${m.accion === 'ENTREGA' ? 'c-ASIGNADO' : 'c-DISPONIBLE'}">${m.accion === 'ENTREGA' ? 'RECIBIÓ' : 'DEVOLVIÓ'}</span></td>
+          <td>${esc(m.nombre)}${m.usuario_login ? ` <span class="muted">· cuenta ${esc(m.usuario_login)}</span>` : ''}${m.comentario ? `<div class="muted" style="font-weight:400">${esc(m.comentario)}</div>` : ''}</td>
+          <td style="white-space:nowrap"><button class="btn-mini" onclick="abrirActa(${m.id})"><i class="bi bi-file-earmark-pdf"></i></button></td></tr>`).join('')}</tbody></table></div>`;
+    }).join('');
   }
 
   async function cargar() {

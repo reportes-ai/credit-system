@@ -290,6 +290,8 @@ router.post('/equipos',                     verifyToken, eqPerm, eq.crear);
 router.get('/equipos/textos',               verifyToken, eqPerm, eq.getTextos);
 router.put('/equipos/textos',               verifyToken, eqPerm, eq.setTextos);
 router.get('/equipos/acta-preview',         verifyToken, eqPerm, eq.actaPreview);
+router.get('/equipos/personas',             verifyToken, eqPerm, eq.personas);
+router.get('/equipos/historial-persona',    verifyToken, eqPerm, eq.historialPersona);
 router.get('/equipos/mov/:id/acta',         verifyToken, eqPerm, eq.acta);
 router.post('/equipos/mov/:id/acta-firmada', verifyToken, eqPerm, eq.subirActaFirmada);
 router.put('/equipos/:id',                  verifyToken, eqPerm, eq.editar);

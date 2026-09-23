@@ -316,6 +316,38 @@ exports.reasignar = async (req, res) => {
   } catch (e) { console.error('[equipos reasignar]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
+/* Historial por PERSONA: qué equipos tuvo, cuándo los recibió, cuándo los devolvió y quién los tiene hoy.
+   Cubre también a ex colaboradores (los movimientos guardan nombre y RUT aunque ya no tengan usuario). */
+exports.personas = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT COALESCE(id_usuario, 0) id_usuario, MAX(nombre) nombre, MAX(rut) rut,
+              SUM(accion='ENTREGA') entregas, SUM(accion='DEVOLUCION') devoluciones, MAX(fecha) ultimo
+         FROM rh_equipos_mov WHERE nombre IS NOT NULL AND nombre<>''
+        GROUP BY COALESCE(id_usuario, 0), IF(id_usuario IS NULL, UPPER(TRIM(nombre)), '') ORDER BY nombre LIMIT 1000`);
+    const ids = rows.filter(r => r.id_usuario).map(r => r.id_usuario);
+    const [act] = ids.length ? await pool.query("SELECT id_usuario, estado FROM usuarios WHERE id_usuario IN (?)", [ids]) : [[]];
+    const est = new Map(act.map(u => [u.id_usuario, u.estado]));
+    const [ten] = await pool.query("SELECT id_usuario_actual id, COUNT(*) n FROM rh_equipos WHERE estado='ASIGNADO' AND id_usuario_actual IS NOT NULL GROUP BY id_usuario_actual");
+    const tiene = new Map(ten.map(t => [t.id, t.n]));
+    ok(res, rows.map(r => ({ ...r, estado_usuario: r.id_usuario ? (est.get(r.id_usuario) || 'sin usuario') : 'sin usuario', tiene_hoy: tiene.get(r.id_usuario) || 0 })));
+  } catch (e) { console.error('[equipos personas]', e.message); fail(res, 'Error interno del servidor'); }
+};
+exports.historialPersona = async (req, res) => {
+  try {
+    const idUsuario = Number(req.query.id_usuario) || 0, nombre = String(req.query.nombre || '').trim();
+    if (!idUsuario && !nombre) return fail(res, 'Indica la persona', 400);
+    const [mios] = idUsuario
+      ? await pool.query('SELECT DISTINCT id_equipo FROM rh_equipos_mov WHERE id_usuario=?', [idUsuario])
+      : await pool.query('SELECT DISTINCT id_equipo FROM rh_equipos_mov WHERE id_usuario IS NULL AND UPPER(TRIM(nombre))=UPPER(?)', [nombre]);
+    if (!mios.length) return ok(res, []);
+    const ids = mios.map(m => m.id_equipo);
+    const [equipos] = await pool.query('SELECT e.*, COALESCE(NULLIF(TRIM(CONCAT_WS(\' \', u.nombre, u.apellido)), \'\'), m.nombre) AS asignado_nombre FROM rh_equipos e LEFT JOIN usuarios u ON u.id_usuario=e.id_usuario_actual LEFT JOIN rh_equipos_mov m ON m.id=e.id_mov_actual WHERE e.id IN (?)', [ids]);
+    const [movs] = await pool.query('SELECT * FROM rh_equipos_mov WHERE id_equipo IN (?) ORDER BY id_equipo, fecha, id', [ids]);
+    ok(res, equipos.map(e => ({ ...e, claves_enc: undefined, movs: movs.filter(m => m.id_equipo === e.id).map(m => ({ ...m, es_persona: idUsuario ? m.id_usuario === idUsuario : (!m.id_usuario && String(m.nombre || '').trim().toUpperCase() === nombre.toUpperCase()) })) })));
+  } catch (e) { console.error('[equipos historial persona]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 exports.historial = async (req, res) => {
   try {
     const id = Number(req.params.id);
