@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.5 — el QR apunta a /api/credenciales/vcf/<token>: el teléfono descarga el contacto CON FOTO (QR chico y muy legible). v1.4 — QR legible: UTF-8 (tildes), vCard liviana (61 módulos en vez de 77), margen 4, 30 mm sin suavizado. v1.3 -->
+<!-- v1.6 — RUT con formato 12.345.678-9 en la lista y en la credencial (rut-core.formatear). v1.5 — el QR apunta a /api/credenciales/vcf/<token>: el teléfono descarga el contacto CON FOTO (QR chico y muy legible). v1.4 — QR legible: UTF-8 (tildes), vCard liviana (61 módulos en vez de 77), margen 4, 30 mm sin suavizado. v1.3 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -110,6 +110,7 @@
 
 <script src="/js/auth-guard.js"></script>
 <script src="/js/qrcode-generator.js"></script>
+<script src="/js/rut-core.js"></script>
 <script src="/js/html2pdf.bundle.min.js"></script>
 <script>
 'use strict';
@@ -145,7 +146,7 @@ async function cargar(){
       <td><input type="checkbox" class="selu" data-i="${i}"></td>
       <td><b>${esc(u.nombre)} ${esc(u.apellido||'')}</b></td>
       <td><input class="form-control form-control-sm" style="width:170px" id="cargo-${i}" value="${esc(u.cargo||'')}" placeholder="Ejecutivo Comercial" onchange="guardarDato(${i})"></td>
-      <td>${esc(u.rut||'—')}</td><td>${esc(u.telefono||'—')}</td>
+      <td>${esc(u.rut ? AF_RUT.formatear(u.rut) : '—')}</td><td>${esc(u.telefono||'—')}</td>
       <td>${u.tiene_foto?'<i class="bi bi-check-circle-fill" style="color:#16a34a"></i>':''} <input type="file" accept="image/*" style="font-size:.7rem;width:170px" onchange="subirFoto(${i}, this)"></td>
       <td><input type="date" class="form-control form-control-sm" style="width:140px" id="exp-${i}" value="${u.expira?String(u.expira).slice(0,10):''}" onchange="guardarDato(${i})"></td>
     </tr>`).join('');
@@ -232,7 +233,7 @@ async function generar(){
             <div class="nom">${esc((u.nombre||'').split(' ')[0].toUpperCase())}</div>
             <div class="ape">${esc(((u.nombre||'').split(' ').slice(1).join(' ')+' '+(u.apellido||'')).trim())} ${esc(u.apellido_materno||'')}</div>
             <div class="cargo">${esc(u.cargo||'')}</div>
-            <div class="datos"><b>RUT:</b> ${esc(u.rut||'—')}<br><b>Expira:</b> ${fFecha(expira)}</div>
+            <div class="datos"><b>RUT:</b> ${esc(u.rut ? AF_RUT.formatear(u.rut) : '—')}<br><b>Expira:</b> ${fFecha(expira)}</div>
           </div>
         </div>
         <div class="franja"></div>
