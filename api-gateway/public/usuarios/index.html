@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Usuarios — AutoFácil</title>
+  <!-- v1.1 — Nuevo Usuario: RUT con formato en vivo (12.345.678-9), semáforo del dígito verificador y bloqueo al guardar si el DV no corresponde (motor único rut-core) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -718,7 +719,8 @@
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label">RUT *</label>
-              <input type="text" id="uRut" class="form-control" placeholder="12345678-9">
+              <input type="text" id="uRut" class="form-control" placeholder="12.345.678-9" maxlength="12" autocomplete="off" oninput="rutEnVivo(this)">
+              <div id="uRutHint" class="form-text" style="min-height:1.1em"></div>
             </div>
             <div class="col-md-4">
               <label class="form-label">Nombre *</label>
@@ -1274,8 +1276,20 @@
         return;
       }
 
+      // RUT: formato canónico y dígito verificador (motor único rut-core). Los placeholders (EXEJ-…) de usuarios ya creados no se validan.
+      const rutIn = document.getElementById('uRut');
+      if (!rutIn.disabled) {
+        const v = rutIn.value.replace(/[^0-9kK]/g, '').length >= 8 ? AF_RUT.validar(rutIn.value) : null;
+        if (v !== true) {
+          errEl.textContent = v === false
+            ? `RUT inválido: el dígito verificador no corresponde (debería ser ${AF_RUT.calcDV(rutIn.value.replace(/[^0-9kK]/g, '').slice(0, -1))}).`
+            : 'Ingresa el RUT completo con dígito verificador (ej. 12.345.678-9).';
+          errEl.classList.remove('d-none'); rutIn.focus();
+          return;
+        }
+      }
       const body = {
-        rut: document.getElementById('uRut').value.trim(),
+        rut: rutIn.disabled ? rutIn.value.trim() : (AF_RUT.normalizar(rutIn.value) || rutIn.value.trim()),
         nombre: document.getElementById('uNombre').value.trim(),
         apellido: document.getElementById('uApellido').value.trim(),
         apellido_materno: document.getElementById('uApellidoM').value.trim() || null,
@@ -2240,6 +2254,19 @@
     }
   </script>
 <script src="/js/topnav.js"></script>
+<script src="/js/rut-core.js"></script>
+<script>
+  // Formato en vivo 12.345.678-9 + semáforo del dígito verificador (mismo patrón que Créditos y DealerNet)
+  function rutEnVivo(inp) {
+    const clean = inp.value.replace(/[^0-9kK]/g, '').toUpperCase().slice(0, 9);
+    inp.value = clean.length >= 2 ? AF_RUT.formatear(clean.slice(0, -1) + '-' + clean.slice(-1)) || clean : clean;
+    const h = document.getElementById('uRutHint'), v = clean.length >= 8 ? AF_RUT.validar(clean) : null;   // no alegar mientras se escribe
+    if (!clean) { h.textContent = ''; inp.style.borderColor = ''; return; }
+    if (v === true) { h.textContent = '✓ RUT válido'; h.style.color = '#059669'; inp.style.borderColor = '#059669'; }
+    else if (v === false) { h.textContent = '✗ Dígito verificador incorrecto (debería ser ' + AF_RUT.calcDV(clean.slice(0, -1)) + ')'; h.style.color = '#dc2626'; inp.style.borderColor = '#dc2626'; }
+    else { h.textContent = 'Ingresa el RUT completo con dígito verificador'; h.style.color = '#9ca3af'; inp.style.borderColor = ''; }
+  }
+</script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
