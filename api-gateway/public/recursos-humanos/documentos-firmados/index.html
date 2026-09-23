@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Carpetas Digitales — RRHH</title>
-  <!-- v2.3 — botón Eliminar (papelera) por documento escaneado, con confirmación; solo RRHH, auditado. v2.2 — tipo y documento en texto plano (sin pill ni negrita). v2.1 — full width. v2.0 — renombrado Carpetas Digitales: toda la carpeta, filtro por colaborador, crear tipo -->
+  <!-- v2.4 — glosario de estados al pie de la lista (ARCHIVO, FIRMADO, PENDIENTE, APROBADA, RECHAZADA, BORRADOR/EMITIDO, EN_FIRMA, VIGENTE/CERRADO/ANULADO). v2.3 — botón Eliminar (papelera) por documento escaneado, con confirmación; solo RRHH, auditado. v2.2 — tipo y documento en texto plano (sin pill ni negrita). v2.1 — full width. v2.0 — renombrado Carpetas Digitales: toda la carpeta, filtro por colaborador, crear tipo -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -41,6 +41,20 @@
     </div>
     <table><thead><tr><th>Tipo</th><th>Documento</th><th>Empleado</th><th>Fecha</th><th>Estado</th><th>Firmas</th><th title="Marcado: el colaborador lo ve y descarga en Mi Ficha. Desmarcado: solo RRHH.">Mi Ficha</th><th></th></tr></thead>
     <tbody id="tb"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody></table>
+    <div style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:10px;padding:12px 16px;font-size:.8rem;color:#334155;margin-top:16px">
+      <b><i class="bi bi-book me-1"></i>Glosario de estados</b>
+      <ul style="margin:6px 0 0;padding-left:18px">
+        <li><b>ARCHIVO</b> — documento escaneado que se subió a la carpeta sin firma electrónica (por ejemplo, un comprobante que generó el sistema o un papel que se guardó tal cual). Tiene huella SHA-256, pero nadie lo firmó en el Suite.</li>
+        <li><b>FIRMADO</b> — el documento lleva firma electrónica simple (FES, Ley 19.799) en el Suite: en un escaneado, la del EMPLEADOR (RRHH) al subirlo; en un contrato o finiquito nativo, la del TRABAJADOR y la contrafirma de la empresa. Queda el hash, la fecha, la IP y quién firmó; si el archivo cambia después, la integridad se rompe.</li>
+        <li><b>PENDIENTE</b> — solicitud (vacaciones, permiso, otras) que el trabajador firmó al pedirla y todavía espera la resolución de su jefatura.</li>
+        <li><b>APROBADA</b> — la jefatura la aprobó (segunda firma). En vacaciones, cuando RRHH la recepciona se genera además el <i>Comprobante de Vacaciones</i> en PDF, que aparece como fila aparte en ARCHIVO.</li>
+        <li><b>RECHAZADA</b> — la jefatura la rechazó; queda el motivo y las firmas hasta ese punto.</li>
+        <li><b>BORRADOR / EMITIDO</b> — contrato o finiquito recién creado, aún sin enviar a firma (se puede editar).</li>
+        <li><b>EN_FIRMA</b> — contrato o finiquito enviado a firma: espera que el trabajador lo firme en Mi Ficha y luego la contrafirma de la empresa.</li>
+        <li><b>VIGENTE / CERRADO / ANULADO</b> — contrato en vigor, finiquito cerrado (inmutable, con ODP y asiento) o documento anulado.</li>
+      </ul>
+      <div style="margin-top:6px;color:#64748b">La casilla <b>Mi Ficha</b> solo dice si el colaborador lo ve en su propia ficha; no cambia el estado. La papelera elimina solo escaneados (ARCHIVO / FIRMADO); los documentos nativos (contratos, vacaciones, solicitudes) se gestionan desde su módulo.</div>
+    </div>
   </div>
   <div class="card-box" id="secSubir" style="display:none">
     <h6 style="color:var(--navy)">Subir documento firmado (papel escaneado)</h6>
