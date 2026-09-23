@@ -297,6 +297,8 @@ router.get('/equipos/:id/historial',        verifyToken, eqPerm, eq.historial);
 router.post('/equipos/:id/entregar',        verifyToken, eqPerm, eq.entregar);
 router.post('/equipos/:id/devolver',        verifyToken, eqPerm, eq.devolver);
 router.post('/equipos/:id/reasignar',       verifyToken, eqPerm, eq.reasignar);
+router.get('/equipos/:id/claves',           verifyToken, eqPerm, eq.getClaves);   // + rh_equipos_claves adentro
+router.put('/equipos/:id/claves',           verifyToken, eqPerm, eq.setClaves);
 
 // Config del mantenedor Saludos y Certificados RRHH
 router.get('/config', verifyToken, requireFunc('mant_rrhh_saludos', 'rh_aprobar'), ctrl.getConfigApi);

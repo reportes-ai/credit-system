@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — página full width. v1.1 — botón Reasignar (devolución "Reasignado a…" + entrega al nuevo en un paso; solo usuarios activos) y marca naranja cuando una persona tiene 2 o más equipos. v1.0 — Entrega de Equipos: laptops, celulares y otros (inventario + entrega/devolución por colaborador + acta PDF) y pestaña Texto del acta editable (rh_config acta_eq_*). Reemplaza ENTREGA EQUIPOS.xlsx y el acta Word a mano (Pato, 23-09-2026) -->
+<!-- v1.3 — claves del equipo (cuenta, preguntas, administrador) cifradas en el servidor; botón 🔑 solo para Administrador / permiso rh_equipos_claves, cada lectura auditada. v1.2 — página full width. v1.1 — botón Reasignar (devolución "Reasignado a…" + entrega al nuevo en un paso; solo usuarios activos) y marca naranja cuando una persona tiene 2 o más equipos. v1.0 — Entrega de Equipos: laptops, celulares y otros (inventario + entrega/devolución por colaborador + acta PDF) y pestaña Texto del acta editable (rh_config acta_eq_*). Reemplaza ENTREGA EQUIPOS.xlsx y el acta Word a mano (Pato, 23-09-2026) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -132,6 +132,23 @@
   <div class="pie"><button class="btn-g" onclick="dlgDev.close()">Cancelar</button><button class="btn" onclick="confirmarDevolucion()">Registrar devolución y generar acta</button></div>
 </div></dialog>
 
+<dialog id="dlgClaves"><div class="dlg">
+  <h4><i class="bi bi-key me-1"></i>Claves del equipo</h4>
+  <div id="clvEquipo" class="ayuda"></div>
+  <input type="hidden" id="clv_id">
+  <div class="grid2">
+    <div class="fld"><label>Clave de la cuenta</label><input id="clv_clave" type="password" autocomplete="new-password"></div>
+    <div class="fld"><label>Clave de administrador</label><input id="clv_clave_admin" type="password" autocomplete="new-password"></div>
+    <div class="fld"><label>Pregunta de seguridad 1</label><input id="clv_pregunta1" type="password" autocomplete="off"></div>
+    <div class="fld"><label>Pregunta de seguridad 2</label><input id="clv_pregunta2" type="password" autocomplete="off"></div>
+    <div class="fld"><label>Pregunta de seguridad 3</label><input id="clv_pregunta3" type="password" autocomplete="off"></div>
+    <div class="fld"><label>Nota</label><input id="clv_nota" placeholder="PIN, BitLocker, etc."></div>
+  </div>
+  <label class="muted" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" onchange="document.querySelectorAll('#dlgClaves input[type=password],#dlgClaves input[data-pw]').forEach(i=>{i.type=this.checked?'text':'password';i.dataset.pw='1'})"> Mostrar claves</label>
+  <p class="muted" style="margin:8px 0 0">Se guardan cifradas en el servidor. Solo el Administrador y quien tiene el permiso "ver claves de los equipos" pueden abrirlas; cada vez que se abren queda registrado en Auditoría.</p>
+  <div class="pie"><button class="btn-g" onclick="dlgClaves.close()">Cerrar</button><button class="btn" id="btnClaves" onclick="guardarClaves()">Guardar claves</button></div>
+</div></dialog>
+
 <dialog id="dlgHist"><div class="dlg">
   <h4>Historial del equipo</h4>
   <div id="histEquipo" class="ayuda"></div>
@@ -150,7 +167,7 @@
   const fmtD = s => { if (!s) return '—'; const [y, m, d] = String(s).slice(0, 10).split('-'); return `${d}-${m}-${y}`; };
   const hoy = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   const LBL = { LAPTOP: 'Laptops', CELULAR: 'Celulares', OTRO: 'Otros equipos' };
-  let tab = 'LAPTOP', equipos = [], colaboradores = [], textosDef = {}, movActa = null;
+  let tab = 'LAPTOP', equipos = [], colaboradores = [], textosDef = {}, movActa = null, puedeClaves = false;
 
   function verTab(t) {
     tab = t;
@@ -162,7 +179,7 @@
   }
 
   async function cargar() {
-    try { const d = await api('/equipos'); equipos = d.equipos; colaboradores = d.colaboradores; }
+    try { const d = await api('/equipos'); equipos = d.equipos; colaboradores = d.colaboradores; puedeClaves = !!d.puede_claves; }
     catch (e) { alert(e.message); return; }
     ['LAPTOP', 'CELULAR', 'OTRO'].forEach(t => document.getElementById('n' + t).textContent = equipos.filter(e => e.tipo === t && e.estado !== 'BAJA').length);
     render();
@@ -191,6 +208,7 @@
       <td style="white-space:nowrap">
         ${e.estado === 'DISPONIBLE' ? `<button class="btn-mini ok" onclick="entregar(${e.id})"><i class="bi bi-box-arrow-in-down"></i> Entregar</button>` : ''}
         ${e.estado === 'ASIGNADO' ? `<button class="btn-mini" onclick="abrirActa(${e.id_mov_actual})"><i class="bi bi-file-earmark-pdf"></i> Acta</button> <button class="btn-mini warn" onclick="devolver(${e.id})"><i class="bi bi-box-arrow-up"></i> Devolver</button> <button class="btn-mini" onclick="entregar(${e.id}, true)"><i class="bi bi-arrow-left-right"></i> Reasignar</button>` : ''}
+        ${puedeClaves ? `<button class="btn-mini" style="background:${e.tiene_claves ? '#fef3c7' : '#f1f5f9'};color:${e.tiene_claves ? '#92400e' : '#64748b'}" title="${e.tiene_claves ? 'Ver claves del equipo' : 'Sin claves registradas'}" onclick="verClaves(${e.id})"><i class="bi bi-key"></i></button>` : ''}
         <button class="btn-mini" onclick="historial(${e.id})"><i class="bi bi-clock-history"></i></button>
         <button class="btn-mini" onclick="editar(${e.id})"><i class="bi bi-pencil"></i></button>
       </td></tr>`).join('') : `<tr><td colspan="9" class="vacio">Sin equipos en esta pestaña. Agrega el primero con "+ Nuevo equipo".</td></tr>`;
@@ -276,6 +294,22 @@
       const d = await api(`/equipos/${id}/devolver`, { method: 'POST', body: JSON.stringify({ fecha: document.getElementById('dev_fecha').value, baja: document.getElementById('dev_baja').value === '1', comentario: document.getElementById('dev_comentario').value }) });
       dlgDev.close(); await cargar(); abrirActa(d.id_mov);
     } catch (e) { alert(e.message); }
+  }
+
+  /* ── Claves del equipo (solo con permiso) ── */
+  const CLV = ['clave', 'clave_admin', 'pregunta1', 'pregunta2', 'pregunta3', 'nota'];
+  async function verClaves(id) {
+    const e = equipos.find(x => x.id === id); if (!e) return;
+    document.getElementById('clv_id').value = id; document.getElementById('clvEquipo').innerHTML = descEq(e) + (e.asignado_nombre ? `<br>Asignado a <b>${esc(e.asignado_nombre)}</b>${e.usuario_login ? ` · cuenta <b>${esc(e.usuario_login)}</b>` : ''}` : '');
+    try { const c = await api(`/equipos/${id}/claves`); CLV.forEach(k => document.getElementById('clv_' + k).value = c[k] || ''); }
+    catch (err) { alert(err.message); return; }
+    dlgClaves.showModal();
+  }
+  async function guardarClaves() {
+    const id = document.getElementById('clv_id').value, b = {}; CLV.forEach(k => b[k] = document.getElementById('clv_' + k).value);
+    const btn = document.getElementById('btnClaves');
+    try { await api(`/equipos/${id}/claves`, { method: 'PUT', body: JSON.stringify(b) }); btn.textContent = '✓ Guardadas'; setTimeout(() => { btn.textContent = 'Guardar claves'; dlgClaves.close(); cargar(); }, 900); }
+    catch (err) { alert(err.message); }
   }
 
   /* ── Historial + acta firmada ── */

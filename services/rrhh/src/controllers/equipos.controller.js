@@ -7,7 +7,10 @@
    ENTREGA EQUIPOS.xlsx y el acta Word que se llenaba a mano.
    · rh_equipos      → el equipo (uno por serie); estado DISPONIBLE / ASIGNADO / BAJA.
    · rh_equipos_mov  → cada ENTREGA y DEVOLUCION (quién, cuándo, acta firmada).
-   · NUNCA se guardan claves de acceso del equipo (la planilla las traía; aquí no).
+   · Claves del equipo (cuenta, preguntas, administrador): cifradas AES-256-GCM en la fila
+     (rh_equipos.claves_enc), llave = EQUIPOS_CLAVES_KEY o derivada de JWT_SECRET. Solo las lee/edita
+     quien tiene el permiso `rh_equipos_claves` (sembrado: Administrador y Gerente de Operaciones y
+     Crédito); cada lectura queda en auditoría (Pato, 23-09-2026).
    · Amarre onboarding/offboarding: la entrega marca la tarea "Entrega de equipos" del
      ONBOARDING abierto; la devolución del último equipo marca la del OFFBOARDING.
    ───────────────────────────────────────────────────────────────────────────── */
@@ -15,6 +18,24 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const almacen = require('../../../../shared/almacen-docs');
 const empresa = require('../../../../shared/empresa');   // a nivel de módulo: sus migraciones se encolan al boot, no dentro de un bloque
+
+const { tieneFunc } = require('../../../../shared/middleware/permisos');
+const crypto = require('crypto');
+
+/* ── Cifrado de claves (AES-256-GCM) ── */
+const KEY = crypto.createHash('sha256').update(process.env.EQUIPOS_CLAVES_KEY || process.env.JWT_SECRET || 'sin-llave').digest();
+function cifrar(obj) {
+  const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', KEY, iv);
+  const enc = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()]);
+  return Buffer.concat([iv, c.getAuthTag(), enc]).toString('base64');
+}
+function descifrar(b64) {
+  if (!b64) return null;
+  const buf = Buffer.from(b64, 'base64'), iv = buf.subarray(0, 12), tag = buf.subarray(12, 28), enc = buf.subarray(28);
+  const d = crypto.createDecipheriv('aes-256-gcm', KEY, iv); d.setAuthTag(tag);
+  return JSON.parse(Buffer.concat([d.update(enc), d.final()]).toString('utf8'));
+}
+const CLAVES_CAMPOS = ['clave', 'pregunta1', 'pregunta2', 'pregunta3', 'clave_admin', 'nota'];
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
@@ -86,6 +107,15 @@ require('../../../../shared/migrate').enFila('rrhh-equipos', async () => {
     await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1, ?, 1)`, [r.insertId]);
     console.log('[rrhh-equipos] card creada');
   }
+  // Claves cifradas + permiso de acción rh_equipos_claves (Administrador y Gerente de Operaciones y Crédito)
+  await pool.query('ALTER TABLE rh_equipos ADD COLUMN claves_enc TEXT NULL').catch(e => { if (e.errno !== 1060) throw e; });
+  const [[fc]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_equipos_claves' LIMIT 1`);
+  if (modRRHH && !fc) {
+    const [r] = await pool.query(`INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Entrega de Equipos: ver claves de los equipos', 'rh_equipos_claves', NULL, NULL)`, [modRRHH.id_modulo]);
+    await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+      SELECT id_perfil, ?, 1 FROM perfiles WHERE nombre IN ('Administrador','Gerente de Operaciones y Crédito')`, [r.insertId]);
+    console.log('[rrhh-equipos] permiso rh_equipos_claves sembrado');
+  }
   // Tarea de ONBOARDING (la de OFFBOARDING "Devolución de equipos" ya existe en la plantilla sembrada)
   const [[t]] = await pool.query(`SELECT id FROM rh_onb_plantilla WHERE tipo='ONBOARDING' AND tarea LIKE 'Entrega de equipos%' LIMIT 1`);
   if (!t) await pool.query(`INSERT INTO rh_onb_plantilla (tipo, orden, tarea, responsable, dias_plazo) VALUES ('ONBOARDING', 2, 'Entrega de equipos (laptop / celular) con acta firmada', 'TI', 0)`);
@@ -120,9 +150,38 @@ exports.listar = async (req, res) => {
     const [colab] = await pool.query(
       `SELECT id_usuario, rut, TRIM(CONCAT_WS(' ', nombre, apellido, apellido_materno)) AS nombre, cargo
          FROM usuarios WHERE estado='activo' ORDER BY nombre LIMIT 800`);
-    ok(res, { equipos, colaboradores: colab });
+    const puede_claves = await tieneFunc(req.usuario?.id_usuario, 'rh_equipos_claves').catch(() => false);
+    equipos.forEach(e => { e.tiene_claves = !!e.claves_enc; delete e.claves_enc; });   // el cifrado nunca viaja en la lista
+    ok(res, { equipos, colaboradores: colab, puede_claves });
   } catch (e) { console.error('[equipos listar]', e.message); fail(res, 'Error interno del servidor'); }
 };
+
+/* ── Claves del equipo (solo rh_equipos_claves; cada lectura se audita) ─────── */
+exports.getClaves = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!(await tieneFunc(req.usuario?.id_usuario, 'rh_equipos_claves'))) return fail(res, 'Solo el Administrador o quien tiene el permiso "ver claves de los equipos" puede verlas', 403);
+    const [[e]] = await pool.query('SELECT id, tipo, marca, modelo, serie, claves_enc FROM rh_equipos WHERE id=?', [id]);
+    if (!e) return fail(res, 'Equipo no existe', 404);
+    let claves = {};
+    try { claves = descifrar(e.claves_enc) || {}; } catch (_) { return fail(res, 'Las claves guardadas no se pueden leer con la llave actual del servidor (EQUIPOS_CLAVES_KEY / JWT_SECRET cambió): vuelve a guardarlas', 409); }
+    auditar({ req, accion: 'VER', modulo: 'rrhh', entidad: 'equipo-claves', entidad_id: id, detalle: `Vio las claves del ${TIPO_LABEL[e.tipo]} ${e.marca || ''} ${e.modelo || ''} serie ${e.serie || '—'}` });
+    ok(res, claves);
+  } catch (e) { console.error('[equipos claves]', e.message); fail(res, 'Error interno del servidor'); }
+};
+exports.setClaves = async (req, res) => {
+  try {
+    const id = Number(req.params.id); const b = req.body || {};
+    if (!(await tieneFunc(req.usuario?.id_usuario, 'rh_equipos_claves'))) return fail(res, 'Solo el Administrador o quien tiene el permiso "ver claves de los equipos" puede editarlas', 403);
+    const [[e]] = await pool.query('SELECT id, tipo, serie FROM rh_equipos WHERE id=?', [id]);
+    if (!e) return fail(res, 'Equipo no existe', 404);
+    const obj = {}; CLAVES_CAMPOS.forEach(k => { const v = String(b[k] == null ? '' : b[k]).trim().slice(0, 200); if (v) obj[k] = v; });
+    await pool.query('UPDATE rh_equipos SET claves_enc=? WHERE id=?', [Object.keys(obj).length ? cifrar(obj) : null, id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'equipo-claves', entidad_id: id, detalle: `Editó las claves del ${TIPO_LABEL[e.tipo]} serie ${e.serie || '—'} (${Object.keys(obj).join(', ') || 'vacías'})` });
+    ok(res, { ok: true, tiene_claves: Object.keys(obj).length > 0 });
+  } catch (e) { console.error('[equipos claves set]', e.message); fail(res, 'Error interno del servidor'); }
+};
+exports._cifrar = cifrar;   // para la carga histórica (script local)
 
 const limpiar = b => ({
   tipo: TIPOS.includes(String(b.tipo || '').toUpperCase()) ? String(b.tipo).toUpperCase() : null,
