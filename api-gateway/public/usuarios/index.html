@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Usuarios — AutoFácil</title>
-  <!-- v1.1 — Nuevo Usuario: RUT con formato en vivo (12.345.678-9), semáforo del dígito verificador y bloqueo al guardar si el DV no corresponde (motor único rut-core) -->
+  <!-- v1.2 — Editar Perfil: aviso bajo "Solo lectura": no restringe qué se ve, solo bloquea escrituras. v1.1 — Nuevo Usuario: RUT con formato en vivo (12.345.678-9), semáforo del dígito verificador y bloqueo al guardar si el DV no corresponde (motor único rut-core) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -843,6 +843,7 @@
             <input class="form-check-input" type="checkbox" id="npSoloLectura">
             <label class="form-check-label" for="npSoloLectura" style="font-size:.88rem"><b>Solo lectura (demo)</b></label>
             <div class="form-text" style="font-size:.78rem">Los usuarios de este perfil ven datos reales pero NO pueden operar: toda escritura se bloquea en el servidor (mismo candado que "Ver como"). Ideal para demostraciones.</div>
+            <div style="font-size:.76rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:6px 10px;margin-top:6px"><i class="bi bi-exclamation-triangle me-1"></i><b>No restringe lo que se VE.</b> El perfil sigue mostrando todas las pantallas y datos que tenga marcados en la matriz de Permisos (sueldos, fichas, claves, comisiones…). Para un perfil de consulta, además de esta casilla hay que dejar en la matriz solo las funcionalidades de lectura.</div>
           </div>
           <div class="mb-2" style="margin-top:6px">
             <label class="form-label" for="npMaxSesiones" style="font-size:.88rem;margin-bottom:2px"><b>Sesiones simultáneas</b></label>
