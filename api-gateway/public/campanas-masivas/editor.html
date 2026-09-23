@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.11 — audiencia "Leyeron otra campaña" (refuerzo a los que abrieron el correo de una campaña enviada). v1.10 — correo de prueba a cualquier dirección. v1.9 — correo de prueba, correos por minuto y cupo diario (continúa otro día), universo y estimación de días. v1.8 — imagen del correo (flyer) con link y botón; audiencia Dealers activos por categoría. v1.7 -->
+<!-- v1.12 — al abrir una campaña con audiencia Dealers o Refuerzo no se muestran los parámetros de clientes. v1.11 — audiencia "Leyeron otra campaña" (refuerzo a los que abrieron el correo de una campaña enviada). v1.10 — correo de prueba a cualquier dirección. v1.9 — correo de prueba, correos por minuto y cupo diario (continúa otro día), universo y estimación de días. v1.8 — imagen del correo (flyer) con link y botón; audiencia Dealers activos por categoría. v1.7 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -367,8 +367,8 @@ async function cargarCampana(){
   if (CAMP.remitente) document.getElementById('mRemitente').value = CAMP.remitente;
   setTpl(CAMP.plantilla || 'banner', true);
   setOrigen(CAMP.origen_data || 'MANUAL', true);
-  document.getElementById('paramCob').style.display = CAMP.objetivo==='COBRANZA' ? '' : 'none';
-  document.getElementById('paramVta').style.display = CAMP.objetivo==='VENTA' ? '' : 'none';
+  document.getElementById('paramCob').style.display = (AUD==='CLIENTES' && CAMP.objetivo==='COBRANZA') ? '' : 'none';
+  document.getElementById('paramVta').style.display = (AUD==='CLIENTES' && CAMP.objetivo==='VENTA') ? '' : 'none';
   // marcar deciles/regiones
   document.querySelectorAll('.pill.decil').forEach(p => p.classList.toggle('on', deciles.includes(Number(p.dataset.d))));
   document.querySelectorAll('[data-reg]').forEach(p => p.classList.toggle('on', regionesEx.includes(Number(p.dataset.reg))));
