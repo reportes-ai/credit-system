@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.5 — fix: el click en una persona no abría el historial (comillas en el onclick); RUT con formato en la lista. v1.4 — pestaña Personas: historial por colaborador (qué recibió, cuándo lo devolvió, quién lo tiene hoy), incluye ex colaboradores. v1.3 — claves del equipo (cuenta, preguntas, administrador) cifradas en el servidor; botón 🔑 solo para Administrador / permiso rh_equipos_claves, cada lectura auditada. v1.2 — página full width. v1.1 — botón Reasignar (devolución "Reasignado a…" + entrega al nuevo en un paso; solo usuarios activos) y marca naranja cuando una persona tiene 2 o más equipos. v1.0 — Entrega de Equipos: laptops, celulares y otros (inventario + entrega/devolución por colaborador + acta PDF) y pestaña Texto del acta editable (rh_config acta_eq_*). Reemplaza ENTREGA EQUIPOS.xlsx y el acta Word a mano (Pato, 23-09-2026) -->
+<!-- v1.6 — Personas: el historial de la derecha queda flotante (sticky) al bajar por la lista. v1.5 — fix: el click en una persona no abría el historial (comillas en el onclick); RUT con formato en la lista. v1.4 — pestaña Personas: historial por colaborador (qué recibió, cuándo lo devolvió, quién lo tiene hoy), incluye ex colaboradores. v1.3 — claves del equipo (cuenta, preguntas, administrador) cifradas en el servidor; botón 🔑 solo para Administrador / permiso rh_equipos_claves, cada lectura auditada. v1.2 — página full width. v1.1 — botón Reasignar (devolución "Reasignado a…" + entrega al nuevo en un paso; solo usuarios activos) y marca naranja cuando una persona tiene 2 o más equipos. v1.0 — Entrega de Equipos: laptops, celulares y otros (inventario + entrega/devolución por colaborador + acta PDF) y pestaña Texto del acta editable (rh_config acta_eq_*). Reemplaza ENTREGA EQUIPOS.xlsx y el acta Word a mano (Pato, 23-09-2026) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -62,9 +62,10 @@
       <div><b>Historial por persona</b> <span class="muted">¿Qué pasó con el equipo de Juan? Aquí: qué recibió, cuándo lo devolvió y quién lo tiene hoy. Incluye a quienes ya no están en la empresa.</span></div>
       <input type="search" id="buscarPersona" placeholder="Buscar persona…" oninput="renderPersonas()">
     </div>
-    <div style="display:grid;grid-template-columns:minmax(260px,1fr) 2fr;gap:18px" id="perGrid">
+    <div style="display:grid;grid-template-columns:minmax(260px,1fr) 2fr;gap:18px;align-items:start" id="perGrid">
       <div><table><thead><tr><th>Persona</th><th>Estado</th><th>Tiene hoy</th></tr></thead><tbody id="tbPersonas"></tbody></table></div>
-      <div id="perDetalle" class="vacio">Elige una persona para ver su historial.</div>
+      <!-- Flotante: se queda a la vista aunque se elija a alguien del final de la lista -->
+      <div id="perDetalle" class="vacio" style="position:sticky;top:70px;max-height:calc(100vh - 90px);overflow:auto">Elige una persona para ver su historial.</div>
     </div>
   </div>
 
@@ -212,6 +213,7 @@
   async function verPersona(idUsuario, nombre) {
     personaSel = idUsuario ? 'u' + idUsuario : 'n' + nombre; renderPersonas();
     const det = document.getElementById('perDetalle'); det.className = ''; det.innerHTML = '<div class="vacio">Cargando…</div>';
+    det.scrollTop = 0; if (det.getBoundingClientRect().top < 60) det.scrollIntoView({ block: 'start', behavior: 'smooth' });
     let eqs; try { eqs = await api('/equipos/historial-persona?' + new URLSearchParams(idUsuario ? { id_usuario: idUsuario } : { nombre })); } catch (e) { det.innerHTML = `<div class="vacio">${esc(e.message)}</div>`; return; }
     if (!eqs.length) { det.innerHTML = '<div class="vacio">Sin equipos registrados.</div>'; return; }
     det.innerHTML = `<h5 style="margin:0 0 10px">${esc(nombre)} · ${eqs.length} equipo${eqs.length > 1 ? 's' : ''}</h5>` + eqs.map(e => {
