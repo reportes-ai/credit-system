@@ -188,8 +188,9 @@ exports.entregar = async (req, res) => {
     if (!e) return fail(res, 'Equipo no existe', 404);
     if (e.estado === 'ASIGNADO') return fail(res, 'El equipo ya está asignado: registra primero la devolución', 400);
     if (e.estado === 'BAJA') return fail(res, 'El equipo está dado de baja', 400);
-    const [[u]] = await pool.query("SELECT id_usuario, rut, TRIM(CONCAT_WS(' ', nombre, apellido, apellido_materno)) nombre FROM usuarios WHERE id_usuario=?", [idUsuario]);
+    const [[u]] = await pool.query("SELECT id_usuario, rut, estado, TRIM(CONCAT_WS(' ', nombre, apellido, apellido_materno)) nombre FROM usuarios WHERE id_usuario=?", [idUsuario]);
     if (!u) return fail(res, 'Colaborador no existe', 404);
+    if (u.estado !== 'activo') return fail(res, `${u.nombre} no está activo en Business Suite: no se le puede asignar un equipo`, 400);
     const quien = nombreDe(req.usuario);
     const [r] = await pool.query('INSERT INTO rh_equipos_mov (id_equipo, accion, id_usuario, nombre, rut, fecha, usuario_login, comentario, registrado_por) VALUES (?,?,?,?,?,?,?,?,?)',
       [id, 'ENTREGA', u.id_usuario, u.nombre, u.rut, fecha, String(b.usuario_login || '').trim().slice(0, 80) || null, String(b.comentario || '').trim().slice(0, 500) || null, quien]);
@@ -221,6 +222,39 @@ exports.devolver = async (req, res) => {
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'equipo-devolucion', entidad_id: r.insertId, detalle: `Devolución de ${TIPO_LABEL[e.tipo]} serie ${e.serie || '—'} por ${ent?.nombre || '—'} (${fecha})${b.baja ? ' → BAJA' : ''}` });
     ok(res, { id_mov: r.insertId });
   } catch (e) { console.error('[equipos devolver]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* Reasignar: devolución del tenedor actual ("Reasignado a …") + entrega al nuevo, en un solo paso.
+   El nuevo debe ser un usuario ACTIVO del Suite (Pato, 23-09-2026). */
+exports.reasignar = async (req, res) => {
+  try {
+    const id = Number(req.params.id); const b = req.body || {};
+    const idUsuario = Number(b.id_usuario);
+    if (!id || !idUsuario) return fail(res, 'Falta el colaborador', 400);
+    const fecha = /^\d{4}-\d{2}-\d{2}$/.test(b.fecha || '') ? b.fecha : hoyChile();
+    const [[e]] = await pool.query('SELECT * FROM rh_equipos WHERE id=?', [id]);
+    if (!e) return fail(res, 'Equipo no existe', 404);
+    if (e.estado !== 'ASIGNADO') return fail(res, 'El equipo no está asignado: usa Entregar', 400);
+    const [[u]] = await pool.query("SELECT id_usuario, rut, estado, TRIM(CONCAT_WS(' ', nombre, apellido, apellido_materno)) nombre FROM usuarios WHERE id_usuario=?", [idUsuario]);
+    if (!u) return fail(res, 'Colaborador no existe', 404);
+    if (u.estado !== 'activo') return fail(res, `${u.nombre} no está activo en Business Suite: no se le puede asignar un equipo`, 400);
+    if (Number(e.id_usuario_actual) === u.id_usuario) return fail(res, 'El equipo ya está asignado a esa persona', 400);
+    const [[ent]] = await pool.query('SELECT * FROM rh_equipos_mov WHERE id=?', [e.id_mov_actual]);
+    const quien = nombreDe(req.usuario);
+    const [dv] = await pool.query('INSERT INTO rh_equipos_mov (id_equipo, accion, id_usuario, nombre, rut, fecha, comentario, registrado_por) VALUES (?,?,?,?,?,?,?,?)',
+      [id, 'DEVOLUCION', ent?.id_usuario || e.id_usuario_actual, ent?.nombre || null, ent?.rut || null, fecha, `Reasignado a ${u.nombre}${b.comentario ? '. ' + String(b.comentario).trim().slice(0, 400) : ''}`, quien]);
+    const [r] = await pool.query('INSERT INTO rh_equipos_mov (id_equipo, accion, id_usuario, nombre, rut, fecha, usuario_login, comentario, registrado_por) VALUES (?,?,?,?,?,?,?,?,?)',
+      [id, 'ENTREGA', u.id_usuario, u.nombre, u.rut, fecha, String(b.usuario_login || '').trim().slice(0, 80) || null, `Reasignado desde ${ent?.nombre || '—'}${b.comentario ? '. ' + String(b.comentario).trim().slice(0, 400) : ''}`, quien]);
+    await pool.query("UPDATE rh_equipos SET estado='ASIGNADO', id_usuario_actual=?, id_mov_actual=? WHERE id=?", [u.id_usuario, r.insertId, id]);
+    const idAnt = ent?.id_usuario || e.id_usuario_actual;
+    if (idAnt) {
+      const [[pend]] = await pool.query("SELECT COUNT(*) n FROM rh_equipos WHERE id_usuario_actual=? AND estado='ASIGNADO'", [idAnt]);
+      if (!pend.n) await marcarTareaOnb('OFFBOARDING', idAnt, 'Devolución de equipos%', quien);
+    }
+    await marcarTareaOnb('ONBOARDING', u.id_usuario, 'Entrega de equipos%', quien);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'equipo-reasignacion', entidad_id: r.insertId, detalle: `Reasignó ${TIPO_LABEL[e.tipo]} serie ${e.serie || '—'}: ${ent?.nombre || '—'} → ${u.nombre} (${fecha})` });
+    ok(res, { id_mov: r.insertId, id_mov_devolucion: dv.insertId });
+  } catch (e) { console.error('[equipos reasignar]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
 exports.historial = async (req, res) => {

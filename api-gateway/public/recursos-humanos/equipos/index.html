@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — Entrega de Equipos: laptops, celulares y otros (inventario + entrega/devolución por colaborador + acta PDF) y pestaña Texto del acta editable (rh_config acta_eq_*). Reemplaza ENTREGA EQUIPOS.xlsx y el acta Word a mano (Pato, 23-09-2026) -->
+<!-- v1.1 — botón Reasignar (devolución "Reasignado a…" + entrega al nuevo en un paso; solo usuarios activos) y marca naranja cuando una persona tiene 2 o más equipos. v1.0 — Entrega de Equipos: laptops, celulares y otros (inventario + entrega/devolución por colaborador + acta PDF) y pestaña Texto del acta editable (rh_config acta_eq_*). Reemplaza ENTREGA EQUIPOS.xlsx y el acta Word a mano (Pato, 23-09-2026) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -26,6 +26,7 @@
   .btn-g { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:9px; padding:7px 12px; font-weight:600; font-size:.82rem; cursor:pointer; }
   .btn-mini { border:none; background:#eef2ff; color:var(--navy); border-radius:7px; padding:3px 10px; cursor:pointer; font-size:.78rem; font-weight:700; margin:1px 0; }
   .btn-mini.ok { background:#dcfce7; color:#15803d; } .btn-mini.warn { background:#fef3c7; color:#92400e; }
+  .multi { display:inline-block; background:#ffedd5; color:#c2410c; border-radius:6px; padding:1px 7px; font-size:.7rem; font-weight:800; margin-left:4px; white-space:nowrap; }
   .chip { display:inline-block; border-radius:6px; padding:2px 9px; font-size:.72rem; font-weight:800; }
   .c-ASIGNADO { background:#dbeafe; color:#1d4ed8; } .c-DISPONIBLE { background:#dcfce7; color:#15803d; } .c-BAJA { background:#f1f5f9; color:#64748b; }
   .fld { margin-bottom:10px; } .fld label { display:block; font-size:.74rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:3px; }
@@ -107,7 +108,7 @@
 </div></dialog>
 
 <dialog id="dlgEnt"><div class="dlg">
-  <h4>Entregar equipo</h4>
+  <h4 id="entTit">Entregar equipo</h4>
   <div id="entEquipo" class="ayuda"></div>
   <input type="hidden" id="ent_id">
   <div class="fld"><label>Colaborador</label><select id="ent_usuario"></select></div>
@@ -116,7 +117,7 @@
     <div class="fld"><label>Usuario del equipo (nombre de cuenta, sin clave)</label><input id="ent_login" placeholder="Autofacil01 / Nombre Apellido"></div>
   </div>
   <div class="fld"><label>Comentario</label><textarea id="ent_comentario" placeholder="Ej.: heredado de …, con cargador y mouse"></textarea></div>
-  <div class="pie"><button class="btn-g" onclick="dlgEnt.close()">Cancelar</button><button class="btn" onclick="confirmarEntrega()">Registrar entrega y generar acta</button></div>
+  <div class="pie"><button class="btn-g" onclick="dlgEnt.close()">Cancelar</button><button class="btn" id="btnEntregar" onclick="confirmarEntrega()">Registrar entrega y generar acta</button></div>
 </div></dialog>
 
 <dialog id="dlgDev"><div class="dlg">
@@ -176,17 +177,20 @@
     const lista = equipos.filter(e => e.tipo === tab && (verBaja || e.estado !== 'BAJA'))
       .filter(e => !q || [e.marca, e.modelo, e.serie, e.numero_linea, e.descripcion, e.asignado_nombre, e.comentarios].join(' ').toLowerCase().includes(q));
     const asig = lista.filter(e => e.estado === 'ASIGNADO').length;
+    // Personas con 2 o más equipos (de cualquier tipo): se marcan en naranjo
+    const porPersona = {}; equipos.filter(e => e.estado === 'ASIGNADO' && e.id_usuario_actual).forEach(e => porPersona[e.id_usuario_actual] = (porPersona[e.id_usuario_actual] || 0) + 1);
+    const multi = e => e.id_usuario_actual && porPersona[e.id_usuario_actual] > 1 ? `<span class="multi" title="Esta persona tiene ${porPersona[e.id_usuario_actual]} equipos asignados">${porPersona[e.id_usuario_actual]} equipos</span>` : '';
     document.getElementById('resumenLista').textContent = `${lista.length} equipos · ${asig} asignados · ${lista.filter(e => e.estado === 'DISPONIBLE').length} disponibles`;
     document.getElementById('tbLista').innerHTML = lista.length ? lista.map(e => `<tr>
       ${otro ? `<td><b>${esc(e.descripcion)}</b></td>` : ''}
       <td>${esc(e.marca) || '—'}</td><td>${esc(e.modelo) || '—'}</td><td><code>${esc(e.serie) || '—'}</code></td>
       ${cel ? `<td>${esc(e.numero_linea) || '—'}</td>` : ''}
       <td><span class="chip c-${e.estado}">${e.estado}</span></td>
-      <td>${e.estado === 'ASIGNADO' ? `<b>${esc(e.asignado_nombre)}</b>${e.usuario_login ? `<div class="muted">cuenta: ${esc(e.usuario_login)}</div>` : ''}` : '<span class="muted">—</span>'}${e.comentarios ? `<div class="muted">${esc(e.comentarios)}</div>` : ''}</td>
+      <td>${e.estado === 'ASIGNADO' ? `<b>${esc(e.asignado_nombre)}</b>${multi(e)}${e.usuario_login ? `<div class="muted">cuenta: ${esc(e.usuario_login)}</div>` : ''}` : '<span class="muted">—</span>'}${e.comentarios ? `<div class="muted">${esc(e.comentarios)}</div>` : ''}</td>
       <td>${e.estado === 'ASIGNADO' ? fmtD(e.fecha_entrega) : '—'}</td>
       <td style="white-space:nowrap">
         ${e.estado === 'DISPONIBLE' ? `<button class="btn-mini ok" onclick="entregar(${e.id})"><i class="bi bi-box-arrow-in-down"></i> Entregar</button>` : ''}
-        ${e.estado === 'ASIGNADO' ? `<button class="btn-mini" onclick="abrirActa(${e.id_mov_actual})"><i class="bi bi-file-earmark-pdf"></i> Acta</button> <button class="btn-mini warn" onclick="devolver(${e.id})"><i class="bi bi-box-arrow-up"></i> Devolver</button>` : ''}
+        ${e.estado === 'ASIGNADO' ? `<button class="btn-mini" onclick="abrirActa(${e.id_mov_actual})"><i class="bi bi-file-earmark-pdf"></i> Acta</button> <button class="btn-mini warn" onclick="devolver(${e.id})"><i class="bi bi-box-arrow-up"></i> Devolver</button> <button class="btn-mini" onclick="entregar(${e.id}, true)"><i class="bi bi-arrow-left-right"></i> Reasignar</button>` : ''}
         <button class="btn-mini" onclick="historial(${e.id})"><i class="bi bi-clock-history"></i></button>
         <button class="btn-mini" onclick="editar(${e.id})"><i class="bi bi-pencil"></i></button>
       </td></tr>`).join('') : `<tr><td colspan="9" class="vacio">Sin equipos en esta pestaña. Agrega el primero con "+ Nuevo equipo".</td></tr>`;
@@ -237,18 +241,24 @@
 
   /* ── Entrega ── */
   const descEq = e => `<b>${e.tipo === 'OTRO' ? esc(e.descripcion) : (e.tipo === 'CELULAR' ? 'Celular' : 'Laptop')}</b> ${esc(e.marca)} ${esc(e.modelo)} · serie <code>${esc(e.serie) || '—'}</code>${e.numero_linea ? ' · línea ' + esc(e.numero_linea) : ''}`;
-  function entregar(id) {
+  let reasignando = false;
+  function entregar(id, reasignar = false) {
     const e = equipos.find(x => x.id === id); if (!e) return;
-    document.getElementById('ent_id').value = id; document.getElementById('entEquipo').innerHTML = descEq(e);
-    document.getElementById('ent_usuario').innerHTML = '<option value="">— elegir —</option>' + colaboradores.map(c => `<option value="${c.id_usuario}">${esc(c.nombre)}${c.cargo ? ' · ' + esc(c.cargo) : ''}</option>`).join('');
-    document.getElementById('ent_fecha').value = hoy(); document.getElementById('ent_login').value = ''; document.getElementById('ent_comentario').value = '';
+    reasignando = !!reasignar;
+    document.getElementById('ent_id').value = id;
+    document.getElementById('entTit').textContent = reasignar ? 'Reasignar equipo' : 'Entregar equipo';
+    document.getElementById('entEquipo').innerHTML = descEq(e) + (reasignar ? `<br>Hoy lo tiene <b>${esc(e.asignado_nombre)}</b>: se registra su devolución ("Reasignado a…") y la entrega al nuevo, con acta nueva.` : '');
+    // Solo usuarios ACTIVOS de Business Suite (la lista ya viene filtrada por el servidor)
+    document.getElementById('ent_usuario').innerHTML = '<option value="">— elegir —</option>' + colaboradores.filter(c => !reasignar || c.id_usuario !== e.id_usuario_actual).map(c => `<option value="${c.id_usuario}">${esc(c.nombre)}${c.cargo ? ' · ' + esc(c.cargo) : ''}</option>`).join('');
+    document.getElementById('ent_fecha').value = hoy(); document.getElementById('ent_login').value = reasignar ? (e.usuario_login || '') : ''; document.getElementById('ent_comentario').value = '';
+    document.getElementById('btnEntregar').textContent = reasignar ? 'Reasignar y generar acta' : 'Registrar entrega y generar acta';
     dlgEnt.showModal();
   }
   async function confirmarEntrega() {
     const id = document.getElementById('ent_id').value, id_usuario = document.getElementById('ent_usuario').value;
     if (!id_usuario) return alert('Elige el colaborador');
     try {
-      const d = await api(`/equipos/${id}/entregar`, { method: 'POST', body: JSON.stringify({ id_usuario, fecha: document.getElementById('ent_fecha').value, usuario_login: document.getElementById('ent_login').value, comentario: document.getElementById('ent_comentario').value }) });
+      const d = await api(`/equipos/${id}/${reasignando ? 'reasignar' : 'entregar'}`, { method: 'POST', body: JSON.stringify({ id_usuario, fecha: document.getElementById('ent_fecha').value, usuario_login: document.getElementById('ent_login').value, comentario: document.getElementById('ent_comentario').value }) });
       dlgEnt.close(); await cargar(); abrirActa(d.id_mov);
     } catch (e) { alert(e.message); }
   }
