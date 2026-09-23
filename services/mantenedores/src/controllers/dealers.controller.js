@@ -345,7 +345,9 @@ const updateDealer = async (req, res) => {
       `UPDATE dealers SET numero_ind=?,rut=?,nombre_indexa=?,nombre_razon=?,ccs_parque=?,
        direccion=?,fecha_incorporacion=?,contacto=?,telefono=?,correo=?,
        num_cuenta=?,banco=?,rut_pago=?,
-       tipo_cuenta=COALESCE(?,tipo_cuenta),nombre_cuenta=COALESCE(?,nombre_cuenta),cuenta_tipo=COALESCE(?,cuenta_tipo),
+       /* NULLIF: '' limpia pero queda NULL, no cadena vacía — los COALESCE(tipo_cuenta, cuenta_tipo)
+          de Saldos/Comisiones a Pagar y del TEF tomarían '' y taparían el otro campo (code review 23-09-2026) */
+       tipo_cuenta=NULLIF(COALESCE(?,tipo_cuenta),''),nombre_cuenta=NULLIF(COALESCE(?,nombre_cuenta),''),cuenta_tipo=NULLIF(COALESCE(?,cuenta_tipo),''),
        activo=?,tiene_factura=?,observaciones=?
        WHERE id_dealer=?`,
       [r.numero_ind, r.rut, r.nombre_indexa, r.nombre_razon, r.ccs_parque,
