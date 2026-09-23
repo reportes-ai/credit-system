@@ -1339,8 +1339,12 @@ function buildV1b() {
   // y quien no tiene jefe asignado van en "Sin jefe / Externos". Misma forma
   // Nombre | Q | Monto Fin. para que la camarita de WhatsApp la capture igual.
   const jcOt = {};
+  // Un Jefe Comercial que también coloca (Damaris) no está en el padrón de ejecutivos:
+  // sus créditos cuentan bajo su propio nombre, no en "Sin jefe / Externos" (Pato, 23-09-2026).
+  const JEFES = {}; Object.values(window.EJ_JEFE || {}).forEach(j => { JEFES[String(j).trim().toUpperCase()] = j; });
   topEj.forEach(([nombre, v]) => {
-    const jefe = v.externo ? 'Sin jefe / Externos' : ((window.EJ_JEFE || {})[String(nombre).trim().toUpperCase()] || 'Sin jefe / Externos');
+    const key = String(nombre).trim().toUpperCase();
+    const jefe = v.externo ? 'Sin jefe / Externos' : ((window.EJ_JEFE || {})[key] || JEFES[key] || 'Sin jefe / Externos');
     if (!jcOt[jefe]) jcOt[jefe] = {ops:0, fin:0, saldo:0, cd:0, afa:0, ej:0, ejConOps:0};
     jcOt[jefe].ops += v.ops; jcOt[jefe].fin += v.fin; jcOt[jefe].saldo += v.saldo; jcOt[jefe].cd += v.cd; jcOt[jefe].afa += v.afa;
     if (!v.externo) { jcOt[jefe].ej++; if (v.ops) jcOt[jefe].ejConOps++; }
