@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Dealer a Pagar — AutoFácil</title>
-  <!-- v2.2 — celdas apiladas para caber al 100% de zoom: 10 columnas → 8 (Dealer+RUT, Banco+cuenta), tabla de ancho fijo sin scroll horizontal (Pato 17-09-2026). v2.1 — TEF: cupo gratis del mes como badge dentro del botón. v2.0 — vista por ORDEN DE PAGO y factura (una fila por ODP con sus OP desplegables, monto de la ODP, popup de la orden y factura adjunta); nómina y TEF por ODP. v1.9 — TEF: generar el archivo registra el pago (y sus correos). v1.8 — botón TEF B.Internacional con el cupo gratis del mes. v1.7 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v2.3 — TEF y nómina con RUT y nombre del TITULAR de la cuenta (poder a un tercero; el banco rechazaba RUT empresa + cuenta persona). v2.2 — celdas apiladas para caber al 100% de zoom: 10 columnas → 8 (Dealer+RUT, Banco+cuenta), tabla de ancho fijo sin scroll horizontal (Pato 17-09-2026). v2.1 — TEF: cupo gratis del mes como badge dentro del botón. v2.0 — vista por ORDEN DE PAGO y factura (una fila por ODP con sus OP desplegables, monto de la ODP, popup de la orden y factura adjunta); nómina y TEF por ODP. v1.9 — TEF: generar el archivo registra el pago (y sus correos). v1.8 — botón TEF B.Internacional con el cupo gratis del mes. v1.7 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v1.6 — login conserva el destino (?next=). v1.5 — full width + columna Orden de Pago (numero y fecha) · v1.4 — columna Factura Recibida muestra N° de factura/boleta y busca por el · v1.3 — navbar migrada al componente topnav · v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -556,7 +556,7 @@ function nominaRows(){ return enviadas(); }
 const COLS = ['RUT Beneficiario','Nombre Beneficiario','Banco','N° Cuenta','Monto','Glosa'];
 function nominaMatriz(){
   return nominaRows().map(r => [
-    r.rut_dealer||'', r.nombre_dealer||'', r.banco||'', r.num_cuenta||'',
+    r.rut_pago||r.rut_dealer||'', r.nombre_pago||r.nombre_dealer||'', r.banco||'', r.num_cuenta||'',
     Math.round(montoP(r)), `Pago comision ${r.num_orden||('OP '+(r.num_op||''))}`
   ]);
 }
@@ -602,7 +602,8 @@ async function cargarCupoTEF(){
     if (el) { el.textContent = ''; el.style.display = 'none'; }   // el badge del botón ya dice cuántas quedan; el detalle por plataforma no aporta
   } catch(e){ const bd = document.getElementById('tefCupoBadge'); if (bd) bd.textContent = 'cupo n/d'; }
 }
-function filasTEF(){ return nominaRows().map(r => ({ id:r.id, ref:(r.num_orden||('OP '+(r.num_op||''))), rut:r.rut_dealer, nombre:r.nombre_dealer, banco:r.banco, tipo_cuenta:r.tipo_cuenta||'', num_cuenta:r.num_cuenta, correo:r.correo||'', monto:Math.round(montoP(r)), motivo:`Pago comision ${r.num_orden||('OP'+(r.num_op||''))}` })); }
+// RUT y nombre del TITULAR de la cuenta (rut_pago/nombre_pago, motor shared/beneficiario-pago): con poder a un tercero el banco rechazaba RUT empresa + cuenta persona
+function filasTEF(){ return nominaRows().map(r => ({ id:r.id, ref:(r.num_orden||('OP '+(r.num_op||''))), rut:r.rut_pago||r.rut_dealer, nombre:r.nombre_pago||r.nombre_dealer, banco:r.banco, tipo_cuenta:r.tipo_cuenta||'', num_cuenta:r.num_cuenta, correo:r.correo||'', monto:Math.round(montoP(r)), motivo:`Pago comision ${r.num_orden||('OP'+(r.num_op||''))}` })); }
 async function descargarTEF(){
   const filas = filasTEF(); if (!filas.length) return;
   if (!confirm(`Se generará el archivo TEF del Banco Internacional con ${filas.length} pago(s) y esas operaciones quedarán registradas como PAGADAS (con sus correos). ¿Continuar?`)) return;

@@ -1897,6 +1897,7 @@ async function datosSaldosAPagar() {
              DATE_FORMAT(oc.created_at,'%Y-%m-%d') AS fecha_orden,
              d.num_cuenta, d.banco,
              COALESCE(d.tipo_cuenta, d.cuenta_tipo) AS tipo_cuenta,
+             d.rut_pago, d.nombre_cuenta,   -- titular de la cuenta (poder a un tercero): el TEF va a nombre de él (shared/beneficiario-pago)
              COALESCE(NULLIF(d.correo,''), NULLIF(d.cf_email,'')) AS correo,   -- correo_destinatario del TEF (misma fuente que el aviso de pago)
              efr.fecha AS fecha_fondos,
              efu.fecha AS fecha_fundantes,
@@ -1934,6 +1935,7 @@ async function datosSaldosAPagar() {
        activo=0) llegó sin cuenta ni banco, quedó FUERA del archivo TEF y siguió
        "enviada a pago" sin pagarse. Si un RUT tiene varias fichas, gana la que tiene cuenta y, entre esas, la activa. */
     await completarPagoPorRut(rows);
+    require('../../../../shared/beneficiario-pago').aplicarBeneficiario(rows);   // rut_pago / nombre_pago del TITULAR de la cuenta
     // AUTOFIN: el monto a pagar/disponer = saldo + Transferencia + Limitación (la orden ya lo registra así).
     const fijos = await getFijosAutoFin();
     /* Fecha comprometida de pago según el SLA de la categoría del dealer
@@ -2394,7 +2396,7 @@ async function completarPagoPorRut(rows) {
   const sinDatos = rows.filter(r => r.rut_dealer && (!r.num_cuenta || !r.banco || !r.categoria || !r.correo || !r.tipo_cuenta));
   if (!sinDatos.length) return;
   const [ds] = await pool.query(
-    `SELECT rut, num_cuenta, banco, COALESCE(tipo_cuenta, cuenta_tipo) AS tipo_cuenta,
+    `SELECT rut, num_cuenta, banco, COALESCE(tipo_cuenta, cuenta_tipo) AS tipo_cuenta, rut_pago, nombre_cuenta,
             COALESCE(NULLIF(correo,''), NULLIF(cf_email,'')) AS correo,
             COALESCE(NULLIF(categoria_asignada,''), NULLIF(categoria_propuesta,''), '') AS categoria,
             COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre
@@ -2403,7 +2405,7 @@ async function completarPagoPorRut(rows) {
   ds.forEach(d => { const k = normRutSaldo(d.rut); if (k && !mapa.has(k)) mapa.set(k, d); });
   sinDatos.forEach(r => {
     const d = mapa.get(normRutSaldo(r.rut_dealer)); if (!d) return;
-    if (!r.num_cuenta) r.num_cuenta = d.num_cuenta;
+    if (!r.num_cuenta) { r.num_cuenta = d.num_cuenta; r.rut_pago = d.rut_pago; r.nombre_cuenta = d.nombre_cuenta; }   // la cuenta viaja con su titular
     if (!r.banco) r.banco = d.banco;
     if (!r.tipo_cuenta) r.tipo_cuenta = d.tipo_cuenta;
     if (!r.correo) r.correo = d.correo;
@@ -2422,6 +2424,7 @@ async function datosComisionesAPagar() {
              c.id_financiera,
              COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco, COALESCE(d.tipo_cuenta, d.cuenta_tipo) AS tipo_cuenta,
+             d.rut_pago, d.nombre_cuenta,   -- titular de la cuenta (poder a un tercero): el TEF va a nombre de él (shared/beneficiario-pago)
              COALESCE(NULLIF(d.correo,''), NULLIF(d.cf_email,'')) AS correo,
              COALESCE(NULLIF(d.categoria_asignada,''), NULLIF(d.categoria_propuesta,''), '') AS categoria,
              /* GOTCHA TiDB: COALESCE(DATE, DATETIME) devuelve NULL aunque ambos
@@ -2465,6 +2468,7 @@ async function datosComisionesAPagar() {
       ORDER BY COALESCE(fc.fecha_factura, DATE(efa.fecha)) ASC, s.num_op ASC
     `);
   await completarPagoPorRut(rows);
+  require('../../../../shared/beneficiario-pago').aplicarBeneficiario(rows);   // rut_pago / nombre_pago del TITULAR de la cuenta
   /* Detalle de las operaciones de cada orden: la titular + las réplicas de su factura
      (Pato, 11-09-2026: en la pantalla se paga por ODP y factura, y al hacer click se ven las OP). */
   const porTitular = new Map(rows.map(r => [r.id, [{ num_op: r.num_op, id_financiera: r.id_financiera, ejecutivo: r.ejecutivo, comision: Number(r.comision) || 0, titular: 1 }]]));

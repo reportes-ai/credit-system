@@ -311,11 +311,13 @@ const createDealer = async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO dealers (numero,numero_ind,rut,nombre_indexa,nombre_razon,ccs_parque,
        direccion,fecha_incorporacion,contacto,telefono,correo,num_cuenta,banco,rut_pago,
+       tipo_cuenta,nombre_cuenta,cuenta_tipo,
        activo,tiene_factura,observaciones)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [maxN, r.numero_ind, r.rut, r.nombre_indexa, r.nombre_razon, r.ccs_parque,
        r.direccion, r.fecha_incorporacion || null, r.contacto, r.telefono, r.correo,
        r.num_cuenta, r.banco, r.rut_pago,
+       r.tipo_cuenta || null, r.nombre_cuenta || null, r.cuenta_tipo || null,
        r.activo ? 1 : 0, r.tiene_factura ? 1 : 0, r.observaciones || null]
     );
     auditar({ req, accion: 'CREAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: result.insertId, detalle: `Creó el dealer N°${maxN} — ${r.nombre_razon || r.nombre_indexa || ''}`, rut: r.rut, meta: req.body });
@@ -342,11 +344,15 @@ const updateDealer = async (req, res) => {
     await pool.query(
       `UPDATE dealers SET numero_ind=?,rut=?,nombre_indexa=?,nombre_razon=?,ccs_parque=?,
        direccion=?,fecha_incorporacion=?,contacto=?,telefono=?,correo=?,
-       num_cuenta=?,banco=?,rut_pago=?,activo=?,tiene_factura=?,observaciones=?
+       num_cuenta=?,banco=?,rut_pago=?,
+       tipo_cuenta=COALESCE(?,tipo_cuenta),nombre_cuenta=COALESCE(?,nombre_cuenta),cuenta_tipo=COALESCE(?,cuenta_tipo),
+       activo=?,tiene_factura=?,observaciones=?
        WHERE id_dealer=?`,
       [r.numero_ind, r.rut, r.nombre_indexa, r.nombre_razon, r.ccs_parque,
        r.direccion, r.fecha_incorporacion || null, r.contacto, r.telefono, r.correo,
        r.num_cuenta, r.banco, r.rut_pago,
+       // undefined (cliente viejo sin estos campos) conserva lo que había; '' limpia
+       r.tipo_cuenta === undefined ? null : (r.tipo_cuenta || ''), r.nombre_cuenta === undefined ? null : (r.nombre_cuenta || ''), r.cuenta_tipo === undefined ? null : (r.cuenta_tipo || ''),
        r.activo ? 1 : 0, r.tiene_factura ? 1 : 0, r.observaciones || null,
        req.params.id]
     );

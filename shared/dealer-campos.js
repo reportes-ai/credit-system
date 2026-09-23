@@ -41,6 +41,9 @@ const CAMPOS = {
     { campo: 'banco',           label: 'Banco',              grupo: 'Datos de pago' },
     { campo: 'num_cuenta',      label: 'N° Cuenta',          grupo: 'Datos de pago' },
     { campo: 'rut_pago',        label: 'RUT Pago',           grupo: 'Datos de pago' },
+    { campo: 'tipo_cuenta',     label: 'Tipo de cuenta',     grupo: 'Datos de pago' },
+    { campo: 'nombre_cuenta',   label: 'Titular de la cuenta', grupo: 'Datos de pago' },
+    { campo: 'cuenta_tipo',     label: 'Cuenta de empresa / persona', grupo: 'Datos de pago' },
     { campo: 'tiene_factura',   label: 'Emite Factura',      grupo: 'Datos de pago' },
     { campo: 'activo',          label: 'Activo',             grupo: 'Estado' },
     { campo: 'observaciones',   label: 'Observaciones',      grupo: 'Estado' },
@@ -112,6 +115,11 @@ enFila('dealer-campos-permisos', async () => {
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
     }
   } catch (e) { console.error('[dealer_campos_permisos funcionalidad]', e.message); }
+  // 23-09-2026: los campos nuevos del titular de la cuenta heredan la atribución de RUT Pago (mismo grupo Datos de pago)
+  await pool.query(`INSERT IGNORE INTO dealer_campos_permisos (id_perfil, pantalla, campo, puede_editar, actualizado, actualizado_por)
+    SELECT p.id_perfil, 'DEALER', c.campo, 1, NOW(), 'migración titular cuenta'
+      FROM dealer_campos_permisos p JOIN (SELECT 'tipo_cuenta' campo UNION SELECT 'nombre_cuenta' UNION SELECT 'cuenta_tipo') c
+     WHERE p.pantalla='DEALER' AND p.campo='rut_pago' AND p.puede_editar=1`).catch(e => console.error('[dealer_campos titular]', e.message));
 });
 
 /* Lo PERMITIDO de un perfil: { FICHA: Set(campos), DEALER: Set(campos) }.

@@ -21,7 +21,9 @@ async function filasParques(items) {
       `SELECT p.nombre, f.rut, f.razon_social, f.banco, f.cuenta_tipo, f.num_cuenta, f.rut_cuenta, f.nombre_cuenta, f.correo_confirmacion
          FROM parques_comisiones p LEFT JOIN parques_ficha f ON f.id_parque = p.id WHERE p.nombre = ? LIMIT 1`, [it.parque]);
     const [[odp]] = await pool.query('SELECT monto FROM op_correlativos WHERE numero = ? AND anulada = 0 LIMIT 1', [it.odp_numero || '']);
-    out.push({ id: it.id, ref: it.parque, rut: p?.rut_cuenta || p?.rut, nombre: p?.razon_social || p?.nombre_cuenta || it.parque, banco: p?.banco,
+    // RUT y nombre van como PAR del titular de la cuenta (motor único shared/beneficiario-pago)
+    const b = require('../../../../shared/beneficiario-pago').beneficiarioPago({ rut: p?.rut, nombre: p?.razon_social || it.parque, rut_pago: p?.rut_cuenta, nombre_cuenta: p?.nombre_cuenta });
+    out.push({ id: it.id, ref: it.parque, rut: b.rut, nombre: b.nombre, banco: p?.banco,
       tipo_cuenta: p?.cuenta_tipo, num_cuenta: p?.num_cuenta, correo: p?.correo_confirmacion, monto: odp?.monto || 0,
       motivo: `Pago com parque ${it.odp_numero || ''}` });   // cabe en los 30 del banco
   }

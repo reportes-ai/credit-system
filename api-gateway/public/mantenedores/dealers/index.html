@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.12 — Banco de la ficha con lista del mantenedor Bancos de la Plaza. v2.11 — ?ver=<id> abre la ficha directo (link desde Atención Remota → Solicitudes). v2.10 — Zona-Parque-Dealer: razones sociales largas abreviadas a EIRL en BD y columna Sucursal acotada · v2.9 — Potencial: columnas RUT y Zona; posiciones de dealers presentes en Zona-Parque-Dealer se leen de esa base (fuente unica, bloqueadas aqui) · v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.13 — Datos bancarios editables completos: tipo de cuenta, titular de la cuenta y si es de EMPRESA o PERSONA (poder a un tercero); el TEF sale con RUT Pago + titular. v2.12 — Banco de la ficha con lista del mantenedor Bancos de la Plaza. v2.11 — ?ver=<id> abre la ficha directo (link desde Atención Remota → Solicitudes). v2.10 — Zona-Parque-Dealer: razones sociales largas abreviadas a EIRL en BD y columna Sucursal acotada · v2.9 — Potencial: columnas RUT y Zona; posiciones de dealers presentes en Zona-Parque-Dealer se leen de esa base (fuente unica, bloqueadas aqui) · v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -465,6 +465,19 @@
             <script src="/js/bancos-cl.js"></script>
             <script>document.getElementById('bancosList').innerHTML = (window.AF_BANCOS||[]).map(b=>'<option value="'+b+'">').join('');</script>
           </div>
+          <div class="col-md-4">
+            <label class="form-label">Tipo de cuenta</label>
+            <select class="form-select form-select-sm" id="fTipoCuenta"><option value="">—</option><option>Cuenta Corriente</option><option>Cuenta Vista</option><option>Cuenta RUT</option><option>Cuenta de Ahorro</option></select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Titular de la cuenta</label>
+            <input type="text" class="form-control form-control-sm" id="fNombreCuenta" placeholder="Nombre del dueño de la cuenta">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">La cuenta es de</label>
+            <select class="form-select form-select-sm" id="fCuentaTipo"><option value="">—</option><option value="EMPRESA">EMPRESA (misma razón social)</option><option value="PERSONA">PERSONA (socio / tercero con poder)</option></select>
+          </div>
+          <div class="col-12" style="font-size:.78rem;color:#64748b"><i class="bi bi-info-circle me-1"></i>El archivo TEF y la nómina bancaria salen con el <b>RUT Pago</b> y el <b>Titular de la cuenta</b> cuando el RUT Pago es distinto del RUT del dealer (poder para depositar a un tercero). El banco valida RUT + nombre contra la cuenta: si no coinciden, rechaza la transferencia.</div>
         </div>
 
         <div class="section-label">OBSERVACIONES</div>
@@ -1308,6 +1321,9 @@ function abrirEditarDirecto(d) {
   document.getElementById('fCorreo').value     = d.correo      || '';
   document.getElementById('fCuenta').value     = d.num_cuenta  || '';
   document.getElementById('fBanco').value      = d.banco       || '';
+  document.getElementById('fTipoCuenta').value = d.tipo_cuenta || '';
+  document.getElementById('fNombreCuenta').value = d.nombre_cuenta || '';
+  document.getElementById('fCuentaTipo').value = d.cuenta_tipo || '';
   document.getElementById('fObs').value        = d.observaciones || '';
   new bootstrap.Modal(document.getElementById('modalForm')).show();
 }
@@ -1316,7 +1332,7 @@ function abrirNuevo() {
   dealerActual = null;
   document.getElementById('formTitulo').textContent = 'Nuevo Dealer';
   ['fId','fNumInd','fRut','fRutPago','fFecha','fNombreIndexa','fNombreRazon',
-   'fCcs','fDireccion','fContacto','fTelefono','fCorreo','fCuenta','fBanco','fObs']
+   'fCcs','fDireccion','fContacto','fTelefono','fCorreo','fCuenta','fBanco','fTipoCuenta','fNombreCuenta','fCuentaTipo','fObs']
     .forEach(id => document.getElementById(id).value = '');
   { const _fni = document.getElementById('fNombreIndexa'); _fni.dataset.full = ''; _fni.dataset.parque = ''; }
   document.getElementById('fActivo').value  = '1';
@@ -1344,6 +1360,9 @@ async function guardar() {
     correo:              document.getElementById('fCorreo').value.trim(),
     num_cuenta:          document.getElementById('fCuenta').value.trim(),
     banco:               document.getElementById('fBanco').value.trim(),
+    tipo_cuenta:         document.getElementById('fTipoCuenta').value,
+    nombre_cuenta:       document.getElementById('fNombreCuenta').value.trim(),
+    cuenta_tipo:         document.getElementById('fCuentaTipo').value,
     observaciones:       document.getElementById('fObs').value.trim(),
   };
   const url    = id ? `/api/dealers/${id}` : '/api/dealers';
