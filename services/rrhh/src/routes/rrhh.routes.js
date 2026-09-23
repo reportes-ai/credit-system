@@ -282,6 +282,21 @@ router.put('/docs/:docId/visible', verifyToken, requireFunc('rh_aprobar'), ficha
 router.post('/docs/:idUsuario',    verifyToken, requireFunc('rh_aprobar'), ficha.subirDoc);
 router.delete('/docs/:docId',      verifyToken, requireFunc('rh_aprobar'), ficha.eliminarDoc);
 
+// Entrega de Equipos (laptops, celulares, otros): inventario, entrega/devolución, acta PDF y su texto editable
+const eq = require('../controllers/equipos.controller');
+const eqPerm = requireFunc('rh_equipos', 'rh_colaboradores', 'rh_aprobar');
+router.get('/equipos',                      verifyToken, eqPerm, eq.listar);
+router.post('/equipos',                     verifyToken, eqPerm, eq.crear);
+router.get('/equipos/textos',               verifyToken, eqPerm, eq.getTextos);
+router.put('/equipos/textos',               verifyToken, eqPerm, eq.setTextos);
+router.get('/equipos/acta-preview',         verifyToken, eqPerm, eq.actaPreview);
+router.get('/equipos/mov/:id/acta',         verifyToken, eqPerm, eq.acta);
+router.post('/equipos/mov/:id/acta-firmada', verifyToken, eqPerm, eq.subirActaFirmada);
+router.put('/equipos/:id',                  verifyToken, eqPerm, eq.editar);
+router.get('/equipos/:id/historial',        verifyToken, eqPerm, eq.historial);
+router.post('/equipos/:id/entregar',        verifyToken, eqPerm, eq.entregar);
+router.post('/equipos/:id/devolver',        verifyToken, eqPerm, eq.devolver);
+
 // Config del mantenedor Saludos y Certificados RRHH
 router.get('/config', verifyToken, requireFunc('mant_rrhh_saludos', 'rh_aprobar'), ctrl.getConfigApi);
 router.put('/config', verifyToken, requireFunc('mant_rrhh_saludos', 'rh_aprobar'), ctrl.setConfigApi);

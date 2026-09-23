@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<!-- v1.0 — Entrega de Equipos: laptops, celulares y otros (inventario + entrega/devolución por colaborador + acta PDF) y pestaña Texto del acta editable (rh_config acta_eq_*). Reemplaza ENTREGA EQUIPOS.xlsx y el acta Word a mano (Pato, 23-09-2026) -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrega de Equipos — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#0141A2; --navy-dark:#012d70; --bg:#f0f4f8; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:#1e293b; }
+  .main { max-width:1150px; margin:0 auto; padding:24px 20px 70px; }
+  .banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy) 60%,#009AFE); border-radius:16px; color:#fff; padding:20px 26px; margin-bottom:18px; display:flex; gap:14px; align-items:center; }
+  .banner i { font-size:2rem; opacity:.85; } .banner h2 { margin:0 0 3px; font-size:1.2rem; } .banner p { margin:0; opacity:.85; font-size:.85rem; }
+  .tabs { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .tabs button { border:none; background:#fff; border-radius:10px; padding:9px 18px; font-weight:700; font-size:.86rem; cursor:pointer; color:#475569; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .tabs button.on { background:var(--navy); color:#fff; }
+  .tabs .n { background:#eef2ff; color:var(--navy); border-radius:8px; padding:1px 7px; font-size:.72rem; margin-left:4px; } .tabs button.on .n { background:rgba(255,255,255,.25); color:#fff; }
+  .panel { background:#fff; border-radius:14px; box-shadow:0 1px 5px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:16px; }
+  .top { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .top input[type=search] { border:1.5px solid #e2e8f0; border-radius:9px; padding:7px 12px; font:inherit; font-size:.86rem; min-width:240px; }
+  table { width:100%; border-collapse:collapse; font-size:.84rem; }
+  th { text-align:left; background:#f8fafc; padding:8px 10px; color:#475569; border-bottom:2px solid #e5e7eb; }
+  td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  .btn { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:8px 16px; font-weight:700; font-size:.83rem; cursor:pointer; }
+  .btn-g { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:9px; padding:7px 12px; font-weight:600; font-size:.82rem; cursor:pointer; }
+  .btn-mini { border:none; background:#eef2ff; color:var(--navy); border-radius:7px; padding:3px 10px; cursor:pointer; font-size:.78rem; font-weight:700; margin:1px 0; }
+  .btn-mini.ok { background:#dcfce7; color:#15803d; } .btn-mini.warn { background:#fef3c7; color:#92400e; }
+  .chip { display:inline-block; border-radius:6px; padding:2px 9px; font-size:.72rem; font-weight:800; }
+  .c-ASIGNADO { background:#dbeafe; color:#1d4ed8; } .c-DISPONIBLE { background:#dcfce7; color:#15803d; } .c-BAJA { background:#f1f5f9; color:#64748b; }
+  .fld { margin-bottom:10px; } .fld label { display:block; font-size:.74rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:3px; }
+  .fld input, .fld select, .fld textarea { width:100%; border:1.5px solid #e2e8f0; border-radius:9px; padding:8px 12px; font:inherit; font-size:.88rem; }
+  .fld textarea { min-height:70px; } .fld textarea.largo { min-height:150px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; } @media(max-width:700px){ .grid2 { grid-template-columns:1fr; } }
+  .ayuda { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:10px 14px; font-size:.82rem; color:#475569; margin-bottom:14px; }
+  .ayuda code { background:#eef2ff; padding:1px 5px; border-radius:4px; }
+  dialog { border:none; border-radius:14px; padding:0; width:min(680px,95vw); max-height:92vh; }
+  dialog::backdrop { background:rgba(0,0,0,.55); }
+  .dlg { padding:20px 24px; } .dlg h4 { margin:0 0 14px; }
+  .pie { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+  .muted { color:#94a3b8; font-size:.78rem; }
+  .vacio { padding:24px; text-align:center; color:#94a3b8; }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Entrega de Equipos',icon:'bi-laptop',current:true}]};</script>
+<div class="main">
+  <div class="banner"><i class="bi bi-laptop"></i><div><h2>Entrega de Equipos</h2><p>Laptops, celulares y otros equipos: quién tiene cada uno, desde cuándo, y el acta de recepción o devolución lista para firmar. Parte del onboarding y del offboarding.</p></div></div>
+
+  <div class="tabs">
+    <button class="on" id="tLAPTOP" onclick="verTab('LAPTOP')"><i class="bi bi-laptop me-1"></i>Laptops<span class="n" id="nLAPTOP">0</span></button>
+    <button id="tCELULAR" onclick="verTab('CELULAR')"><i class="bi bi-phone me-1"></i>Celulares<span class="n" id="nCELULAR">0</span></button>
+    <button id="tOTRO" onclick="verTab('OTRO')"><i class="bi bi-mouse2 me-1"></i>Otros<span class="n" id="nOTRO">0</span></button>
+    <button id="tTEXTO" onclick="verTab('TEXTO')"><i class="bi bi-file-earmark-text me-1"></i>Texto del acta</button>
+  </div>
+
+  <div class="panel" id="pLista">
+    <div class="top">
+      <div><b id="tituloLista">Laptops</b> <span class="muted" id="resumenLista"></span></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="search" id="buscar" placeholder="Buscar por serie, modelo, nombre…" oninput="render()">
+        <label class="muted" style="white-space:nowrap"><input type="checkbox" id="verBaja" onchange="render()"> ver bajas</label>
+        <button class="btn" onclick="nuevo()">+ Nuevo equipo</button>
+      </div>
+    </div>
+    <table><thead id="thLista"></thead><tbody id="tbLista"></tbody></table>
+  </div>
+
+  <div class="panel" id="pTexto" style="display:none">
+    <div class="ayuda"><i class="bi bi-info-circle me-1"></i>Este es el texto que sale en el PDF del acta. Marcadores disponibles:
+      <code>{nombre}</code> <code>{rut}</code> <code>{empresa}</code> <code>{rut_empresa}</code> <code>{fecha}</code> <code>{equipo}</code> <code>{marca}</code> <code>{modelo}</code> <code>{serie}</code>
+      y en la devolución además <code>{fecha_entrega}</code>. La razón social, el RUT y quien firma por la empresa salen de <a href="/mantenedores/empresa/">Datos de la Empresa</a>.</div>
+    <h5 style="margin:0 0 10px"><i class="bi bi-box-arrow-in-down me-1"></i>Acta de recepción (entrega)</h5>
+    <div class="fld"><label>Título</label><input id="acta_eq_titulo"></div>
+    <div class="fld"><label>Introducción</label><textarea id="acta_eq_intro"></textarea></div>
+    <div class="fld"><label>Importante (responsabilidad y devolución)</label><textarea id="acta_eq_importante" class="largo"></textarea></div>
+    <div class="fld"><label>Párrafo de teléfonos</label><textarea id="acta_eq_telefonos"></textarea></div>
+    <h5 style="margin:18px 0 10px"><i class="bi bi-box-arrow-up me-1"></i>Acta de devolución</h5>
+    <div class="fld"><label>Título</label><input id="acta_eq_dev_titulo"></div>
+    <div class="fld"><label>Introducción</label><textarea id="acta_eq_dev_intro"></textarea></div>
+    <div class="fld"><label>Condiciones de recepción</label><textarea id="acta_eq_dev_importante"></textarea></div>
+    <div class="fld"><label>Quien firma por la empresa (vacío = representante legal de Datos de la Empresa)</label><input id="acta_eq_firmante" placeholder="Nombre Apellido"></div>
+    <div class="pie">
+      <button class="btn-g" onclick="restaurarTextos()">Volver al texto original</button>
+      <button class="btn-g" onclick="preview('ENTREGA')"><i class="bi bi-eye me-1"></i>Vista previa entrega</button>
+      <button class="btn-g" onclick="preview('DEVOLUCION')"><i class="bi bi-eye me-1"></i>Vista previa devolución</button>
+      <button class="btn" id="btnGuardarTexto" onclick="guardarTextos()">Guardar texto</button>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlgEq"><div class="dlg">
+  <h4 id="dlgEqTit">Nuevo equipo</h4>
+  <input type="hidden" id="eq_id">
+  <div class="grid2">
+    <div class="fld"><label>Tipo</label><select id="eq_tipo" onchange="camposTipo()"><option value="LAPTOP">Laptop</option><option value="CELULAR">Celular</option><option value="OTRO">Otro</option></select></div>
+    <div class="fld" id="fEqDesc"><label>Qué es (mouse, monitor, cargador…)</label><input id="eq_descripcion"></div>
+    <div class="fld"><label>Marca</label><input id="eq_marca" placeholder="Lenovo, HP, Samsung…"></div>
+    <div class="fld"><label>Modelo</label><input id="eq_modelo"></div>
+    <div class="fld"><label>Serie / IMEI</label><input id="eq_serie"></div>
+    <div class="fld" id="fEqLinea"><label>N° de línea</label><input id="eq_linea" placeholder="9 3264 5134"></div>
+  </div>
+  <div class="fld"><label>Comentarios</label><textarea id="eq_comentarios"></textarea></div>
+  <div class="fld" id="fEqEstado" style="display:none"><label>Estado</label><select id="eq_estado"><option value="DISPONIBLE">Disponible</option><option value="BAJA">Dado de baja</option></select></div>
+  <div class="pie"><button class="btn-g" onclick="dlgEq.close()">Cancelar</button><button class="btn" onclick="guardarEq()">Guardar</button></div>
+</div></dialog>
+
+<dialog id="dlgEnt"><div class="dlg">
+  <h4>Entregar equipo</h4>
+  <div id="entEquipo" class="ayuda"></div>
+  <input type="hidden" id="ent_id">
+  <div class="fld"><label>Colaborador</label><select id="ent_usuario"></select></div>
+  <div class="grid2">
+    <div class="fld"><label>Fecha de entrega</label><input type="date" id="ent_fecha"></div>
+    <div class="fld"><label>Usuario del equipo (nombre de cuenta, sin clave)</label><input id="ent_login" placeholder="Autofacil01 / Nombre Apellido"></div>
+  </div>
+  <div class="fld"><label>Comentario</label><textarea id="ent_comentario" placeholder="Ej.: heredado de …, con cargador y mouse"></textarea></div>
+  <div class="pie"><button class="btn-g" onclick="dlgEnt.close()">Cancelar</button><button class="btn" onclick="confirmarEntrega()">Registrar entrega y generar acta</button></div>
+</div></dialog>
+
+<dialog id="dlgDev"><div class="dlg">
+  <h4>Registrar devolución</h4>
+  <div id="devEquipo" class="ayuda"></div>
+  <input type="hidden" id="dev_id">
+  <div class="grid2">
+    <div class="fld"><label>Fecha de devolución</label><input type="date" id="dev_fecha"></div>
+    <div class="fld"><label>Después de recibirlo</label><select id="dev_baja"><option value="">Queda disponible para reasignar</option><option value="1">Dar de baja (no se vuelve a usar)</option></select></div>
+  </div>
+  <div class="fld"><label>Estado en que se recibe / observaciones</label><textarea id="dev_comentario"></textarea></div>
+  <div class="pie"><button class="btn-g" onclick="dlgDev.close()">Cancelar</button><button class="btn" onclick="confirmarDevolucion()">Registrar devolución y generar acta</button></div>
+</div></dialog>
+
+<dialog id="dlgHist"><div class="dlg">
+  <h4>Historial del equipo</h4>
+  <div id="histEquipo" class="ayuda"></div>
+  <table><thead><tr><th>Fecha</th><th>Acción</th><th>Colaborador</th><th>Comentario</th><th>Acta</th></tr></thead><tbody id="tbHist"></tbody></table>
+  <p class="muted" style="margin-top:8px">El acta firmada (escaneada) queda en la Carpeta Digital del colaborador con el tipo ACTA EQUIPOS.</p>
+  <input type="file" id="fileActa" accept="application/pdf,image/*" style="display:none" onchange="subirActa(this)">
+  <div class="pie"><button class="btn-g" onclick="dlgHist.close()">Cerrar</button></div>
+</div></dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token = sessionStorage.getItem('token');
+  const H = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+  const api = async (url, opt = {}) => { const r = await fetch('/api/rrhh' + url, { headers: H, ...opt }); const j = await r.json().catch(() => ({})); if (!j.success) throw new Error(j.error || 'Error'); return j.data; };
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmtD = s => { if (!s) return '—'; const [y, m, d] = String(s).slice(0, 10).split('-'); return `${d}-${m}-${y}`; };
+  const hoy = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const LBL = { LAPTOP: 'Laptops', CELULAR: 'Celulares', OTRO: 'Otros equipos' };
+  let tab = 'LAPTOP', equipos = [], colaboradores = [], textosDef = {}, movActa = null;
+
+  function verTab(t) {
+    tab = t;
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.id === 't' + t));
+    document.getElementById('pLista').style.display = t === 'TEXTO' ? 'none' : '';
+    document.getElementById('pTexto').style.display = t === 'TEXTO' ? '' : 'none';
+    if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(t === 'TEXTO' ? 'Texto del acta' : LBL[t]);
+    if (t === 'TEXTO') cargarTextos(); else render();
+  }
+
+  async function cargar() {
+    try { const d = await api('/equipos'); equipos = d.equipos; colaboradores = d.colaboradores; }
+    catch (e) { alert(e.message); return; }
+    ['LAPTOP', 'CELULAR', 'OTRO'].forEach(t => document.getElementById('n' + t).textContent = equipos.filter(e => e.tipo === t && e.estado !== 'BAJA').length);
+    render();
+  }
+
+  function render() {
+    if (tab === 'TEXTO') return;
+    const q = document.getElementById('buscar').value.trim().toLowerCase(), verBaja = document.getElementById('verBaja').checked;
+    const cel = tab === 'CELULAR', otro = tab === 'OTRO';
+    document.getElementById('tituloLista').textContent = LBL[tab];
+    document.getElementById('thLista').innerHTML = `<tr>${otro ? '<th>Equipo</th>' : ''}<th>Marca</th><th>Modelo</th><th>Serie${cel ? ' / IMEI' : ''}</th>${cel ? '<th>Línea</th>' : ''}<th>Estado</th><th>Asignado a</th><th>Entregado</th><th></th></tr>`;
+    const lista = equipos.filter(e => e.tipo === tab && (verBaja || e.estado !== 'BAJA'))
+      .filter(e => !q || [e.marca, e.modelo, e.serie, e.numero_linea, e.descripcion, e.asignado_nombre, e.comentarios].join(' ').toLowerCase().includes(q));
+    const asig = lista.filter(e => e.estado === 'ASIGNADO').length;
+    document.getElementById('resumenLista').textContent = `${lista.length} equipos · ${asig} asignados · ${lista.filter(e => e.estado === 'DISPONIBLE').length} disponibles`;
+    document.getElementById('tbLista').innerHTML = lista.length ? lista.map(e => `<tr>
+      ${otro ? `<td><b>${esc(e.descripcion)}</b></td>` : ''}
+      <td>${esc(e.marca) || '—'}</td><td>${esc(e.modelo) || '—'}</td><td><code>${esc(e.serie) || '—'}</code></td>
+      ${cel ? `<td>${esc(e.numero_linea) || '—'}</td>` : ''}
+      <td><span class="chip c-${e.estado}">${e.estado}</span></td>
+      <td>${e.estado === 'ASIGNADO' ? `<b>${esc(e.asignado_nombre)}</b>${e.usuario_login ? `<div class="muted">cuenta: ${esc(e.usuario_login)}</div>` : ''}` : '<span class="muted">—</span>'}${e.comentarios ? `<div class="muted">${esc(e.comentarios)}</div>` : ''}</td>
+      <td>${e.estado === 'ASIGNADO' ? fmtD(e.fecha_entrega) : '—'}</td>
+      <td style="white-space:nowrap">
+        ${e.estado === 'DISPONIBLE' ? `<button class="btn-mini ok" onclick="entregar(${e.id})"><i class="bi bi-box-arrow-in-down"></i> Entregar</button>` : ''}
+        ${e.estado === 'ASIGNADO' ? `<button class="btn-mini" onclick="abrirActa(${e.id_mov_actual})"><i class="bi bi-file-earmark-pdf"></i> Acta</button> <button class="btn-mini warn" onclick="devolver(${e.id})"><i class="bi bi-box-arrow-up"></i> Devolver</button>` : ''}
+        <button class="btn-mini" onclick="historial(${e.id})"><i class="bi bi-clock-history"></i></button>
+        <button class="btn-mini" onclick="editar(${e.id})"><i class="bi bi-pencil"></i></button>
+      </td></tr>`).join('') : `<tr><td colspan="9" class="vacio">Sin equipos en esta pestaña. Agrega el primero con "+ Nuevo equipo".</td></tr>`;
+  }
+
+  // El PDF va por fetch con el token (no hay cookie de sesión) y se abre en una pestaña
+  async function abrirActa(idMov) {
+    try {
+      const r = await fetch(`/api/rrhh/equipos/mov/${idMov}/acta`, { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) throw new Error('No se pudo generar el acta');
+      window.open(URL.createObjectURL(await r.blob()), '_blank');
+    } catch (e) { alert(e.message); }
+    return false;
+  }
+
+  /* ── Nuevo / editar ── */
+  function camposTipo() {
+    const t = document.getElementById('eq_tipo').value;
+    document.getElementById('fEqDesc').style.display = t === 'OTRO' ? '' : 'none';
+    document.getElementById('fEqLinea').style.display = t === 'CELULAR' ? '' : 'none';
+  }
+  function nuevo() {
+    document.getElementById('dlgEqTit').textContent = 'Nuevo equipo';
+    ['eq_id', 'eq_descripcion', 'eq_marca', 'eq_modelo', 'eq_serie', 'eq_linea', 'eq_comentarios'].forEach(i => document.getElementById(i).value = '');
+    document.getElementById('eq_tipo').value = tab === 'TEXTO' ? 'LAPTOP' : tab;
+    document.getElementById('fEqEstado').style.display = 'none';
+    camposTipo(); dlgEq.showModal();
+  }
+  function editar(id) {
+    const e = equipos.find(x => x.id === id); if (!e) return;
+    document.getElementById('dlgEqTit').textContent = 'Editar equipo #' + id;
+    document.getElementById('eq_id').value = id; document.getElementById('eq_tipo').value = e.tipo;
+    document.getElementById('eq_descripcion').value = e.descripcion || ''; document.getElementById('eq_marca').value = e.marca || '';
+    document.getElementById('eq_modelo').value = e.modelo || ''; document.getElementById('eq_serie').value = e.serie || '';
+    document.getElementById('eq_linea').value = e.numero_linea || ''; document.getElementById('eq_comentarios').value = e.comentarios || '';
+    document.getElementById('fEqEstado').style.display = e.estado === 'ASIGNADO' ? 'none' : '';
+    document.getElementById('eq_estado').value = e.estado === 'BAJA' ? 'BAJA' : 'DISPONIBLE';
+    camposTipo(); dlgEq.showModal();
+  }
+  async function guardarEq() {
+    const id = document.getElementById('eq_id').value;
+    const body = { tipo: document.getElementById('eq_tipo').value, descripcion: document.getElementById('eq_descripcion').value, marca: document.getElementById('eq_marca').value,
+      modelo: document.getElementById('eq_modelo').value, serie: document.getElementById('eq_serie').value, numero_linea: document.getElementById('eq_linea').value, comentarios: document.getElementById('eq_comentarios').value };
+    if (id && document.getElementById('fEqEstado').style.display !== 'none') body.estado = document.getElementById('eq_estado').value;
+    try { await api(id ? `/equipos/${id}` : '/equipos', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) }); dlgEq.close(); await cargar(); }
+    catch (e) { alert(e.message); }
+  }
+
+  /* ── Entrega ── */
+  const descEq = e => `<b>${e.tipo === 'OTRO' ? esc(e.descripcion) : (e.tipo === 'CELULAR' ? 'Celular' : 'Laptop')}</b> ${esc(e.marca)} ${esc(e.modelo)} · serie <code>${esc(e.serie) || '—'}</code>${e.numero_linea ? ' · línea ' + esc(e.numero_linea) : ''}`;
+  function entregar(id) {
+    const e = equipos.find(x => x.id === id); if (!e) return;
+    document.getElementById('ent_id').value = id; document.getElementById('entEquipo').innerHTML = descEq(e);
+    document.getElementById('ent_usuario').innerHTML = '<option value="">— elegir —</option>' + colaboradores.map(c => `<option value="${c.id_usuario}">${esc(c.nombre)}${c.cargo ? ' · ' + esc(c.cargo) : ''}</option>`).join('');
+    document.getElementById('ent_fecha').value = hoy(); document.getElementById('ent_login').value = ''; document.getElementById('ent_comentario').value = '';
+    dlgEnt.showModal();
+  }
+  async function confirmarEntrega() {
+    const id = document.getElementById('ent_id').value, id_usuario = document.getElementById('ent_usuario').value;
+    if (!id_usuario) return alert('Elige el colaborador');
+    try {
+      const d = await api(`/equipos/${id}/entregar`, { method: 'POST', body: JSON.stringify({ id_usuario, fecha: document.getElementById('ent_fecha').value, usuario_login: document.getElementById('ent_login').value, comentario: document.getElementById('ent_comentario').value }) });
+      dlgEnt.close(); await cargar(); abrirActa(d.id_mov);
+    } catch (e) { alert(e.message); }
+  }
+
+  /* ── Devolución ── */
+  function devolver(id) {
+    const e = equipos.find(x => x.id === id); if (!e) return;
+    document.getElementById('dev_id').value = id; document.getElementById('devEquipo').innerHTML = descEq(e) + `<br>Asignado a <b>${esc(e.asignado_nombre)}</b> desde el ${fmtD(e.fecha_entrega)}`;
+    document.getElementById('dev_fecha').value = hoy(); document.getElementById('dev_baja').value = ''; document.getElementById('dev_comentario').value = '';
+    dlgDev.showModal();
+  }
+  async function confirmarDevolucion() {
+    const id = document.getElementById('dev_id').value;
+    try {
+      const d = await api(`/equipos/${id}/devolver`, { method: 'POST', body: JSON.stringify({ fecha: document.getElementById('dev_fecha').value, baja: document.getElementById('dev_baja').value === '1', comentario: document.getElementById('dev_comentario').value }) });
+      dlgDev.close(); await cargar(); abrirActa(d.id_mov);
+    } catch (e) { alert(e.message); }
+  }
+
+  /* ── Historial + acta firmada ── */
+  async function historial(id) {
+    const e = equipos.find(x => x.id === id); if (!e) return;
+    document.getElementById('histEquipo').innerHTML = descEq(e);
+    try {
+      const movs = await api(`/equipos/${id}/historial`);
+      document.getElementById('tbHist').innerHTML = movs.length ? movs.map(m => `<tr><td>${fmtD(m.fecha)}</td><td><span class="chip ${m.accion === 'ENTREGA' ? 'c-ASIGNADO' : 'c-DISPONIBLE'}">${m.accion}</span></td>
+        <td>${esc(m.nombre) || '—'}${m.usuario_login ? `<div class="muted">cuenta: ${esc(m.usuario_login)}</div>` : ''}</td><td>${esc(m.comentario) || ''}<div class="muted">reg. ${esc(m.registrado_por)}</div></td>
+        <td style="white-space:nowrap"><button class="btn-mini" onclick="abrirActa(${m.id})"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+          ${m.id_documento ? `<a class="btn-mini ok" href="/api/rrhh/docs/archivo/${m.id_documento}" onclick="return verDoc(${m.id_documento})"><i class="bi bi-check2"></i> Firmada</a>` : (m.id_usuario ? `<button class="btn-mini warn" onclick="pedirActa(${m.id})"><i class="bi bi-upload"></i> Subir firmada</button>` : '')}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="vacio">Sin movimientos</td></tr>';
+    } catch (e) { alert(e.message); return; }
+    dlgHist.showModal();
+  }
+  async function verDoc(idDoc) {
+    try { const r = await fetch(`/api/rrhh/docs/archivo/${idDoc}`, { headers: { Authorization: 'Bearer ' + token } }); if (!r.ok) throw new Error('No se pudo abrir'); window.open(URL.createObjectURL(await r.blob()), '_blank'); }
+    catch (e) { alert(e.message); }
+    return false;
+  }
+  function pedirActa(idMov) { movActa = idMov; document.getElementById('fileActa').value = ''; document.getElementById('fileActa').click(); }
+  function subirActa(inp) {
+    const f = inp.files[0]; if (!f || !movActa) return;
+    if (f.size > 8 * 1024 * 1024) return alert('Máximo 8 MB');
+    const rd = new FileReader();
+    rd.onload = async () => {
+      try {
+        await api(`/equipos/mov/${movActa}/acta-firmada`, { method: 'POST', body: JSON.stringify({ archivo_nombre: f.name, mime_type: f.type, archivo_data: rd.result }) });
+        const idEq = equipos.find(e => e.id_mov_actual === movActa)?.id;
+        dlgHist.close(); if (idEq) historial(idEq); else alert('Acta firmada guardada en la Carpeta Digital');
+      } catch (e) { alert(e.message); }
+    };
+    rd.readAsDataURL(f);
+  }
+
+  /* ── Texto del acta ── */
+  const CLAVES = ['acta_eq_titulo', 'acta_eq_intro', 'acta_eq_importante', 'acta_eq_telefonos', 'acta_eq_dev_titulo', 'acta_eq_dev_intro', 'acta_eq_dev_importante', 'acta_eq_firmante'];
+  async function cargarTextos() {
+    try { const d = await api('/equipos/textos'); textosDef = d.defaults; CLAVES.forEach(k => document.getElementById(k).value = d.textos[k] || ''); }
+    catch (e) { alert(e.message); }
+  }
+  function restaurarTextos() { if (confirm('¿Volver al texto original del acta?')) CLAVES.forEach(k => document.getElementById(k).value = textosDef[k] || ''); }
+  async function guardarTextos() {
+    const b = {}; CLAVES.forEach(k => b[k] = document.getElementById(k).value);
+    const btn = document.getElementById('btnGuardarTexto');
+    try { await api('/equipos/textos', { method: 'PUT', body: JSON.stringify(b) }); btn.textContent = '✓ Guardado'; setTimeout(() => btn.textContent = 'Guardar texto', 2000); }
+    catch (e) { alert(e.message); }
+  }
+  async function preview(tipo) {
+    const p = new URLSearchParams({ tipo }); CLAVES.forEach(k => p.set(k, document.getElementById(k).value));
+    try { const r = await fetch('/api/rrhh/equipos/acta-preview?' + p, { headers: { Authorization: 'Bearer ' + token } }); if (!r.ok) throw new Error('No se pudo generar la vista previa'); window.open(URL.createObjectURL(await r.blob()), '_blank'); }
+    catch (e) { alert(e.message); }
+  }
+
+  cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

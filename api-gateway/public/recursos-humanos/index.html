@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v3.9 — se quita la card Ingreso de Colaboradores (basta el botón en Colaboradores). v3.8 — card Ingreso de Colaboradores (rh_ingresos, todos los perfiles: el supervisor aprueba desde aquí). v3.7 — card Mi Firma por permiso rh_mi_firma. v3.6 — card Mi Firma de Correo (para todos). v3.5 — Documentos Firmados renombrado a Carpetas Digitales. v3.4 — card Revision de Postulantes para el jefe directo (rh_postulaciones_jefe) -->
+  <!-- v4.0 — card Entrega de Equipos (rh_equipos: laptops, celulares, otros + acta PDF). v3.9 — se quita la card Ingreso de Colaboradores (basta el botón en Colaboradores). v3.8 — card Ingreso de Colaboradores (rh_ingresos, todos los perfiles: el supervisor aprueba desde aquí). v3.7 — card Mi Firma por permiso rh_mi_firma. v3.6 — card Mi Firma de Correo (para todos). v3.5 — Documentos Firmados renombrado a Carpetas Digitales. v3.4 — card Revision de Postulantes para el jefe directo (rh_postulaciones_jefe) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -54,6 +54,12 @@
       <div class="card-icon"><i class="bi bi-people"></i></div>
       <h5>Colaboradores <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
       <p>Gestión de fichas del equipo: datos laborales, AFP y salud, sueldo base, cuenta de pago y carpeta digital.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
+    <a href="/recursos-humanos/equipos/" class="module-card" id="cardEq" style="display:none">
+      <div class="card-icon"><i class="bi bi-laptop"></i></div>
+      <h5>Entrega de Equipos <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
+      <p>Laptops, celulares y otros equipos: quién tiene cada uno, entrega y devolución con acta PDF lista para firmar, y el texto del acta editable.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
     <a href="/recursos-humanos/remuneraciones/" class="module-card" id="cardRem" style="display:none">
@@ -185,6 +191,7 @@
     if (tiene('rh_mi_firma')) document.getElementById('cardFirma').style.display='';
     if (tiene('rh_directorio','rh_ver','rh_aprobar')) document.getElementById('cardDir').style.display='';
     if (tiene('rh_colaboradores','rh_aprobar')) document.getElementById('cardCol').style.display='';
+    if (tiene('rh_equipos','rh_colaboradores')) document.getElementById('cardEq').style.display='';
     if (tiene('rh_remuneraciones')) document.getElementById('cardRem').style.display='';
     if (tiene('rh_aumento_renta','rh_remuneraciones')) document.getElementById('cardAum').style.display='';
     if (tiene('rh_ausencias','rh_aprobar')) document.getElementById('cardAus').style.display='';
