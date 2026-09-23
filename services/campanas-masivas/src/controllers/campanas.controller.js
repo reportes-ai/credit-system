@@ -302,7 +302,8 @@ exports.crear = async (req, res) => {
     if (!['VENTA', 'COBRANZA'].includes(objetivo)) return fail(res, 'Objetivo inválido', 400);
     if (!descripcion || !String(descripcion).trim()) return fail(res, 'Falta la descripción', 400);
     const [[mx]] = await pool.query("SELECT COALESCE(MAX(CAST(SUBSTRING(correlativo,4) AS UNSIGNED)),0) n FROM campanas_masivas");
-    const correlativo = 'CM-' + String(mx.n + 1).padStart(4, '0');
+    // Number(): el CAST llega como string desde mysql2 y "41111"+1 concatenaba ("411111") — de ahí CM-0041, CM-0411, CM-4111…
+    const correlativo = 'CM-' + String(Number(mx.n) + 1).padStart(4, '0');
     const [r] = await pool.query(`
       INSERT INTO campanas_masivas (correlativo, canal, objetivo, descripcion, created_by, created_nombre)
       VALUES (?,?,?,?,?,?)`,
