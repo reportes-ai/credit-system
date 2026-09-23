@@ -948,6 +948,7 @@ const otorgar = async (req, res) => {
       // aplicando el % pactado al saldo vigente), y la cartola lee creditos.comdea_real:
       // dashboard y cartola muestran lo mismo.
       const partB = Number(ca.part_bruto) || 0;
+      const ejecCarta = String(ca.ejecutivo || '').trim().toUpperCase();
       if (cond.length) {
         await pool.query(
           `UPDATE creditos SET ${SET_ETAPA_SQL},
@@ -963,7 +964,13 @@ const otorgar = async (req, res) => {
                      curse definitiva (motor único shared/mes-atribucion). Con el CASE
                      anterior una fecha prellenada válida dejaba el mes viejo (07-09-2026). */
                   ${SET_MES_SQL(await mesCorte())},
-                  comdea_real = CASE WHEN ? > 0 AND (COALESCE(comdea_real,0) <= 0 OR ? < comdea_real) THEN ? ELSE comdea_real END, updated_at=NOW()
+                  comdea_real = CASE WHEN ? > 0 AND (COALESCE(comdea_real,0) <= 0 OR ? < comdea_real) THEN ? ELSE comdea_real END,
+                  /* EJECUTIVO: manda la CARTA (Pato, 23-09-2026). La carga Trinidad trae el
+                     ejecutivo que tenga DealerNet, y un ejecutivo nuevo (Manuel Basoalto,
+                     op 26091111) llegó como Karen Méndez: el crédito quedó invisible en su
+                     ranking. Igual que el vendedor: de quién es el negocio lo dice la carta.
+                     Se escribe en MAYÚSCULAS, que es como vive en creditos. */
+                  ejecutivo = CASE WHEN ? <> '' THEN ? ELSE ejecutivo END, updated_at=NOW()
             WHERE (${cond.join(' OR ')})
               /* UPPER en las dos ramas: estas columnas tienen collation BINARIA
                  (utf8mb4_bin), o sea distinguen mayúsculas. La carga Trinidad
@@ -974,7 +981,7 @@ const otorgar = async (req, res) => {
                    /* Créditos de carga masiva: estado NULL, el estado vive en estado_credito.
                       Sin esta rama, otorgar la carta no movía la operación a OTORGADO. */
                    OR (estado IS NULL AND UPPER(COALESCE(estado_credito,'')) IN ('APROBADO','DIGITADO','PENDIENTE')))`,
-          [...valoresEtapa('OTORGADO'), partB, partB, partB, ...args]
+          [...valoresEtapa('OTORGADO'), partB, partB, partB, ejecCarta, ejecCarta, ...args]
         ).then(async ([r]) => {
           /* El fallo era MUDO: si el UPDATE no tocaba ninguna fila, la carta
              quedaba otorgada y el crédito atrás, sin que nadie se enterara hasta
