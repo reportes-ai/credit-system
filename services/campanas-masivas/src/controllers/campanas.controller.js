@@ -409,7 +409,24 @@ exports.generarDesdeBD = async (req, res) => {
     const exRegSQL = exReg.length ? `AND (cl.id_region IS NULL OR cl.id_region NOT IN (${exReg.map(() => '?').join(',')}))` : '';
 
     let rows = [];
-    if (p.audiencia === 'DEALERS') {
+    if (p.audiencia === 'LEIDOS_CAMPANA') {
+      /* Audiencia REFUERZO (Pato, 23-09-2026): los destinatarios que LEYERON otra campaña ya
+         enviada (píxel de lectura). Se copian tal cual (nombre, correo, teléfono, variables),
+         así el refuerzo llega a los mismos que mostraron interés. Solo grupo CAMPAÑA del origen. */
+      const idOrigen = Number(p.id_campana_origen) || 0;
+      const [[orig]] = await pool.query('SELECT id, correlativo, canal FROM campanas_masivas WHERE id=?', [idOrigen]);
+      if (!orig) return fail(res, 'Campaña de origen no existe', 400);
+      if (orig.id === c.id) return fail(res, 'La campaña de origen no puede ser esta misma', 400);
+      const [r] = await pool.query(`
+        SELECT rut, nombre, ap_paterno, ap_materno, genero, saludo, email, telefono,
+               monto_credito, cuotas, tasa, valor_cuota, esp1, esp2, renta, renta_estimada
+          FROM campanas_destinatarios
+         WHERE id_campana=? AND grupo='CAMPANA' AND estado='LEIDO'
+         ORDER BY id`, [orig.id]);
+      const vistos = new Set();
+      rows = r.filter(x => { const k = String(x.email || '').toLowerCase().trim() || limpiaRut(x.rut) || String(x.telefono || ''); if (!k || vistos.has(k)) return false; vistos.add(k); return true; })
+        .map(x => ({ ...x, renta_estimada: x.renta_estimada ? 1 : 0 }));
+    } else if (p.audiencia === 'DEALERS') {
       /* Audiencia DEALERS (Pato, 11-09-2026): la red de dealers activos, con filtro por categoría
          (SOCIO / PARTNER / SUPER_PARTNER). Correo = el de la ficha (correo, si no cf_email / rl_email).
          El RUT es el del dealer (sirve para deciles de control y para no repetir). */

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.10 — correo de prueba a cualquier dirección. v1.9 — correo de prueba, correos por minuto y cupo diario (continúa otro día), universo y estimación de días. v1.8 — imagen del correo (flyer) con link y botón; audiencia Dealers activos por categoría. v1.7 -->
+<!-- v1.11 — audiencia "Leyeron otra campaña" (refuerzo a los que abrieron el correo de una campaña enviada). v1.10 — correo de prueba a cualquier dirección. v1.9 — correo de prueba, correos por minuto y cupo diario (continúa otro día), universo y estimación de días. v1.8 — imagen del correo (flyer) con link y botón; audiencia Dealers activos por categoría. v1.7 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -104,6 +104,13 @@
         <div class="pills" style="margin-bottom:10px">
           <span class="pill on" id="audCLIENTES" onclick="setAud('CLIENTES')">👤 Clientes (según el objetivo)</span>
           <span class="pill" id="audDEALERS" onclick="setAud('DEALERS')">🏢 Dealers activos (red comercial)</span>
+          <span class="pill" id="audLEIDOS" onclick="setAud('LEIDOS_CAMPANA')">📬 Leyeron otra campaña (refuerzo)</span>
+        </div>
+        <div class="row" id="paramLeidos" style="display:none">
+          <div style="grid-column:span 3"><label class="f">Campaña de origen (ya enviada)</label>
+            <select class="f" id="pCampOrigen"></select>
+            <div class="nota">Se cargan solo los destinatarios que <b>abrieron</b> el correo de esa campaña (píxel de lectura), con los mismos datos y variables. Ideal para un mail de refuerzo a quienes mostraron interés.</div>
+          </div>
         </div>
         <div class="row" id="paramDealers" style="display:none">
           <div style="grid-column:span 3"><label class="f">Categorías (vacío = todas)</label>
@@ -356,7 +363,7 @@ async function cargarCampana(){
   pintarUniverso();
   document.getElementById('mBoton').value = CAMP.boton_texto || '';
   pintarImagen(CAMP.imagen_url);
-  try { const pr = safe(CAMP.parametros) || {}; setAud(pr.audiencia === 'DEALERS' ? 'DEALERS' : 'CLIENTES', true); if (Array.isArray(pr.categorias) && pr.categorias.length) document.querySelectorAll('.pill.catd').forEach(x => x.classList.toggle('on', pr.categorias.includes(x.dataset.c))); } catch(_) {}
+  try { const pr = safe(CAMP.parametros) || {}; setAud(['DEALERS','LEIDOS_CAMPANA'].includes(pr.audiencia) ? pr.audiencia : 'CLIENTES', true); if (Array.isArray(pr.categorias) && pr.categorias.length) document.querySelectorAll('.pill.catd').forEach(x => x.classList.toggle('on', pr.categorias.includes(x.dataset.c))); cargarCampOrigen(pr.id_campana_origen); } catch(_) {}
   if (CAMP.remitente) document.getElementById('mRemitente').value = CAMP.remitente;
   setTpl(CAMP.plantilla || 'banner', true);
   setOrigen(CAMP.origen_data || 'MANUAL', true);
@@ -438,11 +445,23 @@ function setAud(a, soloUI){
   AUD = a;
   document.getElementById('audCLIENTES').classList.toggle('on', a==='CLIENTES');
   document.getElementById('audDEALERS').classList.toggle('on', a==='DEALERS');
+  document.getElementById('audLEIDOS').classList.toggle('on', a==='LEIDOS_CAMPANA');
   document.getElementById('paramDealers').style.display = a==='DEALERS' ? '' : 'none';
+  document.getElementById('paramLeidos').style.display = a==='LEIDOS_CAMPANA' ? '' : 'none';
   const ob = CAMP ? CAMP.objetivo : 'VENTA';
   document.getElementById('paramCob').style.display = (a==='CLIENTES' && ob==='COBRANZA') ? '' : 'none';
   document.getElementById('paramVta').style.display = (a==='CLIENTES' && ob==='VENTA') ? '' : 'none';
   if (!soloUI) marcarSucio();
+}
+/* Campañas ya enviadas del mismo canal, con cuántos leyeron: para la audiencia de refuerzo. */
+async function cargarCampOrigen(sel){
+  const s = document.getElementById('pCampOrigen'); if (!s || s.options.length) { if (s && sel) s.value = String(sel); return; }
+  try {
+    const j = await (await fetch('/api/campanas-masivas?canal=' + encodeURIComponent(CANAL), { headers: hdrs() })).json();
+    const lista = (j.success ? j.data : []).filter(c => c.id !== ID && c.estado !== 'BORRADOR' && !c.es_test && Number(c.enviados) > 0);
+    s.innerHTML = '<option value="">— Elige la campaña —</option>' + lista.map(c => `<option value="${c.id}">${c.correlativo} — ${(c.descripcion||'').replace(/</g,'&lt;')} (${c.enviados} enviados)</option>`).join('');
+    if (sel) s.value = String(sel);
+  } catch(_) {}
 }
 function pintarImagen(url){
   const im = document.getElementById('imgPrev'), bq = document.getElementById('btnQuitarImg');
@@ -563,7 +582,10 @@ function subirCSV(inp){
 async function generarBD(){
   if (sucio) await guardar();
   const o = CAMP.objetivo;
-  const p = AUD==='DEALERS'
+  if (AUD==='LEIDOS_CAMPANA' && !document.getElementById('pCampOrigen').value) { document.getElementById('msgBD').textContent = 'Elige la campaña de origen.'; return; }
+  const p = AUD==='LEIDOS_CAMPANA'
+    ? { audiencia:'LEIDOS_CAMPANA', id_campana_origen: +document.getElementById('pCampOrigen').value }
+    : AUD==='DEALERS'
     ? { audiencia:'DEALERS', categorias:[...document.querySelectorAll('.pill.catd.on')].map(x => x.dataset.c) }
     : o==='COBRANZA'
     ? { mora_min:+pMoraMin.value||1, mora_max:+pMoraMax.value||90, capital_min:numCLP(pCapMin.value) }
