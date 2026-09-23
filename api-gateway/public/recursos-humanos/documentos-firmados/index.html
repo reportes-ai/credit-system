@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Carpetas Digitales — RRHH</title>
-  <!-- v2.2 — tipo y documento en texto plano (sin pill ni negrita). v2.1 — full width. v2.0 — renombrado Carpetas Digitales: toda la carpeta, filtro por colaborador, crear tipo -->
+  <!-- v2.3 — botón Eliminar (papelera) por documento escaneado, con confirmación; solo RRHH, auditado. v2.2 — tipo y documento en texto plano (sin pill ni negrita). v2.1 — full width. v2.0 — renombrado Carpetas Digitales: toda la carpeta, filtro por colaborador, crear tipo -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -106,7 +106,7 @@ function pintar(){
     <td><span class="pill ${esc(d.estado)}">${esc(d.estado)}</span></td>
     <td>${(d.firmas||[]).map(f=>`<div class="firma-line">✍ <b>${esc(f.rol)}</b>${f.decision?' ('+esc(f.decision)+')':''}: ${esc(f.nombre)} · ${f.ff||f.fecha||''}</div>`).join('')||'<small style="color:#94a3b8">—</small>'}</td>
     <td style="text-align:center">${d.doc_id?`<input type="checkbox" ${Number(d.visible_colaborador??1)?'checked':''} title="Mostrar en Mi Ficha del colaborador" onchange="visibleDoc(${d.doc_id}, this)">`:'<small style="color:#94a3b8" title="Documento FES nativo: se rige por su propio flujo">—</small>'}</td>
-    <td>${d.doc_id?`<a class="btn-mini" href="#" onclick="return descargar(${d.doc_id})"><i class="bi bi-download"></i> Ver</a>`:''}</td></tr>`).join('')
+    <td style="white-space:nowrap">${d.doc_id?`<a class="btn-mini" href="#" onclick="return descargar(${d.doc_id})"><i class="bi bi-download"></i> Ver</a> <a class="btn-mini" href="#" style="color:#b91c1c" title="Eliminar de la carpeta" onclick="return eliminarDoc(${d.doc_id})"><i class="bi bi-trash"></i></a>`:''}</td></tr>`).join('')
     ||'<tr><td colspan="8" class="empty">Sin documentos que calcen con la búsqueda.</td></tr>';
 }
 /* Nuevo TIPO de documento (catálogo paramétrico rh_config.doc_tipos). */
@@ -126,6 +126,14 @@ window.visibleDoc=async(id,chk)=>{
     body:JSON.stringify({visible:chk.checked?1:0})})).json().catch(()=>null);
   if(!j||!j.success){ chk.checked=!chk.checked; return alert((j&&j.error)||'No se pudo cambiar la visibilidad'); }
   const d=DOCS.find(x=>x.doc_id===id); if(d) d.visible_colaborador=chk.checked?1:0;
+};
+/* Eliminar un escaneado de la carpeta (solo RRHH; queda en Auditoría). Los documentos FES nativos no se eliminan desde aquí. */
+window.eliminarDoc=async id=>{
+  const d=DOCS.find(x=>x.doc_id===id);
+  if(!confirm(`¿Eliminar "${d?d.glosa:'#'+id}" de la carpeta de ${d?d.empleado:'este colaborador'}? No se puede deshacer.`)) return false;
+  const j=await (await fetch('/api/rrhh/docs/'+id,{method:'DELETE',headers:H})).json().catch(()=>null);
+  if(!j||!j.success) { alert((j&&j.error)||'No se pudo eliminar'); return false; }
+  DOCS=DOCS.filter(x=>x.doc_id!==id); pintarTabs(); pintar(); return false;
 };
 window.descargar=async id=>{
   const r=await fetch('/api/rrhh/docs/archivo/'+id,{headers:H});

@@ -552,6 +552,7 @@ const eliminarDoc = async (req, res) => {
     const [[d]] = await pool.query('SELECT id, id_usuario, tipo, nombre_archivo, doc_ruta FROM rh_documentos WHERE id=?', [req.params.docId]);
     if (!d) return fail(res, 'Documento no encontrado', 404);
     await pool.query('DELETE FROM rh_documentos WHERE id=?', [d.id]);
+    await pool.query("DELETE FROM rh_firmas WHERE entidad='ARCHIVO' AND entidad_id=?", [d.id]).catch(() => {});   // la firma FES del escaneado se va con él
     if (d.doc_ruta) await almacen.borrar(d.doc_ruta);
     auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'documento', entidad_id: d.id,
       detalle: `Eliminó ${d.tipo} "${d.nombre_archivo}" del colaborador #${d.id_usuario}` });
