@@ -72,10 +72,18 @@ require('../../../../shared/migrate').migrar('rrhh-ingresos-sin-card', async () 
   await pool.query('DELETE FROM funcionalidades WHERE id_funcionalidad=?', [f.id_funcionalidad]);
 });
 
-const esAdmin = async id => {
-  const [[u]] = await pool.query(`SELECT p.nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE u.id_usuario=?`, [id]);
-  return u?.nombre === 'Administrador';
-};
+/* Aprobación final (segunda firma): Administrador o quien tenga el permiso `rh_ingresos_aprobar`
+   (matriz de Perfiles; sembrado para Gerente de Operaciones y Crédito — Pato, 23-09-2026). */
+require('../../../../shared/migrate').enFila('rrhh-ingresos-aprobador-final', async () => {
+  const [[modRRHH]] = await pool.query(`SELECT id_modulo FROM modulos WHERE ruta='/recursos-humanos/' LIMIT 1`);
+  const [[f]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_ingresos_aprobar' LIMIT 1`);
+  if (!modRRHH || f) return;
+  const [r] = await pool.query(`INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Ingreso de Colaboradores: aprobación final', 'rh_ingresos_aprobar', NULL, NULL)`, [modRRHH.id_modulo]);
+  await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+    SELECT id_perfil, ?, 1 FROM perfiles WHERE nombre IN ('Administrador','Gerente de Operaciones y Crédito')`, [r.insertId]);
+  console.log('[rrhh-ingresos] permiso rh_ingresos_aprobar sembrado');
+});
+const esAdmin = id => tieneFunc(id, 'rh_ingresos_aprobar').catch(() => false);   // "aprobador final" (Admin bypass incluido)
 const esRRHH = id => tieneFunc(id, 'rh_colaboradores', 'rh_aprobar').catch(() => false);
 
 async function avisar(to, subject, cuerpo) {
@@ -94,13 +102,15 @@ async function campana(ids, titulo, mensaje, clave) {
     await notificar(ids, { tipo: 'RRHH', prioridad: 'alta', sonar: true, titulo, mensaje, href: '/recursos-humanos/ingresos/', clave });
   } catch (e) { console.error('[rrhh ingresos campana]', e.message); }
 }
-const idsAdmin = async () => (await pool.query(
-  `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE p.nombre='Administrador' AND u.estado='activo'`))[0].map(r => r.id_usuario);
+// Aprobadores finales activos: perfil Administrador + perfiles con rh_ingresos_aprobar habilitado
+const SQL_APROBADORES = `SELECT DISTINCT u.id_usuario, u.email FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+    LEFT JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+    LEFT JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad AND f.codigo='rh_ingresos_aprobar'
+   WHERE u.estado='activo' AND (p.nombre='Administrador' OR f.id_funcionalidad IS NOT NULL)`;
+const idsAdmin = async () => (await pool.query(SQL_APROBADORES))[0].map(r => r.id_usuario);
 const ficha = s => `<p style="margin:0 0 12px"><b>${s.nombre} ${s.apellido}${s.apellido_materno ? ' ' + s.apellido_materno : ''}</b> · RUT ${s.rut}<br>
   Cargo: <b>${s.cargo || ''}</b> · Ingreso: ${String(s.fecha_ingreso || '').slice(0, 10)}<br>Correo corporativo: ${s.email || 'lo crea el Administrador al aprobar'}</p>`;
-const correosAdmin = async () => (await pool.query(
-  `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
-    WHERE p.nombre='Administrador' AND u.estado='activo' AND u.email LIKE '%@%'`))[0].map(r => r.email);
+const correosAdmin = async () => (await pool.query(SQL_APROBADORES))[0].map(r => r.email).filter(e => /@/.test(e || ''));
 
 /* GET /api/rrhh/ingresos/opciones — cargos (perfiles) y supervisores posibles */
 exports.opciones = async (req, res) => {
@@ -225,7 +235,7 @@ exports.aprobar = async (req, res) => {
     }
 
     if (s.estado === 'PEND_ADMIN') {
-      if (!(await esAdmin(yo))) return fail(res, 'Solo un Administrador aprueba esta etapa', 403);
+      if (!(await esAdmin(yo))) return fail(res, 'Solo el Administrador o quien tiene el permiso de aprobación final (Gerente de Operaciones) aprueba esta etapa', 403);
       // El Administrador crea la casilla corporativa y la informa aquí: ahí llegan usuario y clave
       const email = String(req.body?.email || '').trim().toLowerCase().slice(0, 150);
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(res, 'Ingresa el correo corporativo que creaste: ahí llegan el usuario y la clave', 400);

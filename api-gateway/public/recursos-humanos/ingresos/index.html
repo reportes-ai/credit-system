@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ingreso de Colaboradores — AutoFácil</title>
-  <!-- v1.5 — Jornada Completa 5 días / 6 días (6 días: Edenred cuenta sábados) / Parcial; horario ingreso-salida con casilla Turnos (no exigible); campos obligatorios marcados y validados en el servidor. v1.4 — correo corporativo bloqueado para RRHH: lo ingresa el Administrador al aprobar (él crea la casilla). v1.3 — nota del flujo al pie del formulario; avisos también por campanita. v1.2 — hijos y cargas en el formulario, con fecha de nacimiento y ocupación obligatorias (Seguro de Salud); al aprobar van a rh_cargas por el motor único guardarCargas. v1.1 — todos los campos de la ficha (personales, cónyuge, emergencia, previsión y pago, cargas) + subir Curriculum, Carta oferta, Contrato, Título, Cédula e Informe comercial; al aprobar pasan a la ficha y a la Carpeta Digital. v1.0 — Ingreso de colaboradores: RRHH registra la contratación (cargo = perfil de Business Suite, supervisor), aprueba el supervisor, aprueba el Administrador y se crea el usuario con correo de usuario y clave (Pato 21-09-2026) -->
+  <!-- v1.6 — botón Ver ficha: el aprobador ve la solicitud completa (contratación, ficha, hijos, documentos) antes de firmar; la aprobación final la da el Administrador o quien tiene el permiso rh_ingresos_aprobar (Gerente de Operaciones y Crédito). v1.5 — Jornada Completa 5 días / 6 días (6 días: Edenred cuenta sábados) / Parcial; horario ingreso-salida con casilla Turnos (no exigible); campos obligatorios marcados y validados en el servidor. v1.4 — correo corporativo bloqueado para RRHH: lo ingresa el Administrador al aprobar (él crea la casilla). v1.3 — nota del flujo al pie del formulario; avisos también por campanita. v1.2 — hijos y cargas en el formulario, con fecha de nacimiento y ocupación obligatorias (Seguro de Salud); al aprobar van a rh_cargas por el motor único guardarCargas. v1.1 — todos los campos de la ficha (personales, cónyuge, emergencia, previsión y pago, cargas) + subir Curriculum, Carta oferta, Contrato, Título, Cédula e Informe comercial; al aprobar pasan a la ficha y a la Carpeta Digital. v1.0 — Ingreso de colaboradores: RRHH registra la contratación (cargo = perfil de Business Suite, supervisor), aprueba el supervisor, aprueba el Administrador y se crea el usuario con correo de usuario y clave (Pato 21-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -45,7 +45,7 @@
 <script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Colaboradores',href:'/recursos-humanos/colaboradores/'},{label:'Ingreso de Colaboradores',icon:'bi-person-plus',current:true}]};</script>
 
 <div class="main">
-  <div class="banner"><i class="bi bi-person-plus"></i><div><h2>Ingreso de Colaboradores</h2><p>RRHH registra la contratación → aprueba el supervisor → aprueba el Administrador → se crea el usuario y le llega su clave por correo.</p></div></div>
+  <div class="banner"><i class="bi bi-person-plus"></i><div><h2>Ingreso de Colaboradores</h2><p>RRHH registra la contratación → aprueba el supervisor → aprueba el Administrador o el Gerente de Operaciones → se crea el usuario y le llega su clave por correo.</p></div></div>
   <div class="panel">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">
       <div style="font-weight:700;color:#012d70" id="resumen">—</div>
@@ -60,7 +60,7 @@
   </div>
   <div class="afecta"><b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este proceso</b>
     <ul style="margin:6px 0 0">
-      <li><b>Aprobación del Administrador</b> → crea el usuario en <a href="/usuarios/">Usuarios</a> con el perfil elegido como cargo y envía el correo con usuario y clave temporal</li>
+      <li><b>Aprobación final</b> (Administrador o permiso <code>rh_ingresos_aprobar</code> en <a href="/usuarios/">Perfiles</a>: Gerente de Operaciones) → crea el usuario en <a href="/usuarios/">Usuarios</a> con el perfil elegido como cargo y envía el correo con usuario y clave temporal</li>
       <li><b>Supervisor</b> → queda como jefatura en la ficha (<a href="/recursos-humanos/colaboradores/">Colaboradores</a>), organigrama y aprobaciones de ausencias</li>
       <li><b>Campos de la ficha</b> (contrato, previsión, sueldo, pago, cargas, contacto) → se vuelcan a la ficha en <a href="/recursos-humanos/colaboradores/">Colaboradores</a>, que alimenta <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a> y Previred</li>
       <li><b>Documentos</b> (curriculum, carta oferta, contrato, título, cédula, informe comercial) → pasan a la <a href="/recursos-humanos/documentos-firmados/">Carpeta Digital</a> del colaborador al aprobar</li>
@@ -158,6 +158,11 @@
     <button class="btn-navy" id="bGuardar" onclick="guardar()"><i class="bi bi-send me-1"></i>Enviar a aprobación</button>
   </div>
 </dialog>
+<dialog id="dlgVer" style="max-width:1000px">
+  <div class="dlg-head"><span id="verTit">Solicitud de ingreso</span><button class="btn-ghost" style="padding:4px 10px" onclick="dlgVer.close()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="dlg-body" id="verBody"></div>
+  <div class="dlg-foot" id="verFoot"></div>
+</dialog>
 <div class="toast" id="toast"></div>
 <datalist id="ocupaciones"><option>ESTUDIANTE</option><option>TRABAJADOR DEPENDIENTE</option><option>TRABAJADOR INDEPENDIENTE</option><option>DUEÑA/O DE CASA</option><option>CESANTE</option><option>JUBILADO/A</option><option>MENOR DE EDAD (NO ESTUDIA)</option></datalist>
 
@@ -169,7 +174,7 @@ const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'applic
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
 const fD = s => s ? new Date(String(s).slice(0,10)+'T12:00:00').toLocaleDateString('es-CL') : '—';
 const dlg = document.getElementById('dlg');
-const ETQ = { PEND_SUPERVISOR:'Espera supervisor', PEND_ADMIN:'Espera Administrador', APROBADA:'Aprobada · usuario creado', RECHAZADA:'Rechazada', CREANDO:'Creando usuario…' };
+const ETQ = { PEND_SUPERVISOR:'Espera supervisor', PEND_ADMIN:'Espera aprobación final', APROBADA:'Aprobada · usuario creado', RECHAZADA:'Rechazada', CREANDO:'Creando usuario…' };
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',3000); }
 
 let D = null;
@@ -189,7 +194,7 @@ async function cargar(){
       ${r.estado==='RECHAZADA'?`<div style="font-size:.72rem;color:#b91c1c">${esc(r.motivo_rechazo)}</div>`:''}
       ${r.estado==='APROBADA'&&r.correo_enviado===0?'<div style="font-size:.72rem;color:#b91c1c">Correo con la clave no salió</div>':''}
       ${r.error_alta?`<div style="font-size:.72rem;color:#b91c1c">${esc(r.error_alta)}</div>`:''}</td>
-    <td>${puedo(r)?`<button class="btn-mini ok" onclick="aprobar(${r.id})"><i class="bi bi-check2"></i> Aprobar</button><button class="btn-mini no" onclick="rechazar(${r.id})"><i class="bi bi-x"></i> Rechazar</button>`:''}</td>
+    <td style="white-space:nowrap"><button class="btn-mini" style="background:#e0e7ff;color:#3730a3" onclick="verFicha(${r.id})"><i class="bi bi-person-vcard"></i> Ver ficha</button>${puedo(r)?`<button class="btn-mini ok" onclick="aprobar(${r.id})"><i class="bi bi-check2"></i> Aprobar</button><button class="btn-mini no" onclick="rechazar(${r.id})"><i class="bi bi-x"></i> Rechazar</button>`:''}</td>
   </tr>`).join('') : '<tr><td colspan="9" class="empty">Sin solicitudes.</td></tr>';
 }
 const puedo = r => (r.estado==='PEND_SUPERVISOR' && Number(r.id_supervisor)===Number(D.yo)) || (r.estado==='PEND_ADMIN' && D.es_admin);
@@ -288,6 +293,35 @@ async function aprobar(id){
     else alert(`Usuario creado, pero el correo NO salió (${j.data.correo_error||'error'}).\nClave temporal para entregar en persona: ${j.data.clave_temporal}`);
   } else toast('✓ Aprobada · pasa al Administrador');
   cargar();
+}
+/* Ver ficha (solo lectura): todo lo que RRHH registró, para que el aprobador sepa qué firma.
+   Las etiquetas salen del mismo formulario (data-f) — una sola definición de campos. */
+function verFicha(id){
+  const r = D.ingresos.find(x=>x.id===id); if (!r) return;
+  const F = typeof r.ficha === 'string' ? JSON.parse(r.ficha||'{}') : (r.ficha||{});
+  const HJs = typeof r.hijos === 'string' ? JSON.parse(r.hijos||'[]') : (r.hijos||[]);
+  const clp = v => v==null||v===''?'—':'$'+Number(String(v).replace(/\D/g,'')||0).toLocaleString('es-CL');
+  const CLP = new Set(['sueldo_base','colacion','movilizacion']);
+  const fila = (k,v) => `<div class="fld"><label>${esc(k)}</label><div style="font-size:.86rem;padding:5px 0;border-bottom:1px solid #f1f5f9;min-height:26px">${v==null||v===''?'<span style="color:#cbd5e1">—</span>':esc(v)}</div></div>`;
+  let html = `<div class="sec">Persona</div><div class="grid3">${fila('Nombre',[r.nombre,r.apellido,r.apellido_materno].filter(Boolean).join(' '))}${fila('RUT',r.rut)}${fila('Sexo',r.sexo)}${fila('Fecha de nacimiento',fD(r.fecha_nacimiento))}${fila('Registrado por',r.creado_por_nombre)}${fila('Correo corporativo',r.email||'lo crea quien da la aprobación final')}</div>`;
+  html += `<div class="sec">Contratación</div><div class="grid3">${fila('Cargo (perfil)',r.cargo)}${fila('Supervisor',r.supervisor)}${fila('Fecha de ingreso',fD(r.fecha_ingreso))}${fila('Tipo de contrato',r.tipo_contrato)}${fila('Jornada',r.jornada)}${fila('Horario',F.por_turnos==1?'Por turnos':[F.horario_entrada,F.horario_salida].filter(Boolean).join(' a ')||'')}${fila('Centro de costo',r.centro_costo)}${fila('Teléfono corporativo',r.telefono)}</div>`;
+  // Resto de la ficha, sección por sección, con las etiquetas del formulario
+  let sec = null, buf = '';
+  dlg.querySelectorAll('.dlg-body > .sec, .dlg-body [data-f]').forEach(el => {
+    if (el.classList.contains('sec')) { if (buf) html += `<div class="sec">${sec}</div><div class="grid3">${buf}</div>`; sec = el.firstChild.textContent.trim(); buf = ''; return; }
+    const k = el.dataset.f; if (['horario_entrada','horario_salida'].includes(k)) return;
+    const lbl = el.closest('.fld')?.querySelector('label')?.textContent.replace(/\s*\*.*$/,'').trim() || k;
+    let v = F[k]; if (CLP.has(k)) v = clp(v); else if (k==='pensionado'||k==='edenred') v = v==null||v===''?'':(String(v)==='1'?'SI':'NO');
+    buf += fila(lbl, v);
+  });
+  if (buf) html += `<div class="sec">${sec}</div><div class="grid3">${buf}</div>`;
+  html += `<div class="sec">Hijos y cargas</div>` + (HJs.length ? `<table><thead><tr><th>Relación</th><th>Nombre</th><th>RUT</th><th>Nacimiento</th><th>Sexo</th><th>Ocupación</th><th>Carga</th><th>Seguro</th></tr></thead><tbody>${HJs.map(h=>`<tr><td>${esc(h.relacion)}</td><td>${esc([h.nombres,h.apellido_paterno,h.apellido_materno].filter(Boolean).join(' '))}</td><td>${esc(h.rut)}</td><td>${fD(h.fecha_nacimiento)}</td><td>${esc(h.sexo)}</td><td>${esc(h.ocupacion)}</td><td>${h.es_carga?'SI':'NO'}</td><td>${h.en_seguro?'SI':'NO'}</td></tr>`).join('')}</tbody></table>` : '<div style="font-size:.8rem;color:#94a3b8">Sin hijos ni cargas.</div>');
+  html += `<div class="sec">Documentos</div>` + ((r.docs||[]).length ? `<div style="display:flex;gap:8px;flex-wrap:wrap">${r.docs.map(d=>`<a href="#" class="btn-ghost" style="font-size:.8rem;padding:6px 12px;text-decoration:none" onclick="return verDoc(${d.id})"><i class="bi bi-file-earmark me-1"></i>${esc(d.tipo)}</a>`).join('')}</div>` : `<div style="font-size:.8rem;color:#94a3b8">${r.estado==='APROBADA'?'Ya están en la Carpeta Digital del colaborador.':'Sin documentos adjuntos.'}</div>`);
+  if (r.motivo_rechazo) html += `<div class="sec">Rechazo</div><div style="color:#b91c1c;font-size:.86rem">${esc(r.motivo_rechazo)}</div>`;
+  document.getElementById('verTit').textContent = `Solicitud #${r.id} · ${[r.nombre,r.apellido].join(' ')} · ${ETQ[r.estado]||r.estado}`;
+  document.getElementById('verBody').innerHTML = html;
+  document.getElementById('verFoot').innerHTML = `<button class="btn-ghost" onclick="dlgVer.close()">Cerrar</button>` + (puedo(r) ? `<button class="btn-mini no" style="padding:8px 14px;font-size:.85rem" onclick="dlgVer.close();rechazar(${r.id})"><i class="bi bi-x"></i> Rechazar</button><button class="btn-navy" style="background:#15803d" onclick="dlgVer.close();aprobar(${r.id})"><i class="bi bi-check2 me-1"></i>Aprobar</button>` : '');
+  dlgVer.showModal();
 }
 async function rechazar(id){
   const motivo = prompt('Motivo del rechazo:'); if (!motivo || !motivo.trim()) return;
