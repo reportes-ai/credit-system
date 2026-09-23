@@ -286,6 +286,7 @@ exports.listar = async (req, res) => {
       SELECT c.*,
         (SELECT COUNT(*) FROM campanas_destinatarios d WHERE d.id_campana=c.id) destinatarios,
         (SELECT COUNT(*) FROM campanas_destinatarios d WHERE d.id_campana=c.id AND d.estado IN ('ENVIADO','LEIDO')) enviados,
+        (SELECT COUNT(*) FROM campanas_destinatarios d WHERE d.id_campana=c.id AND d.estado='LEIDO') leidos,
         (SELECT COUNT(*) FROM campanas_destinatarios d WHERE d.id_campana=c.id AND d.estado='ERROR') errores,
         (SELECT COUNT(*) FROM campanas_destinatarios d WHERE d.id_campana=c.id AND d.convertido=1) conversiones
       FROM campanas_masivas c
@@ -418,12 +419,14 @@ exports.generarDesdeBD = async (req, res) => {
       const [[orig]] = await pool.query('SELECT id, correlativo, canal FROM campanas_masivas WHERE id=?', [idOrigen]);
       if (!orig) return fail(res, 'Campaña de origen no existe', 400);
       if (orig.id === c.id) return fail(res, 'La campaña de origen no puede ser esta misma', 400);
+      // alcance: LEIDOS (abrieron el correo) | RECIBIDOS (todos los que lo recibieron: enviados + leídos)
+      const estados = p.alcance === 'RECIBIDOS' ? ['ENVIADO', 'LEIDO'] : ['LEIDO'];
       const [r] = await pool.query(`
         SELECT rut, nombre, ap_paterno, ap_materno, genero, saludo, email, telefono,
                monto_credito, cuotas, tasa, valor_cuota, esp1, esp2, renta, renta_estimada
           FROM campanas_destinatarios
-         WHERE id_campana=? AND grupo='CAMPANA' AND estado='LEIDO'
-         ORDER BY id`, [orig.id]);
+         WHERE id_campana=? AND grupo='CAMPANA' AND estado IN (?)
+         ORDER BY id`, [orig.id, estados]);
       const vistos = new Set();
       rows = r.filter(x => { const k = String(x.email || '').toLowerCase().trim() || limpiaRut(x.rut) || String(x.telefono || ''); if (!k || vistos.has(k)) return false; vistos.add(k); return true; })
         .map(x => ({ ...x, renta_estimada: x.renta_estimada ? 1 : 0 }));

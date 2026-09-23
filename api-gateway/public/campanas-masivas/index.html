@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.4 — Continuar envío desde la bandeja y el informe cuando quedan pendientes (cupo diario). v1.3 -->
+<!-- v1.5 — bandeja: columnas Env. (sin lectura) y Leídos separadas. v1.4 — Continuar envío desde la bandeja y el informe cuando quedan pendientes (cupo diario). v1.3 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -135,7 +135,7 @@ async function cargar(){
     if (!rows.length) { el.innerHTML = '<div class="vacio">Aún no hay campañas — crea la primera.</div>'; continue; }
     el.classList.remove('vacio');
     el.innerHTML = `<div style="overflow-x:auto"><table>
-      <thead><tr><th>N°</th><th>Fecha</th><th>Descripción</th><th>Obj.</th><th>Estado</th><th class="num">Dest.</th><th class="num">Env.</th><th class="num">Err.</th><th class="num">Conv.</th><th></th></tr></thead>
+      <thead><tr><th>N°</th><th>Fecha</th><th>Descripción</th><th>Obj.</th><th>Estado</th><th class="num">Dest.</th><th class="num" title="Enviados sin lectura registrada">Env.</th><th class="num" title="Abrieron el correo (píxel de lectura)">Leídos</th><th class="num">Err.</th><th class="num">Conv.</th><th></th></tr></thead>
       <tbody>${rows.map(c => `
         <tr>
           <td><span class="corr" onclick="abrirResultados(${c.id})">${c.correlativo}</span>${c.es_test?'<span class="tst">TEST</span>':''}</td>
@@ -144,7 +144,8 @@ async function cargar(){
           <td><span class="chip o-${c.objetivo}">${c.objetivo}</span></td>
           <td><span class="chip e-${c.estado}">${c.estado}</span></td>
           <td class="num">${N(c.destinatarios)}</td>
-          <td class="num">${N(c.enviados)}</td>
+          <td class="num">${N(Number(c.enviados)-Number(c.leidos||0))}</td>
+          <td class="num" style="color:#16a34a">${N(c.leidos||0)}</td>
           <td class="num" style="color:${c.errores>0?'#dc2626':'inherit'}">${N(c.errores)}</td>
           <td class="num"><b>${N(c.conversiones)}</b></td>
           <td style="white-space:nowrap">${c.estado==='BORRADOR' ? `<a href="/campanas-masivas/editor?id=${c.id}" title="Editar" style="color:var(--accent);text-decoration:none"><i class="bi bi-pencil-square" style="font-size:.95rem"></i></a>`
