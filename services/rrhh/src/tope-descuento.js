@@ -10,7 +10,8 @@
                                      judiciales: hasta 50% de los ingresos; NO entran en el 45%
      rem_dcto_judiciales         lista de conceptos que son judiciales (separados por coma)
      rem_dcto_vivienda           lista de conceptos que son vivienda/educación/ahorro
-   Base: total haberes de la última liquidación EMITIDA; si no hay, sueldo base de la ficha.
+   Base: total haberes de la liquidación POR EMITIR (proyectada con el motor de liquidaciones);
+   si no se puede, la última EMITIDA; si no hay, sueldo base de la ficha.
    Sin referencia no se valida (RRHH decide). Lo usan Solicitudes (paso RRHH) y el registro
    directo en Descuentos. Los descuentos LEGALES (AFP, salud, impuesto) no pasan por aquí. */
 const pool = require('../../../shared/config/database');
@@ -35,7 +36,16 @@ function categoriaDe(tipo, subtipo, T) {
   return 'OTROS';
 }
 
+/* Base = remuneración total de la liquidación POR EMITIR (la que el descuento va a afectar), armada
+   con el motor único de liquidaciones: sueldo + comisiones del mes vencido + adicionales + días.
+   Si no se puede proyectar, cae a la última EMITIDA y, en último caso, al sueldo base de la ficha
+   (Pato, 24-09-2026: con solo el sueldo base un ejecutivo a comisión quedaba subvalorado). */
 async function baseDe(idUsuario) {
+  try {
+    const rem = require('./controllers/remuneraciones.controller');   // lazy: evita el ciclo con el controller
+    const p = await rem.haberesProyectados(idUsuario);
+    if (Number(p?.total_haberes) > 0) return Number(p.total_haberes);
+  } catch (e) { console.error('[tope-descuento proyección]', e.message); }
   const [[liq]] = await pool.query(
     `SELECT total_haberes FROM rh_liquidaciones WHERE id_usuario=? AND estado='EMITIDA' ORDER BY mes DESC LIMIT 1`, [idUsuario]);
   let base = Number(liq?.total_haberes) || 0;

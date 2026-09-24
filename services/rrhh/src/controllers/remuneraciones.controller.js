@@ -2197,7 +2197,48 @@ async function getNominaBanco(req, res) {
   } catch (e) { fail(res, e.message); }
 }
 
+/* Remuneración total PROYECTADA de la liquidación por emitir de UNA persona, con el motor único
+   (mismo armado que guardar/getMes: sueldo, días, comisiones del mes vencido, adicionales, descuentos).
+   La usa tope-descuento.js como base de los topes legales (Pato, 24-09-2026: la base debe ser la
+   liquidación que el descuento va a afectar, no la última emitida ni el sueldo base).
+   Devuelve { mes, total_haberes, total_imponible } o null si la persona no entra al libro. */
+async function haberesProyectados(idUsuario) {
+  const mes = await proximaLiquidacion();
+  const [[emp]] = await pool.query(
+    `SELECT u.id_usuario, CONCAT(UPPER(COALESCE(u.nombre,'')), ' ', UPPER(COALESCE(u.apellido,''))) AS nombre_corto,
+            u.fecha_ingreso, u.fecha_baja, fi.sueldo_base, fi.afp, fi.salud, fi.tipo_contrato, fi.pensionado, fi.colacion, fi.movilizacion, fi.plan_isapre_uf
+       FROM usuarios u JOIN rh_fichas fi ON fi.id_usuario = u.id_usuario WHERE u.id_usuario = ?`, [idUsuario]);
+  if (!emp || !(Number(emp.sueldo_base) > 0)) return null;
+  const [[ya]] = await pool.query("SELECT total_haberes, total_imponible FROM rh_liquidaciones WHERE id_usuario=? AND mes=? AND estado='EMITIDA'", [idUsuario, mes]);
+  if (ya) return { mes, total_haberes: Number(ya.total_haberes) || 0, total_imponible: Number(ya.total_imponible) || 0 };
+  const ind = await indicadores(mes);
+  const comis = await comisionesDelMes(mes);
+  const adics = await adicionalesDelMes(mes);
+  const descs = await descuentosDelMes(mes);
+  const lics = await licenciasDelMes(mes);
+  const ferVar = await feriadoVariableDelMes(mes);
+  const inp = {
+    sueldo_base: emp.sueldo_base, afp: emp.afp, salud: emp.salud, tipo_contrato: emp.tipo_contrato, pensionado: emp.pensionado,
+    plan_isapre_uf: emp.plan_isapre_uf,
+    dias: diasTrabajadosMes(mes, emp.fecha_ingreso, lics[emp.id_usuario], emp.fecha_baja),
+    colacion: emp.colacion, movilizacion: emp.movilizacion,
+    comisiones: comis[String(emp.nombre_corto).trim()] || 0,
+    feriado_variable: ferVar[emp.id_usuario]?.monto || 0,
+    feriado_var_dias: ferVar[emp.id_usuario]?.dias || 0,
+    otros_imponibles: adics[emp.id_usuario]?.imp || 0,
+    otros_no_imponibles: adics[emp.id_usuario]?.noimp || 0,
+    otros_descuentos: descs[emp.id_usuario] || 0,
+    descuentos_detalle: descs.items[emp.id_usuario] || [],
+    apv: descs.apv[emp.id_usuario] || 0,
+  };
+  aplicarProporcional(inp, adics[emp.id_usuario]);
+  aplicarGarantiaComision(inp, adics[emp.id_usuario]);
+  aplicarLiquidosImponibles(inp, adics[emp.id_usuario], ind);
+  const calc = calcLiquidacion(inp, ind);
+  return { mes, total_haberes: Number(calc.total_haberes) || 0, total_imponible: Number(calc.total_imponible) || 0 };
+}
+
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic, editarAdicional, asignacionFicha,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
-  permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion,
+  permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion, haberesProyectados,
   getDescuentos, crearDescuento, anularDescuento, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
