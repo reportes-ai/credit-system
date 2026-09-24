@@ -59,7 +59,7 @@ function sincronizarCreditoDesdeCarta(c, idCred) {
   // PRODUCTO PREFERENTE marcado/desmarcado en la carta → producto del crédito NO otorgado
   if (c.preferente !== undefined) {
     pool.query(`UPDATE creditos SET producto = ?, com_ejec_pct = ?, updated_at = NOW() WHERE id = ? AND estado_credito <> 'OTORGADO'`,
-      [c.preferente ? (c.producto || 'AUTOFIN PREFERENTE') : null, (c.comEjecPct != null && c.comEjecPct !== '' ? Number(c.comEjecPct) : null), idCred]
+      [c.preferente ? (c.producto || 'AUTOFIN PREFERENTE') : 'NORMAL', (c.comEjecPct != null && c.comEjecPct !== '' ? Number(c.comEjecPct) : null), idCred]
     ).catch(e => console.error('[carta→credito producto]', e.message));
   }
   // Primas/GPS digitadas o corregidas en la carta → al crédito (0 explícito válido)
@@ -280,7 +280,8 @@ async function crearCreditoDesdeCartas(c) {
     (c.ejecutivo_nombre || c.ejecutivoNombre ? String(c.ejecutivo_nombre || c.ejecutivoNombre).trim().toUpperCase() : null),
     (c.part_bruto || c.partBruto || null),
     // PRODUCTO PREFERENTE: el crédito nace con el producto de la carta → rentabilidad y comisiones leen sus reglas
-    (c.preferente ? (c.producto || 'AUTOFIN PREFERENTE') : null),
+    // Sin producto real de la financiera → 'NORMAL' (la carga Trinidad lo pisa con el nombre real; Pato 24-09-2026)
+    (c.preferente ? (c.producto || 'AUTOFIN PREFERENTE') : 'NORMAL'),
     // Comisión ejecutivo pactada en la carta (% monto financiado): la leen rentabilidad y Revisión de Comisiones
     (c.comEjecPct != null && c.comEjecPct !== '' ? Number(c.comEjecPct) : null),
   ]);

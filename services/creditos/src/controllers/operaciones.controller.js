@@ -386,7 +386,7 @@ const update = async (req, res) => {
       b.num_op||null, b.mes||null, b.financiera, b.comentarios||null,
       b.ejecutivo||null, b.automotora||null, b.nombre_local||null, b.estado_eval||null, b.estado_credito||null,
       (b.estado_credito || b.estado_eval || null),
-      b.fecha_otorgado||null, b.producto||null,
+      b.fecha_otorgado||null, b.producto||'NORMAL',   // sin producto real de la financiera → NORMAL (Pato 24-09-2026)
       b.marca||null, b.modelo||null, b.anio||null, b.tasacion||null, b.permiso_circulacion||null,
       b.valor_vehiculo||null, b.pie||null,
       saldo_precio, pct_financiado, b.impuesto||null, b.estado_impuesto||null,
