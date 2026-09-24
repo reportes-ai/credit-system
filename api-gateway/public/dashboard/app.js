@@ -5618,7 +5618,9 @@ function buildColocMensual(vista) {
       style="border:1px solid ${catOn[c] ? col : '#c6d3e8'};background:${catOn[c] ? col : '#fff'};color:${catOn[c] ? '#fff' : '#94a3b8'};border-radius:16px;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer;${catOn[c] ? '' : 'text-decoration:line-through'}">${lbl}</button>`).join('')}` : ''}
   </div>`;
 
-  cont.innerHTML = botones + `<table id="t-coloc-${vista}" style="width:max-content;border-collapse:collapse;font-size:11.5px">
+  // Los filtros quedan FUERA del área que se desplaza y los encabezados pegados arriba (Pato, 24-09-2026)
+  cont.style.overflow = 'visible'; cont.style.maxHeight = 'none';
+  cont.innerHTML = botones + `<div style="overflow:auto;max-height:calc(100vh - 260px)"><table id="t-coloc-${vista}" style="width:max-content;border-collapse:collapse;font-size:11.5px">
     <thead>
       <tr>
         <th rowspan="2" style="position:sticky;left:0;background:#12213f;color:#fff;padding:6px 10px;text-align:left;z-index:2">${esDealers ? 'Dealer' : 'Parque'}</th>
@@ -5651,10 +5653,18 @@ function buildColocMensual(vista) {
       ${meses.map(m => `<td style="text-align:right;padding:5px 8px;border-left:1px solid #2a4070">${totMes[m].n}</td>
         <td style="text-align:right;padding:5px 8px">${f$(totMes[m].monto)}</td>`).join('')}
     </tr></tfoot>
-  </table>` + (esDealers ? `<div style="margin:8px 0 2px;font-size:11px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap">
+  </table></div>` + (esDealers ? `<div style="margin:8px 0 2px;font-size:11px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap">
     <b style="color:#33507e">Cat. (categoría del dealer, según su ficha en Mantenedores → Dealers):</b>
     <span><b style="color:#b45309">SP</b> Super Partner</span><span><b style="color:#0d2f6b">P</b> Partner</span><span><b style="color:#64748b">S</b> Socio</span><span><b>—</b> sin categoría asignada</span>
   </div>` : '');
+  // Encabezados pegados arriba: las dos filas del thead quedan sticky (la segunda bajo la primera)
+  const thead = cont.querySelector('thead');
+  if (thead) {
+    const [r1, r2] = thead.rows;
+    const h1 = r1 ? r1.getBoundingClientRect().height : 0;
+    r1 && [...r1.cells].forEach(th => { th.style.position = 'sticky'; th.style.top = '0'; th.style.zIndex = th.style.zIndex ? '4' : '3'; });
+    r2 && [...r2.cells].forEach(th => { th.style.position = 'sticky'; th.style.top = h1 + 'px'; th.style.zIndex = '3'; });
+  }
 
   // ── Solo Parques: curva mensual de colocaciones por parque (incluye CALLE) ──
   if (!esDealers) {
