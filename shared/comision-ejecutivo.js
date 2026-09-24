@@ -94,9 +94,15 @@ function calcularComision(creditos, vars, mes, opts = {}) {
      % ejecutivo del producto (Productos por Financiera → ejecutivo_pct) sobre el monto
      financiado, en vez de pct_24 / pct_mas24. opts.reglas_producto = { PRODUCTO: fracción }. */
   const reglasProd = (opts && opts.reglas_producto) || null;
-  const pctProd = c => reglasProd ? reglasProd[String(c.producto || '').trim().toUpperCase()] : undefined;
-  const conRegla = reglasProd ? otorgados.filter(c => pctProd(c) != null) : [];
-  const sinRegla = reglasProd ? otorgados.filter(c => pctProd(c) == null) : otorgados;
+  /* % por operación: (1) comisión ejecutivo pactada en la CARTA (creditos.com_ejec_pct, % del monto
+     financiado — menor a la normal no es excepción; mayor la exigió), (2) % del producto con reglas
+     propias, (3) si no, el split general pct_24 / pct_mas24. */
+  const pctProd = c => {
+    if (c.com_ejec_pct != null && c.com_ejec_pct !== '' && !isNaN(c.com_ejec_pct)) return Number(c.com_ejec_pct) / 100;
+    return reglasProd ? reglasProd[String(c.producto || '').trim().toUpperCase()] : undefined;
+  };
+  const conRegla = otorgados.filter(c => pctProd(c) != null);
+  const sinRegla = otorgados.filter(c => pctProd(c) == null);
   const ot24    = sinRegla.filter(c =>  esPlazoMenor(c.plazo, vars));
   const otMas24 = sinRegla.filter(c => !esPlazoMenor(c.plazo, vars));
   const monto24    = ot24.reduce((s, c) => s + (parseFloat(c.monto_financiado) || 0), 0);

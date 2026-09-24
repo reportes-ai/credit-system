@@ -58,8 +58,8 @@ function sincronizarCreditoDesdeCarta(c, idCred) {
   }
   // PRODUCTO PREFERENTE marcado/desmarcado en la carta → producto del crédito NO otorgado
   if (c.preferente !== undefined) {
-    pool.query(`UPDATE creditos SET producto = ?, updated_at = NOW() WHERE id = ? AND estado_credito <> 'OTORGADO'`,
-      [c.preferente ? (c.producto || 'AUTOFIN PREFERENTE') : null, idCred]
+    pool.query(`UPDATE creditos SET producto = ?, com_ejec_pct = ?, updated_at = NOW() WHERE id = ? AND estado_credito <> 'OTORGADO'`,
+      [c.preferente ? (c.producto || 'AUTOFIN PREFERENTE') : null, (c.comEjecPct != null && c.comEjecPct !== '' ? Number(c.comEjecPct) : null), idCred]
     ).catch(e => console.error('[carta→credito producto]', e.message));
   }
   // Primas/GPS digitadas o corregidas en la carta → al crédito (0 explícito válido)
@@ -244,7 +244,7 @@ async function crearCreditoDesdeCartas(c) {
        monto_financiado, plazo, tascli_real,
        seguro_rdh, seguro_cesantia, seguro_rep_menor, seguros, gps, gastos,
        tipo_vehiculo, marca, modelo, anio, patente,
-       automotora, ejecutivo, comdea_real, producto,
+       automotora, ejecutivo, comdea_real, producto, com_ejec_pct,
        created_at, updated_at)
     VALUES (?,?,?,?,
             'APROBADO','INGRESO',   -- nace de una carta APROBADA; estado_eval pasa a OTORGADO recién al otorgar (el dashboard clasifica por estado_eval)
@@ -253,7 +253,7 @@ async function crearCreditoDesdeCartas(c) {
             ?,?,?,
             ?,?,?,?,?,?,
             ?,?,?,?,?,
-            ?,?,?,?,
+            ?,?,?,?,?,
             NOW(),NOW())
   `, [
     /* num_op = correlativo AutoFácil desde que nace (motor único shared/num-op.js,
@@ -281,6 +281,8 @@ async function crearCreditoDesdeCartas(c) {
     (c.part_bruto || c.partBruto || null),
     // PRODUCTO PREFERENTE: el crédito nace con el producto de la carta → rentabilidad y comisiones leen sus reglas
     (c.preferente ? (c.producto || 'AUTOFIN PREFERENTE') : null),
+    // Comisión ejecutivo pactada en la carta (% monto financiado): la leen rentabilidad y Revisión de Comisiones
+    (c.comEjecPct != null && c.comEjecPct !== '' ? Number(c.comEjecPct) : null),
   ]);
     return rIns;
   });
@@ -512,6 +514,13 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS producto VARCHAR(80) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS parque_pct DECIMAL(6,3) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS parque_monto BIGINT DEFAULT NULL`);
+    /* Comisión ejecutivo pactada en la carta (Pato, 24-09-2026): % del monto financiado. Normal = %
+       del producto (PREFERENTE) o pct_ejecutivo_fin de Parámetros de Crédito; menor no es excepción,
+       mayor exige la excepción COMISION_EJECUTIVO_SOBRE_NORMAL. Al otorgar pasa al crédito
+       (creditos.com_ejec_pct) y la leen rentabilidad (comej) y Revisión de Comisiones. */
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS com_ejec_pct DECIMAL(6,3) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS com_ejec_monto BIGINT DEFAULT NULL`);
+    await pool.query(`ALTER TABLE creditos ADD COLUMN IF NOT EXISTS com_ejec_pct DECIMAL(6,3) DEFAULT NULL`).catch(() => {});
     // Compra para un tercero (persona natural o jurídica distinta del cliente que
     // solicita el crédito) — cláusula 13 de la carta antigua. Opcional: NULL = sin tercero.
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS compra_para VARCHAR(200) DEFAULT NULL`);
@@ -716,6 +725,8 @@ function mapRow(r) {
     producto:                 r.producto || null,
     parquePct:                r.parque_pct != null ? parseFloat(r.parque_pct) : null,
     parqueMonto:              r.parque_monto != null ? Number(r.parque_monto) : null,
+    comEjecPct:               r.com_ejec_pct != null ? parseFloat(r.com_ejec_pct) : null,   // comisión ejecutivo pactada (% monto financiado)
+    comEjecMonto:             r.com_ejec_monto != null ? Number(r.com_ejec_monto) : null,
     montoCreditoCLP:          r.monto_credito_clp,
     montoCreditoUF:           r.monto_credito_uf ? parseFloat(r.monto_credito_uf) : 0,
     excepciones:              parseJSON(r.excepciones) || [],
@@ -1391,6 +1402,17 @@ const upsert = async (req, res) => {
         c.parqueMonto = Math.round(saldo * Number(c.parquePct) / 100);
       } else { c.parquePct = null; c.parqueMonto = null; }
     } else { c.preferente = 0; c.producto = c.producto || null; c.parquePct = null; c.parqueMonto = null; }
+    /* Comisión ejecutivo propuesta en la carta: normal = % del producto (PREFERENTE) o pct_ejecutivo_fin
+       de Parámetros de Crédito. Menor o igual pasa; mayor solo con la excepción registrada. */
+    if (c.comEjecPct != null && c.comEjecPct !== '') {
+      let normal = null;
+      if (c.preferente) { const pr = await require('../../../../shared/producto-reglas').reglasDe(c.producto, c.acreedor); const e = pr ? require('../../../../shared/producto-reglas').ejecutivoPct(pr) : null; if (e != null) normal = e * 100; }
+      if (normal == null) { const [[pp]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='pct_ejecutivo_fin'").catch(() => [[null]]); if (pp) normal = parseFloat(pp.valor); }
+      const tieneExc = Array.isArray(c.excepciones) && c.excepciones.some(x => (typeof x === 'string' ? x : (x && x.cod)) === 'COMISION_EJECUTIVO_SOBRE_NORMAL');
+      if (normal != null && Number(c.comEjecPct) > normal + 1e-9 && !tieneExc)
+        return res.status(400).json({ success: false, data: null, error: `La comisión ejecutivo propuesta (${Number(c.comEjecPct).toFixed(2).replace('.', ',')}%) supera la normal (${normal.toFixed(2).replace('.', ',')}%): requiere la excepción "Comisión ejecutivo sobre la normal"` });
+      c.comEjecMonto = Math.round((Number(c.montoCreditoCLP) || 0) * Number(c.comEjecPct) / 100);
+    } else { c.comEjecPct = null; c.comEjecMonto = null; }
 
     const vals = [
       c.opCarta, c.opOrigen, c.tipo,
@@ -1425,6 +1447,7 @@ const upsert = async (req, res) => {
       c.preferente ? 1 : 0, c.producto || null,
       (c.parquePct != null && c.parquePct !== '') ? Number(c.parquePct) : null,
       (c.parqueMonto != null && c.parqueMonto !== '') ? Math.round(Number(c.parqueMonto)) : null,
+      c.comEjecPct != null ? Number(c.comEjecPct) : null, c.comEjecMonto != null ? Math.round(Number(c.comEjecMonto)) : null,
       c.numeroCreditoCreado || null,
       c.idCreditoCreado || null,
     ];
@@ -1480,6 +1503,7 @@ const upsert = async (req, res) => {
           tasa_credito=?, monto_credito_clp=?, monto_credito_uf=?,
           excepciones=?, excepciones_comentarios=?,
           preferente=?, producto=?, parque_pct=?, parque_monto=?,
+          com_ejec_pct=?, com_ejec_monto=?,
           numero_credito_creado=?, id_credito_creado=?
         WHERE id=?`,
         [...vals, c.id]
@@ -1548,6 +1572,7 @@ const upsert = async (req, res) => {
           tasa_credito, monto_credito_clp, monto_credito_uf,
           excepciones, excepciones_comentarios,
           preferente, producto, parque_pct, parque_monto,
+          com_ejec_pct, com_ejec_monto,
           numero_credito_creado, id_credito_creado
         ) VALUES (${vals.map(() => '?').join(',')})`,
         vals

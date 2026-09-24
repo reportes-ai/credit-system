@@ -380,7 +380,7 @@ function fabricaFactorOrigen(vars) {
   return async function factorOrigen(mesOrigen, ejecutivo) {
     if (!cache.has(mesOrigen)) {
       const [rows] = await pool.query(
-        `SELECT ejecutivo, estado_credito, financiera, producto, monto_financiado, plazo,
+        `SELECT ejecutivo, estado_credito, financiera, producto, com_ejec_pct, monto_financiado, plazo,
                 seguro_cesantia, seguro_rep_menor, seguro_rdh
          FROM creditos
          WHERE DATE_FORMAT(COALESCE(fecha_otorgado, mes), '%Y-%m') = ?
@@ -683,7 +683,7 @@ async function calcularMes(mes, varsOverride) {
     // Trae todos los créditos del mes agrupados por ejecutivo
     const [creditos] = await pool.query(
       `SELECT ob.ejecutivo, ob.estado_credito, ob.financiera, ob.producto, ob.cliente_independiente,
-              ob.monto_financiado, ob.plazo, ob.seguro_cesantia, ob.seguro_rep_menor,
+              ob.com_ejec_pct, ob.monto_financiado, ob.plazo, ob.seguro_cesantia, ob.seguro_rep_menor,
               ob.seguro_rdh, ob.valor_vehiculo, ob.pie, ob.saldo_precio,
               ob.fecha_otorgado, ob.num_op, ob.id_financiera,
               COALESCE(cl.nombre_completo, '') AS nombre_cliente,

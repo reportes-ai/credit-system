@@ -112,9 +112,9 @@ async function calcularOperacion(op) {
      Si el crédito lleva un producto con reglas propias, esas reglas MANDAN sobre la
      pizarra de tasas, la tabla del dealer y el % del parque (Pato, 24-09-2026). El
      producto viene en op.producto; si el llamador no lo trae, se lee del crédito. */
-  let productoOp = op.producto;
-  if (productoOp === undefined && op.id) {
-    try { const [[pc]] = await pool.query('SELECT producto FROM creditos WHERE id=?', [op.id]); productoOp = pc ? pc.producto : null; } catch (_) { productoOp = null; }
+  let productoOp = op.producto, comEjecCarta = op.com_ejec_pct;
+  if ((productoOp === undefined || comEjecCarta === undefined) && op.id) {
+    try { const [[pc]] = await pool.query('SELECT producto, com_ejec_pct FROM creditos WHERE id=?', [op.id]); if (productoOp === undefined) productoOp = pc ? pc.producto : null; if (comEjecCarta === undefined) comEjecCarta = pc ? pc.com_ejec_pct : null; } catch (_) { productoOp = productoOp ?? null; comEjecCarta = comEjecCarta ?? null; }
   }
   const reglas = await PR.reglasDe(productoOp, financiera);
 
@@ -202,7 +202,11 @@ async function calcularOperacion(op) {
 
   // ── 4. Comisión ejecutivo — motor único ────────────────────────────
   // Ejecutivo: % del producto con reglas propias si lo define; si no, el parámetro general
-  comej = core.comisionEjecutivo({ montoFin: monto_fin, pctEj: (reglas && PR.ejecutivoPct(reglas) != null) ? PR.ejecutivoPct(reglas) : (p.pct_ejecutivo_fin || 0) / 100 });
+  // Ejecutivo: % del producto con reglas propias si lo define; si no, el parámetro general.
+  // La CARTA manda solo hacia abajo (com_ejec_pct pactado ≤ normal; sobre la normal exigió excepción y entonces manda).
+  let pctEj = (reglas && PR.ejecutivoPct(reglas) != null) ? PR.ejecutivoPct(reglas) : (p.pct_ejecutivo_fin || 0) / 100;
+  if (comEjecCarta != null && !isNaN(comEjecCarta)) pctEj = Number(comEjecCarta) / 100;
+  comej = core.comisionEjecutivo({ montoFin: monto_fin, pctEj });
 
   // ── 5. Ingreso neto total ──────────────────────────────────────────
   const com_seguros_total  = com_rdh + com_cesantia + com_reparaciones;
