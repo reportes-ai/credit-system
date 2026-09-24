@@ -166,6 +166,14 @@ router.get('/provisiones', verifyToken, requireFunc('ctb_provisiones', 'ctb_cier
     res.json({ success: true, data: await prov.cuadro(mes, concepto), error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 });
+router.get('/provisiones/detalle', verifyToken, requireFunc('ctb_provisiones', 'ctb_cierre_mes', 'ctb_estados'), async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : require('../../../../shared/fecha-chile').hoyISO().slice(0, 7);
+    const concepto = String(req.query.concepto || 'DEALER').toUpperCase(), tipo = String(req.query.tipo || 'VIGENTE').toUpperCase();
+    if (!prov.CONCEPTOS[concepto]) return res.status(400).json({ success: false, data: null, error: 'Concepto desconocido' });
+    res.json({ success: true, data: await prov.detalle(mes, concepto, tipo), error: null });
+  } catch (e) { res.status(400).json({ success: false, data: null, error: e.message }); }
+});
 router.post('/provisiones/sincronizar', verifyToken, requireFunc('ctb_provisiones'), async (req, res) => {
   try {
     const u = req.usuario || {};

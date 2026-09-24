@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Provisiones por Devengo — AutoFácil</title>
-  <!-- v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
+  <!-- v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -29,6 +29,10 @@
     .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:18px 22px; font-size:.83rem; color:#374151; margin-top:8px; }
     .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:.82rem; font-weight:700; }
     .btn-navy:disabled { opacity:.6; }
+    .kpi.click { cursor:pointer; transition:box-shadow .15s; } .kpi.click:hover { box-shadow:0 4px 14px rgba(1,65,162,.18); border-color:var(--navy); }
+    .tg { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:8px; padding:3px 10px; font-size:.76rem; font-weight:700; }
+    .tg.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+    #dlgTabla th, #dlgTabla td { white-space:nowrap; }
     @media (max-width:900px){ .kpis{ grid-template-columns:repeat(2,1fr);} .main-content{padding:16px;} }
   </style>
 </head>
@@ -51,10 +55,21 @@
     </div>
     <div class="kpis" id="kpis"></div>
     <div id="cuadre" class="small mt-2"></div>
+    <div class="small text-muted mt-1"><i class="bi bi-hand-index"></i> Haz clic en un cuadro para ver su detalle y exportarlo a Excel.</div>
   </div>
 
   <div class="panel">
-    <h6 class="fw-bold mb-2"><i class="bi bi-exclamation-triangle me-1" style="color:#d97706"></i>Provisiones vigentes (sin documento todavía) <span id="nPend" class="text-muted fw-normal"></span></h6>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <h6 class="fw-bold mb-0"><i class="bi bi-exclamation-triangle me-1" style="color:#d97706"></i>Provisiones vigentes (sin documento todavía) <span id="nPend" class="text-muted fw-normal"></span></h6>
+      <div class="ms-auto d-flex align-items-center gap-1" id="tgAnio">
+        <span class="small text-muted me-1">Año de la provisión:</span>
+        <button class="tg on" data-a="" onclick="setAnio('')">Todos</button>
+        <button class="tg" data-a="<2025" onclick="setAnio('<2025')">&lt; 2025</button>
+        <button class="tg" data-a="2025" onclick="setAnio('2025')">2025</button>
+        <button class="tg" data-a="2026" onclick="setAnio('2026')">2026</button>
+        <button class="btn btn-sm btn-outline-success py-0 ms-2" onclick="excelPend()" title="Exportar las vigentes filtradas"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+      </div>
+    </div>
     <div style="overflow:auto"><table>
       <thead><tr><th>OP</th><th id="thTercero">Dealer</th><th>Mes curse</th><th>Constituida</th><th class="r" id="thBase">Bruto</th><th class="r" id="thProv">Provisión (neto)</th><th class="r">Días</th><th>Comprobante</th><th></th></tr></thead>
       <tbody id="pendBody"><tr><td colspan="9" class="text-center text-muted py-3">Cargando…</td></tr></tbody>
@@ -64,10 +79,19 @@
   <div class="panel">
     <h6 class="fw-bold mb-2"><i class="bi bi-list-ul me-1"></i>Movimientos del mes (constituidas o liberadas en el mes)</h6>
     <div style="overflow:auto"><table>
-      <thead><tr><th>OP</th><th>Dealer</th><th>Constituida</th><th class="r">Provisión</th><th>Estado</th><th>Liberada</th><th>Motivo</th><th>Comprobantes</th></tr></thead>
-      <tbody id="movBody"><tr><td colspan="8" class="text-center text-muted py-3">—</td></tr></tbody>
+      <thead><tr><th>OP</th><th>Dealer</th><th>Constituida</th><th class="r">Provisión</th><th>Estado</th><th>Liberada</th><th>Motivo</th><th>Liberada contra</th><th>Comprobantes</th></tr></thead>
+      <tbody id="movBody"><tr><td colspan="9" class="text-center text-muted py-3">—</td></tr></tbody>
     </table></div>
   </div>
+
+  <dialog id="dlg" style="border:none;border-radius:14px;padding:0;width:min(1200px,96vw);max-height:90vh">
+    <div style="padding:16px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e5e7eb">
+      <h6 class="fw-bold mb-0" id="dlgTitulo">Detalle</h6><span id="dlgSub" class="small text-muted"></span>
+      <button class="btn btn-sm btn-outline-success py-0 ms-auto" onclick="excelDlg()"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+      <button class="btn btn-sm btn-outline-secondary py-0" onclick="document.getElementById('dlg').close()">Cerrar</button>
+    </div>
+    <div style="overflow:auto;max-height:calc(90vh - 60px);padding:0 8px 8px"><table id="dlgTabla"></table></div>
+  </dialog>
 
   <div class="footer-afecta">
     <h6 class="fw-bold"><i class="bi bi-diagram-3 me-1"></i>Cómo funciona y qué afecta</h6>
@@ -84,6 +108,7 @@
 </div>
 
 <script src="/js/auth-guard.js"></script>
+<script src="/js/xlsx.full.min.js"></script>
 <script>
 const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
 const H = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
@@ -98,14 +123,15 @@ async function cargar(){
   const j = await fetch(`/api/contabilidad/provisiones?mes=${mes}&concepto=${concepto}`, { headers:H }).then(r=>r.json());
   if (!j.success) { document.getElementById('kpis').innerHTML = `<div class="bad">${esc(j.error)}</div>`; return; }
   const d = j.data;
+  DATA = d;
   document.getElementById('kpis').innerHTML = [
-    ['Saldo inicial', d.saldo_inicial, `cuenta ${d.cuenta_provision} al inicio del mes`],
-    ['Constituido en el mes', d.constituido, `${d.n_constituido} comprobante(s) · motor: ${clp(d.motor_constituido)} en ${d.motor_n_constituido} crédito(s)`],
-    ['Liberado en el mes', d.liberado, `${d.n_liberado} comprobante(s) · motor: ${clp(d.motor_liberado)} en ${d.motor_n_liberado}`],
-    ['Saldo final', d.saldo_final, `cuenta ${d.cuenta_provision} al cierre del mes`],
-    ['Detalle vigente (por operación)', d.motor_vigente, `${d.motor_n_vigente} provisión(es): ${clp(d.motor_vigente - d.avsoft_vigente)} del motor desde ${d.desde}` + (d.avsoft_n ? ` + ${clp(d.avsoft_vigente)} detalle AVSOFT (${d.avsoft_n})` : '')],
-  ].map(([l,v,s]) => `<div class="kpi"><div class="l">${esc(l)}</div><div class="v">${clp(v)}</div><div class="s">${esc(s)}</div></div>`).join('')
-  + (Math.abs(d.saldo_historico) >= 1 ? `<div class="kpi" style="grid-column:span 5;background:#fffbeb;border-color:#fcd34d"><div class="l">Diferencia cuenta ${esc(d.cuenta_provision)} vs detalle por operación</div><div class="v" style="color:#92400e">${clp(d.saldo_historico)}</div><div class="s">Saldo final de la cuenta menos el detalle vigente (motor + detalle AVSOFT del contador). ${d.saldo_historico > 0 ? 'Provisión en la cuenta sin detalle por operación.' : 'El detalle del contador supera lo que hay en la cuenta: filas que ya se rebajaron en AVSOFT sin marcarse en su planilla.'} Lo concilia el contador; hasta entonces queda a la vista.</div></div>` : '');
+    ['Saldo inicial', d.saldo_inicial, `cuenta ${d.cuenta_provision} al inicio del mes`, 'INICIAL'],
+    ['Constituido en el mes', d.constituido, `${d.n_constituido} comprobante(s) · motor: ${clp(d.motor_constituido)} en ${d.motor_n_constituido} crédito(s)`, 'CONSTITUIDO'],
+    ['Liberado en el mes', d.liberado, `${d.n_liberado} comprobante(s) · motor: ${clp(d.motor_liberado)} en ${d.motor_n_liberado}`, 'LIBERADO'],
+    ['Saldo final', d.saldo_final, `cuenta ${d.cuenta_provision} al cierre del mes`, 'CUENTA'],
+    ['Detalle vigente (por operación)', d.motor_vigente, `${d.motor_n_vigente} provisión(es): ${clp(d.motor_vigente - d.avsoft_vigente)} del motor desde ${d.desde}` + (d.avsoft_n ? ` + ${clp(d.avsoft_vigente)} detalle AVSOFT (${d.avsoft_n})` : ''), 'VIGENTE'],
+  ].map(([l,v,s,t]) => `<div class="kpi click" onclick="verDetalle('${t}','${esc(l)}')" title="Ver detalle"><div class="l">${esc(l)} <i class="bi bi-box-arrow-up-right" style="font-size:.7rem"></i></div><div class="v">${clp(v)}</div><div class="s">${esc(s)}</div></div>`).join('')
+  + (Math.abs(d.saldo_historico) >= 1 ? `<div class="kpi click" style="grid-column:span 5;background:#fffbeb;border-color:#fcd34d" onclick="verDetalle('CUENTA','Movimientos de la cuenta ${esc(d.cuenta_provision)} en el mes')"><div class="l">Diferencia cuenta ${esc(d.cuenta_provision)} vs detalle por operación</div><div class="v" style="color:#92400e">${clp(d.saldo_historico)}</div><div class="s">Saldo final de la cuenta menos el detalle vigente (motor + detalle AVSOFT del contador). ${d.saldo_historico > 0 ? 'Provisión en la cuenta sin detalle por operación.' : 'El detalle del contador supera lo que hay en la cuenta: filas que ya se rebajaron en AVSOFT sin marcarse en su planilla.'} Lo concilia el contador; hasta entonces queda a la vista.</div></div>` : '');
   document.getElementById('cuadre').innerHTML =
     `<span class="ok"><i class="bi bi-check-circle"></i> Cuenta ${d.cuenta_provision}: SI ${clp(d.saldo_inicial)} + constituido ${clp(d.constituido)} − liberado ${clp(d.liberado)} = SF ${clp(d.saldo_final)}</span>`
     + ` <span class="text-muted ms-2">= detalle ${clp(d.motor_vigente)} + diferencia ${clp(d.saldo_historico)}</span>`;
@@ -113,19 +139,53 @@ async function cargar(){
   document.getElementById('thTercero').textContent = esParque ? 'Parque' : 'Dealer';
   document.getElementById('thBase').textContent = esParque ? 'Comisión + arriendo' : 'Bruto';
   document.getElementById('thProv').textContent = esParque ? 'Provisión' : 'Provisión (neto)';
-  const base = p => { if (!esParque) return clp(p.base_bruta); try { const m = JSON.parse(p.montos_json||'{}'); return `${clp(m.comision)} + ${clp(m.arriendo)}`; } catch(_) { return '—'; } };
-  document.getElementById('nPend').textContent = `— ${d.pendientes.length} · ${clp(d.pendientes.reduce((s,p)=>s+Number(p.monto),0))}`;
-  document.getElementById('pendBody').innerHTML = d.pendientes.length ? d.pendientes.map(p => `<tr>
-    <td class="mono">${esc(p.num_op||'—')}${p.origen_tipo==='AVSOFT'?' <span class="b" style="background:#fef3c7;color:#92400e" title="Detalle del contador (AVSOFT), fila '+esc(p.origen_id)+' de su planilla; sin asiento propio, ya vivía en la cuenta">AVSOFT</span>':''}</td><td>${esc(p.tercero||'—')}</td><td>${esc(p.mes)}</td><td>${fch(p.fecha_constitucion)}</td>
-    <td class="r">${base(p)}</td><td class="r fw-bold">${clp(p.monto)}</td><td class="r ${p.dias>60?'bad':''}">${p.dias}</td><td>${comp(p.id_comprobante_constitucion)}</td>
-    <td><button class="btn btn-sm btn-outline-secondary py-0" onclick="liberar(${p.id}, '${esc(p.num_op||p.origen_id)}')" title="Liberar a mano (queda auditado)">Liberar</button></td></tr>`).join('')
-    : '<tr><td colspan="9" class="text-center text-muted py-3">No hay provisiones vigentes</td></tr>';
+  renderPend();
   document.getElementById('movBody').innerHTML = d.movimientos.length ? d.movimientos.map(p => `<tr>
-    <td class="mono">${esc(p.num_op||p.origen_id)}</td><td>${esc(p.tercero||'—')}</td><td>${fch(p.fecha_constitucion)}</td><td class="r">${clp(p.monto)}</td>
+    <td class="mono">${esc(p.num_op||p.origen_id)}${badgeAv(p)}</td><td>${esc(p.tercero||'—')}</td><td>${fch(p.fecha_constitucion)}</td><td class="r">${clp(p.monto)}</td>
     <td><span class="b b-${esc(p.estado)}">${esc(p.estado)}</span></td><td>${fch(p.fecha_liberacion)}</td><td>${esc(p.motivo_liberacion||'—')}</td>
+    <td style="white-space:normal;max-width:360px;font-size:.76rem">${esc(p.liberada_contra||'')}</td>
     <td>${comp(p.id_comprobante_constitucion)} ${p.id_comprobante_liberacion ? '→ ' + comp(p.id_comprobante_liberacion) : ''}</td></tr>`).join('')
-    : '<tr><td colspan="8" class="text-center text-muted py-3">Sin movimientos en el mes</td></tr>';
+    : '<tr><td colspan="9" class="text-center text-muted py-3">Sin movimientos en el mes</td></tr>';
 }
+let DATA = null, ANIO = '';
+const badgeAv = p => p.origen_tipo==='AVSOFT' ? ' <span class="b" style="background:#fef3c7;color:#92400e" title="Detalle del contador (AVSOFT), fila '+esc(p.origen_id)+' de su planilla; sin asiento propio, ya vivía en la cuenta">AVSOFT</span>' : '';
+const enAnio = p => { const a = String(p.mes||'').slice(0,4); return !ANIO ? true : ANIO === '<2025' ? a < '2025' : a === ANIO; };
+const baseTxt = p => { if (document.getElementById('concepto').value !== 'PARQUE') return p.base_bruta != null ? Number(p.base_bruta) : ''; try { const m = JSON.parse(p.montos_json||'{}'); return `${clp(m.comision)} + ${clp(m.arriendo)}`; } catch(_) { return ''; } };
+function setAnio(a){ ANIO = a; document.querySelectorAll('#tgAnio .tg').forEach(b => b.classList.toggle('on', b.dataset.a === a)); renderPend(); }
+function renderPend(){
+  const d = DATA; if (!d) return;
+  const rows = d.pendientes.filter(enAnio);
+  document.getElementById('nPend').textContent = `— ${rows.length} · ${clp(rows.reduce((s,p)=>s+Number(p.monto),0))}` + (ANIO ? ` (de ${d.pendientes.length} · ${clp(d.pendientes.reduce((s,p)=>s+Number(p.monto),0))})` : '');
+  document.getElementById('pendBody').innerHTML = rows.length ? rows.map(p => `<tr>
+    <td class="mono">${esc(p.num_op||'—')}${badgeAv(p)}</td><td>${esc(p.tercero||'—')}</td><td>${esc(p.mes)}</td><td>${fch(p.fecha_constitucion)}</td>
+    <td class="r">${typeof baseTxt(p)==='number' ? clp(baseTxt(p)) : (baseTxt(p)||'—')}</td><td class="r fw-bold">${clp(p.monto)}</td><td class="r ${p.dias>60?'bad':''}">${p.dias}</td><td>${comp(p.id_comprobante_constitucion)}</td>
+    <td><button class="btn btn-sm btn-outline-secondary py-0" onclick="liberar(${p.id}, '${esc(p.num_op||p.origen_id)}')" title="Liberar a mano (queda auditado)">Liberar</button></td></tr>`).join('')
+    : '<tr><td colspan="9" class="text-center text-muted py-3">No hay provisiones vigentes' + (ANIO ? ' en ' + ANIO : '') + '</td></tr>';
+}
+/* ── Detalle de cada cuadro: pop-up + Excel ── */
+let DLG_ROWS = [], DLG_COLS = [], DLG_NOMBRE = '';
+const COLS_PROV = [['num_op','OP'],['origen_tipo','Origen'],['tercero','Dealer / Parque'],['rut_tercero','RUT'],['mes','Mes provisión'],['fecha_constitucion','Constituida',fch],['base_bruta','Bruto',n=>n==null?'':Number(n)],['montos_json','Desglose'],['monto','Provisión',n=>Number(n)],['estado','Estado'],['fecha_liberacion','Liberada',fch],['motivo_liberacion','Motivo'],['liberada_contra','Liberada contra'],['id_comprobante_constitucion','Comp. constitución'],['id_comprobante_liberacion','Comp. liberación'],['dias','Días'],['creado_por','Origen del dato']];
+const COLS_CTA  = [['fecha','Fecha',fch],['tipo','Tipo'],['numero','N°'],['origen','Origen'],['origen_ref','Referencia'],['glosa','Glosa comprobante'],['glosa_linea','Glosa línea'],['debe','Debe',n=>Number(n)],['haber','Haber',n=>Number(n)],['num_op','OP'],['rut','RUT'],['id_comprobante','Comprobante']];
+async function verDetalle(tipo, titulo){
+  const mes = document.getElementById('mes').value, concepto = document.getElementById('concepto').value;
+  const j = await fetch(`/api/contabilidad/provisiones/detalle?mes=${mes}&concepto=${concepto}&tipo=${tipo}`, { headers:H }).then(r=>r.json());
+  if (!j.success) { alert(j.error); return; }
+  DLG_ROWS = j.data; DLG_COLS = tipo === 'CUENTA' ? COLS_CTA : COLS_PROV; DLG_NOMBRE = `provisiones-${concepto.toLowerCase()}-${tipo.toLowerCase()}-${mes}`;
+  const montoCol = tipo === 'CUENTA' ? null : 'monto';
+  const tot = montoCol ? DLG_ROWS.reduce((s,r)=>s+Number(r[montoCol]||0),0) : DLG_ROWS.reduce((s,r)=>s+Number(r.haber||0)-Number(r.debe||0),0);
+  document.getElementById('dlgTitulo').textContent = titulo; document.getElementById('dlgSub').textContent = `${concepto} · ${mes} · ${DLG_ROWS.length} fila(s) · ${tipo==='CUENTA' ? 'haber − debe ' : ''}${clp(tot)}`;
+  const fmt = (c, r) => { const v = r[c[0]]; const f = c[2]; const x = f ? f(v) : v; return typeof x === 'number' ? clp(x) : esc(x==null?'':x); };
+  document.getElementById('dlgTabla').innerHTML = `<thead><tr>${DLG_COLS.map(c=>`<th>${esc(c[1])}</th>`).join('')}</tr></thead><tbody>` +
+    (DLG_ROWS.length ? DLG_ROWS.map(r => `<tr>${DLG_COLS.map(c => `<td class="${typeof (c[2]?c[2](r[c[0]]):r[c[0]])==='number'?'r':''}" style="${c[0]==='liberada_contra'||c[0]==='glosa'||c[0]==='glosa_linea'?'white-space:normal;min-width:260px':''}">${fmt(c, r)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${DLG_COLS.length}" class="text-center text-muted py-3">Sin filas</td></tr>`) + '</tbody>';
+  document.getElementById('dlg').showModal();
+}
+function aExcel(rows, cols, nombre){
+  const data = rows.map(r => { const o = {}; for (const c of cols) { const v = r[c[0]]; o[c[1]] = c[2] ? c[2](v) : (v == null ? '' : v); } return o; });
+  const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Detalle');
+  XLSX.writeFile(wb, nombre + '.xlsx');
+}
+function excelDlg(){ aExcel(DLG_ROWS, DLG_COLS, DLG_NOMBRE); }
+function excelPend(){ if (!DATA) return; aExcel(DATA.pendientes.filter(enAnio), COLS_PROV, `provisiones-${document.getElementById('concepto').value.toLowerCase()}-vigentes${ANIO?'-'+ANIO.replace('<','antes-'):''}`); }
 async function sincronizar(){
   const b = document.getElementById('btnSync'), m = document.getElementById('syncMsg'); b.disabled = true; m.textContent = 'Sincronizando…';
   try {

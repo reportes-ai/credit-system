@@ -48,6 +48,8 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
   await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1)");
   // Desglose por campo de la regla (parque: arriendo + comision); monto = total
   await pool.query('ALTER TABLE ctb_provisiones ADD COLUMN IF NOT EXISTS montos_json VARCHAR(400) NULL');
+  // Contra qué se liberó (factura N°/fecha/neto, pago, aprobación del parque, anulación, conciliación)
+  await pool.query('ALTER TABLE ctb_provisiones ADD COLUMN IF NOT EXISTS liberada_contra VARCHAR(240) NULL');
   // Reglas paramétricas (editables en Reglas de Centralización). INSERT IGNORE: si el Administrador las editó, se respetan.
   const R = [
     ['PROV_DEALER', 'Provisión comisión dealer (al otorgar)', 'Se dispara al OTORGAR un crédito con comisión dealer (motor provisiones): reconoce el gasto del mes de curse por el NETO de la comisión (sin IVA) y deja la provisión. Se libera al registrar la factura/boleta en Post Venta. Campos: monto (neto provisionado).', 'TRASPASO', 1, [
@@ -107,13 +109,15 @@ const contabilizar = (...a) => require('./motor-asientos').contabilizar(...a);
 async function documentoDealer(num_op, registradoDesde = null) {
   if (!num_op) return null;
   const [[d]] = await pool.query(
-    `SELECT fc.es_boleta, DATE_FORMAT(COALESCE(fc.fecha_factura, fc.created_at),'%Y-%m-%d') f
+    `SELECT fc.es_boleta, fc.numero_factura, fc.monto_bruto neto, fc.nombre_dealer, DATE_FORMAT(COALESCE(fc.fecha_factura, fc.created_at),'%Y-%m-%d') f
        FROM postventa_facturas_comision fc WHERE fc.num_op=? AND fc.monto_liquido IS NOT NULL ${registradoDesde ? 'AND fc.created_at >= ?' : ''}
       ORDER BY fc.created_at DESC LIMIT 1`, registradoDesde ? [num_op, registradoDesde] : [num_op]);
   if (!d) return null;
   // Nunca antes del arranque del motor: una factura vieja no puede mandar el asiento a un mes ya informado
   const fecha = registradoDesde && d.f < registradoDesde ? registradoDesde : d.f;
-  return { tipo: Number(d.es_boleta) ? 'BOLETA' : 'FACTURA', fecha };
+  const tipo = Number(d.es_boleta) ? 'BOLETA' : 'FACTURA';
+  const contra = `${tipo === 'BOLETA' ? 'Boleta' : 'Factura'} N° ${d.numero_factura || 's/n'} del ${(d.f || '').split('-').reverse().join('-')} · neto $${Math.round(Number(d.neto) || 0).toLocaleString('es-CL')}${d.nombre_dealer ? ' · ' + d.nombre_dealer : ''}`;
+  return { tipo, fecha, contra };
 }
 
 /* Constituye la provisión de comisión dealer de UN crédito otorgado. Idempotente. Devuelve la fila o null (con motivo). */
@@ -154,11 +158,12 @@ async function constituirDealer(idCredito, usuario = 'Motor provisiones') {
 /* Libera (reversa íntegra) la provisión CONSTITUIDA de un crédito. motivo: FACTURA | BOLETA | ANULACION | MANUAL */
 /* Libera UNA fila de provisión dealer (del motor: origen CREDITO, o del detalle AVSOFT del contador:
    origen AVSOFT, cargado el 24-09-2026 sin asiento porque ya vivía en la cuenta). Ref idempotente por fila. */
-async function _liberarFilaDealer(p, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones') {
+async function _liberarFilaDealer(p, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
   const C = CONCEPTOS.DEALER;
   try {
     const fecha = await fechaContable(fechaISO || hoyISO());
-    const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'", [motivo, fecha, p.id]);
+    const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, liberada_contra=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'",
+      [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
     if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
     const ref = p.origen_tipo === 'CREDITO' ? `PROV-DEALER-${p.origen_id}-LIB` : `PROV-DEALER-${p.origen_tipo}-${p.origen_id}-LIB`;
     const id = await contabilizar({
@@ -172,24 +177,26 @@ async function _liberarFilaDealer(p, motivo = 'MANUAL', fechaISO = null, usuario
   } catch (e) { console.error('[provisiones liberarDealer]', p.id, e.message); return { error: e.message }; }
 }
 /* Libera (reversa íntegra) la provisión CONSTITUIDA de un crédito: la del motor y, si existe, la de AVSOFT amarrada a su OP */
-async function liberarDealer(idCredito, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones') {
+async function liberarDealer(idCredito, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
   const [[c]] = await pool.query('SELECT num_op FROM creditos WHERE id=?', [idCredito]);
   const [filas] = await pool.query(
     `SELECT * FROM ctb_provisiones WHERE concepto='DEALER' AND estado='CONSTITUIDA'
        AND ((origen_tipo='CREDITO' AND origen_id=?) OR (origen_tipo='AVSOFT' AND num_op IS NOT NULL AND num_op=?))`, [idCredito, c ? c.num_op : null]);
   if (!filas.length) return { skip: 'sin provisión constituida' };
+  // Si no nos dicen contra qué, se busca el documento de la OP (factura/boleta) para dejarlo escrito
+  if (!contra && (motivo === 'FACTURA' || motivo === 'BOLETA') && c) { const d = await documentoDealer(c.num_op); if (d) contra = d.contra; }
   let out = null;
-  for (const p of filas) { const r = await _liberarFilaDealer(p, motivo, fechaISO, usuario); if (r && r.id) out = out ? { ...out, monto: out.monto + r.monto, n: (out.n || 1) + 1 } : r; }
+  for (const p of filas) { const r = await _liberarFilaDealer(p, motivo, fechaISO, usuario, contra); if (r && r.id) out = out ? { ...out, monto: out.monto + r.monto, n: (out.n || 1) + 1 } : r; }
   return out || { skip: 'nada liberado' };
 }
-async function liberarDealerPorNumOp(num_op, motivo, fechaISO, usuario) {
+async function liberarDealerPorNumOp(num_op, motivo, fechaISO, usuario, contra = null) {
   const [[c]] = await pool.query('SELECT id FROM creditos WHERE num_op=? LIMIT 1', [num_op]);
-  return c ? liberarDealer(c.id, motivo, fechaISO, usuario) : { skip: 'sin crédito' };
+  return c ? liberarDealer(c.id, motivo, fechaISO, usuario, contra) : { skip: 'sin crédito' };
 }
-async function liberarFilaPorId(idFila, motivo, fechaISO, usuario) {
+async function liberarFilaPorId(idFila, motivo, fechaISO, usuario, contra = null) {
   const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE id=? AND estado='CONSTITUIDA'", [idFila]);
   if (!p) return { skip: 'sin provisión constituida' };
-  return p.concepto === 'PARQUE' ? liberarParque(p.origen_id, motivo, fechaISO, usuario) : _liberarFilaDealer(p, motivo, fechaISO, usuario);
+  return p.concepto === 'PARQUE' ? liberarParque(p.origen_id, motivo, fechaISO, usuario, contra) : _liberarFilaDealer(p, motivo, fechaISO, usuario, contra);
 }
 
 /* Red de seguridad: constituye lo otorgado sin provisión y libera lo facturado o anulado. */
@@ -209,17 +216,17 @@ async function sincronizarDealer(usuario = 'Motor provisiones') {
       LEFT JOIN creditos c ON c.id = CASE WHEN p.origen_tipo='CREDITO' THEN p.origen_id END
      WHERE p.concepto='DEALER' AND p.estado='CONSTITUIDA' AND (p.origen_tipo='CREDITO' OR p.num_op IS NOT NULL)`);
   for (const p of abiertas) {
-    if (p.origen_tipo === 'CREDITO' && p.est !== 'OTORGADO') { const x = await _liberarFilaDealer(p, 'ANULACION', null, usuario); if (x && x.id) out.liberadas++; continue; }
+    if (p.origen_tipo === 'CREDITO' && p.est !== 'OTORGADO') { const x = await _liberarFilaDealer(p, 'ANULACION', null, usuario, `Crédito en estado ${p.est}`); if (x && x.id) out.liberadas++; continue; }
     // AVSOFT: solo documentos registrados desde que el motor manda (los anteriores ya los rebajó el contador o son parte de su diferencia)
     const d = await documentoDealer(p.num_op, p.origen_tipo === 'AVSOFT' ? `${desde}-01` : null);
-    if (d) { const x = await _liberarFilaDealer(p, d.tipo, d.fecha, usuario); if (x && x.id) out.liberadas++; continue; }
+    if (d) { const x = await _liberarFilaDealer(p, d.tipo, d.fecha, usuario, d.contra); if (x && x.id) out.liberadas++; continue; }
     // AVSOFT sin factura por OP pero con COMISION PAGADA en el Seguimiento desde el arranque (típico: comisiones de
     // parque que el contador provisionó en 2106011 y se pagan por la cartola del parque): el pago es la evidencia.
     if (p.origen_tipo === 'AVSOFT') {
       const [[pg]] = await pool.query(
         `SELECT DATE_FORMAT(MIN(e.fecha),'%Y-%m-%d') f FROM postventa_etapas e JOIN postventa_seguimiento s ON s.id=e.id_seguimiento
           JOIN creditos c ON c.id=s.id_credito WHERE c.num_op=? AND e.track='COMISION' AND e.etapa LIKE '%PAGAD%' AND e.fecha >= ?`, [p.num_op, `${desde}-01`]);
-      if (pg && pg.f) { const x = await _liberarFilaDealer(p, 'PAGO', pg.f, usuario); if (x && x.id) out.liberadas++; }
+      if (pg && pg.f) { const x = await _liberarFilaDealer(p, 'PAGO', pg.f, usuario, `Comisión pagada el ${pg.f.split('-').reverse().join('-')} (Seguimiento Post Venta, sin factura por OP)`); if (x && x.id) out.liberadas++; }
     }
   }
   return out;
@@ -272,13 +279,14 @@ async function constituirParque(idCredito, usuario = 'Motor provisiones') {
 }
 
 /* Libera (reversa íntegra) la provisión PARQUE de un crédito. motivo: APROBACION | ANULACION | MANUAL */
-async function liberarParque(idCredito, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones') {
+async function liberarParque(idCredito, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
   const C = CONCEPTOS.PARQUE;
   try {
     const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto='PARQUE' AND origen_tipo='CREDITO' AND origen_id=? AND estado='CONSTITUIDA'", [idCredito]);
     if (!p) return { skip: 'sin provisión constituida' };
     const fecha = await fechaContable(fechaISO || hoyISO());
-    const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'", [motivo, fecha, p.id]);
+    const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, liberada_contra=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'",
+      [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
     if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
     let montos; try { montos = JSON.parse(p.montos_json || ''); } catch (_) { montos = null; }
     if (!montos) montos = { comision: Number(p.monto), arriendo: 0 };
@@ -297,7 +305,8 @@ async function liberarParquePorPago(parque, mes, fechaISO = null, usuario = 'Mot
     `SELECT c.id FROM parques_pagos_ops po JOIN creditos c ON c.num_op=po.num_op
       WHERE po.parque=? AND DATE_FORMAT(po.mes,'%Y-%m')=?`, [parque, mes]);
   let n = 0;
-  for (const o of ops) { const x = await liberarParque(o.id, 'APROBACION', fechaISO, usuario); if (x && x.id) n++; }
+  const contra = `Pago del parque ${parque} ${mes} aprobado (Comisiones Parques, devengo COMISION_PARQUES)`;
+  for (const o of ops) { const x = await liberarParque(o.id, 'APROBACION', fechaISO, usuario, contra); if (x && x.id) n++; }
   return { liberadas: n, ops: ops.length };
 }
 
@@ -315,9 +324,9 @@ async function sincronizarParque(usuario = 'Motor provisiones') {
     `SELECT p.origen_id id, p.num_op, UPPER(COALESCE(c.estado_credito,'')) est FROM ctb_provisiones p
       JOIN creditos c ON c.id=p.origen_id WHERE p.concepto='PARQUE' AND p.estado='CONSTITUIDA'`);
   for (const p of abiertas) {
-    if (p.est !== 'OTORGADO') { const x = await liberarParque(p.id, 'ANULACION', null, usuario); if (x && x.id) out.liberadas++; continue; }
+    if (p.est !== 'OTORGADO') { const x = await liberarParque(p.id, 'ANULACION', null, usuario, `Crédito en estado ${p.est}`); if (x && x.id) out.liberadas++; continue; }
     const a = await pagoParqueAprobado(p.num_op);
-    if (a) { const x = await liberarParque(p.id, 'APROBACION', a.f, usuario); if (x && x.id) out.liberadas++; }
+    if (a) { const x = await liberarParque(p.id, 'APROBACION', a.f, usuario, `Pago del parque ${a.parque} ${a.mes} aprobado (Comisiones Parques, devengo COMISION_PARQUES)`); if (x && x.id) out.liberadas++; }
   }
   return out;
 }
@@ -359,6 +368,27 @@ async function cuadro(mes, concepto = 'DEALER') {
     motor_vigente, motor_n_vigente: sf.n, avsoft_vigente, avsoft_n, saldo_historico, pendientes, movimientos: movs, desde };
 }
 
+/* Detalle detrás de cada cuadro (pop-up y Excel). tipo: INICIAL | CONSTITUIDO | LIBERADO | VIGENTE | CUENTA */
+async function detalle(mes, concepto, tipo) {
+  const cta = CONCEPTOS[concepto].cuentaProv;
+  const cols = 'p.*, DATEDIFF(CURDATE(), p.fecha_constitucion) dias';
+  const q = {
+    INICIAL:     [`SELECT ${cols} FROM ctb_provisiones p WHERE p.concepto=? AND DATE_FORMAT(p.fecha_constitucion,'%Y-%m') < ? AND (p.estado='CONSTITUIDA' OR DATE_FORMAT(p.fecha_liberacion,'%Y-%m') >= ?) ORDER BY p.fecha_constitucion, p.id`, [concepto, mes, mes]],
+    CONSTITUIDO: [`SELECT ${cols} FROM ctb_provisiones p WHERE p.concepto=? AND DATE_FORMAT(p.fecha_constitucion,'%Y-%m') = ? ORDER BY p.fecha_constitucion, p.id`, [concepto, mes]],
+    LIBERADO:    [`SELECT ${cols} FROM ctb_provisiones p WHERE p.concepto=? AND p.estado='LIBERADA' AND DATE_FORMAT(p.fecha_liberacion,'%Y-%m') = ? ORDER BY p.fecha_liberacion, p.id`, [concepto, mes]],
+    VIGENTE:     [`SELECT ${cols} FROM ctb_provisiones p WHERE p.concepto=? AND DATE_FORMAT(p.fecha_constitucion,'%Y-%m') <= ? AND (p.estado='CONSTITUIDA' OR DATE_FORMAT(p.fecha_liberacion,'%Y-%m') > ?) ORDER BY p.fecha_constitucion, p.id`, [concepto, mes, mes]],
+  }[tipo];
+  if (q) { const [r] = await pool.query(q[0], q[1]); return r; }
+  if (tipo === 'CUENTA') {
+    const [r] = await pool.query(
+      `SELECT c.id id_comprobante, DATE_FORMAT(c.fecha,'%Y-%m-%d') fecha, c.tipo, c.numero, c.origen, c.origen_ref, c.glosa, m.glosa glosa_linea, m.debe, m.haber, m.num_op, m.rut
+         FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+        WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') = ? ORDER BY c.fecha, c.id`, [cta, mes]);
+    return r;
+  }
+  throw new Error('Tipo de detalle desconocido');
+}
+
 const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque };
 const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque };
 /* Al otorgar: todos los conceptos que nacen con el crédito (fire-and-forget, nunca lanza) */
@@ -375,4 +405,4 @@ async function tick() {
 require('../../../shared/scheduler.js').programar('provisiones-devengo', tick, 6 * 60 * 60 * 1000, { arranqueMs: 3 * 60 * 1000 });
 
 module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constituirDealer, liberarDealer, liberarDealerPorNumOp, liberarFilaPorId, sincronizarDealer,
-  constituirParque, liberarParque, liberarParquePorPago, sincronizarParque, cuadro };
+  constituirParque, liberarParque, liberarParquePorPago, sincronizarParque, cuadro, detalle };
