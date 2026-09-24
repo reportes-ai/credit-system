@@ -29,6 +29,11 @@ const CONCEPTOS = {
      la 2106012 es el "por pagar" que deja COMISION_PARQUES al aprobar el mes). Se libera al APROBAR el pago
      del parque del mes en Post Venta → Comisiones Parques (foto parques_pagos_ops) o al anular. */
   PARQUE: { nombre: 'Comisión y arriendo parque', regla: 'PROV_PARQUE', reglaLib: 'PROV_PARQUE_LIB', cuentaProv: '2106013', cuentaGasto: '4001100 / 4002100', paramDesde: 'prov_parque_desde' },
+  /* EJECUTIVO (24-09-2026): al otorgar se provisiona la comisión estimada del ejecutivo de la operación
+     (creditos.comej = monto financiado × %: carta > producto > pct_ejecutivo_fin) contra 2106014. Se libera
+     cuando Operaciones APRUEBA la comisión del ejecutivo del mes en Revisión de Comisiones; en ese acto entra
+     el devengo real por COMISION_EJECUTIVOS (incentivo aprobado, con semana corrida) contra 2106060. */
+  EJECUTIVO: { nombre: 'Comisión ejecutivo', regla: 'PROV_EJECUTIVO', reglaLib: 'PROV_EJECUTIVO_LIB', cuentaProv: '2106014', cuentaGasto: '4001100', paramDesde: 'prov_ejecutivo_desde' },
 };
 
 require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
@@ -44,8 +49,8 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
     creado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
     UNIQUE KEY uq_origen (concepto, origen_tipo, origen_id), INDEX idx_estado (concepto, estado), INDEX idx_mes (mes))`);
   await pool.query('CREATE TABLE IF NOT EXISTS ctb_config (clave VARCHAR(60) PRIMARY KEY, valor VARCHAR(200) NOT NULL)');
-  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09')");
-  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1)");
+  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09')");
+  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1)");
   // Desglose por campo de la regla (parque: arriendo + comision); monto = total
   await pool.query('ALTER TABLE ctb_provisiones ADD COLUMN IF NOT EXISTS montos_json VARCHAR(400) NULL');
   // Contra qué se liberó (factura N°/fecha/neto, pago, aprobación del parque, anulación, conciliación)
@@ -71,6 +76,14 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
       ['2106013', 'DEBE',  'arriendo', 'Liberación provisión parque (arriendo)'],
       ['4001100', 'HABER', 'comision', 'Abono comisión parque provisionada'],
       ['4002100', 'HABER', 'arriendo', 'Abono arriendo parque provisionado'],
+    ]],
+    ['PROV_EJECUTIVO', 'Provisión comisión ejecutivo (al otorgar)', 'Se dispara al OTORGAR un crédito (motor provisiones): reconoce en el mes de curse la comisión estimada del ejecutivo de la operación (creditos.comej: monto financiado × % de la carta, del producto o de Parámetros de Crédito) y deja la provisión. Se libera al aprobar la comisión del ejecutivo del mes en Revisión de Comisiones. Campos: monto.', 'TRASPASO', 1, [
+      ['4001100', 'DEBE',  'monto', 'Provisión comisión ejecutivo'],
+      ['2106014', 'HABER', 'monto', 'Provisión comisiones ejecutivos'],
+    ]],
+    ['PROV_EJECUTIVO_LIB', 'Liberación provisión comisión ejecutivo', 'Se dispara al APROBAR en Revisión de Comisiones la comisión del ejecutivo del mes (entra el devengo real por COMISION_EJECUTIVOS) o al anular la operación: reversa íntegra la provisión de cada crédito del ejecutivo en ese mes. Campos: monto.', 'TRASPASO', 1, [
+      ['2106014', 'DEBE',  'monto', 'Liberación provisión comisión ejecutivo'],
+      ['4001100', 'HABER', 'monto', 'Abono comisión ejecutivo provisionada'],
     ]],
   ];
   for (const [evento, nombre, desc, tipo, activa, lineas] of R) {
@@ -196,7 +209,9 @@ async function liberarDealerPorNumOp(num_op, motivo, fechaISO, usuario, contra =
 async function liberarFilaPorId(idFila, motivo, fechaISO, usuario, contra = null) {
   const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE id=? AND estado='CONSTITUIDA'", [idFila]);
   if (!p) return { skip: 'sin provisión constituida' };
-  return p.concepto === 'PARQUE' ? liberarParque(p.origen_id, motivo, fechaISO, usuario, contra) : _liberarFilaDealer(p, motivo, fechaISO, usuario, contra);
+  if (p.concepto === 'PARQUE') return liberarParque(p.origen_id, motivo, fechaISO, usuario, contra);
+  if (p.concepto === 'EJECUTIVO') return liberarEjecutivo(p.origen_id, motivo, fechaISO, usuario, contra);
+  return _liberarFilaDealer(p, motivo, fechaISO, usuario, contra);
 }
 
 /* Red de seguridad: constituye lo otorgado sin provisión y libera lo facturado o anulado. */
@@ -368,6 +383,106 @@ async function cuadro(mes, concepto = 'DEALER') {
     motor_vigente, motor_n_vigente: sf.n, avsoft_vigente, avsoft_n, saldo_historico, pendientes, movimientos: movs, desde };
 }
 
+/* ── EJECUTIVO ──────────────────────────────────────────────────────────────── */
+/* Mes de atribución de comisiones del crédito (motor único shared/mes-atribucion) para un id */
+async function mesAtribucionEjecutivo(idCredito) {
+  const ATRIB = require('../../../shared/mes-atribucion');
+  const corte = await ATRIB.mesCorte();
+  const [[r]] = await pool.query(`SELECT DATE_FORMAT(c.mes,'%Y-%m') mes_c, DATE_FORMAT(c.fecha_otorgado,'%Y-%m') mes_f FROM creditos c WHERE c.id=?`, [idCredito]);
+  if (!r) return null;
+  // Desde el corte manda la fecha de curse; antes el mes contable ajustado (misma definición que MES_SQL)
+  return (r.mes_f && r.mes_f >= corte) ? r.mes_f : (r.mes_c || r.mes_f);
+}
+/* ¿La comisión del ejecutivo de ese mes ya está aprobada por Operaciones? → { fecha, total } | null */
+async function aprobacionEjecutivo(ejecutivo, mes) {
+  if (!ejecutivo || !mes) return null;
+  const [[a]] = await pool.query(
+    `SELECT DATE_FORMAT(aprobado_at,'%Y-%m-%d') f, incentivo_final, con_semana_corrida FROM comisiones_aprobaciones WHERE ejecutivo=? AND mes=? AND estado='aprobado'`, [ejecutivo, mes]);
+  if (!a) return null;
+  return { fecha: a.f, total: Math.round(Number(a.con_semana_corrida) || Number(a.incentivo_final) || 0) };
+}
+
+async function constituirEjecutivo(idCredito, usuario = 'Motor provisiones') {
+  const C = CONCEPTOS.EJECUTIVO;
+  try {
+    const [[c]] = await pool.query(
+      `SELECT id, num_op, UPPER(COALESCE(estado_credito,'')) est, comej, ejecutivo, DATE_FORMAT(fecha_otorgado,'%Y-%m-%d') fo, DATE_FORMAT(mes,'%Y-%m') mes FROM creditos WHERE id=?`, [idCredito]);
+    if (!c) return { skip: 'sin crédito' };
+    if (c.est !== 'OTORGADO') return { skip: 'no otorgado' };
+    const monto = Math.round(Number(c.comej) || 0);
+    if (monto <= 0) return { skip: 'sin comisión ejecutivo (comej)' };
+    if (!c.ejecutivo) return { skip: 'sin ejecutivo' };
+    const desde = await param(C.paramDesde, '2026-09');
+    const mes = c.mes || (c.fo || '').slice(0, 7);
+    if (!mes || mes < desde) return { skip: `anterior a ${desde}` };
+    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto='EJECUTIVO' AND origen_tipo='CREDITO' AND origen_id=?", [idCredito]);
+    if (ya) return { skip: `ya ${ya.estado.toLowerCase()}`, id: ya.id };
+    const mesAtr = await mesAtribucionEjecutivo(idCredito);
+    if (await aprobacionEjecutivo(c.ejecutivo, mesAtr)) return { skip: 'comisión del mes ya aprobada (devengo real)' };
+    const fecha = await fechaContable(c.fo || `${mes}-01`);
+    const [ins] = await pool.query(
+      `INSERT IGNORE INTO ctb_provisiones (concepto, origen_tipo, origen_id, num_op, tercero, mes, fecha_constitucion, monto, creado_por)
+       VALUES ('EJECUTIVO','CREDITO',?,?,?,?,?,?,?)`, [idCredito, c.num_op || null, c.ejecutivo, mes, fecha, monto, usuario]);
+    if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
+    const id = await contabilizar({
+      evento: C.regla, fecha, ref: `PROV-EJECUTIVO-${idCredito}`, montos: { monto },
+      glosa: `Provisión comisión ejecutivo OP ${c.num_op || idCredito} — ${c.ejecutivo}`.slice(0, 300), num_op: c.num_op || null,
+      detalle: `OP ${c.num_op || idCredito} · ${c.ejecutivo} · mes de comisión ${mesAtr || mes}`,
+    });
+    await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
+    return { id: ins.insertId, monto, id_comprobante: id };
+  } catch (e) { console.error('[provisiones constituirEjecutivo]', idCredito, e.message); return { error: e.message }; }
+}
+async function liberarEjecutivo(idCredito, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
+  const C = CONCEPTOS.EJECUTIVO;
+  try {
+    const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto='EJECUTIVO' AND origen_tipo='CREDITO' AND origen_id=? AND estado='CONSTITUIDA'", [idCredito]);
+    if (!p) return { skip: 'sin provisión constituida' };
+    const fecha = await fechaContable(fechaISO || hoyISO());
+    const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, liberada_contra=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'",
+      [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
+    if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
+    const id = await contabilizar({
+      evento: C.reglaLib, fecha, ref: `PROV-EJECUTIVO-${idCredito}-LIB`, montos: { monto: Number(p.monto) },
+      glosa: `Liberación provisión comisión ejecutivo OP ${p.num_op || idCredito} — ${p.tercero || ''} (${motivo.toLowerCase()})`.slice(0, 300), num_op: p.num_op || null,
+      detalle: `OP ${p.num_op || idCredito} · ${p.tercero || 'ejecutivo'} · ${motivo} · por ${usuario}`,
+    });
+    await pool.query('UPDATE ctb_provisiones SET id_comprobante_liberacion=? WHERE id=?', [id, p.id]);
+    return { id: p.id, monto: Number(p.monto), id_comprobante: id };
+  } catch (e) { console.error('[provisiones liberarEjecutivo]', idCredito, e.message); return { error: e.message }; }
+}
+/* Al aprobar la comisión del ejecutivo del mes: libera las provisiones de sus créditos de ese mes de atribución */
+async function liberarEjecutivoPorAprobacion(ejecutivo, mes, fechaISO = null, usuario = 'Motor provisiones', total = null) {
+  const ATRIB = require('../../../shared/mes-atribucion');
+  const [ops] = await pool.query(
+    `SELECT p.origen_id id FROM ctb_provisiones p JOIN creditos c ON c.id=p.origen_id
+      WHERE p.concepto='EJECUTIVO' AND p.estado='CONSTITUIDA' AND c.ejecutivo=? AND ${ATRIB.MES_SQL(mes, await ATRIB.mesCorte(), 'c')} = ?`, [ejecutivo, mes]);
+  const contra = `Comisión de ${ejecutivo} ${mes} aprobada en Revisión de Comisiones${total != null ? ' · total $' + Math.round(total).toLocaleString('es-CL') : ''} (devengo COMISION_EJECUTIVOS)`;
+  let n = 0;
+  for (const o of ops) { const x = await liberarEjecutivo(o.id, 'APROBACION', fechaISO, usuario, contra); if (x && x.id) n++; }
+  return { liberadas: n, ops: ops.length };
+}
+async function sincronizarEjecutivo(usuario = 'Motor provisiones') {
+  const desde = await param(CONCEPTOS.EJECUTIVO.paramDesde, '2026-09');
+  const out = { constituidas: 0, liberadas: 0, omitidas: 0 };
+  const [pend] = await pool.query(
+    `SELECT c.id FROM creditos c
+      LEFT JOIN ctb_provisiones p ON p.concepto='EJECUTIVO' AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
+     WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND COALESCE(c.comej,0)>0 AND c.ejecutivo IS NOT NULL AND c.ejecutivo<>''
+       AND DATE_FORMAT(COALESCE(c.mes, c.fecha_otorgado),'%Y-%m') >= ? AND p.id IS NULL`, [desde]);
+  for (const r of pend) { const x = await constituirEjecutivo(r.id, usuario); if (x && x.id && !x.skip) out.constituidas++; else out.omitidas++; }
+  const [abiertas] = await pool.query(
+    `SELECT p.origen_id id, c.ejecutivo, UPPER(COALESCE(c.estado_credito,'')) est FROM ctb_provisiones p
+      JOIN creditos c ON c.id=p.origen_id WHERE p.concepto='EJECUTIVO' AND p.estado='CONSTITUIDA'`);
+  for (const p of abiertas) {
+    if (p.est !== 'OTORGADO') { const x = await liberarEjecutivo(p.id, 'ANULACION', null, usuario, `Crédito en estado ${p.est}`); if (x && x.id) out.liberadas++; continue; }
+    const mesAtr = await mesAtribucionEjecutivo(p.id);
+    const a = await aprobacionEjecutivo(p.ejecutivo, mesAtr);
+    if (a) { const x = await liberarEjecutivo(p.id, 'APROBACION', a.fecha, usuario, `Comisión de ${p.ejecutivo} ${mesAtr} aprobada en Revisión de Comisiones · total $${a.total.toLocaleString('es-CL')} (devengo COMISION_EJECUTIVOS)`); if (x && x.id) out.liberadas++; }
+  }
+  return out;
+}
+
 /* Detalle detrás de cada cuadro (pop-up y Excel). tipo: INICIAL | CONSTITUIDO | LIBERADO | VIGENTE | CUENTA */
 async function detalle(mes, concepto, tipo) {
   const cta = CONCEPTOS[concepto].cuentaProv;
@@ -389,11 +504,11 @@ async function detalle(mes, concepto, tipo) {
   throw new Error('Tipo de detalle desconocido');
 }
 
-const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque };
-const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque };
+const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo };
+const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, EJECUTIVO: liberarEjecutivo };
 /* Al otorgar: todos los conceptos que nacen con el crédito (fire-and-forget, nunca lanza) */
 async function constituirAlOtorgar(idCredito, usuario) {
-  const r = { DEALER: await constituirDealer(idCredito, usuario), PARQUE: await constituirParque(idCredito, usuario) };
+  const r = { DEALER: await constituirDealer(idCredito, usuario), PARQUE: await constituirParque(idCredito, usuario), EJECUTIVO: await constituirEjecutivo(idCredito, usuario) };
   return r;
 }
 async function tick() {
@@ -405,4 +520,5 @@ async function tick() {
 require('../../../shared/scheduler.js').programar('provisiones-devengo', tick, 6 * 60 * 60 * 1000, { arranqueMs: 3 * 60 * 1000 });
 
 module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constituirDealer, liberarDealer, liberarDealerPorNumOp, liberarFilaPorId, sincronizarDealer,
-  constituirParque, liberarParque, liberarParquePorPago, sincronizarParque, cuadro, detalle };
+  constituirParque, liberarParque, liberarParquePorPago, sincronizarParque,
+  constituirEjecutivo, liberarEjecutivo, liberarEjecutivoPorAprobacion, sincronizarEjecutivo, cuadro, detalle };

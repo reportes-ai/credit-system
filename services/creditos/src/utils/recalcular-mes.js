@@ -191,7 +191,12 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
     comdea_real = Math.round(saldo * PR.dealerPct(reglas, plazo));
     if (esParque) com_parque = Math.round(saldo * PR.parquePct(reglas));
   }
-  return { monto_capitalizado: montoCap, monto_comision_fin, comdea_real, com_parque, arriendo };
+  // Comisión ejecutivo (misma precedencia que calcular-operacion): carta com_ejec_pct > % del producto > pct_ejecutivo_fin.
+  // Antes el recálculo mensual no la escribía y comej quedaba NULL en toda la carga Trinidad (24-09-2026).
+  let pctEj = (reglas && PR.ejecutivoPct(reglas) != null) ? PR.ejecutivoPct(reglas) : (parseFloat(p.pct_ejecutivo_fin) || 0) / 100;
+  if (op.com_ejec_pct != null && op.com_ejec_pct !== '' && !isNaN(Number(op.com_ejec_pct))) pctEj = Number(op.com_ejec_pct) / 100;
+  const comej = core.comisionEjecutivo({ montoFin, pctEj });
+  return { monto_capitalizado: montoCap, monto_comision_fin, comdea_real, com_parque, arriendo, comej };
 }
 
 /* ── Detectar y marcar campos forzados ──────────────────────────────────────
@@ -290,7 +295,7 @@ async function recalcularMeses(meses, opciones = {}) {
              seguro_rdh, seguro_cesantia, seguro_rep_menor,
              com_rdh, com_cesantia, com_reparaciones,
              pen_rdh, pen_cesantia, pen_reparaciones,
-             tascli_real,
+             tascli_real, producto, com_ejec_pct,
              campos_forzados, monto_comision_fin, comdea_real, com_parque
       FROM creditos
       WHERE DATE_FORMAT(mes, '%Y-%m') = ?
@@ -413,6 +418,7 @@ async function recalcularMeses(meses, opciones = {}) {
           pen_cesantia        = ?,
           pen_reparaciones    = ?,
           ingreso_neto_total  = ?,
+          comej               = ?,
           updated_at          = NOW()
         WHERE id = ?
       `, [
@@ -428,6 +434,7 @@ async function recalcularMeses(meses, opciones = {}) {
         pen_cesantia,
         pen_reparaciones,
         ingreso_neto_total,
+        calc.comej || 0,
         op.id,
       ]);
 

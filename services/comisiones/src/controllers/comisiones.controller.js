@@ -989,6 +989,19 @@ const aprobar = async (req, res) => {
         `UPDATE comisiones_aprobaciones SET ejec_estado='pendiente', ejec_comentario=NULL, ejec_por=NULL, ejec_at=NULL
          WHERE ejecutivo=? AND mes=?`, [ejecutivo, mes]);
       await notificarComisionRev('com_rev_aprobada_ops', { ejecutivo, mes });
+      /* Máxima 4 (24-09-2026): al aprobar entra el DEVENGO REAL de la comisión del ejecutivo del mes
+         (regla COMISION_EJECUTIVOS, 4001100 / 2106060) por lo que RRHH paga (con semana corrida si aplica),
+         y se liberan las provisiones al otorgar de sus créditos del mes (motor único provisiones.js).
+         Idempotente por ref: re-aprobar tras un rechazo no duplica el asiento. Nunca bloquea. */
+      try {
+        const totalReal = Math.round(Number(con_semana_corrida) || Number(incentivo_final) || 0);
+        if (totalReal > 0) await require('../../../contabilidad/src/motor-asientos').contabilizar({
+          evento: 'COMISION_EJECUTIVOS', ref: `COMEJ-${ejecutivo}-${mes}`, montos: { monto: totalReal },
+          glosa: `Comisión ejecutivo ${ejecutivo} — ${mes} aprobada`, detalle: `${ejecutivo} · ${mes} · incentivo $${Math.round(Number(incentivo_final) || 0).toLocaleString('es-CL')}${Number(con_semana_corrida) ? ' · con semana corrida' : ''}`,
+        });
+        const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || 'Revisión de Comisiones';
+        await require('../../../contabilidad/src/provisiones').liberarEjecutivoPorAprobacion(ejecutivo, mes, null, quien, totalReal);
+      } catch (e) { console.error('[comisiones aprobar→contabilidad]', e.message); }
       // Saldo de descuentos manuales que la comisión del mes no alcanzó a cubrir → mes siguiente
       traslado = await require('./descuentos.controller').trasladarSaldo(ejecutivo, mes, filaAprobada, req).catch(e => { console.error('[traslado saldo]', e.message); return null; });
     }

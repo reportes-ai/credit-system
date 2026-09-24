@@ -108,6 +108,7 @@ require('../../../../shared/migrate').enFila('cierre-mes', async () => {
     for (const [auto, nombre, desc, orden] of [
       ['PROVISION_DEALER', 'Provisiones de comisión dealer cuadradas', 'Toda otorgada del mes con comisión dealer tiene su provisión (o ya su factura) y los asientos del motor calzan con sus provisiones en la cuenta 2106011.', 8],
       ['PROVISION_PARQUE', 'Provisiones de parques cuadradas', 'Toda otorgada del mes con comisión o arriendo de parque tiene su provisión (o el pago del parque ya aprobado) y los asientos del motor calzan en la cuenta 2106013.', 9],
+      ['PROVISION_EJECUTIVO', 'Provisiones de comisión ejecutivo cuadradas', 'Toda otorgada del mes con comisión de ejecutivo tiene su provisión (o la comisión del mes ya aprobada) y los asientos del motor calzan en la cuenta 2106014.', 10],
     ]) {
       const [[hay]] = await pool.query('SELECT COUNT(*) n FROM cierre_checklist_items WHERE check_auto=?', [auto]);
       if (hay.n) continue;
@@ -167,6 +168,7 @@ const CHECKS_AUTO = {
      otorgada del mes con comisión sin provisión ni documento, y saldo del motor = cuenta 2106011. */
   async PROVISION_DEALER(mes) { return CHECKS_AUTO._provision(mes, 'DEALER'); },
   async PROVISION_PARQUE(mes) { return CHECKS_AUTO._provision(mes, 'PARQUE'); },
+  async PROVISION_EJECUTIVO(mes) { return CHECKS_AUTO._provision(mes, 'EJECUTIVO'); },
   async _provision(mes, concepto) {
     const prov = require('../../../contabilidad/src/provisiones');
     const K = prov.CONCEPTOS[concepto];
@@ -179,12 +181,18 @@ const CHECKS_AUTO = {
         LEFT JOIN postventa_facturas_comision fc ON fc.num_op=c.num_op AND fc.monto_liquido IS NOT NULL
        WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND COALESCE(c.comdea_real,0)>0
          AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND fc.id_seguimiento IS NULL`, [mes])
-    : await pool.query(
+    : concepto === 'PARQUE' ? await pool.query(
       `SELECT COUNT(*) n, GROUP_CONCAT(c.num_op ORDER BY c.num_op SEPARATOR ', ') ops FROM creditos c
         LEFT JOIN ctb_provisiones p ON p.concepto='PARQUE' AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
         LEFT JOIN (SELECT po.num_op FROM parques_pagos_ops po JOIN parques_pagos_mes pm ON pm.parque=po.parque AND pm.mes=po.mes WHERE pm.etapa<>'EN_APROBACION') ap ON ap.num_op=c.num_op
        WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND (COALESCE(c.com_parque,0)>0 OR COALESCE(c.arriendo_parque,0)>0)
-         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND ap.num_op IS NULL`, [mes]);
+         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND ap.num_op IS NULL`, [mes])
+    : await pool.query(
+      `SELECT COUNT(*) n, GROUP_CONCAT(c.num_op ORDER BY c.num_op SEPARATOR ', ') ops FROM creditos c
+        LEFT JOIN ctb_provisiones p ON p.concepto='EJECUTIVO' AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
+        LEFT JOIN comisiones_aprobaciones a ON a.ejecutivo=c.ejecutivo AND a.mes=? AND a.estado='aprobado'
+       WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND COALESCE(c.comej,0)>0
+         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND a.ejecutivo IS NULL`, [mes, mes]);
     // Los asientos del motor en la cuenta deben calzar con sus filas (constituido y liberado del mes)
     const [[asi]] = await pool.query(
       `SELECT COALESCE(SUM(CASE WHEN c.origen=? THEN m.haber END),0) h, COALESCE(SUM(CASE WHEN c.origen=? THEN m.debe END),0) d
