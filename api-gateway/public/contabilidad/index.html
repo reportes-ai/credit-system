@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Contabilidad — AutoFácil</title>
-  <!-- v1.4 — card Libros Legales y Exportables (ctb_libros_legales); v1.3 — card DJ menciona la 1887; v1.2 — card Declaraciones Juradas (ctb_dj); v1.1 — card Dashboard Contable (ctb_dashboard); v1.0 — Fase 1: plan de cuentas, comprobantes, libros diario/mayor, balance de comprobación -->
+  <!-- v1.5 — card Provisiones por Devengo (ctb_provisiones); v1.4 — card Libros Legales y Exportables (ctb_libros_legales); v1.3 — card DJ menciona la 1887; v1.2 — card Declaraciones Juradas (ctb_dj); v1.1 — card Dashboard Contable (ctb_dashboard); v1.0 — Fase 1: plan de cuentas, comprobantes, libros diario/mayor, balance de comprobación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -96,6 +96,12 @@
       <p>Lo que piden auditores y fiscalizadores en un solo lugar: balance de 8 columnas, remuneraciones por persona, feriados, asistencia, cartera vs TMC, mora y cobranza, y la carpeta ZIP del ejercicio. Cada Excel queda registrado con su SHA-256.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/contabilidad/provisiones/" class="module-card" id="cardProvisiones" style="display:none">
+      <div class="card-icon"><i class="bi bi-hourglass-split"></i></div>
+      <h5>Provisiones por Devengo</h5>
+      <p>El gasto se reconoce cuando nace la obligación, no cuando llega el documento. Comisión dealer: se provisiona al otorgar y se libera sola con la factura o boleta. Cuadro del mes, pendientes por dealer y cuadratura contra la cuenta de provisión.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/contabilidad/declaraciones-juradas/" class="module-card" id="cardDJ" style="display:none">
       <div class="card-icon"><i class="bi bi-journal-check"></i></div>
       <h5>Declaraciones Juradas</h5>
@@ -168,6 +174,7 @@
     if (tiene('ctb_lre','ctb_libros_aux')) document.getElementById('cardLRE').style.display='';
     if (tiene('ctb_dj')) document.getElementById('cardDJ').style.display='';
     if (tiene('ctb_libros_legales','ctb_lre')) document.getElementById('cardLegales').style.display='';
+    if (tiene('ctb_provisiones')) document.getElementById('cardProvisiones').style.display='';
     if (tiene('ctb_balance')) document.getElementById('cardBal').style.display='';
     if (tiene('ctb_plan')) document.getElementById('cardPlan').style.display='';
     if (tiene('ctb_reglas')) document.getElementById('cardReglas').style.display='';

@@ -624,7 +624,12 @@ async function guardarFacturaComision(idSeguimiento, f, usuario) {
      f.es_terceros ? 1 : 0, f.es_boleta ? 1 : 0, f.emisor_retiene ? 1 : 0,
      (f.impuesto_pct != null && f.impuesto_pct !== '') ? Number(f.impuesto_pct) : null,
      _intOrNull(f.impuesto_monto), _intOrNull(f.monto_liquido), usuario])
-    .then(() => contabilizarComision(idSeguimiento, 'DEVENGO'));
+    .then(() => contabilizarComision(idSeguimiento, 'DEVENGO'))
+    /* Entró el devengo real → se libera la provisión constituida al otorgar (motor único
+       services/contabilidad/src/provisiones.js). Nunca bloquea: el motor no lanza. */
+    .then(() => f.num_op && require('../../../contabilidad/src/provisiones')
+      .liberarDealerPorNumOp(f.num_op, f.es_boleta ? 'BOLETA' : 'FACTURA', f.fecha_factura ? String(f.fecha_factura).slice(0, 10) : null, usuario)
+      .catch(e => console.error('[factura comisión→provisión]', e.message)));
 }
 
 /* ── Centralización contable de la comisión a dealer ──────────────────────────

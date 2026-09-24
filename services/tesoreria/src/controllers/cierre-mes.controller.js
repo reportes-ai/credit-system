@@ -104,6 +104,17 @@ require('../../../../shared/migrate').enFila('cierre-mes', async () => {
          '/dashboard/', 0, 2, pOp ? pOp.id_perfil : null, 'MES_ATRIBUCION']);
     }
 
+    // Ítem agregado el 24-09-2026: provisiones de comisión dealer cuadradas contra la cuenta 2106011
+    const [[hayPD]] = await pool.query("SELECT COUNT(*) n FROM cierre_checklist_items WHERE check_auto='PROVISION_DEALER'");
+    if (!hayPD.n) {
+      const [[pFin]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Gerente de Finanzas' LIMIT 1");
+      await pool.query(
+        `INSERT INTO cierre_checklist_items (nombre, descripcion, href, orden, obligatorio, dia_habil, resp_tipo, id_perfil, check_auto)
+         VALUES (?,?,?,?,1,?,'PERFIL',?,?)`,
+        ['Provisiones de comisión dealer cuadradas', 'Toda otorgada del mes con comisión dealer tiene su provisión (o ya su factura) y el saldo del motor calza con la cuenta 2106011.',
+         '/contabilidad/provisiones/', 8, 3, pFin ? pFin.id_perfil : null, 'PROVISION_DEALER']);
+    }
+
     // Funcionalidades: página (todos los que operan cierre) + acción de cerrar + mantenedor
     const [[modT]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Tesorería' OR ruta LIKE '/tesoreria%' LIMIT 1");
     if (modT) {
@@ -150,6 +161,25 @@ function fechaLimite(mes, diaHabil) {
 
 /* Chequeos automáticos: devuelven { ok, detalle } */
 const CHECKS_AUTO = {
+  /* Provisión comisión dealer (24-09-2026, motor services/contabilidad/src/provisiones.js): ninguna
+     otorgada del mes con comisión sin provisión ni documento, y saldo del motor = cuenta 2106011. */
+  async PROVISION_DEALER(mes) {
+    const prov = require('../../../contabilidad/src/provisiones');
+    const c = await prov.cuadro(mes, 'DEALER');
+    if (mes < c.desde) return { ok: true, detalle: `Mes anterior a ${c.desde}: no se provisiona` };
+    const [[sin]] = await pool.query(
+      `SELECT COUNT(*) n, GROUP_CONCAT(c.num_op ORDER BY c.num_op SEPARATOR ', ') ops FROM creditos c
+        LEFT JOIN ctb_provisiones p ON p.concepto='DEALER' AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
+        LEFT JOIN postventa_facturas_comision fc ON fc.num_op=c.num_op AND fc.monto_liquido IS NOT NULL
+       WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND COALESCE(c.comdea_real,0)>0
+         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND fc.id_seguimiento IS NULL`, [mes]);
+    const dif = Math.round(c.saldo_final - c.saldo_cuenta);
+    if (sin.n === 0 && dif === 0) return { ok: true, detalle: `${c.n_final} provisión(es) vigentes por $${c.saldo_final.toLocaleString('es-CL')}, cuadra con la cuenta ${c.cuenta_provision}` };
+    const partes = [];
+    if (sin.n) partes.push(`${sin.n} otorgada(s) sin provisión ni documento: ${String(sin.ops || '').slice(0, 200)}`);
+    if (dif) partes.push(`motor $${c.saldo_final.toLocaleString('es-CL')} vs cuenta ${c.cuenta_provision} $${c.saldo_cuenta.toLocaleString('es-CL')} (dif. $${dif.toLocaleString('es-CL')})`);
+    return { ok: false, detalle: partes.join(' · ') };
+  },
   async PROVISIONES(mes) {
     const [[r]] = await pool.query("SELECT saldo FROM contab_saldos_mensuales WHERE mes=? AND cuenta='PROVISIONES' LIMIT 1", [mes]);
     return r ? { ok: true, detalle: `Cierre guardado (saldo $${Math.round(r.saldo).toLocaleString('es-CL')})` }

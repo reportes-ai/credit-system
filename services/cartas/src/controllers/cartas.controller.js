@@ -1069,7 +1069,14 @@ const otorgar = async (req, res) => {
            por colocación ni por seguros" en el dashboard (2608001-2608004).
            Fire-and-forget: respeta forzados y meses cerrados. */
         pool.query(`SELECT id FROM creditos WHERE (${cond.join(' OR ')}) LIMIT 1`, args)
-          .then(([[cr2]]) => cr2 && recalcularPorOps([cr2.id]))
+          .then(async ([[cr2]]) => {
+            if (!cr2) return;
+            await recalcularPorOps([cr2.id]);
+            /* PROVISIÓN comisión dealer (Máxima 4, Pato 24-09-2026): el gasto nace al otorgar.
+               Después del recálculo, para provisionar el comdea_real definitivo. Fire-and-forget. */
+            require('../../../contabilidad/src/provisiones').constituirDealer(cr2.id, `Carta ${ca.op_carta}`)
+              .catch(e => console.error('[carta otorgar→provision]', e.message));
+          })
           .catch(e => console.error('[carta otorgar→recalculo]', e.message));
         // comdea_real pactado: márcalo forzado para que el recálculo mensual lo respete
         // (marcarForzadosCalculo re-compara contra el motor: solo queda forzado si difiere).

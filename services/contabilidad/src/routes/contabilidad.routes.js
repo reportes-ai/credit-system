@@ -154,4 +154,40 @@ router.post('/devengo-intereses/:mes', verifyToken, requireFunc('ctb_comprobante
   } catch (e) { res.status(400).json({ success: false, data: null, error: e.message }); }
 });
 
+// Provisiones por devengo (motor único services/contabilidad/src/provisiones.js): cuadro del mes,
+// pendientes y sincronización manual. Primer concepto: comisión dealer (constituye al otorgar,
+// libera al registrar la factura/boleta o al anular).
+const prov = require('../provisiones');
+router.get('/provisiones', verifyToken, requireFunc('ctb_provisiones', 'ctb_cierre_mes', 'ctb_estados'), async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : require('../../../../shared/fecha-chile').hoyISO().slice(0, 7);
+    const concepto = String(req.query.concepto || 'DEALER').toUpperCase();
+    if (!prov.CONCEPTOS[concepto]) return res.status(400).json({ success: false, data: null, error: 'Concepto desconocido' });
+    res.json({ success: true, data: await prov.cuadro(mes, concepto), error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+});
+router.post('/provisiones/sincronizar', verifyToken, requireFunc('ctb_provisiones'), async (req, res) => {
+  try {
+    const u = req.usuario || {};
+    const quien = [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || 'Usuario';
+    const r = await prov.sincronizarDealer(quien);
+    require('../../../../shared/audit').auditar({ req, accion: 'EJECUTAR', modulo: 'contabilidad', entidad: 'provisiones', entidad_id: 'DEALER',
+      detalle: `Sincronización provisiones dealer: ${r.constituidas} constituida(s), ${r.liberadas} liberada(s), ${r.omitidas} omitida(s)` });
+    res.json({ success: true, data: r, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+});
+router.post('/provisiones/:id/liberar', verifyToken, requireFunc('ctb_provisiones'), async (req, res) => {
+  try {
+    const u = req.usuario || {};
+    const quien = [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || 'Usuario';
+    const pool = require('../../../../shared/config/database');
+    const [[p]] = await pool.query("SELECT origen_id, num_op FROM ctb_provisiones WHERE id=? AND concepto='DEALER' AND estado='CONSTITUIDA'", [req.params.id]);
+    if (!p) return res.status(404).json({ success: false, data: null, error: 'Provisión no encontrada o ya liberada' });
+    const r = await prov.liberarDealer(p.origen_id, 'MANUAL', null, quien);
+    require('../../../../shared/audit').auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'provisiones', entidad_id: req.params.id,
+      detalle: `Liberación manual provisión dealer OP ${p.num_op || p.origen_id}: $${r.monto || 0} — motivo: ${String(req.body?.motivo || '').slice(0, 200) || 'sin motivo'}` });
+    res.json({ success: true, data: r, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+});
+
 module.exports = router;
