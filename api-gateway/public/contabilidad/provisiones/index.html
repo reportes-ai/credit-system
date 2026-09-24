@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Provisiones por Devengo — AutoFácil</title>
-  <!-- v1.12 — cuadro con columna Ajustes al motor (no son constituciones ni liberaciones). v1.11 — sueldos + leyes sociales. v1.10 — mensaje de sincronización con ajustes al motor. v1.9 — ejecutivos mensual. v1.8 — concepto SUELDOS. v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
+  <!-- v1.13 — pop-ups: Tercero, formato por columna (días y comprobantes sin $), Creado por, desglose legible. v1.12 — cuadro con columna Ajustes al motor (no son constituciones ni liberaciones). v1.11 — sueldos + leyes sociales. v1.10 — mensaje de sincronización con ajustes al motor. v1.9 — ejecutivos mensual. v1.8 — concepto SUELDOS. v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -168,8 +168,10 @@ function renderPend(){
 }
 /* ── Detalle de cada cuadro: pop-up + Excel ── */
 let DLG_ROWS = [], DLG_COLS = [], DLG_NOMBRE = '';
-const COLS_PROV = [['num_op','OP'],['origen_tipo','Origen'],['tercero','Dealer / Parque'],['rut_tercero','RUT'],['mes','Mes provisión'],['fecha_constitucion','Constituida',fch],['base_bruta','Bruto',n=>n==null?'':Number(n)],['montos_json','Desglose'],['monto','Provisión',n=>Number(n)],['estado','Estado'],['fecha_liberacion','Liberada',fch],['motivo_liberacion','Motivo'],['liberada_contra','Liberada contra'],['id_comprobante_constitucion','Comp. constitución'],['id_comprobante_liberacion','Comp. liberación'],['dias','Días'],['creado_por','Origen del dato']];
-const COLS_CTA  = [['fecha','Fecha',fch],['tipo','Tipo'],['numero','N°'],['origen','Origen'],['origen_ref','Referencia'],['glosa','Glosa comprobante'],['glosa_linea','Glosa línea'],['debe','Debe',n=>Number(n)],['haber','Haber',n=>Number(n)],['num_op','OP'],['rut','RUT'],['id_comprobante','Comprobante']];
+// [campo, título, formato?, tipo?] — tipo 'clp' = moneda; 'int' = número sin signo $; sin tipo = texto
+const COLS_PROV = [['num_op','OP'],['origen_tipo','Origen'],['tercero','Tercero (dealer / parque / ejecutivo)'],['rut_tercero','RUT'],['mes','Mes provisión'],['fecha_constitucion','Constituida',fch],['base_bruta','Bruto',n=>n==null?'':Number(n),'clp'],['montos_json','Desglose',desglose],['monto','Provisión',n=>Number(n),'clp'],['estado','Estado'],['fecha_liberacion','Liberada',fch],['motivo_liberacion','Motivo'],['liberada_contra','Liberada contra'],['id_comprobante_constitucion','Comp. constitución',n=>n?'#'+n:''],['id_comprobante_liberacion','Comp. liberación',n=>n?'#'+n:''],['dias','Días',n=>n==null?'':String(n),'int'],['creado_por','Creado por']];
+function desglose(j){ try { const m = JSON.parse(j||''); if (m && m.montos) return Object.entries(m.montos).map(([k,v])=>k+' '+clp(v)).join(' · '); if (m && (m.comision!=null||m.arriendo!=null)) return 'comisión '+clp(m.comision)+' · arriendo '+clp(m.arriendo); if (m && m.creditos!=null) return m.creditos+' crédito(s)'; } catch(_) {} return ''; }
+const COLS_CTA  = [['fecha','Fecha',fch],['tipo','Tipo'],['numero','N°',n=>n==null?'':String(n),'int'],['origen','Origen'],['origen_ref','Referencia'],['glosa','Glosa comprobante'],['glosa_linea','Glosa línea'],['debe','Debe',n=>Number(n),'clp'],['haber','Haber',n=>Number(n),'clp'],['num_op','OP'],['rut','RUT'],['id_comprobante','Comprobante',n=>n?'#'+n:'']];
 async function verDetalle(tipo, titulo){
   const mes = document.getElementById('mes').value, concepto = document.getElementById('concepto').value;
   const j = await fetch(`/api/contabilidad/provisiones/detalle?mes=${mes}&concepto=${concepto}&tipo=${tipo}`, { headers:H }).then(r=>r.json());
@@ -178,13 +180,13 @@ async function verDetalle(tipo, titulo){
   const montoCol = tipo === 'CUENTA' ? null : 'monto';
   const tot = montoCol ? DLG_ROWS.reduce((s,r)=>s+Number(r[montoCol]||0),0) : DLG_ROWS.reduce((s,r)=>s+Number(r.haber||0)-Number(r.debe||0),0);
   document.getElementById('dlgTitulo').textContent = titulo; document.getElementById('dlgSub').textContent = `${concepto} · ${mes} · ${DLG_ROWS.length} fila(s) · ${tipo==='CUENTA' ? 'haber − debe ' : ''}${clp(tot)}`;
-  const fmt = (c, r) => { const v = r[c[0]]; const f = c[2]; const x = f ? f(v) : v; return typeof x === 'number' ? clp(x) : esc(x==null?'':x); };
+  const fmt = (c, r) => { const v = r[c[0]]; const f = c[2]; const x = f ? f(v) : v; return c[3] === 'clp' ? clp(x) : esc(x==null?'':x); };
   document.getElementById('dlgTabla').innerHTML = `<thead><tr>${DLG_COLS.map(c=>`<th>${esc(c[1])}</th>`).join('')}</tr></thead><tbody>` +
-    (DLG_ROWS.length ? DLG_ROWS.map(r => `<tr>${DLG_COLS.map(c => `<td class="${typeof (c[2]?c[2](r[c[0]]):r[c[0]])==='number'?'r':''}" style="${c[0]==='liberada_contra'||c[0]==='glosa'||c[0]==='glosa_linea'?'white-space:normal;min-width:260px':''}">${fmt(c, r)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${DLG_COLS.length}" class="text-center text-muted py-3">Sin filas</td></tr>`) + '</tbody>';
+    (DLG_ROWS.length ? DLG_ROWS.map(r => `<tr>${DLG_COLS.map(c => `<td class="${c[3]==='clp'||c[3]==='int'?'r':''}" style="${c[0]==='liberada_contra'||c[0]==='glosa'||c[0]==='glosa_linea'?'white-space:normal;min-width:260px':''}">${fmt(c, r)}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${DLG_COLS.length}" class="text-center text-muted py-3">Sin filas</td></tr>`) + '</tbody>';
   document.getElementById('dlg').showModal();
 }
 function aExcel(rows, cols, nombre){
-  const data = rows.map(r => { const o = {}; for (const c of cols) { const v = r[c[0]]; o[c[1]] = c[2] ? c[2](v) : (v == null ? '' : v); } return o; });
+  const data = rows.map(r => { const o = {}; for (const c of cols) { const v = r[c[0]]; o[c[1]] = c[3] === 'int' || c[3] === 'clp' ? (v == null ? '' : Number(v)) : (c[2] ? c[2](v) : (v == null ? '' : v)); } return o; });
   const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Detalle');
   XLSX.writeFile(wb, nombre + '.xlsx');
 }
