@@ -209,21 +209,17 @@ const CHECKS_AUTO = {
     const [[sin]] = concepto === 'DEALER' ? await pool.query(
       `SELECT COUNT(*) n, GROUP_CONCAT(c.num_op ORDER BY c.num_op SEPARATOR ', ') ops FROM creditos c
         LEFT JOIN ctb_provisiones p ON p.concepto='DEALER' AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
-        LEFT JOIN postventa_facturas_comision fc ON fc.num_op=c.num_op AND fc.monto_liquido IS NOT NULL
+        LEFT JOIN (SELECT f.num_op FROM postventa_facturas_comision f LEFT JOIN postventa_facturas_comision t ON t.id_seguimiento=f.id_titular
+                    WHERE COALESCE(f.monto_liquido, t.monto_liquido) IS NOT NULL) fc ON fc.num_op=c.num_op   /* réplicas cuentan como documento (auditoría A2) */
        WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND COALESCE(c.comdea_real,0)>0
-         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND fc.id_seguimiento IS NULL`, [mes])
+         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND fc.num_op IS NULL`, [mes])
     : concepto === 'PARQUE' ? await pool.query(
       `SELECT COUNT(*) n, GROUP_CONCAT(c.num_op ORDER BY c.num_op SEPARATOR ', ') ops FROM creditos c
         LEFT JOIN ctb_provisiones p ON p.concepto='PARQUE' AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
         LEFT JOIN (SELECT po.num_op FROM parques_pagos_ops po JOIN parques_pagos_mes pm ON pm.parque=po.parque AND pm.mes=po.mes WHERE pm.etapa<>'EN_APROBACION') ap ON ap.num_op=c.num_op
        WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND (COALESCE(c.com_parque,0)>0 OR COALESCE(c.arriendo_parque,0)>0)
          AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND ap.num_op IS NULL`, [mes])
-    : await pool.query(
-      `SELECT COUNT(*) n, GROUP_CONCAT(c.num_op ORDER BY c.num_op SEPARATOR ', ') ops FROM creditos c
-        LEFT JOIN ctb_provisiones p ON p.concepto='EJECUTIVO' AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
-        LEFT JOIN comisiones_aprobaciones a ON a.ejecutivo=c.ejecutivo AND a.mes=? AND a.estado='aprobado'
-       WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND COALESCE(c.comej,0)>0
-         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND a.ejecutivo IS NULL`, [mes, mes]);
+    : [[{ n: 0, ops: '' }]];   // EJECUTIVO y SUELDOS tienen su chequeo mensual propio (PROVISION_EJECUTIVO / PROVISION_SUELDOS)
     // Los asientos del motor en la cuenta deben calzar con sus filas (constituido y liberado del mes)
     const [[asi]] = await pool.query(
       `SELECT COALESCE(SUM(CASE WHEN c.origen=? THEN m.haber END),0) h, COALESCE(SUM(CASE WHEN c.origen=? THEN m.debe END),0) d

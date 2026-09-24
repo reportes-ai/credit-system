@@ -668,8 +668,10 @@ async function contabilizarComision(idSeguimiento, momento, ctaBancaria = null, 
         if (o) numOrden = o.numero;
       } catch (_) {}
     }
+    // Si el EMISOR retiene, AutoFácil no debe nada al SII por esa boleta: retención 0 y líquido = honorario (auditoría 24-09-2026, M3)
     const montos = d.es_boleta
-      ? { honorario: Number(d.monto_bruto) || 0, retencion: Number(d.impuesto_monto) || 0, liquido: Number(d.monto_liquido) || 0 }
+      ? (Number(d.emisor_retiene) ? { honorario: Number(d.monto_bruto) || 0, retencion: 0, liquido: Number(d.monto_bruto) || 0 }
+                                   : { honorario: Number(d.monto_bruto) || 0, retencion: Number(d.impuesto_monto) || 0, liquido: Number(d.monto_liquido) || 0 })
       : { neto: Number(d.monto_bruto) || 0, iva: Number(d.impuesto_monto) || 0, liquido: Number(d.monto_liquido) || 0 };
     const reemplazos = (ctaBancaria && ctaBancaria.cuenta_contable) ? { '1101090': ctaBancaria.cuenta_contable } : null;
     await require('../../../contabilidad/src/motor-asientos').contabilizar({
@@ -1300,6 +1302,9 @@ async function replicarFacturaComision(idTitular, usuario) {
          es_replica=1, id_titular=VALUES(id_titular), usuario=VALUES(usuario)`,
       [s.id, s.num_op, fac.rut_dealer, fac.nombre_dealer, fac.fecha_factura, fac.numero_factura,
        fac.es_terceros ? 1 : 0, fac.es_boleta ? 1 : 0, fac.emisor_retiene ? 1 : 0, idTitular, usuario]);
+    // La misma factura cubre esta OP: se libera su provisión al otorgar (auditoría 24-09-2026, A2)
+    require('../../../contabilidad/src/provisiones').liberarDealerPorNumOp(s.num_op, fac.es_boleta ? 'BOLETA' : 'FACTURA', fac.fecha_factura ? String(fac.fecha_factura).slice(0, 10) : null, usuario)
+      .catch(e => console.error('[replica factura→provisión]', e.message));
   }
   return sibs.length;
 }

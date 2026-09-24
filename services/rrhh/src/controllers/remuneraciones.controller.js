@@ -1489,11 +1489,13 @@ const emitir = async (req, res) => {
       "SELECT COALESCE(SUM(total_haberes),0) h, COALESCE(SUM(liquido),0) l, COALESCE(SUM(total_descuentos),0) d FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
     require('../../../contabilidad/src/motor-asientos').contabilizar({
       evento: 'REMUNERACIONES', glosa: `Libro de remuneraciones ${mes}`, ref: `REM-${mes}`,
+      fecha: (() => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); })(),   // último día del mes del libro (auditoría 24-09-2026, A4)
       montos: { haberes: Number(t.h), liquido: Number(t.l), descuentos: Number(t.d) },
     }).then(() => {
       // Entró el devengo real → se libera la provisión de sueldos del mes si el cierre la había constituido (motor único provisiones.js)
       const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || 'RRHH';
-      return require('../../../contabilidad/src/provisiones').liberarSueldos(mes, 'LIBRO', null, quien, `Liquidaciones ${mes} emitidas (REMUNERACIONES, haberes $${Math.round(Number(t.h)).toLocaleString('es-CL')})`);
+      const fLibro = (() => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); })();
+      return require('../../../contabilidad/src/provisiones').liberarSueldos(mes, 'LIBRO', fLibro, quien, `Liquidaciones ${mes} emitidas (REMUNERACIONES, haberes $${Math.round(Number(t.h)).toLocaleString('es-CL')})`);
     }).catch(e => console.error('[remuneraciones emitir→provisión]', e && e.message));
     // Envío automático: cada colaborador recibe su liquidación al correo
     // (no bloquea la respuesta; Modo Desarrollo redirige solo, vía shared/mailer)

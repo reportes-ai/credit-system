@@ -165,9 +165,13 @@ const contabilizar = (...a) => require('./motor-asientos').contabilizar(...a);
 /* ¿La comisión de esta OP ya tiene documento registrado en Post Venta? → { tipo, fecha } | null */
 async function documentoDealer(num_op, registradoDesde = null) {
   if (!num_op) return null;
+  /* Una factura puede cubrir varias OP (réplicas es_replica=1 que apuntan a la titular por id_titular): el
+     desglose vive solo en la titular. Sin este JOIN las OP hermanas nunca se liberaban (auditoría 24-09-2026, A2). */
   const [[d]] = await pool.query(
-    `SELECT fc.es_boleta, fc.numero_factura, fc.monto_bruto neto, fc.nombre_dealer, DATE_FORMAT(COALESCE(fc.fecha_factura, fc.created_at),'%Y-%m-%d') f
-       FROM postventa_facturas_comision fc WHERE fc.num_op=? AND fc.monto_liquido IS NOT NULL ${registradoDesde ? 'AND fc.created_at >= ?' : ''}
+    `SELECT fc.es_boleta, COALESCE(fc.numero_factura, t.numero_factura) numero_factura, COALESCE(fc.monto_bruto, t.monto_bruto) neto,
+            COALESCE(fc.nombre_dealer, t.nombre_dealer) nombre_dealer, DATE_FORMAT(COALESCE(fc.fecha_factura, t.fecha_factura, fc.created_at),'%Y-%m-%d') f
+       FROM postventa_facturas_comision fc LEFT JOIN postventa_facturas_comision t ON t.id_seguimiento = fc.id_titular
+      WHERE fc.num_op=? AND COALESCE(fc.monto_liquido, t.monto_liquido) IS NOT NULL ${registradoDesde ? 'AND fc.created_at >= ?' : ''}
       ORDER BY fc.created_at DESC LIMIT 1`, registradoDesde ? [num_op, registradoDesde] : [num_op]);
   if (!d) return null;
   // Nunca antes del arranque del motor: una factura vieja no puede mandar el asiento a un mes ya informado
@@ -207,6 +211,7 @@ async function constituirDealer(idCredito, usuario = 'Motor provisiones') {
       num_op: c.num_op || null, rut: c.rut_dealer || null,
       detalle: `OP ${c.num_op || idCredito} · ${c.automotora || 'dealer'} · bruto $${bruto.toLocaleString('es-CL')}`,
     });
+    if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); return { error: 'sin asiento (ver log del motor en Reglas de Centralización)' }; }
     await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
     return { id: ins.insertId, monto, id_comprobante: id };
   } catch (e) { console.error('[provisiones constituirDealer]', idCredito, e.message); return { error: e.message }; }
@@ -229,6 +234,7 @@ async function _liberarFilaDealer(p, motivo = 'MANUAL', fechaISO = null, usuario
       num_op: p.num_op || null, rut: p.rut_tercero || null,
       detalle: `OP ${p.num_op || p.origen_id} · ${p.tercero || 'dealer'} · ${motivo} · ${p.origen_tipo === 'AVSOFT' ? 'provisionada en AVSOFT ' + p.mes + ' · ' : ''}por ${usuario}`,
     });
+    if (!id) { await pool.query("UPDATE ctb_provisiones SET estado='CONSTITUIDA', motivo_liberacion=NULL, fecha_liberacion=NULL, liberada_contra=NULL WHERE id=?", [p.id]); return { error: 'sin asiento de liberación (ver log del motor)' }; }
     await pool.query('UPDATE ctb_provisiones SET id_comprobante_liberacion=? WHERE id=?', [id, p.id]);
     return { id: p.id, monto: Number(p.monto), id_comprobante: id };
   } catch (e) { console.error('[provisiones liberarDealer]', p.id, e.message); return { error: e.message }; }
@@ -279,7 +285,11 @@ async function sincronizarDealer(usuario = 'Motor provisiones') {
     if (p.origen_tipo === 'CREDITO' && p.est !== 'OTORGADO') { const x = await _liberarFilaDealer(p, 'ANULACION', null, usuario, `Crédito en estado ${p.est}`); if (x && x.id) out.liberadas++; continue; }
     // AVSOFT: solo documentos registrados desde que el motor manda (los anteriores ya los rebajó el contador o son parte de su diferencia)
     const d = await documentoDealer(p.num_op, p.origen_tipo === 'AVSOFT' ? `${desde}-01` : null);
-    if (d) { const x = await _liberarFilaDealer(p, d.tipo, d.fecha, usuario, d.contra); if (x && x.id) out.liberadas++; continue; }
+    if (d) {
+      const fc0 = p.fecha_constitucion ? String(p.fecha_constitucion instanceof Date ? p.fecha_constitucion.toISOString().slice(0, 10) : p.fecha_constitucion).slice(0, 10) : null;
+      const f = (p.origen_tipo === 'CREDITO' && fc0 && d.fecha < fc0) ? fc0 : d.fecha;   // nunca antes de la constitución (auditoría B2)
+      const x = await _liberarFilaDealer(p, d.tipo, f, usuario, d.contra); if (x && x.id) out.liberadas++; continue;
+    }
     // AVSOFT sin factura por OP pero con COMISION PAGADA en el Seguimiento desde el arranque (típico: comisiones de
     // parque que el contador provisionó en 2106011 y se pagan por la cartola del parque): el pago es la evidencia.
     if (p.origen_tipo === 'AVSOFT') {
@@ -333,6 +343,7 @@ async function constituirParque(idCredito, usuario = 'Motor provisiones') {
       glosa: `Provisión parque OP ${c.num_op || idCredito} — ${c.parque || ''}`.slice(0, 300), num_op: c.num_op || null,
       detalle: `OP ${c.num_op || idCredito} · ${c.parque || 'parque'} · comisión $${comision.toLocaleString('es-CL')} · arriendo $${arriendo.toLocaleString('es-CL')}`,
     });
+    if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); return { error: 'sin asiento (ver log del motor en Reglas de Centralización)' }; }
     await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
     return { id: ins.insertId, monto, id_comprobante: id };
   } catch (e) { console.error('[provisiones constituirParque]', idCredito, e.message); return { error: e.message }; }
@@ -355,6 +366,7 @@ async function liberarParque(idCredito, motivo = 'MANUAL', fechaISO = null, usua
       glosa: `Liberación provisión parque OP ${p.num_op || idCredito} — ${p.tercero || ''} (${motivo.toLowerCase()})`.slice(0, 300), num_op: p.num_op || null,
       detalle: `OP ${p.num_op || idCredito} · ${p.tercero || 'parque'} · ${motivo} · por ${usuario}`,
     });
+    if (!id) { await pool.query("UPDATE ctb_provisiones SET estado='CONSTITUIDA', motivo_liberacion=NULL, fecha_liberacion=NULL, liberada_contra=NULL WHERE id=?", [p.id]); return { error: 'sin asiento de liberación (ver log del motor)' }; }
     await pool.query('UPDATE ctb_provisiones SET id_comprobante_liberacion=? WHERE id=?', [id, p.id]);
     return { id: p.id, monto: Number(p.monto), id_comprobante: id };
   } catch (e) { console.error('[provisiones liberarParque]', idCredito, e.message); return { error: e.message }; }
@@ -484,6 +496,7 @@ async function constituirEjecutivoMes(mes, usuario = 'Motor provisiones') {
         glosa: ('Provisión comisión ejecutivo ' + f.ejecutivo + ' — ' + mes + ' (motor Revisión de Comisiones, sin aprobar al cierre)').slice(0, 300),
         detalle: f.ejecutivo + ' · ' + mes + ' · ' + f.creditos + ' crédito(s) · cálculo del motor al cierre',
       });
+      if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); out.omitidas++; continue; }
       await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
       out.constituidas++; out.total += f.total;
     }
@@ -503,6 +516,7 @@ async function _liberarFilaEjecutivo(p, motivo = 'MANUAL', fechaISO = null, usua
       glosa: ('Liberación provisión comisión ejecutivo ' + (p.tercero || '') + ' ' + p.mes + (p.num_op ? ' OP ' + p.num_op : '') + ' (' + motivo.toLowerCase() + ')').slice(0, 300), num_op: p.num_op || null,
       detalle: (p.tercero || 'ejecutivo') + ' · ' + p.mes + ' · ' + motivo + ' · por ' + usuario,
     });
+    if (!id) { await pool.query("UPDATE ctb_provisiones SET estado='CONSTITUIDA', motivo_liberacion=NULL, fecha_liberacion=NULL, liberada_contra=NULL WHERE id=?", [p.id]); return { error: 'sin asiento de liberación (ver log del motor)' }; }
     await pool.query('UPDATE ctb_provisiones SET id_comprobante_liberacion=? WHERE id=?', [id, p.id]);
     return { id: p.id, monto: Number(p.monto), id_comprobante: id };
   } catch (e) { console.error('[provisiones liberarEjecutivo]', p.id, e.message); return { error: e.message }; }
@@ -634,6 +648,7 @@ async function constituirSueldos(mes, usuario = 'Motor provisiones') {
       glosa: ('Provisión remuneraciones y leyes sociales ' + mes + ' — libro no contabilizado (' + py.filas.length + ' colaboradores)').slice(0, 300),
       detalle: 'Haberes $' + py.montos.haberes.toLocaleString('es-CL') + ' · SIS $' + py.montos.sis.toLocaleString('es-CL') + ' · AFC $' + py.montos.afc.toLocaleString('es-CL') + ' · mutual+SANNA $' + py.montos.mutual.toLocaleString('es-CL') + ' · motor RRHH',
     });
+    if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); return { error: 'sin asiento (ver log del motor en Reglas de Centralización)' }; }
     await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
     return { id: ins.insertId, monto: py.total, id_comprobante: id, colaboradores: py.filas.length };
   } catch (e) { console.error('[provisiones constituirSueldos]', mes, e.message); return { error: e.message }; }
@@ -652,6 +667,7 @@ async function liberarSueldos(mes, motivo = 'MANUAL', fechaISO = null, usuario =
       evento: C.reglaLib, fecha, ref: 'PROV-SUELDOS-' + mes + '-LIB', montos: montosDe(p),
       glosa: ('Liberación provisión remuneraciones y leyes sociales ' + mes + ' (' + motivo.toLowerCase() + ')').slice(0, 300), detalle: motivo + ' · por ' + usuario,
     });
+    if (!id) { await pool.query("UPDATE ctb_provisiones SET estado='CONSTITUIDA', motivo_liberacion=NULL, fecha_liberacion=NULL, liberada_contra=NULL WHERE id=?", [p.id]); return { error: 'sin asiento de liberación (ver log del motor)' }; }
     await pool.query('UPDATE ctb_provisiones SET id_comprobante_liberacion=? WHERE id=?', [id, p.id]);
     return { id: p.id, monto: Number(p.monto), id_comprobante: id };
   } catch (e) { console.error('[provisiones liberarSueldos]', mes, e.message); return { error: e.message }; }
@@ -694,7 +710,7 @@ async function sincronizarSueldos(usuario = 'Motor provisiones') {
   const [abiertas] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto='SUELDOS' AND estado='CONSTITUIDA'");
   for (const p of abiertas) {
     const lib = await libroRemuneracionesContabilizado(p.mes);
-    if (lib) { const x = await liberarSueldos(p.mes, 'LIBRO', hoyISO(), usuario, 'Libro de remuneraciones ' + p.mes + ' contabilizado (comprobante #' + lib.id + ', origen ' + lib.origen + ', ' + lib.f + ')'); if (x && x.id) out.liberadas++; }
+    if (lib) { const x = await liberarSueldos(p.mes, 'LIBRO', lib.f, usuario, 'Libro de remuneraciones ' + p.mes + ' contabilizado (comprobante #' + lib.id + ', origen ' + lib.origen + ', ' + lib.f + ')'); if (x && x.id) out.liberadas++; }
   }
   return out;
 }
