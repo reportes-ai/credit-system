@@ -265,6 +265,8 @@ exports.getDatos = async (req, res) => {
         -- FUENTE ÚNICA de nombres de dealers: tabla dealers (via id_dealer);
         -- el texto libre de creditos.automotora es solo fallback
         COALESCE(NULLIF(dl.nombre_razon,''), NULLIF(dl.nombre_indexa,''), automotora, '') AS automotora,
+        -- Categoría de la ficha del dealer (SOCIO / PARTNER / SUPER_PARTNER): columna CAT. en Dealers — Colocaciones Mensuales
+        COALESCE(dl.categoria_asignada, '')                    AS dealer_categoria,
         COALESCE(nombre_local, '')                             AS nombre_local,
         COALESCE(estado_eval, '')                              AS estado_eval,
         COALESCE(estado_credito, '')                           AS estado_credito,

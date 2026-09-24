@@ -5582,10 +5582,13 @@ function buildColocMensual(vista) {
               : mesesAll;
   const mesesSet = new Set(meses);
   const M = {};   // nombre → { mes: {n, monto} }
+  // Categoría de la ficha del dealer (viene del JOIN a dealers en getDatos): SP / P / S
+  const CAT = {}, CAT_SIGLA = { SUPER_PARTNER: 'SP', PARTNER: 'P', SOCIO: 'S' };
   for (const r of rows) {
     if (!mesesSet.has(r.mes)) continue;     // fuera del período elegido
     const k = key(r);
     if (!k) continue;                       // parques: solo ops con parque
+    if (esDealers && !CAT[k] && r.dealer_categoria) CAT[k] = CAT_SIGLA[String(r.dealer_categoria).toUpperCase()] || '';
     (M[k] = M[k] || {});
     const c = (M[k][r.mes] = M[k][r.mes] || { n: 0, monto: 0 });
     c.n++; c.monto += (+r.monto_financiado || 0);
@@ -5611,6 +5614,7 @@ function buildColocMensual(vista) {
     <thead>
       <tr>
         <th rowspan="2" style="position:sticky;left:0;background:#12213f;color:#fff;padding:6px 10px;text-align:left;z-index:2">${esDealers ? 'Dealer' : 'Parque'}</th>
+        ${esDealers ? '<th rowspan="2" title="Categoría del dealer: SP = Super Partner · P = Partner · S = Socio" style="background:#12213f;color:#ffd54f;padding:6px 8px;text-align:center">Cat.</th>' : ''}
         <th rowspan="2" style="background:#12213f;color:#4fc3f7;padding:6px 8px;text-align:right">Total<br>Cant.</th>
         <th rowspan="2" style="background:#12213f;color:#4fc3f7;padding:6px 8px;text-align:right;border-right:2px solid #2a4070">Total<br>Monto</th>
         ${meses.map(m => `<th colspan="2" style="background:#1a2a4a;color:#fff;padding:5px 8px;text-align:center;border-left:1px solid #2a4070">${fMes(m)}</th>`).join('')}
@@ -5621,6 +5625,7 @@ function buildColocMensual(vista) {
     <tbody>
       ${lista.map(([nombre, mm], i) => `<tr style="background:${i % 2 ? '#f6f9ff' : '#fff'}">
         <td style="position:sticky;left:0;background:${i % 2 ? '#eef3fb' : '#fff'};padding:4px 10px;font-weight:600;white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid #e8eef7">${nombre}</td>
+        ${esDealers ? `<td style="text-align:center;padding:4px 8px;font-weight:800;color:${CAT[nombre] === 'SP' ? '#b45309' : CAT[nombre] === 'P' ? '#0d2f6b' : '#64748b'};border-bottom:1px solid #e8eef7">${CAT[nombre] || '—'}</td>` : ''}
         <td style="text-align:right;padding:4px 8px;font-weight:800;color:#0d2f6b;border-bottom:1px solid #e8eef7">${tot(mm, 'n')}</td>
         <td style="text-align:right;padding:4px 8px;font-weight:700;color:#0d2f6b;border-right:2px solid #dbe3ee;border-bottom:1px solid #e8eef7">${f$(tot(mm, 'monto'))}</td>
         ${meses.map(m => mm[m]
@@ -5632,12 +5637,16 @@ function buildColocMensual(vista) {
     </tbody>
     <tfoot><tr style="background:#12213f;color:#fff;font-weight:800">
       <td style="position:sticky;left:0;background:#12213f;padding:5px 10px">Total (${lista.length})</td>
+      ${esDealers ? '<td></td>' : ''}
       <td style="text-align:right;padding:5px 8px">${lista.reduce((a, [, mm]) => a + tot(mm, 'n'), 0)}</td>
       <td style="text-align:right;padding:5px 8px;border-right:2px solid #2a4070">${f$(lista.reduce((a, [, mm]) => a + tot(mm, 'monto'), 0))}</td>
       ${meses.map(m => `<td style="text-align:right;padding:5px 8px;border-left:1px solid #2a4070">${totMes[m].n}</td>
         <td style="text-align:right;padding:5px 8px">${f$(totMes[m].monto)}</td>`).join('')}
     </tr></tfoot>
-  </table>`;
+  </table>` + (esDealers ? `<div style="margin:8px 0 2px;font-size:11px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap">
+    <b style="color:#33507e">Cat. (categoría del dealer, según su ficha en Mantenedores → Dealers):</b>
+    <span><b style="color:#b45309">SP</b> Super Partner</span><span><b style="color:#0d2f6b">P</b> Partner</span><span><b style="color:#64748b">S</b> Socio</span><span><b>—</b> sin categoría asignada</span>
+  </div>` : '');
 
   // ── Solo Parques: curva mensual de colocaciones por parque (incluye CALLE) ──
   if (!esDealers) {
