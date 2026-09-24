@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Provisiones por Devengo — AutoFácil</title>
-  <!-- v1.11 — sueldos + leyes sociales. v1.10 — mensaje de sincronización con ajustes al motor. v1.9 — ejecutivos mensual. v1.8 — concepto SUELDOS. v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
+  <!-- v1.12 — cuadro con columna Ajustes al motor (no son constituciones ni liberaciones). v1.11 — sueldos + leyes sociales. v1.10 — mensaje de sincronización con ajustes al motor. v1.9 — ejecutivos mensual. v1.8 — concepto SUELDOS. v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -15,7 +15,7 @@
     .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
     .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
     .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:22px; }
-    .kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
+    .kpis { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; }
     .kpi { background:#f8fafc; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px; }
     .kpi .l { font-size:.72rem; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
     .kpi .v { font-size:1.25rem; font-weight:800; color:var(--navy); } .kpi .s { font-size:.72rem; color:#94a3b8; }
@@ -33,7 +33,7 @@
     .tg { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:8px; padding:3px 10px; font-size:.76rem; font-weight:700; }
     .tg.on { background:var(--navy); color:#fff; border-color:var(--navy); }
     #dlgTabla th, #dlgTabla td { white-space:nowrap; }
-    @media (max-width:900px){ .kpis{ grid-template-columns:repeat(2,1fr);} .main-content{padding:16px;} }
+    @media (max-width:900px){ .kpis{ grid-template-columns:repeat(2,1fr);} .kpi[style*='span 6']{grid-column:span 2 !important;} .main-content{padding:16px;} }
   </style>
 </head>
 <body>
@@ -130,13 +130,14 @@ async function cargar(){
   document.getElementById('kpis').innerHTML = [
     ['Saldo inicial', d.saldo_inicial, `cuenta ${d.cuenta_provision} al inicio del mes`, 'INICIAL'],
     ['Constituido en el mes', d.constituido, `${d.n_constituido} comprobante(s) · motor: ${clp(d.motor_constituido)} en ${d.motor_n_constituido} crédito(s)`, 'CONSTITUIDO'],
+    ['Ajustes al motor', d.ajustes, `${d.n_ajustes} comprobante(s): la provisión del mes en curso siguiendo al cálculo (no son constituciones ni liberaciones)`, 'AJUSTES'],
     ['Liberado en el mes', d.liberado, `${d.n_liberado} comprobante(s) · motor: ${clp(d.motor_liberado)} en ${d.motor_n_liberado}`, 'LIBERADO'],
     ['Saldo final', d.saldo_final, `cuenta ${d.cuenta_provision} al cierre del mes`, 'CUENTA'],
     ['Detalle vigente (por operación)', d.motor_vigente, `${d.motor_n_vigente} provisión(es): ${clp(d.motor_vigente - d.avsoft_vigente)} del motor desde ${d.desde}` + (d.avsoft_n ? ` + ${clp(d.avsoft_vigente)} detalle AVSOFT (${d.avsoft_n})` : ''), 'VIGENTE'],
   ].map(([l,v,s,t]) => `<div class="kpi click" onclick="verDetalle('${t}','${esc(l)}')" title="Ver detalle"><div class="l">${esc(l)} <i class="bi bi-box-arrow-up-right" style="font-size:.7rem"></i></div><div class="v">${clp(v)}</div><div class="s">${esc(s)}</div></div>`).join('')
-  + (Math.abs(d.saldo_historico) >= 1 ? `<div class="kpi click" style="grid-column:span 5;background:#fffbeb;border-color:#fcd34d" onclick="verDetalle('CUENTA','Movimientos de la cuenta ${esc(d.cuenta_provision)} en el mes')"><div class="l">Diferencia cuenta ${esc(d.cuenta_provision)} vs detalle por operación</div><div class="v" style="color:#92400e">${clp(d.saldo_historico)}</div><div class="s">Saldo final de la cuenta menos el detalle vigente (motor + detalle AVSOFT del contador). ${d.saldo_historico > 0 ? 'Provisión en la cuenta sin detalle por operación.' : 'El detalle del contador supera lo que hay en la cuenta: filas que ya se rebajaron en AVSOFT sin marcarse en su planilla.'} Lo concilia el contador; hasta entonces queda a la vista.</div></div>` : '');
+  + (Math.abs(d.saldo_historico) >= 1 ? `<div class="kpi click" style="grid-column:span 6;background:#fffbeb;border-color:#fcd34d" onclick="verDetalle('CUENTA','Movimientos de la cuenta ${esc(d.cuenta_provision)} en el mes')"><div class="l">Diferencia cuenta ${esc(d.cuenta_provision)} vs detalle por operación</div><div class="v" style="color:#92400e">${clp(d.saldo_historico)}</div><div class="s">Saldo final de la cuenta menos el detalle vigente (motor + detalle AVSOFT del contador). ${d.saldo_historico > 0 ? 'Provisión en la cuenta sin detalle por operación.' : 'El detalle del contador supera lo que hay en la cuenta: filas que ya se rebajaron en AVSOFT sin marcarse en su planilla.'} Lo concilia el contador; hasta entonces queda a la vista.</div></div>` : '');
   document.getElementById('cuadre').innerHTML =
-    `<span class="ok"><i class="bi bi-check-circle"></i> Cuenta ${d.cuenta_provision}: SI ${clp(d.saldo_inicial)} + constituido ${clp(d.constituido)} − liberado ${clp(d.liberado)} = SF ${clp(d.saldo_final)}</span>`
+    `<span class="ok"><i class="bi bi-check-circle"></i> Cuenta ${d.cuenta_provision}: SI ${clp(d.saldo_inicial)} + constituido ${clp(d.constituido)} ${d.ajustes<0?"−":"+"} ajustes ${clp(Math.abs(d.ajustes))} − liberado ${clp(d.liberado)} = SF ${clp(d.saldo_final)}</span>`
     + ` <span class="text-muted ms-2">= detalle ${clp(d.motor_vigente)} + diferencia ${clp(d.saldo_historico)}</span>`;
   const esParque = concepto === 'PARQUE';
   document.getElementById('thTercero').textContent = esParque ? 'Parque' : (concepto === 'EJECUTIVO' ? 'Ejecutivo' : concepto === 'SUELDOS' ? 'Concepto' : 'Dealer');

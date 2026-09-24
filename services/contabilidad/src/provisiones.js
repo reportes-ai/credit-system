@@ -401,12 +401,17 @@ async function cuadro(mes, concepto = 'DEALER') {
   const [[si]] = await pool.query(
     `SELECT COALESCE(SUM(m.haber - m.debe),0) s FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
       WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') < ?`, [cta, mes]);
+  /* Los AJUSTES al motor (refs -AJn: la provisión del mes en curso siguiendo al cálculo) no son constituciones
+     ni liberaciones: van en su propia columna, con signo. Así "constituido" y "liberado" cuentan solo lo real
+     (Pato, 24-09-2026: "se constituyen en el mes y se pagan el 31"). */
   const [[mv]] = await pool.query(
-    `SELECT COALESCE(SUM(m.haber),0) h, COALESCE(SUM(m.debe),0) d,
-            COUNT(DISTINCT CASE WHEN m.haber>0 THEN c.id END) nh, COUNT(DISTINCT CASE WHEN m.debe>0 THEN c.id END) nd
+    `SELECT COALESCE(SUM(CASE WHEN c.origen_ref NOT LIKE '%-AJ%' THEN m.haber END),0) h, COALESCE(SUM(CASE WHEN c.origen_ref NOT LIKE '%-AJ%' THEN m.debe END),0) d,
+            COALESCE(SUM(CASE WHEN c.origen_ref LIKE '%-AJ%' THEN m.haber - m.debe END),0) aj,
+            COUNT(DISTINCT CASE WHEN m.haber>0 AND c.origen_ref NOT LIKE '%-AJ%' THEN c.id END) nh, COUNT(DISTINCT CASE WHEN m.debe>0 AND c.origen_ref NOT LIKE '%-AJ%' THEN c.id END) nd,
+            COUNT(DISTINCT CASE WHEN c.origen_ref LIKE '%-AJ%' THEN c.id END) naj
        FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
       WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') = ?`, [cta, mes]);
-  const saldo_inicial = Number(si.s), constituido = Number(mv.h), liberado = Number(mv.d), saldo_final = saldo_inicial + constituido - liberado;
+  const saldo_inicial = Number(si.s), constituido = Number(mv.h), liberado = Number(mv.d), ajustes = Number(mv.aj), saldo_final = saldo_inicial + constituido + ajustes - liberado;
   // Lo que controla el motor (sus filas) al cierre del mes
   const [[con]] = await pool.query("SELECT COALESCE(SUM(monto),0) m, COUNT(*) n FROM ctb_provisiones WHERE concepto=? AND DATE_FORMAT(fecha_constitucion,'%Y-%m')=?", [concepto, mes]);
   const [[lib]] = await pool.query("SELECT COALESCE(SUM(monto),0) m, COUNT(*) n FROM ctb_provisiones WHERE concepto=? AND estado='LIBERADA' AND DATE_FORMAT(fecha_liberacion,'%Y-%m')=?", [concepto, mes]);
@@ -423,7 +428,7 @@ async function cuadro(mes, concepto = 'DEALER') {
   const [movs] = await pool.query(
     `SELECT * FROM ctb_provisiones WHERE concepto=? AND (DATE_FORMAT(fecha_constitucion,'%Y-%m')=? OR DATE_FORMAT(fecha_liberacion,'%Y-%m')=?) ORDER BY fecha_constitucion DESC, id DESC LIMIT 500`, [concepto, mes, mes]);
   return { mes, concepto, nombre: CONCEPTOS[concepto].nombre, cuenta_provision: cta, cuenta_gasto: CONCEPTOS[concepto].cuentaGasto,
-    saldo_inicial, constituido, n_constituido: mv.nh, liberado, n_liberado: mv.nd, saldo_final,
+    saldo_inicial, constituido, n_constituido: mv.nh, liberado, n_liberado: mv.nd, ajustes, n_ajustes: mv.naj, saldo_final,
     motor_constituido: Number(con.m), motor_n_constituido: con.n, motor_liberado: Number(lib.m), motor_n_liberado: lib.n,
     motor_vigente, motor_n_vigente: sf.n, avsoft_vigente, avsoft_n, saldo_historico, pendientes, movimientos: movs, desde };
 }
@@ -662,12 +667,16 @@ async function ajustarSueldos(mes, usuario = 'Motor provisiones') {
   if (!(py.total > 0) || py.total === Math.round(Number(p.monto))) return { ajustada: false };
   let mj = {}; try { mj = JSON.parse(p.montos_json || '{}'); } catch (_) {}
   const n = (mj.ajustes || 0) + 1, viejo = montosDe(p), fecha = await fechaContable(ultimoDiaMes(mes));
-  const idLib = await contabilizar({ evento: C.reglaLib, fecha, ref: 'PROV-SUELDOS-' + mes + '-AJ' + n + '-LIB', montos: viejo,
-    glosa: ('Ajuste provisión remuneraciones ' + mes + ' (' + n + '): reversa de $' + Math.round(Number(p.monto)).toLocaleString('es-CL')).slice(0, 300), detalle: 'ajuste ' + n + ' · por ' + usuario });
-  if (!idLib) return { ajustada: false };
-  const idNew = await contabilizar({ evento: C.regla, fecha, ref: 'PROV-SUELDOS-' + mes + '-AJ' + n, montos: py.montos,
-    glosa: ('Ajuste provisión remuneraciones ' + mes + ' (' + n + '): nueva proyección $' + py.total.toLocaleString('es-CL') + ' (' + py.filas.length + ' colaboradores)').slice(0, 300),
-    detalle: 'Haberes $' + py.montos.haberes.toLocaleString('es-CL') + ' · SIS $' + py.montos.sis.toLocaleString('es-CL') + ' · AFC $' + py.montos.afc.toLocaleString('es-CL') + ' · mutual+SANNA $' + py.montos.mutual.toLocaleString('es-CL') });
+  // Solo la DIFERENCIA por concepto: lo que sube va por PROV_SUELDOS, lo que baja por PROV_SUELDOS_LIB (refs -AJn / -AJn-LIB)
+  const sube = {}, baja = {};
+  for (const k of ['haberes', 'sis', 'afc', 'mutual']) { const d = (py.montos[k] || 0) - (Number(viejo[k]) || 0); if (d > 0) sube[k] = d; else if (d < 0) baja[k] = -d; }
+  const txt = o => Object.entries(o).map(([k, v]) => k + ' $' + v.toLocaleString('es-CL')).join(' · ');
+  let idNew = null, idLib = null;
+  if (Object.keys(sube).length) idNew = await contabilizar({ evento: C.regla, fecha, ref: 'PROV-SUELDOS-' + mes + '-AJ' + n, montos: sube,
+    glosa: ('Ajuste provisión remuneraciones ' + mes + ' (' + n + '): la proyección subió a $' + py.total.toLocaleString('es-CL') + ' (' + py.filas.length + ' colaboradores)').slice(0, 300), detalle: ('sube: ' + txt(sube) + ' · por ' + usuario).slice(0, 300) });
+  if (Object.keys(baja).length) idLib = await contabilizar({ evento: C.reglaLib, fecha, ref: 'PROV-SUELDOS-' + mes + '-AJ' + n + '-LIB', montos: baja,
+    glosa: ('Ajuste provisión remuneraciones ' + mes + ' (' + n + '): la proyección bajó a $' + py.total.toLocaleString('es-CL') + ' (' + py.filas.length + ' colaboradores)').slice(0, 300), detalle: ('baja: ' + txt(baja) + ' · por ' + usuario).slice(0, 300) });
+  if (!idNew && !idLib) return { ajustada: false };
   mj = { ...mj, montos: py.montos, colaboradores: py.filas.length, ajustes: n, historial: [...(mj.historial || []), { n, fecha: hoyISO(), de: Math.round(Number(p.monto)), a: py.total, lib: idLib, comp: idNew }].slice(-6) };
   await pool.query('UPDATE ctb_provisiones SET monto=?, montos_json=?, tercero=?, updated_at=NOW() WHERE id=?', [py.total, JSON.stringify(mj).slice(0, 400), 'Libro de remuneraciones ' + mes + ' (' + py.filas.length + ' colaboradores)', p.id]);
   return { ajustada: true, de: Math.round(Number(p.monto)), a: py.total };
@@ -701,11 +710,11 @@ async function detalle(mes, concepto, tipo) {
     VIGENTE:     [`SELECT ${cols} FROM ctb_provisiones p WHERE p.concepto=? AND DATE_FORMAT(p.fecha_constitucion,'%Y-%m') <= ? AND (p.estado='CONSTITUIDA' OR DATE_FORMAT(p.fecha_liberacion,'%Y-%m') > ?) ORDER BY p.fecha_constitucion, p.id`, [concepto, mes, mes]],
   }[tipo];
   if (q) { const [r] = await pool.query(q[0], q[1]); return r; }
-  if (tipo === 'CUENTA') {
+  if (tipo === 'CUENTA' || tipo === 'AJUSTES') {
     const [r] = await pool.query(
       `SELECT c.id id_comprobante, DATE_FORMAT(c.fecha,'%Y-%m-%d') fecha, c.tipo, c.numero, c.origen, c.origen_ref, c.glosa, m.glosa glosa_linea, m.debe, m.haber, m.num_op, m.rut
          FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
-        WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') = ? ORDER BY c.fecha, c.id`, [cta, mes]);
+        WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') = ? ${tipo === 'AJUSTES' ? "AND c.origen_ref LIKE '%-AJ%'" : ''} ORDER BY c.fecha, c.id`, [cta, mes]);
     return r;
   }
   throw new Error('Tipo de detalle desconocido');
