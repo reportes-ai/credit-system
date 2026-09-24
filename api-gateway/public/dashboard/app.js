@@ -5564,9 +5564,9 @@ async function vsegOverride(mes, actual) {
 // Filtro de período de las tablas de colocaciones (por vista): todo | u6 | u12 | 2026 | 2025
 window.__colocFiltro = window.__colocFiltro || {};
 function setColocFiltro(vista, f) { window.__colocFiltro[vista] = f; buildColocMensual(vista); }
-// Toggle de categorías (solo Dealers): SP / P / S / sin categoría — todas encendidas al partir
-window.__colocCat = window.__colocCat || { SP: true, P: true, S: true, '—': true };
-function togColocCat(c) { window.__colocCat[c] = !window.__colocCat[c]; buildColocMensual('vdealers'); }
+// Filtro de categoría (solo Dealers): pinchar SP muestra SOLO los SP; pinchar de nuevo vuelve a todos
+window.__colocCat = window.__colocCat || null;
+function togColocCat(c) { window.__colocCat = window.__colocCat === c ? null : c; buildColocMensual('vdealers'); }
 
 function buildColocMensual(vista) {
   const esDealers = vista === 'vdealers';
@@ -5599,8 +5599,8 @@ function buildColocMensual(vista) {
   }
   const ult = meses[0];
   const tot = (m, campo) => Object.values(m).reduce((a, x) => a + x[campo], 0);
-  const catOn = window.__colocCat;
-  const lista = Object.entries(M).filter(([nombre]) => !esDealers || catOn[CAT[nombre] || '—']).sort((a, b) =>
+  const catSel = window.__colocCat;   // null = todas
+  const lista = Object.entries(M).filter(([nombre]) => !esDealers || !catSel || (CAT[nombre] || '—') === catSel).sort((a, b) =>
     ((b[1][ult]?.n || 0) - (a[1][ult]?.n || 0)) || (tot(b[1], 'n') - tot(a[1], 'n')));
 
   const fMes = m => { const [a, mm] = m.split('-'); return mm + '-' + a; };   // 2026-06 → 06-2026
@@ -5614,8 +5614,9 @@ function buildColocMensual(vista) {
     ${FILTROS.map(([f, lbl]) => `<button onclick="setColocFiltro('${vista}','${f}')"
       style="border:1px solid ${f === filtro ? '#0d2f6b' : '#c6d3e8'};background:${f === filtro ? '#0d2f6b' : '#fff'};color:${f === filtro ? '#fff' : '#33507e'};border-radius:16px;padding:4px 14px;font-size:11.5px;font-weight:700;cursor:pointer">${lbl}</button>`).join('')}
     ${esDealers ? `<span style="border-left:1px solid #c6d3e8;margin:0 4px"></span><span style="font-size:11px;color:#64748b;align-self:center">Categoría:</span>
-    ${[['SP','SP · Super Partner','#b45309'],['P','P · Partner','#0d2f6b'],['S','S · Socio','#64748b'],['—','Sin categoría','#94a3b8']].map(([c, lbl, col]) => `<button onclick="togColocCat('${c}')" title="Mostrar / ocultar"
-      style="border:1px solid ${catOn[c] ? col : '#c6d3e8'};background:${catOn[c] ? col : '#fff'};color:${catOn[c] ? '#fff' : '#94a3b8'};border-radius:16px;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer;${catOn[c] ? '' : 'text-decoration:line-through'}">${lbl}</button>`).join('')}` : ''}
+    <button onclick="togColocCat(null)" style="border:1px solid ${!catSel ? '#0d2f6b' : '#c6d3e8'};background:${!catSel ? '#0d2f6b' : '#fff'};color:${!catSel ? '#fff' : '#33507e'};border-radius:16px;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer">Todas</button>
+    ${[['SP','SP · Super Partner','#b45309'],['P','P · Partner','#0d2f6b'],['S','S · Socio','#64748b'],['—','Sin categoría','#94a3b8']].map(([c, lbl, col]) => `<button onclick="togColocCat('${c}')" title="Ver solo esta categoría (pincha de nuevo para ver todas)"
+      style="border:1px solid ${catSel === c ? col : '#c6d3e8'};background:${catSel === c ? col : '#fff'};color:${catSel === c ? '#fff' : col};border-radius:16px;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer">${lbl}</button>`).join('')}` : ''}
   </div>`;
 
   // Los filtros quedan FUERA del área que se desplaza y los encabezados pegados arriba (Pato, 24-09-2026)
