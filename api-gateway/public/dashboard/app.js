@@ -5576,7 +5576,8 @@ function buildColocMensual(vista) {
   const mesesAll = [...new Set(rows.map(r => r.mes))].filter(Boolean).sort().reverse();
   // ── Filtro de período: recorta los MESES; totales y orden respetan el filtro ──
   const filtro = window.__colocFiltro[vista] || 'todo';
-  const meses = filtro === 'u6'  ? mesesAll.slice(0, 6)
+  const meses = filtro === 'u3'  ? mesesAll.slice(0, 3)
+              : filtro === 'u6'  ? mesesAll.slice(0, 6)
               : filtro === 'u12' ? mesesAll.slice(0, 12)
               : /^\d{4}$/.test(filtro) ? mesesAll.filter(m => m.startsWith(filtro + '-'))
               : mesesAll;
@@ -5604,7 +5605,7 @@ function buildColocMensual(vista) {
   meses.forEach(m => { totMes[m] = { n: 0, monto: 0 }; });
   lista.forEach(([, mm]) => meses.forEach(m => { if (mm[m]) { totMes[m].n += mm[m].n; totMes[m].monto += mm[m].monto; } }));
 
-  const FILTROS = [['todo','Todo'],['u6','Últimos 6 meses'],['u12','Últimos 12 meses'],['2026','2026'],['2025','2025']];
+  const FILTROS = [['todo','Todo'],['u3','Últimos 3 meses'],['u6','Últimos 6 meses'],['u12','Últimos 12 meses'],['2026','2026'],['2025','2025']];
   const botones = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px">
     ${FILTROS.map(([f, lbl]) => `<button onclick="setColocFiltro('${vista}','${f}')"
       style="border:1px solid ${f === filtro ? '#0d2f6b' : '#c6d3e8'};background:${f === filtro ? '#0d2f6b' : '#fff'};color:${f === filtro ? '#fff' : '#33507e'};border-radius:16px;padding:4px 14px;font-size:11.5px;font-weight:700;cursor:pointer">${lbl}</button>`).join('')}
