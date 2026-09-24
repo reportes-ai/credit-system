@@ -59,6 +59,9 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
   await pool.query('ALTER TABLE ctb_provisiones ADD COLUMN IF NOT EXISTS montos_json VARCHAR(400) NULL');
   // origen_id pasa a texto para los conceptos mensuales por tercero (EJECUTIVO|AAAA-MM); los ids numéricos siguen iguales
   await pool.query('ALTER TABLE ctb_provisiones MODIFY origen_id VARCHAR(80) NOT NULL');
+  // La ref de idempotencia PROV-EJECUTIVO-<EJECUTIVO>|AAAA-MM supera los 40 caracteres del libro central
+  await pool.query('ALTER TABLE ctb_comprobantes MODIFY origen_ref VARCHAR(100) NULL').catch(() => {});
+  await pool.query('ALTER TABLE ctb_eventos_log MODIFY ref VARCHAR(100) NULL').catch(() => {});
   // Contra qué se liberó (factura N°/fecha/neto, pago, aprobación del parque, anulación, conciliación)
   await pool.query('ALTER TABLE ctb_provisiones ADD COLUMN IF NOT EXISTS liberada_contra VARCHAR(240) NULL');
   // Reglas paramétricas (editables en Reglas de Centralización). INSERT IGNORE: si el Administrador las editó, se respetan.
@@ -431,7 +434,9 @@ async function constituirEjecutivoMes(mes, usuario = 'Motor provisiones') {
     if (!/^\d{4}-\d{2}$/.test(mes || '')) return { ...out, skip: 'mes inválido' };
     const desde = await param(C.paramDesde, '2026-09');
     if (mes < desde) return { ...out, skip: 'anterior a ' + desde };
-    if (mes >= hoyISO().slice(0, 7)) return { ...out, skip: 'el mes no ha terminado' };
+    // El mes en curso también se provisiona (Pato: "tiene que cuadrar con lo que hay que provisionar en septiembre");
+    // el valor se ajusta en cada sincronización hasta que Operaciones apruebe.
+    if (mes > hoyISO().slice(0, 7)) return { ...out, skip: 'mes futuro' };
     const fecha = await fechaContable(ultimoDiaMes(mes));
     for (const f of await comisionesMotorMes(mes)) {
       const oid = idEjecMes(f.ejecutivo, mes);
@@ -487,12 +492,45 @@ async function liberarEjecutivoPorAprobacion(ejecutivo, mes, fechaISO = null, us
   for (const p of filas) { const x = await _liberarFilaEjecutivo(p, 'APROBACION', fechaISO, usuario, contra); if (x && x.id) n++; }
   return { liberadas: n, filas: filas.length };
 }
-/* Red de seguridad: constituye el mes anterior si terminó con comisiones sin aprobar; libera lo aprobado. */
+/* Mientras no se apruebe, la provisión sigue al motor: si el cálculo cambió (más créditos, descuentos,
+   ajustes), se contabiliza solo la DIFERENCIA (PROV_EJECUTIVO si sube, PROV_EJECUTIVO_LIB si baja) con
+   ref propia por ajuste, y la fila queda en el valor vigente. Una sola fila por ejecutivo y mes. */
+async function ajustarEjecutivoMes(mes, usuario = 'Motor provisiones') {
+  const C = CONCEPTOS.EJECUTIVO;
+  const out = { ajustadas: 0, delta: 0 };
+  const [abiertas] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto='EJECUTIVO' AND estado='CONSTITUIDA' AND origen_tipo='EJECUTIVO_MES' AND mes=?", [mes]);
+  if (!abiertas.length) return out;
+  const motor = new Map((await comisionesMotorMes(mes)).map(f => [idEjecMes(f.ejecutivo, mes), f]));
+  const fecha = await fechaContable(ultimoDiaMes(mes));
+  for (const p of abiertas) {
+    const f = motor.get(p.origen_id);
+    const nuevo = f ? f.total : 0;
+    const delta = nuevo - Math.round(Number(p.monto));
+    if (!delta) continue;
+    let mj = {}; try { mj = JSON.parse(p.montos_json || '{}'); } catch (_) {}
+    const n = (mj.ajustes || 0) + 1;
+    const id = await contabilizar({
+      evento: delta > 0 ? C.regla : C.reglaLib, fecha, ref: 'PROV-EJECUTIVO-' + p.origen_id + '-AJ' + n, montos: { monto: Math.abs(delta) },
+      glosa: ('Ajuste provisión comisión ejecutivo ' + p.tercero + ' — ' + mes + ' (' + (delta > 0 ? '+' : '−') + '$' + Math.abs(delta).toLocaleString('es-CL') + ', el motor pasó de $' + Math.round(Number(p.monto)).toLocaleString('es-CL') + ' a $' + nuevo.toLocaleString('es-CL') + ')').slice(0, 300),
+      detalle: p.tercero + ' · ' + mes + ' · ajuste ' + n + ' · ' + (f ? f.creditos : 0) + ' crédito(s) · por ' + usuario,
+    });
+    if (!id) continue;   // sin asiento no se mueve la fila (queda en el log del motor)
+    mj.ajustes = n; mj.creditos = f ? f.creditos : 0; mj.historial = [...(mj.historial || []), { n, fecha: hoyISO(), de: Math.round(Number(p.monto)), a: nuevo, comp: id }].slice(-8);
+    await pool.query('UPDATE ctb_provisiones SET monto=?, montos_json=?, updated_at=NOW() WHERE id=?', [nuevo, JSON.stringify(mj).slice(0, 400), p.id]);
+    out.ajustadas++; out.delta += delta;
+  }
+  return out;
+}
+/* Red de seguridad: constituye el mes en curso y el anterior, ajusta lo vigente al motor y libera lo aprobado. */
 async function sincronizarEjecutivo(usuario = 'Motor provisiones') {
-  const out = { constituidas: 0, liberadas: 0, omitidas: 0 };
+  const out = { constituidas: 0, liberadas: 0, omitidas: 0, ajustadas: 0 };
   const desde = await param(CONCEPTOS.EJECUTIVO.paramDesde, '2026-09');
-  const ant = mesAnteriorDe(hoyISO().slice(0, 7));
-  if (ant >= desde) { const x = await constituirEjecutivoMes(ant, usuario); out.constituidas += x.constituidas || 0; out.omitidas += x.omitidas || 0; }
+  const actual = hoyISO().slice(0, 7), ant = mesAnteriorDe(actual);
+  for (const m of [ant, actual]) {
+    if (m < desde) continue;
+    const x = await constituirEjecutivoMes(m, usuario); out.constituidas += x.constituidas || 0; out.omitidas += x.omitidas || 0;
+    const aj = await ajustarEjecutivoMes(m, usuario); out.ajustadas += aj.ajustadas || 0;
+  }
   const [abiertas] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto='EJECUTIVO' AND estado='CONSTITUIDA' AND origen_tipo='EJECUTIVO_MES'");
   for (const p of abiertas) {
     const a = await aprobacionEjecutivo(p.tercero, p.mes);
