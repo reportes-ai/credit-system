@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Seguimiento Fundantes — AutoFácil</title><!-- v1.1 -->
+  <title>Seguimiento Fundantes — AutoFácil</title><!-- v1.2 — insignias con la cantidad pendiente: por validar (Operaciones) y devueltos por la financiera. v1.1 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
@@ -18,6 +18,8 @@
     .cards-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; }
     .module-card { background:#fff; border-radius:16px; box-shadow:0 1px 6px rgba(0,0,0,.08); padding:26px 24px; text-decoration:none; color:inherit; display:flex; flex-direction:column; gap:10px; border:1.5px solid transparent; transition:.15s; }
     .module-card:hover { border-color:#bfdbfe; transform:translateY(-2px); box-shadow:0 8px 24px rgba(1,65,162,.12); }
+    .module-card { position:relative; }
+    .insignia { position:absolute; top:14px; right:14px; min-width:26px; height:26px; padding:0 8px; border-radius:13px; background:#dc2626; color:#fff; font-weight:800; font-size:.8rem; display:none; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(220,38,38,.35); }
     .card-icon { width:54px; height:54px; border-radius:14px; background:linear-gradient(135deg,#eff6ff,#dbeafe); display:flex; align-items:center; justify-content:center; }
     .card-icon i { font-size:1.7rem; color:var(--navy); }
     .module-card h6 { margin:6px 0 0; font-size:1.08rem; font-weight:800; color:var(--navy-dark); }
@@ -54,12 +56,14 @@
     </a>
     <a href="/fundantes-operaciones/" class="module-card" id="cardOps" style="display:none">
       <div class="card-icon"><i class="bi bi-inboxes"></i></div>
+      <span class="insignia" id="insOps" title="Fundantes enviados pendientes de aprobar o rechazar"></span>
       <h6>Seguimiento Fundantes - Operaciones</h6>
       <p>Revisa los fundantes enviados 1 a 1, descárgalos y apruébalos o recházalos.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i> Acceder</span>
     </a>
     <a href="/fundantes-seguimiento/devueltos" class="module-card" id="cardDev" style="display:none">
       <div class="card-icon"><i class="bi bi-arrow-counterclockwise"></i></div>
+      <span class="insignia" id="insDev" title="Operaciones devueltas por la financiera"></span>
       <h6>Fundantes Devueltos</h6>
       <p>Operaciones que la financiera devolvió y volvieron a Pendientes: quién, cuándo y por qué.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i> Acceder</span>
@@ -100,6 +104,12 @@ if (!token || !yo) location.href = '/login.html';
   if (tiene('fundantes_historial') || tiene('fundantes_operaciones') || tiene('fundantes_validar') || tiene('fundantes_seguimiento')) { document.getElementById('cardDev').style.display = ''; alguna = true; }
   if (tiene('fundantes_bitacora_atrasados') || tiene('fundantes_operaciones') || tiene('fundantes_validar')) { document.getElementById('cardBitAtr').style.display = ''; alguna = true; }
   if (!alguna) document.getElementById('vacio').style.display = '';
+  // Insignias con lo pendiente (Pato, 24-09-2026): por validar en Operaciones, devueltos por la financiera
+  try {
+    const p = await (await fetch('/api/fundantes-seguimiento/pendientes?_=' + Date.now(), { cache:'no-store', headers:{ Authorization:'Bearer ' + token } })).json();
+    const pinta = (id, n) => { const el = document.getElementById(id); if (el && n > 0) { el.textContent = n; el.style.display = 'flex'; } };
+    if (p && p.success) { pinta('insOps', p.data.por_validar); pinta('insDev', p.data.devueltos); }
+  } catch (e) {}
 })();
 </script>
 <script src="/js/topnav.js"></script>

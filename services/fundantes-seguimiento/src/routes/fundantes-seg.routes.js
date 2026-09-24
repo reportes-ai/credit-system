@@ -15,6 +15,7 @@ router.delete('/tipos/:id',             verifyToken, requireFunc('fundantes_tipo
 router.get('/',                         verifyToken, c.listar);
 router.get('/resumen',                  verifyToken, c.resumen);
 router.get('/devueltos',                verifyToken, c.devueltos);
+router.get('/pendientes',               verifyToken, c.pendientes);   // contadores para las insignias de la landing
 router.post('/:id/devolver',            verifyToken, requireFunc('fundantes_validar', 'fundantes_operaciones'), c.devolver);
 router.get('/historial',                verifyToken, requireFunc('fundantes_historial', 'fundantes_operaciones', 'fundantes_validar'), c.historial);
 router.get('/bitacora-atrasados',       verifyToken, requireFunc('fundantes_bitacora_atrasados', 'fundantes_operaciones', 'fundantes_validar'), c.bitacoraAtrasados);

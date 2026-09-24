@@ -623,6 +623,23 @@ const devolver = async (req, res) => {
    estado ACTUAL en el flujo de fundantes (el mismo de Fundantes Pendientes).
    No se sacan de la lista al corregirse: la marca queda como historia para saber
    por qué se demoró cada operación (la bitácora guarda el detalle). */
+/* GET /pendientes → contadores para las insignias de la landing (Pato, 24-09-2026):
+   por_validar = fundantes ENVIADOS que Operaciones aún no aprueba ni rechaza (todos);
+   devueltos   = operaciones devueltas por la financiera, con la visibilidad del usuario. */
+const pendientes = async (req, res) => {
+  try {
+    const [[v]] = await pool.query(`SELECT COUNT(*) n FROM fundantes_seg fs JOIN creditos c ON c.id = fs.id_credito
+                                     WHERE fs.estado = 'ENVIADO' AND UPPER(c.financiera) IN (?)`, [FINANCIERAS]);
+    const vis = await ejecutivosVisibles(req);
+    let d = { n: 0 };
+    if (vis.all) [[d]] = await pool.query('SELECT COUNT(*) n FROM fundantes_seg WHERE devuelto_fin = 1');
+    else if ((vis.lista || []).length) [[d]] = await pool.query(
+      `SELECT COUNT(*) n FROM fundantes_seg fs JOIN creditos c ON c.id = fs.id_credito
+        WHERE fs.devuelto_fin = 1 AND UPPER(COALESCE(c.ejecutivo,'')) IN (?)`, [vis.lista.map(x => String(x).toUpperCase())]);
+    res.json({ success: true, data: { por_validar: Number(v.n) || 0, devueltos: Number(d.n) || 0 }, error: null });
+  } catch (e) { console.error('[fundantes pendientes]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 const devueltos = async (req, res) => {
   try {
     // Visibilidad por ejecutivo: un Ejecutivo Comercial ve solo SUS devueltos
@@ -1152,5 +1169,5 @@ const tiposEliminar = async (req, res) => {
   } catch (e) { console.error('[fundantes tipos eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
 };
 
-module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, marcarSinLimitacion, validar, historial, listarDocs, devolver, devueltos, bitacora, bitacoraAtrasados, comentar, popup, popupComentar,
+module.exports = { listar, resumen, pendientes, subirDoc, eliminarDoc, descargar, descargarZip, enviar, marcarSinLimitacion, validar, historial, listarDocs, devolver, devueltos, bitacora, bitacoraAtrasados, comentar, popup, popupComentar,
   tiposListar, tiposCrear, tiposActualizar, tiposEliminar };
