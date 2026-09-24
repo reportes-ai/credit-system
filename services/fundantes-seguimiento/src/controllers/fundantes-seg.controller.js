@@ -625,17 +625,19 @@ const devolver = async (req, res) => {
    por qué se demoró cada operación (la bitácora guarda el detalle). */
 /* GET /pendientes → contadores para las insignias de la landing (Pato, 24-09-2026):
    por_validar = fundantes ENVIADOS que Operaciones aún no aprueba ni rechaza (todos);
-   devueltos   = operaciones devueltas por la financiera, con la visibilidad del usuario. */
+   devueltos   = devueltas por la financiera que SIGUEN por corregir (estado PENDIENTE), con la
+                 visibilidad del usuario — la página abre con el filtro "Solo POR CORREGIR". */
 const pendientes = async (req, res) => {
   try {
     const [[v]] = await pool.query(`SELECT COUNT(*) n FROM fundantes_seg fs JOIN creditos c ON c.id = fs.id_credito
                                      WHERE fs.estado = 'ENVIADO' AND UPPER(c.financiera) IN (?)`, [FINANCIERAS]);
     const vis = await ejecutivosVisibles(req);
     let d = { n: 0 };
-    if (vis.all) [[d]] = await pool.query('SELECT COUNT(*) n FROM fundantes_seg WHERE devuelto_fin = 1');
+    if (vis.all) [[d]] = await pool.query("SELECT COUNT(*) n FROM fundantes_seg WHERE devuelto_fin = 1 AND COALESCE(estado,'PENDIENTE') = 'PENDIENTE'");
     else if ((vis.lista || []).length) [[d]] = await pool.query(
       `SELECT COUNT(*) n FROM fundantes_seg fs JOIN creditos c ON c.id = fs.id_credito
-        WHERE fs.devuelto_fin = 1 AND UPPER(COALESCE(c.ejecutivo,'')) IN (?)`, [vis.lista.map(x => String(x).toUpperCase())]);
+        WHERE fs.devuelto_fin = 1 AND COALESCE(fs.estado,'PENDIENTE') = 'PENDIENTE'
+          AND UPPER(COALESCE(c.ejecutivo,'')) IN (?)`, [vis.lista.map(x => String(x).toUpperCase())]);
     res.json({ success: true, data: { por_validar: Number(v.n) || 0, devueltos: Number(d.n) || 0 }, error: null });
   } catch (e) { console.error('[fundantes pendientes]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
