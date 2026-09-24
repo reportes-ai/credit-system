@@ -1490,7 +1490,11 @@ const emitir = async (req, res) => {
     require('../../../contabilidad/src/motor-asientos').contabilizar({
       evento: 'REMUNERACIONES', glosa: `Libro de remuneraciones ${mes}`, ref: `REM-${mes}`,
       montos: { haberes: Number(t.h), liquido: Number(t.l), descuentos: Number(t.d) },
-    }).catch(() => {});
+    }).then(() => {
+      // Entró el devengo real → se libera la provisión de sueldos del mes si el cierre la había constituido (motor único provisiones.js)
+      const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || 'RRHH';
+      return require('../../../contabilidad/src/provisiones').liberarSueldos(mes, 'LIBRO', null, quien, `Liquidaciones ${mes} emitidas (REMUNERACIONES, haberes $${Math.round(Number(t.h)).toLocaleString('es-CL')})`);
+    }).catch(e => console.error('[remuneraciones emitir→provisión]', e && e.message));
     // Envío automático: cada colaborador recibe su liquidación al correo
     // (no bloquea la respuesta; Modo Desarrollo redirige solo, vía shared/mailer)
     enviarLiquidacionesCorreo(mes).catch(e => console.error('[remuneraciones correo]', e.message));

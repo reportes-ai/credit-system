@@ -109,6 +109,7 @@ require('../../../../shared/migrate').enFila('cierre-mes', async () => {
       ['PROVISION_DEALER', 'Provisiones de comisión dealer cuadradas', 'Toda otorgada del mes con comisión dealer tiene su provisión (o ya su factura) y los asientos del motor calzan con sus provisiones en la cuenta 2106011.', 8],
       ['PROVISION_PARQUE', 'Provisiones de parques cuadradas', 'Toda otorgada del mes con comisión o arriendo de parque tiene su provisión (o el pago del parque ya aprobado) y los asientos del motor calzan en la cuenta 2106013.', 9],
       ['PROVISION_EJECUTIVO', 'Provisiones de comisión ejecutivo cuadradas', 'Toda otorgada del mes con comisión de ejecutivo tiene su provisión (o la comisión del mes ya aprobada) y los asientos del motor calzan en la cuenta 2106014.', 10],
+      ['PROVISION_SUELDOS', 'Remuneraciones del mes devengadas', 'El libro de remuneraciones del mes está contabilizado (RRHH o AVSOFT) o, si no, existe la provisión de sueldos del cierre en la cuenta 2106015.', 11],
     ]) {
       const [[hay]] = await pool.query('SELECT COUNT(*) n FROM cierre_checklist_items WHERE check_auto=?', [auto]);
       if (hay.n) continue;
@@ -169,6 +170,20 @@ const CHECKS_AUTO = {
   async PROVISION_DEALER(mes) { return CHECKS_AUTO._provision(mes, 'DEALER'); },
   async PROVISION_PARQUE(mes) { return CHECKS_AUTO._provision(mes, 'PARQUE'); },
   async PROVISION_EJECUTIVO(mes) { return CHECKS_AUTO._provision(mes, 'EJECUTIVO'); },
+  /* Sueldos: el mes tiene su libro contabilizado (RRHH o traspaso AVSOFT) o la provisión del cierre */
+  async PROVISION_SUELDOS(mes) {
+    const prov = require('../../../contabilidad/src/provisiones');
+    const c = await prov.cuadro(mes, 'SUELDOS');
+    if (mes < c.desde) return { ok: true, detalle: `Mes anterior a ${c.desde}: no se provisiona` };
+    const [[lib]] = await pool.query(
+      `SELECT c.id, c.origen, SUM(m.debe) d FROM ctb_comprobantes c JOIN ctb_movimientos m ON m.id_comprobante=c.id
+        WHERE m.cuenta=? AND m.debe>0 AND c.estado='CONTABILIZADO' AND c.origen NOT IN ('PROV_SUELDOS','PROV_SUELDOS_LIB')
+          AND (DATE_FORMAT(c.fecha,'%Y-%m')=? OR (c.origen='REMUNERACIONES' AND c.origen_ref=?)) GROUP BY c.id, c.origen ORDER BY c.id LIMIT 1`, ['4001060', mes, `REM-${mes}`]);
+    if (lib && lib.id) return { ok: true, detalle: `Libro de remuneraciones ${mes} contabilizado (comprobante #${lib.id}, ${lib.origen}, $${Math.round(Number(lib.d)).toLocaleString('es-CL')})` };
+    const [[p]] = await pool.query("SELECT monto, estado FROM ctb_provisiones WHERE concepto='SUELDOS' AND origen_tipo='MES' AND origen_id=?", [Number(mes.replace('-', ''))]);
+    if (p) return { ok: true, detalle: `Sin libro: provisión de sueldos ${p.estado.toLowerCase()} por $${Math.round(Number(p.monto)).toLocaleString('es-CL')} (cuenta 2106015)` };
+    return { ok: false, detalle: `El libro de remuneraciones ${mes} no está contabilizado y no hay provisión de sueldos: correr "Sincronizar" en Provisiones por Devengo (concepto Sueldos) o contabilizar el libro` };
+  },
   async _provision(mes, concepto) {
     const prov = require('../../../contabilidad/src/provisiones');
     const K = prov.CONCEPTOS[concepto];

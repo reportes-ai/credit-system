@@ -34,6 +34,13 @@ const CONCEPTOS = {
      cuando Operaciones APRUEBA la comisión del ejecutivo del mes en Revisión de Comisiones; en ese acto entra
      el devengo real por COMISION_EJECUTIVOS (incentivo aprobado, con semana corrida) contra 2106060. */
   EJECUTIVO: { nombre: 'Comisión ejecutivo', regla: 'PROV_EJECUTIVO', reglaLib: 'PROV_EJECUTIVO_LIB', cuentaProv: '2106014', cuentaGasto: '4001100', paramDesde: 'prov_ejecutivo_desde' },
+  /* SUELDOS (24-09-2026): concepto MENSUAL, no por crédito. Si un mes termina sin su libro de remuneraciones
+     contabilizado (ni REMUNERACIONES del motor RRHH ni el traspaso de AVSOFT en 4001060 con fecha de ese mes),
+     el cierre provisiona los haberes proyectados de la dotación (motor único haberesProyectados) al último día
+     del mes, contra 2106015. Se libera cuando se emiten las liquidaciones de ese mes o cuando aparece el asiento
+     real de remuneraciones fechado en el mes (importación AVSOFT). Hoy AVSOFT contabiliza el libro el último
+     día del mes, así que normalmente no hay nada que provisionar: es la red de seguridad del devengo. */
+  SUELDOS: { nombre: 'Sueldos (libro de remuneraciones)', regla: 'PROV_SUELDOS', reglaLib: 'PROV_SUELDOS_LIB', cuentaProv: '2106015', cuentaGasto: '4001060', paramDesde: 'prov_sueldos_desde' },
 };
 
 require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
@@ -49,8 +56,8 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
     creado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
     UNIQUE KEY uq_origen (concepto, origen_tipo, origen_id), INDEX idx_estado (concepto, estado), INDEX idx_mes (mes))`);
   await pool.query('CREATE TABLE IF NOT EXISTS ctb_config (clave VARCHAR(60) PRIMARY KEY, valor VARCHAR(200) NOT NULL)');
-  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09')");
-  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1)");
+  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09'), ('prov_sueldos_desde','2026-09')");
+  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1), ('2106015','PROVISION REMUNERACIONES (DEVENGO)','PASIVO',1)");
   // Desglose por campo de la regla (parque: arriendo + comision); monto = total
   await pool.query('ALTER TABLE ctb_provisiones ADD COLUMN IF NOT EXISTS montos_json VARCHAR(400) NULL');
   // Contra qué se liberó (factura N°/fecha/neto, pago, aprobación del parque, anulación, conciliación)
@@ -84,6 +91,14 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
     ['PROV_EJECUTIVO_LIB', 'Liberación provisión comisión ejecutivo', 'Se dispara al APROBAR en Revisión de Comisiones la comisión del ejecutivo del mes (entra el devengo real por COMISION_EJECUTIVOS) o al anular la operación: reversa íntegra la provisión de cada crédito del ejecutivo en ese mes. Campos: monto.', 'TRASPASO', 1, [
       ['2106014', 'DEBE',  'monto', 'Liberación provisión comisión ejecutivo'],
       ['4001100', 'HABER', 'monto', 'Abono comisión ejecutivo provisionada'],
+    ]],
+    ['PROV_SUELDOS', 'Provisión de remuneraciones (mes sin libro)', 'Se dispara al cerrar un mes cuyo libro de remuneraciones aún no está contabilizado (motor provisiones, último día del mes): reconoce los haberes proyectados de la dotación (motor único haberesProyectados de RRHH) y deja la provisión. Se libera al emitir las liquidaciones o al aparecer el asiento real del libro fechado en ese mes. Campos: monto (haberes proyectados).', 'TRASPASO', 1, [
+      ['4001060', 'DEBE',  'monto', 'Provisión remuneraciones del mes'],
+      ['2106015', 'HABER', 'monto', 'Provisión remuneraciones'],
+    ]],
+    ['PROV_SUELDOS_LIB', 'Liberación provisión de remuneraciones', 'Se dispara al EMITIR las liquidaciones del mes en RRHH (entra el devengo real por REMUNERACIONES) o cuando se contabiliza el libro de ese mes por otra vía (traspaso AVSOFT): reversa íntegra la provisión. Campos: monto.', 'TRASPASO', 1, [
+      ['2106015', 'DEBE',  'monto', 'Liberación provisión remuneraciones'],
+      ['4001060', 'HABER', 'monto', 'Abono remuneraciones provisionadas'],
     ]],
   ];
   for (const [evento, nombre, desc, tipo, activa, lineas] of R) {
@@ -211,6 +226,7 @@ async function liberarFilaPorId(idFila, motivo, fechaISO, usuario, contra = null
   if (!p) return { skip: 'sin provisión constituida' };
   if (p.concepto === 'PARQUE') return liberarParque(p.origen_id, motivo, fechaISO, usuario, contra);
   if (p.concepto === 'EJECUTIVO') return liberarEjecutivo(p.origen_id, motivo, fechaISO, usuario, contra);
+  if (p.concepto === 'SUELDOS') return liberarSueldos(p.mes, motivo, fechaISO, usuario, contra);
   return _liberarFilaDealer(p, motivo, fechaISO, usuario, contra);
 }
 
@@ -483,6 +499,95 @@ async function sincronizarEjecutivo(usuario = 'Motor provisiones') {
   return out;
 }
 
+/* ── SUELDOS (mensual) ──────────────────────────────────────────────────────── */
+const ultimoDiaMes = mes => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
+const mesAnteriorDe = mes => { const [y, m] = mes.split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`; };
+/* ¿El libro de remuneraciones del mes ya está en la contabilidad? (motor RRHH o traspaso AVSOFT en 4001060 fechado en el mes) */
+async function libroRemuneracionesContabilizado(mes) {
+  const [[r]] = await pool.query(
+    `SELECT c.id, c.origen, DATE_FORMAT(c.fecha,'%Y-%m-%d') f FROM ctb_comprobantes c JOIN ctb_movimientos m ON m.id_comprobante=c.id
+      WHERE m.cuenta=? AND m.debe>0 AND c.estado='CONTABILIZADO' AND c.origen NOT IN (?,?)
+        AND (DATE_FORMAT(c.fecha,'%Y-%m')=? OR (c.origen='REMUNERACIONES' AND c.origen_ref=?))
+      ORDER BY c.id LIMIT 1`, [CONCEPTOS.SUELDOS.cuentaGasto, CONCEPTOS.SUELDOS.regla, CONCEPTOS.SUELDOS.reglaLib, mes, `REM-${mes}`]);
+  return r || null;
+}
+/* Haberes proyectados de la dotación del mes (motor único RRHH haberesProyectados, misma dotación que el libro) */
+async function proyeccionSueldos(mes) {
+  const REM = require('../../rrhh/src/controllers/remuneraciones.controller');
+  const [emps] = await pool.query(
+    `SELECT u.id_usuario, CONCAT(UPPER(COALESCE(u.nombre,'')),' ',UPPER(COALESCE(u.apellido,''))) nombre FROM usuarios u JOIN rh_fichas f ON f.id_usuario=u.id_usuario
+      WHERE (u.estado='activo' OR (DATE_FORMAT(u.fecha_baja,'%Y-%m') >= ? AND u.fecha_baja > CONCAT(?, '-01'))
+             OR EXISTS (SELECT 1 FROM rh_liquidaciones l WHERE l.id_usuario=u.id_usuario AND l.mes=?))
+        AND COALESCE(f.sueldo_base,0) > 0 ORDER BY nombre`, [mes, mes, mes]);
+  const filas = [];
+  for (const e of emps) {
+    try { const h = await REM.haberesProyectados(e.id_usuario, mes); if (h && Number(h.total_haberes) > 0) filas.push({ id_usuario: e.id_usuario, nombre: e.nombre, haberes: Math.round(Number(h.total_haberes)), emitida: !!h.emitida }); }
+    catch (err) { console.error('[provisiones sueldos] haberes', e.id_usuario, err.message); }
+  }
+  return { mes, total: filas.reduce((s, f) => s + f.haberes, 0), filas };
+}
+/* Constituye la provisión del mes si terminó sin libro. origen MES / id AAAAMM. Idempotente. */
+async function constituirSueldos(mes, usuario = 'Motor provisiones') {
+  const C = CONCEPTOS.SUELDOS;
+  try {
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return { skip: 'mes inválido' };
+    const desde = await param(C.paramDesde, '2026-09');
+    if (mes < desde) return { skip: `anterior a ${desde}` };
+    if (mes >= hoyISO().slice(0, 7)) return { skip: 'el mes no ha terminado' };
+    const origenId = Number(mes.replace('-', ''));
+    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto='SUELDOS' AND origen_tipo='MES' AND origen_id=?", [origenId]);
+    if (ya) return { skip: `ya ${ya.estado.toLowerCase()}`, id: ya.id };
+    if (await libroRemuneracionesContabilizado(mes)) return { skip: 'libro de remuneraciones ya contabilizado' };
+    const py = await proyeccionSueldos(mes);
+    if (!(py.total > 0)) return { skip: 'sin haberes proyectados' };
+    const fecha = await fechaContable(ultimoDiaMes(mes));
+    const [ins] = await pool.query(
+      `INSERT IGNORE INTO ctb_provisiones (concepto, origen_tipo, origen_id, tercero, mes, fecha_constitucion, monto, montos_json, creado_por)
+       VALUES ('SUELDOS','MES',?,?,?,?,?,?,?)`,
+      [origenId, `Libro de remuneraciones ${mes} (${py.filas.length} colaboradores)`, mes, fecha, py.total, JSON.stringify(py.filas).slice(0, 400), usuario]);
+    if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
+    // El detalle por persona completo queda en el detalle del comprobante y en montos_json (recortado a 400)
+    const id = await contabilizar({
+      evento: C.regla, fecha, ref: `PROV-SUELDOS-${mes}`, montos: { monto: py.total },
+      glosa: `Provisión remuneraciones ${mes} — libro no contabilizado al cierre (${py.filas.length} colaboradores)`.slice(0, 300),
+      detalle: `Haberes proyectados ${mes} · ${py.filas.length} colaboradores · motor RRHH`,
+    });
+    await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
+    return { id: ins.insertId, monto: py.total, id_comprobante: id, colaboradores: py.filas.length };
+  } catch (e) { console.error('[provisiones constituirSueldos]', mes, e.message); return { error: e.message }; }
+}
+async function liberarSueldos(mes, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
+  const C = CONCEPTOS.SUELDOS;
+  try {
+    const origenId = Number(String(mes).replace('-', ''));
+    const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto='SUELDOS' AND origen_tipo='MES' AND origen_id=? AND estado='CONSTITUIDA'", [origenId]);
+    if (!p) return { skip: 'sin provisión constituida' };
+    const fecha = await fechaContable(fechaISO || hoyISO());
+    const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, liberada_contra=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'",
+      [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
+    if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
+    const id = await contabilizar({
+      evento: C.reglaLib, fecha, ref: `PROV-SUELDOS-${mes}-LIB`, montos: { monto: Number(p.monto) },
+      glosa: `Liberación provisión remuneraciones ${mes} (${motivo.toLowerCase()})`.slice(0, 300), detalle: `${motivo} · por ${usuario}`,
+    });
+    await pool.query('UPDATE ctb_provisiones SET id_comprobante_liberacion=? WHERE id=?', [id, p.id]);
+    return { id: p.id, monto: Number(p.monto), id_comprobante: id };
+  } catch (e) { console.error('[provisiones liberarSueldos]', mes, e.message); return { error: e.message }; }
+}
+/* Red de seguridad mensual: constituye el mes anterior si quedó sin libro; libera lo que ya tiene libro. */
+async function sincronizarSueldos(usuario = 'Motor provisiones') {
+  const out = { constituidas: 0, liberadas: 0, omitidas: 0 };
+  const desde = await param(CONCEPTOS.SUELDOS.paramDesde, '2026-09');
+  const ant = mesAnteriorDe(hoyISO().slice(0, 7));
+  if (ant >= desde) { const x = await constituirSueldos(ant, usuario); if (x && x.id && !x.skip) out.constituidas++; else out.omitidas++; }
+  const [abiertas] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto='SUELDOS' AND estado='CONSTITUIDA'");
+  for (const p of abiertas) {
+    const lib = await libroRemuneracionesContabilizado(p.mes);
+    if (lib) { const x = await liberarSueldos(p.mes, 'LIBRO', hoyISO(), usuario, `Libro de remuneraciones ${p.mes} contabilizado (comprobante #${lib.id}, origen ${lib.origen}, ${lib.f})`); if (x && x.id) out.liberadas++; }
+  }
+  return out;
+}
+
 /* Detalle detrás de cada cuadro (pop-up y Excel). tipo: INICIAL | CONSTITUIDO | LIBERADO | VIGENTE | CUENTA */
 async function detalle(mes, concepto, tipo) {
   const cta = CONCEPTOS[concepto].cuentaProv;
@@ -504,8 +609,8 @@ async function detalle(mes, concepto, tipo) {
   throw new Error('Tipo de detalle desconocido');
 }
 
-const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo };
-const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, EJECUTIVO: liberarEjecutivo };
+const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo, SUELDOS: sincronizarSueldos };
+const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, EJECUTIVO: liberarEjecutivo, SUELDOS: liberarSueldos };
 /* Al otorgar: todos los conceptos que nacen con el crédito (fire-and-forget, nunca lanza) */
 async function constituirAlOtorgar(idCredito, usuario) {
   const r = { DEALER: await constituirDealer(idCredito, usuario), PARQUE: await constituirParque(idCredito, usuario), EJECUTIVO: await constituirEjecutivo(idCredito, usuario) };
@@ -521,4 +626,5 @@ require('../../../shared/scheduler.js').programar('provisiones-devengo', tick, 6
 
 module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constituirDealer, liberarDealer, liberarDealerPorNumOp, liberarFilaPorId, sincronizarDealer,
   constituirParque, liberarParque, liberarParquePorPago, sincronizarParque,
-  constituirEjecutivo, liberarEjecutivo, liberarEjecutivoPorAprobacion, sincronizarEjecutivo, cuadro, detalle };
+  constituirEjecutivo, liberarEjecutivo, liberarEjecutivoPorAprobacion, sincronizarEjecutivo,
+  constituirSueldos, liberarSueldos, sincronizarSueldos, proyeccionSueldos, cuadro, detalle };

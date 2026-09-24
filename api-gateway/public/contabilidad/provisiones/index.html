@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Provisiones por Devengo — AutoFácil</title>
-  <!-- v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
+  <!-- v1.8 — concepto SUELDOS. v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -47,7 +47,7 @@
   <div class="panel">
     <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
       <div><label class="form-label small fw-bold mb-1">Concepto</label>
-        <select id="concepto" class="form-select form-select-sm" onchange="cargar()"><option value="DEALER">Comisión dealer</option><option value="PARQUE">Comisión y arriendo parque</option><option value="EJECUTIVO">Comisión ejecutivo</option></select></div>
+        <select id="concepto" class="form-select form-select-sm" onchange="cargar()"><option value="DEALER">Comisión dealer</option><option value="PARQUE">Comisión y arriendo parque</option><option value="EJECUTIVO">Comisión ejecutivo</option><option value="SUELDOS">Sueldos (libro de remuneraciones)</option></select></div>
       <div><label class="form-label small fw-bold mb-1">Mes</label><input type="month" id="mes" class="form-control form-control-sm" onchange="cargar()"></div>
       <div class="ms-auto d-flex gap-2 align-items-end">
         <button class="btn-navy" id="btnSync" onclick="sincronizar()" title="Constituye lo otorgado sin provisión y libera lo facturado o anulado (el motor lo hace solo cada 6 horas)"><i class="bi bi-arrow-repeat me-1"></i>Sincronizar ahora</button>
@@ -103,6 +103,7 @@
       <li><b>Desde cuándo</b> → parámetro <code>prov_dealer_desde</code> (ctb_config, hoy 2026-09). Lo anterior lo provisionó el contador en AVSOFT: su detalle está cargado como provisiones con badge <b>AVSOFT</b> (sin asiento, ya vivían en la cuenta) y se liberan solas por lo que él provisionó cuando se registra la factura de esa OP. La <b>diferencia cuenta vs detalle</b> es lo que él debe conciliar.</li>
       <li><b>Parques</b> → al otorgar un crédito de parque se provisionan su comisión parque (<code>com_parque</code> → 4001100) y su arriendo prorrateado (<code>arriendo_parque</code> → 4002100) contra <b>2106013</b> (regla <b>PROV_PARQUE</b>); se liberan al <b>aprobar el pago del parque del mes</b> en <a href="/postventa/comisiones-parques/">Comisiones Parques</a> (entra el devengo real por COMISION_PARQUES contra 2106012, el "por pagar") o al anular (<b>PROV_PARQUE_LIB</b>). Parámetro <code>prov_parque_desde</code>.</li>
       <li><b>Ejecutivos</b> → al otorgar se provisiona la comisión estimada del ejecutivo de la operación (<code>comej</code> = monto financiado × % de la carta, del producto o de Parámetros de Crédito → 4001100) contra <b>2106014</b> (regla <b>PROV_EJECUTIVO</b>); se libera al <b>aprobar la comisión del ejecutivo del mes</b> en <a href="/comisiones/revision/">Revisión de Comisiones</a> (entra el devengo real por COMISION_EJECUTIVOS contra 2106060, por el incentivo aprobado con semana corrida) o al anular (<b>PROV_EJECUTIVO_LIB</b>). Parámetro <code>prov_ejecutivo_desde</code>.</li>
+      <li><b>Sueldos</b> → concepto mensual: si un mes termina sin su libro de remuneraciones contabilizado (ni las liquidaciones del motor RRHH ni el traspaso de AVSOFT en 4001060), el cierre provisiona los <b>haberes proyectados</b> de la dotación (motor único <code>haberesProyectados</code>) al último día del mes contra <b>2106015</b> (regla <b>PROV_SUELDOS</b>) y lo libera al emitir las liquidaciones o al aparecer el libro (<b>PROV_SUELDOS_LIB</b>). Parámetro <code>prov_sueldos_desde</code>. Normalmente no constituye nada: AVSOFT contabiliza el libro el último día del mes.</li>
       <li><b>Cuadratura</b> → el cuadro lee la cuenta de provisión completa (saldo inicial + constituido − liberado = saldo final, comprobantes manuales incluidos) y separa cuánto controla el motor; el Cierre de Mes revisa que los asientos del motor calcen con sus provisiones (ver log en Reglas de Centralización).</li>
       <li><b>Pendientes</b> → una provisión con muchos días sin documento es un dealer que no ha facturado su comisión: revisar en <a href="/postventa/seguimiento/">Seguimiento Post Venta</a>.</li>
     </ul>
@@ -138,9 +139,9 @@ async function cargar(){
     `<span class="ok"><i class="bi bi-check-circle"></i> Cuenta ${d.cuenta_provision}: SI ${clp(d.saldo_inicial)} + constituido ${clp(d.constituido)} − liberado ${clp(d.liberado)} = SF ${clp(d.saldo_final)}</span>`
     + ` <span class="text-muted ms-2">= detalle ${clp(d.motor_vigente)} + diferencia ${clp(d.saldo_historico)}</span>`;
   const esParque = concepto === 'PARQUE';
-  document.getElementById('thTercero').textContent = esParque ? 'Parque' : (concepto === 'EJECUTIVO' ? 'Ejecutivo' : 'Dealer');
-  document.getElementById('thBase').textContent = esParque ? 'Comisión + arriendo' : (concepto === 'EJECUTIVO' ? '—' : 'Bruto');
-  document.getElementById('thProv').textContent = (esParque || concepto === 'EJECUTIVO') ? 'Provisión' : 'Provisión (neto)';
+  document.getElementById('thTercero').textContent = esParque ? 'Parque' : (concepto === 'EJECUTIVO' ? 'Ejecutivo' : concepto === 'SUELDOS' ? 'Concepto' : 'Dealer');
+  document.getElementById('thBase').textContent = esParque ? 'Comisión + arriendo' : ((concepto === 'EJECUTIVO' || concepto === 'SUELDOS') ? '—' : 'Bruto');
+  document.getElementById('thProv').textContent = (esParque || concepto === 'EJECUTIVO' || concepto === 'SUELDOS') ? 'Provisión' : 'Provisión (neto)';
   renderPend();
   document.getElementById('movBody').innerHTML = d.movimientos.length ? d.movimientos.map(p => `<tr>
     <td class="mono">${esc(p.num_op||p.origen_id)}${badgeAv(p)}</td><td>${esc(p.tercero||'—')}</td><td>${fch(p.fecha_constitucion)}</td><td class="r">${clp(p.monto)}</td>
