@@ -387,9 +387,10 @@ function fabricaFactorOrigen(vars) {
            AND ejecutivo IS NOT NULL AND ejecutivo != ''`, [mesOrigen]);
       const porEj = {};
       rows.forEach(r => { (porEj[r.ejecutivo] = porEj[r.ejecutivo] || []).push(r); });
+      const reglasProd = await require('../../../../shared/producto-reglas').mapaEjecutivoPct();   // AUTOFIN PREFERENTE → % ejecutivo propio
       const factores = {};
       for (const [ej, creds] of Object.entries(porEj)) {
-        const c = calcularComision(creds, vars, mesOrigen);
+        const c = calcularComision(creds, vars, mesOrigen, { reglas_producto: reglasProd });
         factores[ej] = { factor_ajuste: c.factor_ajuste || 0, factor_sc: c.factor_semana_corrida || factorSemanaCorrida(mesOrigen, vars) };
       }
       cache.set(mesOrigen, factores);
@@ -753,8 +754,9 @@ async function calcularMes(mes, varsOverride) {
     const nombresU = new Set();
     for (const u of todosU) { nombresU.add(normN(u.nombre + ' ' + (u.apellido || ''))); nombresU.add(normN(String(u.nombre || '').split(/\s+/)[0] + ' ' + (u.apellido || ''))); }
 
+    const reglasProd = await require('../../../../shared/producto-reglas').mapaEjecutivoPct();   // AUTOFIN PREFERENTE → % ejecutivo propio (caché 60 s)
     const resultado = Object.entries(map).map(([ejecutivo, creds]) => {
-      const calc = calcularComision(creds, vars, mes, { fecha_ingreso: ingresoDe[String(ejecutivo).toUpperCase().trim()] || null });
+      const calc = calcularComision(creds, vars, mes, { fecha_ingreso: ingresoDe[String(ejecutivo).toUpperCase().trim()] || null, reglas_producto: reglasProd });
       if (nombresU.size && !nombresU.has(normN(ejecutivo))) calc.externo = true;
       if (rentaFija.has(String(ejecutivo).toUpperCase().trim())) {
         calc.renta_fija = true;

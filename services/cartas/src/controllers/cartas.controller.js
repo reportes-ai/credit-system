@@ -56,6 +56,12 @@ function sincronizarCreditoDesdeCarta(c, idCred) {
       [c.concesionario || null, (c.rutConc || c.rut_conc || null), (c.parque || null), idCred]
     ).catch(e => console.error('[carta→credito dealer]', e.message));
   }
+  // PRODUCTO PREFERENTE marcado/desmarcado en la carta → producto del crédito NO otorgado
+  if (c.preferente !== undefined) {
+    pool.query(`UPDATE creditos SET producto = ?, updated_at = NOW() WHERE id = ? AND estado_credito <> 'OTORGADO'`,
+      [c.preferente ? (c.producto || 'AUTOFIN PREFERENTE') : null, idCred]
+    ).catch(e => console.error('[carta→credito producto]', e.message));
+  }
   // Primas/GPS digitadas o corregidas en la carta → al crédito (0 explícito válido)
   if (c.segRdh !== undefined || c.segDesgravamen !== undefined || c.segCesantia !== undefined || c.segRep !== undefined || c.gps !== undefined || c.gastos !== undefined) {
     const rdhT = (c.segRdh != null || c.segDesgravamen != null) ? (Number(c.segRdh || 0) + Number(c.segDesgravamen || 0)) : null;
@@ -238,7 +244,7 @@ async function crearCreditoDesdeCartas(c) {
        monto_financiado, plazo, tascli_real,
        seguro_rdh, seguro_cesantia, seguro_rep_menor, seguros, gps, gastos,
        tipo_vehiculo, marca, modelo, anio, patente,
-       automotora, ejecutivo, comdea_real,
+       automotora, ejecutivo, comdea_real, producto,
        created_at, updated_at)
     VALUES (?,?,?,?,
             'APROBADO','INGRESO',   -- nace de una carta APROBADA; estado_eval pasa a OTORGADO recién al otorgar (el dashboard clasifica por estado_eval)
@@ -247,7 +253,7 @@ async function crearCreditoDesdeCartas(c) {
             ?,?,?,
             ?,?,?,?,?,?,
             ?,?,?,?,?,
-            ?,?,?,
+            ?,?,?,?,
             NOW(),NOW())
   `, [
     /* num_op = correlativo AutoFácil desde que nace (motor único shared/num-op.js,
@@ -273,6 +279,8 @@ async function crearCreditoDesdeCartas(c) {
        carta partía al ejecutivo en dos y su conteo del mes salía corto. */
     (c.ejecutivo_nombre || c.ejecutivoNombre ? String(c.ejecutivo_nombre || c.ejecutivoNombre).trim().toUpperCase() : null),
     (c.part_bruto || c.partBruto || null),
+    // PRODUCTO PREFERENTE: el crédito nace con el producto de la carta → rentabilidad y comisiones leen sus reglas
+    (c.preferente ? (c.producto || 'AUTOFIN PREFERENTE') : null),
   ]);
     return rIns;
   });
@@ -496,6 +504,14 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS fecha_correccion_carta DATETIME DEFAULT NULL`);
     // 1 = la corrección cambió la comisión (part_bruto): manda en ambos sentidos (motor comisionDealerEfectiva)
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS comision_corregida TINYINT NOT NULL DEFAULT 0`);
+    /* PRODUCTO PREFERENTE (Pato, 24-09-2026): la carta se arma con las reglas propias del producto
+       (Productos por Financiera → AUTOFIN PREFERENTE): tasa fija del mantenedor, comisión dealer por
+       tramo de plazo (puede ser menor), comisión parque como dato (puede ser menor). El crédito nace
+       con ese producto y los motores de rentabilidad y comisiones (dealer, parque, ejecutivo) lo leen. */
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS preferente TINYINT NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS producto VARCHAR(80) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS parque_pct DECIMAL(6,3) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS parque_monto BIGINT DEFAULT NULL`);
     // Compra para un tercero (persona natural o jurídica distinta del cliente que
     // solicita el crédito) — cláusula 13 de la carta antigua. Opcional: NULL = sin tercero.
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS compra_para VARCHAR(200) DEFAULT NULL`);
@@ -696,6 +712,10 @@ function mapRow(r) {
     tierUacN:                 r.tier_uac_n != null ? Number(r.tier_uac_n) : null,
     tierUacPct:               r.tier_uac_pct != null ? parseFloat(r.tier_uac_pct) : null,
     tasaCredito:              r.tasa_credito ? parseFloat(r.tasa_credito) : 0,
+    preferente:               !!r.preferente,                                   // PRODUCTO PREFERENTE (reglas propias del mantenedor)
+    producto:                 r.producto || null,
+    parquePct:                r.parque_pct != null ? parseFloat(r.parque_pct) : null,
+    parqueMonto:              r.parque_monto != null ? Number(r.parque_monto) : null,
     montoCreditoCLP:          r.monto_credito_clp,
     montoCreditoUF:           r.monto_credito_uf ? parseFloat(r.monto_credito_uf) : 0,
     excepciones:              parseJSON(r.excepciones) || [],
@@ -1346,6 +1366,32 @@ const upsert = async (req, res) => {
       'UPDATE cartas_aprobacion SET codigo_excepcion=?, codigo_excepcion_tipo=? WHERE id=?',
       [codExc, codExcTipo, idCarta]).catch(e => console.error('[carta codigo excepcion]', e.message)); };
 
+    /* PRODUCTO PREFERENTE: el servidor valida contra el mantenedor, no confía en el navegador.
+       Tasa = la del producto por tramo UF (no se puede variar); comisión dealer ≤ tramo del
+       producto sobre el saldo; comisión parque ≤ % del producto (solo cartas de parque). */
+    if (c.preferente) {
+      const PR = require('../../../../shared/producto-reglas');
+      const pr = (await PR.reglasDe(c.producto, c.acreedor)) || (await PR.preferenteDe(c.acreedor || 'AUTOFIN'));
+      if (!pr) return res.status(400).json({ success: false, data: null, error: 'No hay un producto con reglas propias (PREFERENTE) activo en Productos por Financiera' });
+      c.producto = pr.producto;
+      const esMayor = Number(c.montoCreditoUF) > 200;
+      const tasaProd = PR.tasaPct(pr, esMayor);
+      const f2 = v => Number(v).toFixed(3).replace('.', ',');
+      if (tasaProd != null && Math.abs(Number(c.tasaCredito) - tasaProd) > 0.0005)
+        return res.status(400).json({ success: false, data: null, error: `Producto ${pr.producto}: la tasa es ${f2(tasaProd)}% (${esMayor ? '>' : '≤'} 200 UF) y no se puede variar` });
+      const saldo = Number(c.saldo) || 0;
+      const topeDealer = Math.round(saldo * PR.dealerPct(pr, c.plazo));
+      if (Number(c.partBruto || 0) > topeDealer + 1)
+        return res.status(400).json({ success: false, data: null, error: `Producto ${pr.producto}: la comisión dealer máxima para ${c.plazo} cuotas es ${(PR.dealerPct(pr, c.plazo) * 100).toFixed(2).replace('.', ',')}% del saldo ($${topeDealer.toLocaleString('es-CL')}); puede ser menor, no mayor` });
+      const topeParque = PR.parquePct(pr) * 100;
+      if (String(c.tipo || '').toUpperCase().includes('PARQUE')) {
+        if (c.parquePct == null || c.parquePct === '') c.parquePct = topeParque;
+        if (Number(c.parquePct) > topeParque + 1e-9)
+          return res.status(400).json({ success: false, data: null, error: `Producto ${pr.producto}: la comisión parque máxima es ${topeParque.toFixed(2).replace('.', ',')}% del saldo; puede ser menor, no mayor` });
+        c.parqueMonto = Math.round(saldo * Number(c.parquePct) / 100);
+      } else { c.parquePct = null; c.parqueMonto = null; }
+    } else { c.preferente = 0; c.producto = c.producto || null; c.parquePct = null; c.parqueMonto = null; }
+
     const vals = [
       c.opCarta, c.opOrigen, c.tipo,
       c.ejecutivoIdx || null, c.ejecutivoNombre, c.ejecutivoMail, c.ejecutivoTel,
@@ -1376,6 +1422,9 @@ const upsert = async (req, res) => {
       c.montoCreditoUF || null,
       c.excepciones ? JSON.stringify(c.excepciones) : null,
       c.excepcionesComentarios ? JSON.stringify(c.excepcionesComentarios) : null,
+      c.preferente ? 1 : 0, c.producto || null,
+      (c.parquePct != null && c.parquePct !== '') ? Number(c.parquePct) : null,
+      (c.parqueMonto != null && c.parqueMonto !== '') ? Math.round(Number(c.parqueMonto)) : null,
       c.numeroCreditoCreado || null,
       c.idCreditoCreado || null,
     ];
@@ -1430,6 +1479,7 @@ const upsert = async (req, res) => {
           otorgado=?, fecha_otorgado = COALESCE(fecha_otorgado, ?),
           tasa_credito=?, monto_credito_clp=?, monto_credito_uf=?,
           excepciones=?, excepciones_comentarios=?,
+          preferente=?, producto=?, parque_pct=?, parque_monto=?,
           numero_credito_creado=?, id_credito_creado=?
         WHERE id=?`,
         [...vals, c.id]
@@ -1497,6 +1547,7 @@ const upsert = async (req, res) => {
           otorgado, fecha_otorgado,
           tasa_credito, monto_credito_clp, monto_credito_uf,
           excepciones, excepciones_comentarios,
+          preferente, producto, parque_pct, parque_monto,
           numero_credito_creado, id_credito_creado
         ) VALUES (${vals.map(() => '?').join(',')})`,
         vals

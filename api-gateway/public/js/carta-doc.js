@@ -77,6 +77,7 @@
       <tr><td class="lbl">EJECUTIVO</td><td class="val">${esc(c.ejecutivoNombre || '')}</td><td class="lbl">TELÉFONO</td><td class="val">${esc(c.ejecutivoTel || '')}</td></tr>
       <tr><td class="lbl">CORREO</td><td class="val">${esc(c.ejecutivoMail || '')}</td><td class="lbl">N° CARTA</td><td class="val"><strong>${esc(c.opCarta || '')}</strong>${c.numeroCreditoCreado ? ` &nbsp;<span style="color:#475569;font-weight:normal;font-size:8.5px">· Crédito: <b>${esc(c.numeroCreditoCreado)}</b></span>` : ''}</td></tr>
     </table>
+    ${c.preferente ? `<div style="margin:2px 0 7px;padding:4px 8px;border:1.5px solid #0141A2;border-radius:5px;background:#eff6ff;font-size:9.5px;font-weight:bold;color:#0141A2;text-align:center;letter-spacing:.6px;text-transform:uppercase">★ PRODUCTO PREFERENTE${c.producto ? ' — ' + esc(c.producto) : ''}</div>` : ''}
     <div class="sec-title">DATOS DEL CLIENTE</div>
     <table class="data-tbl">
       <tr><td class="lbl" style="width:13%">NOMBRE</td><td class="val" style="width:37%">${esc(title(c.cliente || ''))}</td><td class="lbl" style="width:13%">RUT</td><td class="val">${rutF(c.rutCliente || '')}</td></tr>
@@ -96,6 +97,7 @@
     <table class="data-tbl">
       <tr><td class="lbl" style="width:13%">VALOR NETO</td><td class="val" style="width:20%">${clp(c.partNeto)}</td><td class="lbl" style="width:13%">VALOR IVA</td><td class="val">${clp(c.partIVA)}</td></tr>
       <tr><td class="lbl">VALOR BRUTO</td><td class="val">${clp(c.partBruto)}</td><td class="lbl">ACREEDOR</td><td class="val">${acreedor}</td></tr>
+      ${c.preferente && c.parqueMonto != null && isParque ? `<tr><td class="lbl">COMISIÓN PARQUE</td><td class="val">${clp(c.parqueMonto)}</td><td class="lbl">% SOBRE SALDO</td><td class="val">${c.parquePct != null ? String(Number(c.parquePct).toFixed(2)).replace('.', ',') + ' %' : ''}</td></tr>` : ''}
     </table>
     ${excepcionesSec}
     <div class="sec-title">CONSIDERACIONES</div>

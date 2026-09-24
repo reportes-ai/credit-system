@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.76 — Revisión Cartolas con corte INMEDIATO: entran también las otorgadas y marcadas en el mes en curso (todo hasta el día de emisión, Pato 22-09-2026). v4.75 — Impresión de Cartas: columna Ejecutivo después del Dealer. v4.74 — los 6 buscadores (cartas, vigentes, impresión, informes, movimientos y revisión de cartolas) usan el motor único busqueda-core: + N° OP, ejecutivo y RUT del dealer; sin distinguir mayúsculas y RUT sin puntos/guion. v4.73 — el autocompletado desde el PDF de la financiera ya no toca el dealer ni su RUT (lo elige el ejecutivo). v4.72 — cartola: el nombre de quien digitó el adicional/descuento ya no sale en el PDF al dealer (sigue en pantalla para el supervisor); con un ajuste POR APROBAR la cartola no se puede enviar (botón bloqueado + validación en el servidor). v4.71 — corte de cartola paramétrico: lo marcado A PAGAR en el mes en curso sale en la cartola del mes siguiente (aviso con las diferidas). v4.70 (Revisión Cartolas: botón Adicional / Descuento por dealer — popup con tipo, monto, glosa (cartola + ODP) y comentario interno; queda POR APROBAR hasta que lo apruebe el supervisor del digitador, con campanita; suma en la cartola solo aprobado) — v4.69 (PDF de cartola: las que no eran la primera salian cortadas o en blanco — html2canvas solo captura dentro del viewport; se captura un clon en flujo al inicio del body con scroll 0) — v4.68 (abrir documento: muestra la causa real del servidor, p.ej. host sin acceso al almacén) — v4.67 (Rentabilidad de la carta aplica el corte por plazo del Modelo 2 UAC: op >= 36 cuotas = % fijo, no el tier del mes) — v4.66 (hora con segundos de creación en Revisión de Cartas Pendientes) — v4.65 — ?carta=ID abre directo una carta (puerta de entrada desde la ficha del crédito) · v4.64 — excepciones: lo que cuadra con pizarra se resume en "✓ Tasa OK · Comisión OK"; solo lo distinto se detalla · v4.63 — vigencia desde fecha carta O digitacion (lo mas tarde), igual que el servidor · v4.62 — participacion sugerida desde la TABLA PACTADA del local (motor /api/comision-dealer/tabla); la excepcion compara contra lo pactado · v4.61 — cartola con SECCIONES por local (subtotal por parque/calle) cuando el dealer curso en mas de una ubicacion · v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.77 — checkbox PREFERENTE en la caja AUTOFIN: tasa fija del producto, comisión dealer y parque topadas por Productos por Financiera; la carta dice Producto Preferente. v4.76 — Revisión Cartolas con corte INMEDIATO: entran también las otorgadas y marcadas en el mes en curso (todo hasta el día de emisión, Pato 22-09-2026). v4.75 — Impresión de Cartas: columna Ejecutivo después del Dealer. v4.74 — los 6 buscadores (cartas, vigentes, impresión, informes, movimientos y revisión de cartolas) usan el motor único busqueda-core: + N° OP, ejecutivo y RUT del dealer; sin distinguir mayúsculas y RUT sin puntos/guion. v4.73 — el autocompletado desde el PDF de la financiera ya no toca el dealer ni su RUT (lo elige el ejecutivo). v4.72 — cartola: el nombre de quien digitó el adicional/descuento ya no sale en el PDF al dealer (sigue en pantalla para el supervisor); con un ajuste POR APROBAR la cartola no se puede enviar (botón bloqueado + validación en el servidor). v4.71 — corte de cartola paramétrico: lo marcado A PAGAR en el mes en curso sale en la cartola del mes siguiente (aviso con las diferidas). v4.70 (Revisión Cartolas: botón Adicional / Descuento por dealer — popup con tipo, monto, glosa (cartola + ODP) y comentario interno; queda POR APROBAR hasta que lo apruebe el supervisor del digitador, con campanita; suma en la cartola solo aprobado) — v4.69 (PDF de cartola: las que no eran la primera salian cortadas o en blanco — html2canvas solo captura dentro del viewport; se captura un clon en flujo al inicio del body con scroll 0) — v4.68 (abrir documento: muestra la causa real del servidor, p.ej. host sin acceso al almacén) — v4.67 (Rentabilidad de la carta aplica el corte por plazo del Modelo 2 UAC: op >= 36 cuotas = % fijo, no el tier del mes) — v4.66 (hora con segundos de creación en Revisión de Cartas Pendientes) — v4.65 — ?carta=ID abre directo una carta (puerta de entrada desde la ficha del crédito) · v4.64 — excepciones: lo que cuadra con pizarra se resume en "✓ Tasa OK · Comisión OK"; solo lo distinto se detalla · v4.63 — vigencia desde fecha carta O digitacion (lo mas tarde), igual que el servidor · v4.62 — participacion sugerida desde la TABLA PACTADA del local (motor /api/comision-dealer/tabla); la excepcion compara contra lo pactado · v4.61 — cartola con SECCIONES por local (subtotal por parque/calle) cuando el dealer curso en mas de una ubicacion · v4.60 — multi-local: el filtro de dealers por parque reconoce a quien tenga LOCAL en ese parque (d.locales), no solo su ficha · v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -305,6 +305,8 @@
             <input type="file" id="docAutofin" accept="application/pdf" style="display:none" onchange="onAutofinDoc(this)">
             <button type="button" onclick="document.getElementById('docAutofin').click()" style="background:#111827;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:.82rem;font-weight:700;cursor:pointer"><i class="bi bi-file-earmark-arrow-up me-1"></i>Subir Carta Aprobación</button>
             <span id="docAutofinName" style="font-size:.74rem;color:#16a34a;font-weight:600"></span>
+            <!-- PRODUCTO PREFERENTE (Pato, 24-09-2026): tasa fija del mantenedor; comisión dealer y parque según el producto (pueden ser menores) -->
+            <label id="wrapPref" title="Producto AUTOFIN PREFERENTE (Mantenedores → Productos por Financiera): la tasa es la del producto y no se puede variar; la comisión dealer y la comisión parque se toman del producto y pueden ser menores, nunca mayores" style="display:none;align-items:center;gap:5px;font-size:.78rem;font-weight:800;color:#0141A2;cursor:pointer;margin-left:auto;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:4px 9px"><input type="checkbox" id="chkPreferente" onchange="onPreferente()" style="width:14px;height:14px;cursor:pointer"> PREFERENTE</label>
           </div>
           <!-- Pantallazo del sistema Autofin: prueba del ESTADO (Revisión Firma / Cursado).
                Solo se muestra con el Revisor AUTOFIN encendido (rev_autofin_activo). -->
@@ -418,6 +420,8 @@
       <div class="ff"><label>Valor bruto</label><input id="cPartBruto" inputmode="numeric" readonly oninput="fmtMoney(this);partDesdeBruto()">
         <div id="partMsg" style="font-size:.72rem;margin-top:3px;font-weight:700"></div></div>
       <div class="ff"><label>% sobre saldo</label><input id="cPartPct" inputmode="decimal" readonly oninput="partDesdePct()" onblur="fmtPctBlur(this)" onfocus="fmtPctFocus(this)"></div>
+      <div class="ff" id="wrapParquePct" style="display:none"><label>Comisión parque (%) <span id="parquePctMax" style="font-weight:400;color:#94a3b8;font-size:.68rem;text-transform:none"></span></label><input id="cParquePct" inputmode="decimal" oninput="onParquePct()" onblur="fmtPctBlur(this);onParquePct()" onfocus="fmtPctFocus(this)">
+        <div id="parqueMsg" style="font-size:.72rem;margin-top:3px;font-weight:700"></div></div>
       <div class="ff"><label>Valor neto</label><input id="cPartNeto" readonly></div>
       <div class="ff"><label>Valor IVA</label><input id="cPartIVA" readonly></div>
     </div>
@@ -750,6 +754,7 @@
 <script src="/js/busqueda-core.js"></script>
 <script src="/js/rentabilidad-core.js"></script>
 <script src="/js/comision-dealer.js"></script>
+<script src="/js/producto-reglas-core.js"></script>
 <script src="/js/rentabilidad-calc.js"></script>
 <script src="/js/uac-tier.js"></script>
 <script src="/js/preferencia-financiera.js"></script>
@@ -889,6 +894,7 @@ const dDT = v => {
 })();
 
 async function cargarUFyTasas(){
+  cargarProductoPreferente();   // producto con reglas propias (checkbox PREFERENTE de la caja AUTOFIN)
   try {
     const [rUf, rTas, rPar, rUac] = await Promise.all([
       fetch('/api/uf/vigente', { headers: hdr() }),
@@ -1698,6 +1704,7 @@ function onTipoCarta(){
   const wrap = document.getElementById('wrapParque');
   wrap.style.display = esCalle ? 'none' : '';
   if (esCalle) { document.getElementById('cParque').value = ''; filtrarConcesionarios(); }
+  const wpp = document.getElementById('wrapParquePct'); if (wpp) wpp.style.display = (PREF_ON() && !esCalle) ? '' : 'none';
   recalcParticipacion();
 }
 function calcSaldo(){
@@ -1760,6 +1767,9 @@ function calcUFyTasa(){
       if (!String(cTasaEl.value).trim()) cTasaEl.value = topePiz.toFixed(2).replace('.',',');
     }
   }
+  // PRODUCTO PREFERENTE: la tasa es la del producto (fija) y también es la pizarra de comparación
+  const tasaPref = aplicarTasaPreferente(esMenor200);
+  if (tasaPref != null) pizarra = tasaPref;
   // Comparación tasa crédito vs pizarra: SOLO décimas y centésimas (a 2 decimales).
   // La tasa ingresada conserva 3 decimales; el truncado es solo para decidir excepción.
   const tasa = tope2(parseFloat(String(document.getElementById('cTasa').value).replace(',','.')));
@@ -1783,9 +1793,65 @@ function calcUFyTasa(){
 // Trunca a 2 decimales hacia abajo (décimas y centésimas). Nunca redondea hacia arriba:
 // así la tasa nunca supera la TMC (2,8683% → tope 2,86%). El +1e-6 protege valores exactos.
 function tope2(n){ return (n==null || isNaN(n)) ? n : Math.floor(n*100 + 1e-6)/100; }
+/* ── PRODUCTO PREFERENTE (Pato, 24-09-2026) ──────────────────────────────────
+   Checkbox en la caja AUTOFIN. Marcado: la carta usa las reglas propias del producto
+   AUTOFIN PREFERENTE del mantenedor Productos por Financiera (motor único
+   /js/producto-reglas-core.js): tasa por tramo UF FIJA (no se puede variar), comisión
+   dealer = tramo del producto por plazo sobre el saldo (puede ser menor), comisión
+   parque = % del producto (dato de la carta, puede ser menor). El servidor vuelve a
+   validar todo contra el mantenedor al grabar. */
+let PROD_PREF = null;
+async function cargarProductoPreferente(){
+  try {
+    const j = await fetch('/api/productos-financiera?activo=1', { headers: hdr() }).then(r=>r.json());
+    const rows = (j.success && Array.isArray(j.data)) ? j.data : [];
+    const af = rows.filter(p => Number(p.reglas_propias)===1 && String(p.financiera||'').toUpperCase()==='AUTOFIN');
+    PROD_PREF = af.find(p => AF_PROD_REGLAS.esPreferente(p)) || af[0] || null;
+    const w = document.getElementById('wrapPref'); if (w) w.style.display = PROD_PREF ? 'flex' : 'none';
+  } catch(e){ PROD_PREF = null; }
+}
+function PREF_ON(){ return !!(PROD_PREF && document.getElementById('chkPreferente')?.checked); }
+const pctTxt = v => (Number(v)||0).toFixed(2).replace('.',',') + ' %';
+function onPreferente(){
+  const on = PREF_ON();
+  if (on) {   // el producto es AUTOFIN: se fija el acreedor
+    const sel = document.getElementById('cAcreedor');
+    const opt = [...sel.options].find(o => String(o.value||o.textContent).toUpperCase().includes('AUTOFIN'));
+    if (opt) sel.value = opt.value;
+  }
+  const t = document.getElementById('cTasa'); t.readOnly = on; t.style.background = on ? '#f1f5f9' : '';
+  const chk = document.getElementById('chkCambioPart'); if (chk.checked) { chk.checked = false; toggleCambioPart(); }
+  const esParque = document.getElementById('cTipo').value.includes('PARQUE');
+  const wp = document.getElementById('wrapParquePct'); wp.style.display = (on && esParque) ? '' : 'none';
+  if (on) {
+    document.getElementById('cParquePct').value = pctTxt(PROD_PREF.parque_pct);
+    document.getElementById('parquePctMax').textContent = '(máx ' + pctTxt(PROD_PREF.parque_pct) + ' del saldo · ' + PROD_PREF.producto + ')';
+    onParquePct();
+  } else { document.getElementById('parqueMsg').textContent = ''; }
+  calcUFyTasa(); recalcParticipacion();
+}
+/* Tasa del producto según tramo UF: se escribe en la tasa de la carta y pasa a ser la "pizarra" de comparación */
+function aplicarTasaPreferente(esMenor200){
+  if (!PREF_ON() || esMenor200 === null) return null;
+  const tasa = AF_PROD_REGLAS.tasaPct(PROD_PREF, !esMenor200);
+  if (tasa == null) return null;
+  document.getElementById('cTasa').value = String(Number(tasa.toFixed(3))).replace('.',',');
+  document.getElementById('cTasaPizarra').value = tasa.toFixed(3).replace('.',',') + ' % (' + PROD_PREF.producto + ' ' + (esMenor200?'≤':'>') + '200 UF — fija)';
+  return tasa;
+}
+function parquePctVal(){ return parseFloat(String(document.getElementById('cParquePct').value).replace(/[^\d,\.]/g,'').replace(',','.')) || 0; }
+function onParquePct(){
+  const msg = document.getElementById('parqueMsg'); if (!PREF_ON()) { msg.textContent=''; return; }
+  const saldo = rawMoney('cSaldo'), max = Number(PROD_PREF.parque_pct)||0, pct = parquePctVal();
+  if (pct > max + 1e-9) { msg.style.color='#dc2626'; msg.innerHTML = '<i class="bi bi-x-octagon"></i> Sobre el ' + pctTxt(max) + ' del producto — no se puede grabar (puede ser menor, no mayor)'; }
+  else { msg.style.color='#0141A2'; msg.textContent = saldo ? 'Comisión parque: ' + fmtCLP(Math.round(saldo*pct/100)) : ''; }
+}
+
 function getFactor(plazo, tipo){
   const p = parseInt(plazo)||0;
   if (!p) return 0;
+  // PRODUCTO PREFERENTE: la comisión dealer es el tramo de plazo del producto (motor único), no la tabla ni la pizarra
+  if (PREF_ON()) return AF_PROD_REGLAS.dealerPct(PROD_PREF, p);
   // 1) Tabla PACTADA del dealer para el LOCAL de la carta (multi-local v218.7):
   //    viene del motor único /api/comision-dealer/tabla y MANDA sobre la pizarra.
   //    Con esto la excepción PARTICIPACION_SOBRE_PIZARRA compara contra lo pactado.
@@ -1843,7 +1909,8 @@ function recalcParticipacion(){
   const saldo = rawMoney('cSaldo');
   const factor = getFactor(plazo, tipo);
   const lbl = document.getElementById('comisionPizarra');
-  const fuente = (DEALER_TAB && (tipo==='DEALER PARQUE' || tipo==='DEALER CALLE'))
+  const fuente = PREF_ON() ? 'Producto ' + PROD_PREF.producto + ' (tramo de plazo)'
+    : (DEALER_TAB && (tipo==='DEALER PARQUE' || tipo==='DEALER CALLE'))
     ? 'Tabla pactada del dealer' + (tipo.includes('PARQUE') ? ' — ' + (((document.getElementById('cParque')||{}).value)||'parque') : ' — calle')
     : `Pizarra ${tipo.includes('PARQUE')?'parque':'calle'}`;
   lbl.textContent = (factor && saldo)
@@ -1897,7 +1964,9 @@ function avisoParticipacion(){
   const bruto = rawMoney('cPartBruto');
   if (brutoPiz > 0 && bruto > brutoPiz) {
     msg.style.color = '#d97706';
-    msg.innerHTML = `<i class="bi bi-exclamation-triangle"></i> Sobre ${DEALER_TAB?'lo pactado':'pizarra'} (${fmtCLP(brutoPiz)}) — REQUIERE EXCEPCIÓN`;
+    msg.innerHTML = PREF_ON()
+      ? `<i class="bi bi-x-octagon"></i> Sobre el tramo del producto ${PROD_PREF.producto} (${fmtCLP(brutoPiz)}) — no se puede grabar (puede ser menor, no mayor)`
+      : `<i class="bi bi-exclamation-triangle"></i> Sobre ${DEALER_TAB?'lo pactado':'pizarra'} (${fmtCLP(brutoPiz)}) — REQUIERE EXCEPCIÓN`;
   } else {
     msg.textContent = '';
   }
@@ -2088,6 +2157,7 @@ function limpiarForm(){
   COMPRA_PARA = null; renderCompraParaInfo();
   ['piePct','ufBadge','tasaMsg','comisionPizarra'].forEach(id=>document.getElementById(id).innerHTML='');
   document.getElementById('chkCambioPart').checked = false;
+  const chkPref = document.getElementById('chkPreferente'); if (chkPref) { chkPref.checked = false; onPreferente(); }
   toggleCambioPart();
   document.getElementById('wrapParque').style.display = '';
   document.getElementById('formAlert').className = 'alert-inline';
@@ -2124,6 +2194,14 @@ async function guardarCarta(){
   const patenteVal = document.getElementById('cPatente').value.trim();
   if (patenteVal && !patenteValida(patenteVal)) { setFormAlert('Patente inválida — formato: 4 letras + 2 números (ABCD12), o déjala vacía si es 0 km'); return; }
 
+  // PRODUCTO PREFERENTE: comisión dealer y parque no pueden superar el producto (el servidor lo vuelve a validar)
+  if (PREF_ON()) {
+    const factorP = getFactor(document.getElementById('cPlazo').value, document.getElementById('cTipo').value);
+    const topeD = Math.round(rawMoney('cSaldo') * factorP);
+    if (rawMoney('cPartBruto') > topeD + 1) { setFormAlert(`⛔ Producto ${PROD_PREF.producto}: la comisión dealer no puede superar ${fmtCLP(topeD)} (${pctTxt(factorP*100)} del saldo para este plazo); puede ser menor, no mayor`); return; }
+    if (document.getElementById('cTipo').value.includes('PARQUE') && parquePctVal() > (Number(PROD_PREF.parque_pct)||0) + 1e-9) {
+      setFormAlert(`⛔ Producto ${PROD_PREF.producto}: la comisión parque no puede superar ${pctTxt(PROD_PREF.parque_pct)} del saldo; puede ser menor, no mayor`); return; }
+  }
   // Financiera bloqueada → no se puede grabar
   const finSel = document.getElementById('cAcreedor').value;
   const fin = FINANCIERAS.find(x=>x.nombre===finSel);
@@ -2217,6 +2295,11 @@ async function guardarCarta(){
     montoCreditoCLP: montoCred,
     montoCreditoUF: montoUF != null ? Math.round(montoUF*10000)/10000 : null,
     tasaCredito: !isNaN(tasa) ? tasa : null,
+    // PRODUCTO PREFERENTE: producto de la carta + comisión parque como dato (solo cartas de parque)
+    preferente: PREF_ON(),
+    producto: PREF_ON() ? PROD_PREF.producto : null,
+    parquePct: (PREF_ON() && document.getElementById('cTipo').value.includes('PARQUE')) ? parquePctVal() : null,
+    parqueMonto: (PREF_ON() && document.getElementById('cTipo').value.includes('PARQUE')) ? Math.round(rawMoney('cSaldo') * parquePctVal() / 100) : null,
     excepciones: excepciones.length ? excepciones : null,
     status: 'PENDIENTE',
   };
@@ -2633,6 +2716,9 @@ function editarCarta(id){
   cargarVendedores(c.rutConc||'');   // llena el selector y preserva el vendedor de la carta
   if (c.montoCreditoCLP) { setMoney('cMontoCred', c.montoCreditoCLP); montoCredManual = true; }
   if (c.tasaCredito) document.getElementById('cTasa').value = String(c.tasaCredito).replace('.',',');
+  // PRODUCTO PREFERENTE guardado en la carta → checkbox, tasa fija y % parque de la carta
+  const chkP = document.getElementById('chkPreferente');
+  if (chkP) { chkP.checked = !!c.preferente; onPreferente(); if (c.preferente && c.parquePct != null) { document.getElementById('cParquePct').value = pctTxt(c.parquePct); onParquePct(); } }
   setMoney('cPartBruto', c.partBruto); setMoney('cPartNeto', c.partNeto); setMoney('cPartIVA', c.partIVA);
   const saldoE = c.saldo||0;
   document.getElementById('cPartPct').value = saldoE>0 ? ((c.partBruto||0)/saldoE*100).toFixed(2).replace('.',',') : '';

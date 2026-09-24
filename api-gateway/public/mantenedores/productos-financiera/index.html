@@ -7,7 +7,7 @@
   <title>Productos por Financiera — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v2.2 — seguros obligatorios por producto. v2.1 — spreads propios (costo de fondo = tasa − spread). v2.0 — productos con REGLAS PROPIAS (tasa cliente, comisión dealer por tramo de plazo, parque y ejecutivo): nace AUTOFIN PREFERENTE; footer Qué afecta. v1.2 -->
+  <!-- v2.3 — pie: las reglas propias ya mandan en cartas (checkbox PREFERENTE), rentabilidad y comisiones. v2.2 — seguros obligatorios por producto. v2.1 — spreads propios (costo de fondo = tasa − spread). v2.0 — productos con REGLAS PROPIAS (tasa cliente, comisión dealer por tramo de plazo, parque y ejecutivo): nace AUTOFIN PREFERENTE; footer Qué afecta. v1.2 -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -115,7 +115,7 @@
   <div class="afecta"><i class="bi bi-diagram-3 me-1"></i><b>Qué afecta este mantenedor</b>
     <ul>
       <li><b>Lista de productos por financiera</b> → selector de producto en la <a href="/creditos/digitacion-autofin.html">digitación AutoFin</a> y <a href="/creditos/digitacion-unidad.html">Unidad de Crédito</a>.</li>
-      <li><b>Reglas propias de un producto</b> (tasa cliente ≤/&gt; 200 UF, comisión dealer por tramo de plazo sobre el saldo precio, comisión parque, comisión ejecutivo sobre el monto financiado) → aparece como un panel más en el <a href="/simulador/">Simulador de Rentabilidad</a>, junto a AutoFin y Unidad de Crédito. Ej.: <b>AUTOFIN PREFERENTE</b>. Los productos sin reglas propias usan las pizarras generales de <a href="/mantenedores/parametros/">Parámetros de Crédito</a> y <a href="/mantenedores/tasas/">Tasas</a>.</li>
+      <li><b>Reglas propias de un producto</b> (tasa cliente ≤/&gt; 200 UF, comisión dealer por tramo de plazo sobre el saldo precio, comisión parque, comisión ejecutivo sobre el monto financiado) → aparece como un panel más en el <a href="/simulador/">Simulador de Rentabilidad</a>, junto a AutoFin y Unidad de Crédito. Ej.: <b>AUTOFIN PREFERENTE</b>. Los productos sin reglas propias usan las pizarras generales de <a href="/mantenedores/parametros/">Parámetros de Crédito</a> y <a href="/mantenedores/tasas/">Tasas</a>. <b>Desde el 24-09-2026 también mandan en la operación</b>: el checkbox <b>PREFERENTE</b> del <a href="/aprobaciones/">Generador de Cartas</a> toma la tasa del producto (fija, no se puede variar) y topa la comisión dealer (tramo de plazo) y la comisión parque (pueden ser menores); la carta dice "Producto Preferente"; el crédito nace con ese producto y los motores de <a href="/rentabilidad/">rentabilidad</a> (spread propio), <a href="/postventa/">comisión dealer y parque</a> y <a href="/comisiones/revision/">comisión de ejecutivos</a> (% ejecutivo del producto) lo leen. Motor único <code>producto-reglas-core.js</code>.</li>
     </ul>
   </div>
 </div>

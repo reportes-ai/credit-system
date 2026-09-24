@@ -8,6 +8,8 @@
 const pool = require('../../../../shared/config/database');
 const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('./penetracion');
 const { comisionDealer, comisionDealerEfectiva, CARTA_MANDA_SQL } = require('../../../../api-gateway/public/js/comision-dealer');
+// Reglas propias del producto (AUTOFIN PREFERENTE): tasa/spread, dealer por tramo, parque y ejecutivo (motor único)
+const PR = require('../../../../shared/producto-reglas');
 const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { cargarTasas, getTasaByFecha } = require('./recalcular-mes');
 const { getUF } = require('../../../../shared/uf');
@@ -106,6 +108,16 @@ async function calcularOperacion(op) {
   let arriendo_parque_calc = 0;
   let comej              = 0;
 
+  /* ── 0. Reglas propias del producto (AUTOFIN PREFERENTE) ─────────────
+     Si el crédito lleva un producto con reglas propias, esas reglas MANDAN sobre la
+     pizarra de tasas, la tabla del dealer y el % del parque (Pato, 24-09-2026). El
+     producto viene en op.producto; si el llamador no lo trae, se lee del crédito. */
+  let productoOp = op.producto;
+  if (productoOp === undefined && op.id) {
+    try { const [[pc]] = await pool.query('SELECT producto FROM creditos WHERE id=?', [op.id]); productoOp = pc ? pc.producto : null; } catch (_) { productoOp = null; }
+  }
+  const reglas = await PR.reglasDe(productoOp, financiera);
+
   // ── 1. Ingreso por tasa — MOTOR ÚNICO rentabilidad-core ─────────────
   if (plazo > 0 && monto_fin > 0) {
     if (financiera.includes('AUTOFIN') || financiera.includes('AUTOF')) {
@@ -115,8 +127,10 @@ async function calcularOperacion(op) {
       const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
       if (tasa) {
         const mayor      = core.esMayor200({ montoCap: monto_cap || monto_fin, uf, umbralUf: p.umbral_uf_tramo });
-        const mantTasa   = mayor ? parseFloat(tasa.tasa_mensual_mayor) : parseFloat(tasa.tasa_mensual_menor);
-        const mantSpread = mayor ? parseFloat(tasa.spread_mayor)       : parseFloat(tasa.spread_menor);
+        let mantTasa   = mayor ? parseFloat(tasa.tasa_mensual_mayor) : parseFloat(tasa.tasa_mensual_menor);
+        let mantSpread = mayor ? parseFloat(tasa.spread_mayor)       : parseFloat(tasa.spread_menor);
+        // Producto con reglas propias: su tasa y su spread (costo de fondo = tasa − spread, misma fórmula)
+        if (reglas) { const tP = PR.tasaPct(reglas, mayor), sP = PR.spreadPct(reglas, mayor); if (tP != null) mantTasa = tP; if (sP != null) mantSpread = sP; }
         const costoFondo = (mantTasa - mantSpread) / 100;
         // Regla de negocio: tasa cliente JAMÁS bajo el costo de fondo (dato inválido
         // → cae al mantenedor). Incluye normalización fracción→% (motor único).
@@ -165,6 +179,11 @@ async function calcularOperacion(op) {
     comdea_real          = cd.comdea_real;
     com_parque_calc      = cd.com_parque;
     arriendo_parque_calc = cd.arriendo;
+    // Producto con reglas propias: dealer por tramo de plazo y parque por % del producto (el arriendo del parque no cambia)
+    if (reglas) {
+      comdea_real = Math.round(saldo_precio * PR.dealerPct(reglas, plazo));
+      if (esParque) com_parque_calc = Math.round(saldo_precio * PR.parquePct(reglas));
+    }
   }
 
   // La carta manda SOLO HACIA ABAJO (08-09-2026): si la participación pactada en la
@@ -182,7 +201,8 @@ async function calcularOperacion(op) {
   }
 
   // ── 4. Comisión ejecutivo — motor único ────────────────────────────
-  comej = core.comisionEjecutivo({ montoFin: monto_fin, pctEj: (p.pct_ejecutivo_fin || 0) / 100 });
+  // Ejecutivo: % del producto con reglas propias si lo define; si no, el parámetro general
+  comej = core.comisionEjecutivo({ montoFin: monto_fin, pctEj: (reglas && PR.ejecutivoPct(reglas) != null) ? PR.ejecutivoPct(reglas) : (p.pct_ejecutivo_fin || 0) / 100 });
 
   // ── 5. Ingreso neto total ──────────────────────────────────────────
   const com_seguros_total  = com_rdh + com_cesantia + com_reparaciones;

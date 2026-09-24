@@ -90,14 +90,23 @@ function calcularComision(creditos, vars, mes, opts = {}) {
 
   // Split por plazo — anexo 08-2026: MENOR a 24 = pct_24; IGUAL O MAYOR a 24 = pct_mas24.
   // Con tramo_24_tasa_menor = 1 (modelo anterior) el 24 exacto cae en la tasa menor.
-  const ot24    = otorgados.filter(c =>  esPlazoMenor(c.plazo, vars));
-  const otMas24 = otorgados.filter(c => !esPlazoMenor(c.plazo, vars));
+  /* Producto con reglas propias (AUTOFIN PREFERENTE, 24-09-2026): esas operaciones pagan el
+     % ejecutivo del producto (Productos por Financiera → ejecutivo_pct) sobre el monto
+     financiado, en vez de pct_24 / pct_mas24. opts.reglas_producto = { PRODUCTO: fracción }. */
+  const reglasProd = (opts && opts.reglas_producto) || null;
+  const pctProd = c => reglasProd ? reglasProd[String(c.producto || '').trim().toUpperCase()] : undefined;
+  const conRegla = reglasProd ? otorgados.filter(c => pctProd(c) != null) : [];
+  const sinRegla = reglasProd ? otorgados.filter(c => pctProd(c) == null) : otorgados;
+  const ot24    = sinRegla.filter(c =>  esPlazoMenor(c.plazo, vars));
+  const otMas24 = sinRegla.filter(c => !esPlazoMenor(c.plazo, vars));
   const monto24    = ot24.reduce((s, c) => s + (parseFloat(c.monto_financiado) || 0), 0);
   const montoMas24 = otMas24.reduce((s, c) => s + (parseFloat(c.monto_financiado) || 0), 0);
+  const montoProd  = conRegla.reduce((s, c) => s + (parseFloat(c.monto_financiado) || 0), 0);
 
   const base24    = monto24    * pct_24;
   const baseMas24 = montoMas24 * pct_mas24;
-  const incentivo_base = base24 + baseMas24;
+  const baseProd  = conRegla.reduce((s, c) => s + (parseFloat(c.monto_financiado) || 0) * pctProd(c), 0);
+  const incentivo_base = base24 + baseMas24 + baseProd;
 
   // NCNU: AUTOFIN, no CORFO, no UNIDAD — los créditos susceptibles de llevar
   // estos seguros. Es la base de medición del cumplimiento Y la única base

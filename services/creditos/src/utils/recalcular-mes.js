@@ -149,6 +149,9 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
   // los días a la primera cuota (motor único rentabilidad-core.montoCapitalizado).
   let montoCap   = parseFloat(op.monto_capitalizado) || 0;
   const plazo    = parseInt(op.plazo)                || 0;
+  // Reglas propias del producto (AUTOFIN PREFERENTE): mandan sobre pizarra, tabla del dealer y % del parque
+  const PR = require('../../../../shared/producto-reglas');
+  const reglas = await PR.reglasDe(op.producto, op.financiera);
 
   let monto_comision_fin = 0;
   if (esUAC) {
@@ -161,8 +164,9 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
     if (tasa) {
       const uf    = await getUF(op.fecha_otorgado);
       const mayor = core.esMayor200({ montoCap: montoCap || montoFin, uf, umbralUf: p.umbral_uf_tramo });
-      const mantTasa   = mayor ? parseFloat(tasa.tasa_mensual_mayor) : parseFloat(tasa.tasa_mensual_menor); // %
-      const mantSpread = mayor ? parseFloat(tasa.spread_mayor)       : parseFloat(tasa.spread_menor);        // %
+      let mantTasa   = mayor ? parseFloat(tasa.tasa_mensual_mayor) : parseFloat(tasa.tasa_mensual_menor); // %
+      let mantSpread = mayor ? parseFloat(tasa.spread_mayor)       : parseFloat(tasa.spread_menor);        // %
+      if (reglas) { const tP = PR.tasaPct(reglas, mayor), sP = PR.spreadPct(reglas, mayor); if (tP != null) mantTasa = tP; if (sP != null) mantSpread = sP; }
       const costoFondo = (mantTasa - mantSpread) / 100;        // costo de fondo del mantenedor a la fecha
       // Tasa cliente (cuota): la real de la op (tascli_real, % mensual normalizado) MANDA;
       // por defecto la del mantenedor a la fecha de otorgamiento.
@@ -179,10 +183,14 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
   // Comisión dealer y parque — motor único comision-dealer.js (tabla del dealer manda;
   // con dealer_comisiones, la fila del LOCAL de la op manda sobre la tabla legacy).
   const dTab = (dealerMap || {})[normRutD(op.rut_dealer)];
-  const { comdea_real, com_parque, arriendo } = comisionDealer(
+  let { comdea_real, com_parque, arriendo } = comisionDealer(
     { saldo, plazo, esParque, ubicacion: parqKey },
     { dealerTabla: dTab, dealerUbicaciones: dTab && dTab._ubics, parqData: parqMap[parqKey], pizarra: p }
   );
+  if (reglas && saldo > 0 && plazo > 0) {
+    comdea_real = Math.round(saldo * PR.dealerPct(reglas, plazo));
+    if (esParque) com_parque = Math.round(saldo * PR.parquePct(reglas));
+  }
   return { monto_capitalizado: montoCap, monto_comision_fin, comdea_real, com_parque, arriendo };
 }
 
@@ -200,7 +208,7 @@ async function marcarForzadosCalculo(opIds, opts = {}) {
   const tol = opts.tol != null ? opts.tol : 1; // $ de tolerancia por redondeo
   const [p, parqMap, todasTasas, dealerMap] = await Promise.all([cargarParams(), cargarParques(), cargarTasas(), cargarDealers()]);
   const [ops] = await pool.query(
-    `SELECT id, id_financiera, financiera, parque, rut_dealer, saldo_precio, monto_financiado, monto_capitalizado, plazo, fecha_otorgado, fecha_primera_cuota, tascli_real,
+    `SELECT id, id_financiera, financiera, producto, parque, rut_dealer, saldo_precio, monto_financiado, monto_capitalizado, plazo, fecha_otorgado, fecha_primera_cuota, tascli_real,
             monto_comision_fin, comdea_real, com_parque, campos_forzados
      FROM creditos WHERE id IN (?)`, [ids]);
   // La carta manda: el valor esperado de comdea_real es el part_bruto de la carta
