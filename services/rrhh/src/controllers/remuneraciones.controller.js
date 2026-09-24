@@ -87,6 +87,16 @@ require('../../../../shared/migrate').enFila('rrhh-remuneraciones', async () => 
       ('rem_grat_tope_imm', '4.75'),
       ('rem_apv_tope_uf', '50'),
       ('rem_prorratea_topes', '1')`);
+    /* Topes legales de descuentos (Pato, 24-09-2026): art. 58 CT (15% otros acordados, 30% vivienda/
+       educación/ahorro, 45% suma de voluntarios) y Ley 14.908 art. 7 (pensión de alimentos y retención
+       judicial hasta 50% de los ingresos, fuera del 45%). Motor único: services/rrhh/src/tope-descuento.js */
+    await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES
+      ('rem_tope_dcto_otros_pct', '15'),
+      ('rem_tope_dcto_vivienda_pct', '30'),
+      ('rem_tope_dcto_total_pct', '45'),
+      ('rem_tope_pension_pct', '50'),
+      ('rem_dcto_judiciales', 'ORDEN TRIBUNAL,PENSIÓN DE ALIMENTOS'),
+      ('rem_dcto_vivienda', 'APV')`);
     // Haberes no imponibles fijos en la ficha
     await pool.query('ALTER TABLE rh_fichas ADD COLUMN colacion DECIMAL(10,0) NULL').catch(() => {});
     await pool.query('ALTER TABLE rh_fichas ADD COLUMN movilizacion DECIMAL(10,0) NULL').catch(() => {});
@@ -856,9 +866,13 @@ const crearDescuento = async (req, res) => {
       if (subtipo === 'OTRO' && !String(b.detalle_texto || '').trim()) return fail(res, 'Describe el descuento (texto libre)', 400);
       cuotas = 0; valorCuota = monto; // mensual indefinido hasta anular
     }
-    // Tope 15% art. 58 CT en anticipos y préstamos registrados directo (Pato 17-09-2026; antes solo lo validaba Solicitudes)
-    if (!todos && ['ANTICIPO', 'PRESTAMO'].includes(tipo)) {
-      try { await require('../tope-descuento').validarTope15(idU, valorCuota); }
+    /* Topes legales (motor único tope-descuento.js, paramétricos en Indicadores de Remuneraciones):
+       15% otros acordados / 30% vivienda-ahorro / 45% suma de voluntarios (art. 58 CT) y 50% para
+       pensión de alimentos y retenciones judiciales (Ley 14.908). Antes solo anticipos y préstamos al
+       15% (17-09-2026); desde el 24-09-2026 todo descuento por persona. "Todo el personal" no se
+       valida uno a uno (la liquidación lo muestra). */
+    if (!todos) {
+      try { await require('../tope-descuento').validarTope({ idUsuario: idU, valorCuota, tipo, subtipo }); }
       catch (e) { return fail(res, e.message, 400); }
     }
     // Texto libre (Pato 08-09-2026): opcional en todos los tipos, obligatorio en PERMANENTE/OTRO
@@ -1026,7 +1040,8 @@ async function descuentosDelMes(mes) {
 /* ── Indicadores del período ────────────────────────────────────────────────── */
 async function indicadores(mes) {
   const [cfgRows] = await pool.query("SELECT clave, valor FROM rh_config WHERE clave LIKE 'rem_%'");
-  const cfg = {}; cfgRows.forEach(r => cfg[r.clave] = parseFloat(r.valor) || 0);
+  // rem_dcto_* son listas de conceptos (texto separado por coma), no números
+  const cfg = {}; cfgRows.forEach(r => cfg[r.clave] = /^rem_dcto_/.test(r.clave) ? String(r.valor || '') : (parseFloat(r.valor) || 0));
   // UF del ÚLTIMO día del mes (norma Previred/DT); si el mes aún no termina, getUF entrega la última cargada.
   const [y, m] = mes.split('-').map(Number);
   const finMes = mes + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0');
@@ -1714,9 +1729,16 @@ const putIndicadores = async (req, res) => {
     const b = req.body || {};
     // Config rem_* permitidas
     const PERM = ['rem_tope_imponible_uf', 'rem_tope_afc_uf', 'rem_afc_trabajador_pct', 'rem_salud_pct', 'rem_imm', 'rem_grat_tope_imm',
-                  'rem_sis_pct', 'rem_afc_emp_pct', 'rem_afc_emp_pfijo_pct', 'rem_mutual_pct'];
+                  'rem_sis_pct', 'rem_afc_emp_pct', 'rem_afc_emp_pfijo_pct', 'rem_mutual_pct',
+                  // Topes legales de descuentos (24-09-2026): % sobre la remuneración total
+                  'rem_tope_dcto_otros_pct', 'rem_tope_dcto_vivienda_pct', 'rem_tope_dcto_total_pct', 'rem_tope_pension_pct'];
     for (const k of PERM) if (k in b && b[k] !== '' && !isNaN(parseFloat(b[k]))) {
       await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(parseFloat(b[k]))]);
+    }
+    // Listas de conceptos (texto, separados por coma): qué descuentos son judiciales y cuáles vivienda/ahorro
+    for (const k of ['rem_dcto_judiciales', 'rem_dcto_vivienda']) if (k in b) {
+      const v = String(b[k] || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean).join(',');
+      await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, v]);
     }
     // Tasas AFP: upsert por administradora
     if (Array.isArray(b.afps)) for (const a of b.afps) {

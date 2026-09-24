@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Indicadores de Remuneraciones — AutoFácil</title>
-  <!-- v1.8 — el catálogo de Bancos pasa a su propio mantenedor Bancos de la Plaza. v1.7 — Ley SANNA (rem_sanna_pct). v1.6 — topes proporcionales a días pagados (rem_prorratea_topes) y UF del último día del mes. v1.5 — catálogos Isapres (código Previred) y Bancos (código SBIF): fuente única de los selectores de la ficha, Previred y Nómina Banco. v1.4 — tope APV (UF/mes) que rebaja la base del impuesto único · v1.3 — navbar migrada al componente topnav -->
+  <!-- v1.9 — sección Topes legales de descuentos (art. 58 CT: 15/30/45%; Ley 14.908: pensión 50%) con listas de conceptos judiciales y de vivienda. v1.8 — el catálogo de Bancos pasa a su propio mantenedor Bancos de la Plaza. v1.7 — Ley SANNA (rem_sanna_pct). v1.6 — topes proporcionales a días pagados (rem_prorratea_topes) y UF del último día del mes. v1.5 — catálogos Isapres (código Previred) y Bancos (código SBIF): fuente única de los selectores de la ficha, Previred y Nómina Banco. v1.4 — tope APV (UF/mes) que rebaja la base del impuesto único · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -67,6 +67,19 @@
   </div>
 
   <div class="panel">
+    <h5><i class="bi bi-shield-check me-1"></i>Topes legales de descuentos a la remuneración <span style="font-weight:400;color:#94a3b8;font-size:.74rem">art. 58 Código del Trabajo · Ley 14.908 art. 7</span></h5>
+    <div class="grid3">
+      <div class="fld"><label>Otros descuentos acordados (%) — anticipos, préstamos, Caja, varios</label><input id="rem_tope_dcto_otros_pct" type="number" step="1" min="0" max="100"></div>
+      <div class="fld"><label>Vivienda / educación / ahorro (%) — APV</label><input id="rem_tope_dcto_vivienda_pct" type="number" step="1" min="0" max="100"></div>
+      <div class="fld"><label>Suma de todos los voluntarios (%)</label><input id="rem_tope_dcto_total_pct" type="number" step="1" min="0" max="100"></div>
+      <div class="fld"><label>Pensión de alimentos / retención judicial (%) — fuera del total</label><input id="rem_tope_pension_pct" type="number" step="1" min="0" max="100"></div>
+      <div class="fld"><label>Conceptos judiciales (separados por coma)</label><input id="rem_dcto_judiciales" type="text" placeholder="ORDEN TRIBUNAL,PENSIÓN DE ALIMENTOS"></div>
+      <div class="fld"><label>Conceptos vivienda / educación / ahorro (separados por coma)</label><input id="rem_dcto_vivienda" type="text" placeholder="APV"></div>
+    </div>
+    <div style="font-size:.76rem;color:#64748b;margin-top:6px">Los <b>descuentos legales</b> (AFP, salud, AFC, impuesto único, cuota sindical) no tienen tope y no pasan por aquí. Los porcentajes se aplican sobre la <b>remuneración total</b> de la última liquidación emitida (o el sueldo base de la ficha si aún no hay). Un 0 desactiva ese tope.</div>
+  </div>
+
+  <div class="panel">
     <h5><i class="bi bi-bank me-1"></i>Tasas AFP (cotización 10% + comisión, % del imponible)</h5>
     <table><thead><tr><th>AFP</th><th>Tasa trabajador %</th><th>Código Previred <span style="font-weight:400;color:#94a3b8">(Tabla N°10)</span></th></tr></thead><tbody id="tbAfp"></tbody></table>
   </div>
@@ -101,6 +114,7 @@
       <li><b>Salud legal %</b> → descuento de salud (Fonasa/Isapre 7% base) en las liquidaciones.</li>
       <li><b>Tope APV</b> → el descuento permanente con concepto APV (en <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a>) rebaja la base del impuesto único hasta ese tope en UF (art. 42 bis LIR, régimen B).</li>
       <li><b>Tramos impuesto único</b> → impuesto de 2ª categoría de cada liquidación y del <a href="/recursos-humanos/remuneraciones/">libro de remuneraciones</a>.</li>
+      <li><b>Topes legales de descuentos</b> → al ingresar un descuento por persona en <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a> y al aprobar anticipos o préstamos en <a href="/recursos-humanos/solicitudes/">Solicitudes</a>: la cuota no puede superar el % de su categoría (otros 15% / vivienda-ahorro 30% / judicial 50%) y la suma de los voluntarios vigentes del mes no puede pasar del 45%. Los conceptos listados como judiciales usan el tope de pensión y quedan fuera del 45%.</li>
       <li>Las liquidaciones <b>EMITIDAS no cambian</b> (quedan congeladas); los cambios rigen desde el próximo cálculo.</li>
     </ul>
   </div>
@@ -114,7 +128,8 @@ if (!token||!yo) location.href='/login.html';
 
 const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'application/json' };
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2600); }
-const CFG = ['rem_imm','rem_grat_tope_imm','rem_tope_imponible_uf','rem_tope_afc_uf','rem_afc_trabajador_pct','rem_salud_pct','rem_sis_pct','rem_afc_emp_pct','rem_afc_emp_pfijo_pct','rem_mutual_pct','rem_apv_tope_uf','rem_prorratea_topes','rem_sanna_pct'];
+const CFG = ['rem_imm','rem_grat_tope_imm','rem_tope_imponible_uf','rem_tope_afc_uf','rem_afc_trabajador_pct','rem_salud_pct','rem_sis_pct','rem_afc_emp_pct','rem_afc_emp_pfijo_pct','rem_mutual_pct','rem_apv_tope_uf','rem_prorratea_topes','rem_sanna_pct',
+  'rem_tope_dcto_otros_pct','rem_tope_dcto_vivienda_pct','rem_tope_dcto_total_pct','rem_tope_pension_pct','rem_dcto_judiciales','rem_dcto_vivienda'];
 
 async function cargar(){
   const j = await (await fetch('/api/rrhh/remuneraciones/indicadores', { headers:H })).json();
