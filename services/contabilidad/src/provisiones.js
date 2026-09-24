@@ -212,7 +212,15 @@ async function sincronizarDealer(usuario = 'Motor provisiones') {
     if (p.origen_tipo === 'CREDITO' && p.est !== 'OTORGADO') { const x = await _liberarFilaDealer(p, 'ANULACION', null, usuario); if (x && x.id) out.liberadas++; continue; }
     // AVSOFT: solo documentos registrados desde que el motor manda (los anteriores ya los rebajó el contador o son parte de su diferencia)
     const d = await documentoDealer(p.num_op, p.origen_tipo === 'AVSOFT' ? `${desde}-01` : null);
-    if (d) { const x = await _liberarFilaDealer(p, d.tipo, d.fecha, usuario); if (x && x.id) out.liberadas++; }
+    if (d) { const x = await _liberarFilaDealer(p, d.tipo, d.fecha, usuario); if (x && x.id) out.liberadas++; continue; }
+    // AVSOFT sin factura por OP pero con COMISION PAGADA en el Seguimiento desde el arranque (típico: comisiones de
+    // parque que el contador provisionó en 2106011 y se pagan por la cartola del parque): el pago es la evidencia.
+    if (p.origen_tipo === 'AVSOFT') {
+      const [[pg]] = await pool.query(
+        `SELECT DATE_FORMAT(MIN(e.fecha),'%Y-%m-%d') f FROM postventa_etapas e JOIN postventa_seguimiento s ON s.id=e.id_seguimiento
+          JOIN creditos c ON c.id=s.id_credito WHERE c.num_op=? AND e.track='COMISION' AND e.etapa LIKE '%PAGAD%' AND e.fecha >= ?`, [p.num_op, `${desde}-01`]);
+      if (pg && pg.f) { const x = await _liberarFilaDealer(p, 'PAGO', pg.f, usuario); if (x && x.id) out.liberadas++; }
+    }
   }
   return out;
 }
