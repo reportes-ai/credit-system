@@ -170,9 +170,11 @@ router.post('/provisiones/sincronizar', verifyToken, requireFunc('ctb_provisione
   try {
     const u = req.usuario || {};
     const quien = [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || 'Usuario';
-    const r = await prov.sincronizarDealer(quien);
-    require('../../../../shared/audit').auditar({ req, accion: 'EJECUTAR', modulo: 'contabilidad', entidad: 'provisiones', entidad_id: 'DEALER',
-      detalle: `Sincronización provisiones dealer: ${r.constituidas} constituida(s), ${r.liberadas} liberada(s), ${r.omitidas} omitida(s)` });
+    const concepto = String(req.body?.concepto || req.query.concepto || 'DEALER').toUpperCase();
+    if (!prov.SINCRONIZAR[concepto]) return res.status(400).json({ success: false, data: null, error: 'Concepto desconocido' });
+    const r = await prov.SINCRONIZAR[concepto](quien);
+    require('../../../../shared/audit').auditar({ req, accion: 'EJECUTAR', modulo: 'contabilidad', entidad: 'provisiones', entidad_id: concepto,
+      detalle: `Sincronización provisiones ${concepto}: ${r.constituidas} constituida(s), ${r.liberadas} liberada(s), ${r.omitidas} omitida(s)` });
     res.json({ success: true, data: r, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 });
@@ -181,11 +183,11 @@ router.post('/provisiones/:id/liberar', verifyToken, requireFunc('ctb_provisione
     const u = req.usuario || {};
     const quien = [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || 'Usuario';
     const pool = require('../../../../shared/config/database');
-    const [[p]] = await pool.query("SELECT origen_id, num_op FROM ctb_provisiones WHERE id=? AND concepto='DEALER' AND estado='CONSTITUIDA'", [req.params.id]);
-    if (!p) return res.status(404).json({ success: false, data: null, error: 'Provisión no encontrada o ya liberada' });
-    const r = await prov.liberarDealer(p.origen_id, 'MANUAL', null, quien);
+    const [[p]] = await pool.query("SELECT concepto, origen_id, num_op FROM ctb_provisiones WHERE id=? AND estado='CONSTITUIDA'", [req.params.id]);
+    if (!p || !prov.LIBERAR[p.concepto]) return res.status(404).json({ success: false, data: null, error: 'Provisión no encontrada o ya liberada' });
+    const r = await prov.LIBERAR[p.concepto](p.origen_id, 'MANUAL', null, quien);
     require('../../../../shared/audit').auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'provisiones', entidad_id: req.params.id,
-      detalle: `Liberación manual provisión dealer OP ${p.num_op || p.origen_id}: $${r.monto || 0} — motivo: ${String(req.body?.motivo || '').slice(0, 200) || 'sin motivo'}` });
+      detalle: `Liberación manual provisión ${p.concepto} OP ${p.num_op || p.origen_id}: $${r.monto || 0} — motivo: ${String(req.body?.motivo || '').slice(0, 200) || 'sin motivo'}` });
     res.json({ success: true, data: r, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 });

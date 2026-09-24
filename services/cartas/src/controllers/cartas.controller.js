@@ -1074,7 +1074,7 @@ const otorgar = async (req, res) => {
             await recalcularPorOps([cr2.id]);
             /* PROVISIÓN comisión dealer (Máxima 4, Pato 24-09-2026): el gasto nace al otorgar.
                Después del recálculo, para provisionar el comdea_real definitivo. Fire-and-forget. */
-            require('../../../contabilidad/src/provisiones').constituirDealer(cr2.id, `Carta ${ca.op_carta}`)
+            require('../../../contabilidad/src/provisiones').constituirAlOtorgar(cr2.id, `Carta ${ca.op_carta}`)
               .catch(e => console.error('[carta otorgar→provision]', e.message));
           })
           .catch(e => console.error('[carta otorgar→recalculo]', e.message));

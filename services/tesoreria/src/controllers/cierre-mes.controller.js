@@ -105,14 +105,16 @@ require('../../../../shared/migrate').enFila('cierre-mes', async () => {
     }
 
     // Ítem agregado el 24-09-2026: provisiones de comisión dealer cuadradas contra la cuenta 2106011
-    const [[hayPD]] = await pool.query("SELECT COUNT(*) n FROM cierre_checklist_items WHERE check_auto='PROVISION_DEALER'");
-    if (!hayPD.n) {
+    for (const [auto, nombre, desc, orden] of [
+      ['PROVISION_DEALER', 'Provisiones de comisión dealer cuadradas', 'Toda otorgada del mes con comisión dealer tiene su provisión (o ya su factura) y los asientos del motor calzan con sus provisiones en la cuenta 2106011.', 8],
+      ['PROVISION_PARQUE', 'Provisiones de parques cuadradas', 'Toda otorgada del mes con comisión o arriendo de parque tiene su provisión (o el pago del parque ya aprobado) y los asientos del motor calzan en la cuenta 2106013.', 9],
+    ]) {
+      const [[hay]] = await pool.query('SELECT COUNT(*) n FROM cierre_checklist_items WHERE check_auto=?', [auto]);
+      if (hay.n) continue;
       const [[pFin]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Gerente de Finanzas' LIMIT 1");
       await pool.query(
         `INSERT INTO cierre_checklist_items (nombre, descripcion, href, orden, obligatorio, dia_habil, resp_tipo, id_perfil, check_auto)
-         VALUES (?,?,?,?,1,?,'PERFIL',?,?)`,
-        ['Provisiones de comisión dealer cuadradas', 'Toda otorgada del mes con comisión dealer tiene su provisión (o ya su factura) y el saldo del motor calza con la cuenta 2106011.',
-         '/contabilidad/provisiones/', 8, 3, pFin ? pFin.id_perfil : null, 'PROVISION_DEALER']);
+         VALUES (?,?,?,?,1,?,'PERFIL',?,?)`, [nombre, desc, '/contabilidad/provisiones/', orden, 3, pFin ? pFin.id_perfil : null, auto]);
     }
 
     // Funcionalidades: página (todos los que operan cierre) + acción de cerrar + mantenedor
@@ -163,21 +165,31 @@ function fechaLimite(mes, diaHabil) {
 const CHECKS_AUTO = {
   /* Provisión comisión dealer (24-09-2026, motor services/contabilidad/src/provisiones.js): ninguna
      otorgada del mes con comisión sin provisión ni documento, y saldo del motor = cuenta 2106011. */
-  async PROVISION_DEALER(mes) {
+  async PROVISION_DEALER(mes) { return CHECKS_AUTO._provision(mes, 'DEALER'); },
+  async PROVISION_PARQUE(mes) { return CHECKS_AUTO._provision(mes, 'PARQUE'); },
+  async _provision(mes, concepto) {
     const prov = require('../../../contabilidad/src/provisiones');
-    const c = await prov.cuadro(mes, 'DEALER');
+    const K = prov.CONCEPTOS[concepto];
+    const c = await prov.cuadro(mes, concepto);
     if (mes < c.desde) return { ok: true, detalle: `Mes anterior a ${c.desde}: no se provisiona` };
-    const [[sin]] = await pool.query(
+    // Otorgadas del mes que deberían tener provisión y no la tienen ni tienen ya su devengo real
+    const [[sin]] = concepto === 'DEALER' ? await pool.query(
       `SELECT COUNT(*) n, GROUP_CONCAT(c.num_op ORDER BY c.num_op SEPARATOR ', ') ops FROM creditos c
         LEFT JOIN ctb_provisiones p ON p.concepto='DEALER' AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
         LEFT JOIN postventa_facturas_comision fc ON fc.num_op=c.num_op AND fc.monto_liquido IS NOT NULL
        WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND COALESCE(c.comdea_real,0)>0
-         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND fc.id_seguimiento IS NULL`, [mes]);
+         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND fc.id_seguimiento IS NULL`, [mes])
+    : await pool.query(
+      `SELECT COUNT(*) n, GROUP_CONCAT(c.num_op ORDER BY c.num_op SEPARATOR ', ') ops FROM creditos c
+        LEFT JOIN ctb_provisiones p ON p.concepto='PARQUE' AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
+        LEFT JOIN (SELECT po.num_op FROM parques_pagos_ops po JOIN parques_pagos_mes pm ON pm.parque=po.parque AND pm.mes=po.mes WHERE pm.etapa<>'EN_APROBACION') ap ON ap.num_op=c.num_op
+       WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND (COALESCE(c.com_parque,0)>0 OR COALESCE(c.arriendo_parque,0)>0)
+         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND ap.num_op IS NULL`, [mes]);
     // Los asientos del motor en la cuenta deben calzar con sus filas (constituido y liberado del mes)
     const [[asi]] = await pool.query(
-      `SELECT COALESCE(SUM(CASE WHEN c.origen='PROV_DEALER' THEN m.haber END),0) h, COALESCE(SUM(CASE WHEN c.origen='PROV_DEALER_LIB' THEN m.debe END),0) d
+      `SELECT COALESCE(SUM(CASE WHEN c.origen=? THEN m.haber END),0) h, COALESCE(SUM(CASE WHEN c.origen=? THEN m.debe END),0) d
          FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
-        WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m')=? AND c.origen IN ('PROV_DEALER','PROV_DEALER_LIB')`, [c.cuenta_provision, mes]);
+        WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m')=? AND c.origen IN (?,?)`, [K.regla, K.reglaLib, c.cuenta_provision, mes, K.regla, K.reglaLib]);
     const dif = Math.round((c.motor_constituido - Number(asi.h)) + (c.motor_liberado - Number(asi.d)));
     if (sin.n === 0 && dif === 0) return { ok: true, detalle: `Cuenta ${c.cuenta_provision}: SF $${c.saldo_final.toLocaleString('es-CL')} (motor $${c.motor_vigente.toLocaleString('es-CL')} en ${c.motor_n_vigente} vigente(s) + histórico $${c.saldo_historico.toLocaleString('es-CL')}); asientos del motor calzan con sus provisiones` };
     const partes = [];

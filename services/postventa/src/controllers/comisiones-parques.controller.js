@@ -462,6 +462,9 @@ async function aprobarPagoParque(parque, mes, quien, req) {
     ref: `PARQUE-${parque}-${mes}`,
     montos: { arriendo: Math.round(Number(row.arriendo) || 0), comision: Math.round(Number(row.comision_creditos) || 0) },
   }).catch(e => console.error('[parques ctb devengo]', e.message));
+  // Entró el devengo real → se liberan las provisiones al otorgar de las OP de la foto (motor único provisiones.js)
+  require('../../../contabilidad/src/provisiones').liberarParquePorPago(parque, mes, null, quien)
+    .catch(e => console.error('[parques→provisión]', e.message));
   if (req) auditar({ req, accion: 'EDITAR', modulo: 'postventa', entidad: 'parque_pago', detalle: `Aprobó comisión parque ${parque} ${mes}: arriendo ${CLP(row.arriendo)} + comisión ${CLP(row.comision_creditos)} (${row.ops} ops)` });
   return 'APROBADA';
 }

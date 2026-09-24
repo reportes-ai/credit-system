@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Provisiones por Devengo — AutoFácil</title>
-  <!-- v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
+  <!-- v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -42,7 +42,7 @@
   <div class="panel">
     <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
       <div><label class="form-label small fw-bold mb-1">Concepto</label>
-        <select id="concepto" class="form-select form-select-sm" onchange="cargar()"><option value="DEALER">Comisión dealer</option></select></div>
+        <select id="concepto" class="form-select form-select-sm" onchange="cargar()"><option value="DEALER">Comisión dealer</option><option value="PARQUE">Comisión y arriendo parque</option></select></div>
       <div><label class="form-label small fw-bold mb-1">Mes</label><input type="month" id="mes" class="form-control form-control-sm" onchange="cargar()"></div>
       <div class="ms-auto d-flex gap-2 align-items-end">
         <button class="btn-navy" id="btnSync" onclick="sincronizar()" title="Constituye lo otorgado sin provisión y libera lo facturado o anulado (el motor lo hace solo cada 6 horas)"><i class="bi bi-arrow-repeat me-1"></i>Sincronizar ahora</button>
@@ -56,7 +56,7 @@
   <div class="panel">
     <h6 class="fw-bold mb-2"><i class="bi bi-exclamation-triangle me-1" style="color:#d97706"></i>Provisiones vigentes (sin documento todavía) <span id="nPend" class="text-muted fw-normal"></span></h6>
     <div style="overflow:auto"><table>
-      <thead><tr><th>OP</th><th>Dealer</th><th>Mes curse</th><th>Constituida</th><th class="r">Bruto</th><th class="r">Provisión (neto)</th><th class="r">Días</th><th>Comprobante</th><th></th></tr></thead>
+      <thead><tr><th>OP</th><th id="thTercero">Dealer</th><th>Mes curse</th><th>Constituida</th><th class="r" id="thBase">Bruto</th><th class="r" id="thProv">Provisión (neto)</th><th class="r">Días</th><th>Comprobante</th><th></th></tr></thead>
       <tbody id="pendBody"><tr><td colspan="9" class="text-center text-muted py-3">Cargando…</td></tr></tbody>
     </table></div>
   </div>
@@ -76,7 +76,8 @@
       <li><b>Liberación</b> → al registrar la <b>factura o boleta</b> en <a href="/postventa/seguimiento/">Post Venta → Seguimiento</a> (entra el devengo real por COMISION_DEV_*) o si la operación se <b>anula</b>: reversa íntegra, regla <b>PROV_DEALER_LIB</b>. La diferencia entre lo provisionado y lo real queda en el resultado del mes de la liberación.</li>
       <li><b>Motor automático</b> <code>provisiones-dealer</code> (cada 6 h) → red de seguridad para todas las vías; "Sincronizar ahora" lo ejecuta a mano. Se apaga con <code>MOTORES=off</code> como los demás.</li>
       <li><b>Desde cuándo</b> → parámetro <code>prov_dealer_desde</code> (ctb_config, hoy 2026-09): lo anterior ya venía devengado por documento y no se provisiona.</li>
-      <li><b>Cuadratura</b> → el saldo final del cuadro debe calzar con el saldo de la cuenta 2106011 en el <a href="/contabilidad/balance/">Balance</a>; si no calza, hay un asiento manual o un mes cerrado que mandó el asiento a otra fecha (ver log del motor en Reglas de Centralización).</li>
+      <li><b>Parques</b> → al otorgar un crédito de parque se provisionan su comisión parque (<code>com_parque</code> → 4001100) y su arriendo prorrateado (<code>arriendo_parque</code> → 4002100) contra <b>2106013</b> (regla <b>PROV_PARQUE</b>); se liberan al <b>aprobar el pago del parque del mes</b> en <a href="/postventa/comisiones-parques/">Comisiones Parques</a> (entra el devengo real por COMISION_PARQUES contra 2106012, el "por pagar") o al anular (<b>PROV_PARQUE_LIB</b>). Parámetro <code>prov_parque_desde</code>.</li>
+      <li><b>Cuadratura</b> → el cuadro lee la cuenta de provisión completa (saldo inicial + constituido − liberado = saldo final, comprobantes manuales incluidos) y separa cuánto controla el motor; el Cierre de Mes revisa que los asientos del motor calcen con sus provisiones (ver log en Reglas de Centralización).</li>
       <li><b>Pendientes</b> → una provisión con muchos días sin documento es un dealer que no ha facturado su comisión: revisar en <a href="/postventa/seguimiento/">Seguimiento Post Venta</a>.</li>
     </ul>
   </div>
@@ -108,10 +109,15 @@ async function cargar(){
   document.getElementById('cuadre').innerHTML =
     `<span class="ok"><i class="bi bi-check-circle"></i> Cuenta ${d.cuenta_provision}: SI ${clp(d.saldo_inicial)} + constituido ${clp(d.constituido)} − liberado ${clp(d.liberado)} = SF ${clp(d.saldo_final)}</span>`
     + ` <span class="text-muted ms-2">= motor ${clp(d.motor_vigente)} + histórico ${clp(d.saldo_historico)}</span>`;
+  const esParque = concepto === 'PARQUE';
+  document.getElementById('thTercero').textContent = esParque ? 'Parque' : 'Dealer';
+  document.getElementById('thBase').textContent = esParque ? 'Comisión + arriendo' : 'Bruto';
+  document.getElementById('thProv').textContent = esParque ? 'Provisión' : 'Provisión (neto)';
+  const base = p => { if (!esParque) return clp(p.base_bruta); try { const m = JSON.parse(p.montos_json||'{}'); return `${clp(m.comision)} + ${clp(m.arriendo)}`; } catch(_) { return '—'; } };
   document.getElementById('nPend').textContent = `— ${d.pendientes.length} · ${clp(d.pendientes.reduce((s,p)=>s+Number(p.monto),0))}`;
   document.getElementById('pendBody').innerHTML = d.pendientes.length ? d.pendientes.map(p => `<tr>
     <td class="mono">${esc(p.num_op||p.origen_id)}</td><td>${esc(p.tercero||'—')}</td><td>${esc(p.mes)}</td><td>${fch(p.fecha_constitucion)}</td>
-    <td class="r">${clp(p.base_bruta)}</td><td class="r fw-bold">${clp(p.monto)}</td><td class="r ${p.dias>60?'bad':''}">${p.dias}</td><td>${comp(p.id_comprobante_constitucion)}</td>
+    <td class="r">${base(p)}</td><td class="r fw-bold">${clp(p.monto)}</td><td class="r ${p.dias>60?'bad':''}">${p.dias}</td><td>${comp(p.id_comprobante_constitucion)}</td>
     <td><button class="btn btn-sm btn-outline-secondary py-0" onclick="liberar(${p.id}, '${esc(p.num_op||p.origen_id)}')" title="Liberar a mano (queda auditado)">Liberar</button></td></tr>`).join('')
     : '<tr><td colspan="9" class="text-center text-muted py-3">No hay provisiones vigentes</td></tr>';
   document.getElementById('movBody').innerHTML = d.movimientos.length ? d.movimientos.map(p => `<tr>
@@ -123,7 +129,7 @@ async function cargar(){
 async function sincronizar(){
   const b = document.getElementById('btnSync'), m = document.getElementById('syncMsg'); b.disabled = true; m.textContent = 'Sincronizando…';
   try {
-    const j = await fetch('/api/contabilidad/provisiones/sincronizar', { method:'POST', headers:H }).then(r=>r.json());
+    const j = await fetch('/api/contabilidad/provisiones/sincronizar', { method:'POST', headers:H, body: JSON.stringify({ concepto: document.getElementById('concepto').value }) }).then(r=>r.json());
     m.textContent = j.success ? `✓ ${j.data.constituidas} constituida(s), ${j.data.liberadas} liberada(s), ${j.data.omitidas} omitida(s)` : '✗ ' + j.error;
     m.style.color = j.success ? '#166534' : '#991b1b';
   } catch(e) { m.textContent = '✗ ' + e.message; }
