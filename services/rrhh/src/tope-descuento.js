@@ -17,7 +17,7 @@
 const pool = require('../../../shared/config/database');
 
 const DEF = { rem_tope_dcto_otros_pct: 15, rem_tope_dcto_vivienda_pct: 30, rem_tope_dcto_total_pct: 45, rem_tope_pension_pct: 50,
-              rem_dcto_judiciales: 'ORDEN TRIBUNAL,PENSIÓN DE ALIMENTOS', rem_dcto_vivienda: 'APV' };
+              rem_dcto_judiciales: 'ORDEN TRIBUNAL,PENSIÓN DE ALIMENTOS', rem_dcto_vivienda: 'APV', rem_dcto_caja: 'CAJA LOS ANDES' };
 const lista = s => String(s || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
 
 async function topes() {
@@ -25,13 +25,16 @@ async function topes() {
   const c = { ...DEF }; rows.forEach(r => { if (r.valor !== null && r.valor !== '') c[r.clave] = r.valor; });
   return { otros: Number(c.rem_tope_dcto_otros_pct) || 0, vivienda: Number(c.rem_tope_dcto_vivienda_pct) || 0,
            total: Number(c.rem_tope_dcto_total_pct) || 0, pension: Number(c.rem_tope_pension_pct) || 0,
-           judiciales: lista(c.rem_dcto_judiciales), viviendaLista: lista(c.rem_dcto_vivienda) };
+           judiciales: lista(c.rem_dcto_judiciales), viviendaLista: lista(c.rem_dcto_vivienda), caja: lista(c.rem_dcto_caja) };
 }
 
-// JUDICIAL (pensión / tribunal, tope propio y fuera del 45%) · VIVIENDA (30%) · OTROS (15%)
+/* JUDICIAL (pensión / tribunal: tope propio, fuera del 45%, 2° en la prelación) · CAJA (Caja de
+   Compensación: 3° en la prelación, tope 15%) · VIVIENDA (30%) · OTROS (15%). La prelación de la
+   liquidación (calcLiquidacion) usa esta misma clasificación: un solo criterio. */
 function categoriaDe(tipo, subtipo, T) {
   const s = String(subtipo || '').toUpperCase();
   if (T.judiciales.some(j => s.includes(j))) return 'JUDICIAL';
+  if ((T.caja || []).some(c => s.includes(c))) return 'CAJA';
   if (T.viviendaLista.some(v => s === v || s.startsWith(v + ' '))) return 'VIVIENDA';
   return 'OTROS';
 }

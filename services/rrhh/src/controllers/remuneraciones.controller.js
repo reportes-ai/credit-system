@@ -96,7 +96,9 @@ require('../../../../shared/migrate').enFila('rrhh-remuneraciones', async () => 
       ('rem_tope_dcto_total_pct', '45'),
       ('rem_tope_pension_pct', '50'),
       ('rem_dcto_judiciales', 'ORDEN TRIBUNAL,PENSIÓN DE ALIMENTOS'),
-      ('rem_dcto_vivienda', 'APV')`);
+      ('rem_dcto_vivienda', 'APV'),
+      ('rem_dcto_caja', 'CAJA LOS ANDES'),
+      ('rem_tope_pension_base', 'LIQUIDO')`);
     // Haberes no imponibles fijos en la ficha
     await pool.query('ALTER TABLE rh_fichas ADD COLUMN colacion DECIMAL(10,0) NULL').catch(() => {});
     await pool.query('ALTER TABLE rh_fichas ADD COLUMN movilizacion DECIMAL(10,0) NULL').catch(() => {});
@@ -1030,7 +1032,8 @@ async function descuentosDelMes(mes) {
     const det = String(d.detalle_texto || '').replace(/\s*·\s*cuota\s+\d+\s*\/\s*\d+/i, '').replace(/\s*·\s*obs\s+.*$/i, '').trim();
     const partes = [base, det && !det.toUpperCase().startsWith(base.toUpperCase()) ? det : null, nCuota && total > 1 ? `cuota ${nCuota} de ${total}` : null,
       d.tipo === 'PAGO_EXCESO' && d.mes_referencia ? `de ${d.mes_referencia}` : null].filter(Boolean);
-    (items[d.id_usuario] = items[d.id_usuario] || []).push({ glosa: partes.join(' · ').slice(0, 160), monto: c });
+    // tipo/subtipo viajan con el ítem: calcLiquidacion aplica con ellos el orden de prelación legal
+    (items[d.id_usuario] = items[d.id_usuario] || []).push({ glosa: partes.join(' · ').slice(0, 160), monto: c, tipo: d.tipo, subtipo: d.subtipo || null, id: d.id });
   }
   Object.defineProperty(m, 'apv', { value: apv, enumerable: false });
   Object.defineProperty(m, 'items', { value: items, enumerable: false });
@@ -1041,7 +1044,7 @@ async function descuentosDelMes(mes) {
 async function indicadores(mes) {
   const [cfgRows] = await pool.query("SELECT clave, valor FROM rh_config WHERE clave LIKE 'rem_%'");
   // rem_dcto_* son listas de conceptos (texto separado por coma), no números
-  const cfg = {}; cfgRows.forEach(r => cfg[r.clave] = /^rem_dcto_/.test(r.clave) ? String(r.valor || '') : (parseFloat(r.valor) || 0));
+  const cfg = {}; cfgRows.forEach(r => cfg[r.clave] = /^rem_dcto_|^rem_tope_pension_base$/.test(r.clave) ? String(r.valor || '') : (parseFloat(r.valor) || 0));
   // UF del ÚLTIMO día del mes (norma Previred/DT); si el mes aún no termina, getUF entrega la última cargada.
   const [y, m] = mes.split('-').map(Number);
   const finMes = mes + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0');
@@ -1113,7 +1116,57 @@ function calcLiquidacion(inp, ind) {
   impuesto = Math.max(0, impuesto);
 
   const totalHaberes = imponible + colacion + movilizacion + otrosNoImp;
-  const totalDescuentos = descAfp + descSalud + descSaludAdicional + descAfc + impuesto + otrosDesc;
+  const legales = descAfp + descSalud + descSaludAdicional + descAfc + impuesto;
+  /* ORDEN DE PRELACIÓN de los "otros descuentos" (Dirección del Trabajo; Pato, 24-09-2026):
+       1. legales (AFP, salud, AFC, impuesto) → queda el líquido legal
+       2. pensión de alimentos / retención judicial, hasta rem_tope_pension_pct (50%) de la base
+          (rem_tope_pension_base: LIQUIDO = líquido legal, TOTAL = remuneración total)
+       3. Caja de Compensación
+       4. préstamos de la empresa y demás voluntarios
+     Lo que no cabe en el líquido NO se descuenta (o se descuenta parcial) y queda en
+     descuentos_omitidos con el motivo: RRHH informa a la Caja ("sin capacidad de descuento")
+     o reprograma el préstamo. Priorizar la Caja o la empresa sobre la pensión hace al
+     empleador solidariamente responsable de la deuda alimenticia. */
+  const detalleIn = Array.isArray(inp.descuentos_detalle) ? inp.descuentos_detalle : [];
+  let otrosDescAplicado = otrosDesc, detalle = detalleIn, omitidos = [];
+  if (detalleIn.length && detalleIn.some(i => i.tipo)) {
+    const { categoriaDe } = require('../tope-descuento');
+    const lista = s => String(s || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+    const T = { judiciales: lista(ind.rem_dcto_judiciales || 'ORDEN TRIBUNAL,PENSIÓN DE ALIMENTOS'),
+                viviendaLista: lista(ind.rem_dcto_vivienda || 'APV'), caja: lista(ind.rem_dcto_caja || 'CAJA LOS ANDES') };
+    const ORDEN = { JUDICIAL: 1, CAJA: 2, VIVIENDA: 3, OTROS: 3 };
+    const clasificados = detalleIn.map((i, k) => ({ ...i, cat: categoriaDe(i.tipo, i.subtipo, T), k }))
+      .sort((a, b) => (ORDEN[a.cat] - ORDEN[b.cat]) || (a.k - b.k));
+    const liquidoLegal = Math.max(0, totalHaberes - legales);
+    const basePension = String(ind.rem_tope_pension_base || 'LIQUIDO').toUpperCase() === 'TOTAL' ? totalHaberes : liquidoLegal;
+    const topePension = Number(ind.rem_tope_pension_pct) > 0 ? R(basePension * Number(ind.rem_tope_pension_pct) / 100) : Infinity;
+    // Los voluntarios (Caja, empresa, APV…) además no pueden sumar más del 45% de la remuneración total (art. 58 CT)
+    const topeVol = Number(ind.rem_tope_dcto_total_pct) > 0 ? R(totalHaberes * Number(ind.rem_tope_dcto_total_pct) / 100) : Infinity;
+    let disponible = liquidoLegal, pensionAcum = 0, volAcum = 0;
+    detalle = []; otrosDescAplicado = 0;
+    for (const i of clasificados) {
+      const cuota = R(i.monto);
+      let cabe = Math.max(0, Math.min(cuota, disponible));
+      let motivo = null;
+      if (i.cat === 'JUDICIAL') {
+        const margen = Math.max(0, topePension - pensionAcum);
+        if (cabe > margen) { cabe = margen; motivo = `tope ${ind.rem_tope_pension_pct}% de la ${basePension === totalHaberes ? 'remuneración total' : 'remuneración líquida'} para pensión / retención judicial (Ley 14.908)`; }
+        pensionAcum += cabe;
+      } else {
+        const margen = Math.max(0, topeVol - volAcum);
+        if (cabe > margen) { cabe = margen; motivo = `tope ${ind.rem_tope_dcto_total_pct}% de la remuneración total para la suma de descuentos voluntarios (art. 58 CT)`; }
+        volAcum += cabe;
+      }
+      if (cabe < cuota && !motivo) motivo = i.cat === 'CAJA'
+        ? 'sin capacidad de descuento: el líquido no alcanza tras los legales y la pensión — informar a la Caja (pago directo por caja)'
+        : 'sin capacidad de descuento: el líquido no alcanza tras los legales, la pensión y la Caja — reprogramar con el trabajador';
+      const { cat, k, ...item } = i;
+      detalle.push({ ...item, monto: cabe, categoria: cat, ...(cabe < cuota ? { cuota_original: cuota, no_descontado: cuota - cabe, motivo } : {}) });
+      if (cabe < cuota) omitidos.push({ glosa: item.glosa, cuota, descontado: cabe, no_descontado: cuota - cabe, categoria: cat, motivo });
+      disponible -= cabe; otrosDescAplicado += cabe;
+    }
+  }
+  const totalDescuentos = legales + otrosDescAplicado;
   // Aportes del EMPLEADOR (no afectan el líquido; alimentan costo empresa/Previred)
   const aporteSis = pensionado ? 0 : R(baseCotiz * (ind.rem_sis_pct || 0) / 100);
   const aporteAfcEmp = pensionado ? 0 : R(baseAfc * ((esIndef ? ind.rem_afc_emp_pct : ind.rem_afc_emp_pfijo_pct) || 0) / 100);
@@ -1132,8 +1185,10 @@ function calcLiquidacion(inp, ind) {
     plan_isapre_uf: planUF || null, desc_salud_adicional: descSaludAdicional,
     afc_pct: esIndef ? ind.rem_afc_trabajador_pct : 0, desc_afc: descAfc, base_afc: baseAfc,
     base_tributable: baseTrib, apv_deducible: apvDeducible, impuesto,
-    otros_descuentos: otrosDesc, total_descuentos: totalDescuentos,
-    descuentos_detalle: Array.isArray(inp.descuentos_detalle) ? inp.descuentos_detalle : [],   // glosa + monto de cada "otro descuento"
+    otros_descuentos: otrosDescAplicado, total_descuentos: totalDescuentos,
+    descuentos_detalle: detalle,            // glosa + monto de cada "otro descuento", ya con la prelación aplicada
+    descuentos_omitidos: omitidos,          // lo que NO cupo en el líquido (Caja / empresa) con el motivo — RRHH debe actuar
+    otros_descuentos_solicitados: otrosDesc,
     liquido: totalHaberes - totalDescuentos,
     aporte_sis: aporteSis, aporte_afc_emp: aporteAfcEmp, aporte_mutual: aporteMutual, aporte_sanna: aporteSanna,
     costo_empresa: totalHaberes + aporteSis + aporteAfcEmp + aporteMutual + aporteSanna,
@@ -1447,10 +1502,23 @@ const emitir = async (req, res) => {
    si ya existe una ODP vigente para ese mes no crea otra. */
 const CAJA_PROVEEDOR = { rut: '70016160-9', nombre: 'CAJA DE COMPENSACION DE ASIGNACION FAMILIAR DE LOS ANDES' };
 async function ordenPagoCaja(mes, req) {
-  const [items] = await pool.query(
-    `SELECT d.valor_cuota monto, d.detalle_texto, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut
+  let [items] = await pool.query(
+    `SELECT d.id_usuario, d.valor_cuota monto, d.detalle_texto, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut
        FROM rh_descuentos d JOIN usuarios u ON u.id_usuario=d.id_usuario
       WHERE d.estado='VIGENTE' AND d.tipo='PERMANENTE' AND d.subtipo=? AND d.mes_inicio=? ORDER BY nombre`, [CAJA_SUBTIPO, mes]);
+  /* La ODP paga lo que REALMENTE se retuvo: si la prelación legal (pensión de alimentos primero)
+     dejó la cuota de la Caja parcial o en cero, va ese monto — la persona paga el resto directo
+     por caja (Pato, 24-09-2026). Se lee del snapshot emitido del mes (descuentos_detalle, categoria CAJA). */
+  try {
+    const [liqs] = await pool.query("SELECT id_usuario, detalle FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
+    const retenido = {}; let conInfo = false;
+    for (const l of liqs) {
+      let det = {}; try { det = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) {}
+      const cajas = (det.descuentos_detalle || []).filter(x => x.categoria === 'CAJA');
+      if (cajas.length) { conInfo = true; retenido[l.id_usuario] = cajas.reduce((s, x) => s + (Number(x.monto) || 0), 0); }
+    }
+    if (conInfo) items = items.map(x => ({ ...x, monto: retenido[x.id_usuario] ?? Number(x.monto) })).filter(x => Number(x.monto) > 0);
+  } catch (e) { console.error('[ordenPagoCaja prelación]', e.message); }
   if (!items.length) return null;
   const total = items.reduce((s, x) => s + Math.round(Number(x.monto) || 0), 0);
   if (!(total > 0)) return null;
@@ -1509,7 +1577,7 @@ async function enviarLiquidacionesCorreo(mes) {
         ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila('Comisiones' + (d.comisiones_mes ? ' ' + String(d.comisiones_mes).split('-').reverse().join('-') : ''), d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación' + (d.dias != null && d.dias !== 30 && d.colacion ? ` (${d.dias}/30 días)` : ''), d.colacion)}${fila('Movilización' + (d.dias != null && d.dias !== 30 && d.movilizacion ? ` (${d.dias}/30 días)` : ''), d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
         <tr><td style="padding:3px 10px;font-weight:700">Total haberes</td><td style="padding:3px 10px;text-align:right;font-weight:700">${co(d.total_haberes)}</td></tr>
         <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">DESCUENTOS</td></tr>
-        ${fila('AFP ' + (d.afp || ''), d.desc_afp, 1)}${fila('Salud 7%', d.desc_salud, 1)}${fila('Adicional Isapre', d.desc_salud_adicional, 1)}${fila('Seguro cesantía', d.desc_afc, 1)}${fila('Impuesto único', d.impuesto, 1)}${(d.descuentos_detalle || []).length ? d.descuentos_detalle.map(x => fila(x.glosa, x.monto, 1)).join('') : fila('Otros descuentos', d.otros_descuentos, 1)}
+        ${fila('AFP ' + (d.afp || ''), d.desc_afp, 1)}${fila('Salud 7%', d.desc_salud, 1)}${fila('Adicional Isapre', d.desc_salud_adicional, 1)}${fila('Seguro cesantía', d.desc_afc, 1)}${fila('Impuesto único', d.impuesto, 1)}${(d.descuentos_detalle || []).length ? d.descuentos_detalle.map(x => fila(x.glosa + (x.no_descontado ? ' (parcial)' : ''), x.monto, 1)).join('') : fila('Otros descuentos', d.otros_descuentos, 1)}${(d.descuentos_omitidos || []).length ? '<tr><td colspan="2" style="color:#b91c1c;font-size:11px;padding:4px 0">Prelación legal: ' + d.descuentos_omitidos.map(o => o.glosa + ' — $' + Math.round(o.no_descontado).toLocaleString('es-CL') + ' no descontado (' + o.motivo + ')').join('; ') + '</td></tr>' : ''}
         <tr><td style="padding:3px 10px;font-weight:700">Total descuentos</td><td style="padding:3px 10px;text-align:right;font-weight:700;color:#b91c1c">−${co(d.total_descuentos)}</td></tr>
         <tr><td style="padding:8px 10px;font-weight:800;font-size:14px">LÍQUIDO A PAGAR</td><td style="padding:8px 10px;text-align:right;font-weight:800;font-size:14px;color:#15803d">${co(d.liquido)}</td></tr>
       </table>
@@ -1736,7 +1804,7 @@ const putIndicadores = async (req, res) => {
       await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(parseFloat(b[k]))]);
     }
     // Listas de conceptos (texto, separados por coma): qué descuentos son judiciales y cuáles vivienda/ahorro
-    for (const k of ['rem_dcto_judiciales', 'rem_dcto_vivienda']) if (k in b) {
+    for (const k of ['rem_dcto_judiciales', 'rem_dcto_vivienda', 'rem_dcto_caja', 'rem_tope_pension_base']) if (k in b) {
       const v = String(b[k] || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean).join(',');
       await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, v]);
     }

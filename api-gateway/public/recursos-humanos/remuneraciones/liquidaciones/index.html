@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v2.17 — razón social y RUT del pie desde Datos de la Empresa. v2.16 — RUT de la empresa corregido en la liquidación impresa (76.545.638-K). v2.15 — el pie Business Suite va a la derecha de la línea Estado. v2.14 — pie "Liquidación generada/emitida a través de AutoFácil Business Suite®". v2.13 — logo más grande y RUT separado del logo. v2.12 — logo real de AutoFácil (logo-blanco.png) en la cabecera de la liquidación. v2.11 — botón PDF borrador: todas las liquidaciones del mes en un PDF con marca de agua BORRADOR (no emite). v2.10 — nombre del colaborador en mayúsculas (como el resto de la cabecera) y mes de comisiones a la chilena (08-2026). v2.9 — cabecera con Fecha de contrato (en vez de AFP/Salud), descuentos "Salud <isapre>" y "Adicional <isapre>", total descuentos en negro. v2.8 — al emitir avisa la ODP a la Caja Los Andes generada. v2.7 — cuenta de depósito con prefijo "Banco" cuando el nombre no lo trae. v2.6 — la vista previa también muestra la cuenta de depósito (solo salía en las emitidas). v2.5 — liquidación más ancha (1000px, montos sin cortar), haberes sin paréntesis, más espacio para las firmas. v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
+  <!-- v2.18 — prelación legal: aviso rojo sobre el libro, marca por fila y detalle en la liquidación de lo no descontado (pensión antes que Caja y empresa). v2.17 — razón social y RUT del pie desde Datos de la Empresa. v2.16 — RUT de la empresa corregido en la liquidación impresa (76.545.638-K). v2.15 — el pie Business Suite va a la derecha de la línea Estado. v2.14 — pie "Liquidación generada/emitida a través de AutoFácil Business Suite®". v2.13 — logo más grande y RUT separado del logo. v2.12 — logo real de AutoFácil (logo-blanco.png) en la cabecera de la liquidación. v2.11 — botón PDF borrador: todas las liquidaciones del mes en un PDF con marca de agua BORRADOR (no emite). v2.10 — nombre del colaborador en mayúsculas (como el resto de la cabecera) y mes de comisiones a la chilena (08-2026). v2.9 — cabecera con Fecha de contrato (en vez de AFP/Salud), descuentos "Salud <isapre>" y "Adicional <isapre>", total descuentos en negro. v2.8 — al emitir avisa la ODP a la Caja Los Andes generada. v2.7 — cuenta de depósito con prefijo "Banco" cuando el nombre no lo trae. v2.6 — la vista previa también muestra la cuenta de depósito (solo salía en las emitidas). v2.5 — liquidación más ancha (1000px, montos sin cortar), haberes sin paréntesis, más espacio para las firmas. v2.4 — adicional Líquido imponible muestra el bruto y el líquido objetivo. v2.3 — cada "otro descuento" con su glosa y cuota real en la liquidación (descuentos_detalle). v2.2 — firma del trabajador sin "Recibí conforme" (lo dice el texto de abajo). v2.1 — cada adicional con su nombre en la liquidación (ej. Asignación de celular (no imponible)) en vez de 'Otros'. v2.0 — texto de conformidad bajo la firma del trabajador + cuenta de depósito (banco · tipo · N°, desde la ficha). v1.9 — RUT con puntos y guión en la liquidación. v1.8 —aviso cuando las comisiones vienen de la Nómina de Comisiones (congeladas). v1.7 — APV rebaja la base del impuesto (nota en la liquidación) · v1.6 — colación y movilización en 30avos (etiqueta n/30 días) · v1.5 — comisiones mes vencido (la liquidación paga las del mes anterior) · v1.4 — haber Feriado renta variable art. 71 (dias de vacaciones x promedio comisiones 3 meses) en la liquidacion · v1.3 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -162,12 +162,24 @@ function render(){
       <td style="color:#b91c1c">${$((r.desc_salud||0)+(r.desc_salud_adicional||0))}${r.desc_salud_adicional?`<div style="font-size:.62rem;color:#94a3b8">7% + adic. isapre</div>`:''}</td>
       <td style="color:#b91c1c">${$(r.desc_afc)}</td>
       <td style="color:#b91c1c">${$(r.impuesto)}</td>
-      <td>${$(r.otros_descuentos)}</td>
+      <td>${$(r.otros_descuentos)}${(r.descuentos_omitidos||[]).length?`<div style="font-size:.62rem;color:#b91c1c;font-weight:700" title="${esc(r.descuentos_omitidos.map(o=>o.glosa+': '+o.motivo).join(' | '))}"><i class="bi bi-exclamation-triangle-fill"></i> ${$(r.descuentos_omitidos.reduce((s,o)=>s+(o.no_descontado||0),0))} no descontado</div>`:''}</td>
       <td style="font-weight:800;color:#15803d">${$(r.liquido)}</td>
       <td style="text-align:center"><span class="pill ${r.estado.replace(' ','')}">${r.estado}</span></td>
       <td><button class="btn-ghost" style="padding:3px 8px;font-size:.72rem" title="Vista previa de la liquidación" onclick="${r.id_liq&&r.estado==='EMITIDA'?`verLiq(${r.id_liq})`:`verPrev(${i})`}"><i class="bi bi-receipt"></i></button></td>
     </tr>`;
   }).join('') + totalRow(rows);
+  avisoPrelacion(rows);
+}
+/* Aviso rojo sobre el libro cuando la prelación legal dejó descuentos sin aplicar (Pato, 24-09-2026):
+   RRHH debe informar a la Caja (sin capacidad de descuento) o reprogramar el préstamo de la empresa. */
+function avisoPrelacion(rows){
+  const con = rows.filter(r => (r.descuentos_omitidos||[]).length);
+  let box = document.getElementById('avisoPrelacion');
+  if (!con.length) { if (box) box.remove(); return; }
+  if (!box) { box = document.createElement('div'); box.id = 'avisoPrelacion'; box.style.cssText = 'background:#fef2f2;border-left:4px solid #dc2626;border-radius:8px;padding:10px 14px;margin:0 0 12px;font-size:.8rem;color:#7f1d1d'; const t = document.getElementById('tb').closest('table'); t.parentNode.insertBefore(box, t); }
+  box.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i><b>Orden de prelación legal:</b> a ${con.length===1?'una persona':con.length+' personas'} no se le pudo descontar todo porque el líquido no alcanza tras los legales y la pensión de alimentos. ` +
+    `<ul style="margin:6px 0 0;padding-left:18px">${con.map(r=>`<li><b>${esc(r.nombre)}</b>: ${r.descuentos_omitidos.map(o=>esc(o.glosa)+' — '+$(o.no_descontado)+' no descontado ('+esc(o.motivo)+')').join('; ')}</li>`).join('')}</ul>` +
+    `<div style="margin-top:6px">Caja de Compensación: avisar que la persona no tiene capacidad de descuento (paga directo por caja). Préstamo de la empresa: reprogramar con el trabajador. Nunca se prioriza la Caja o la empresa sobre la pensión.</div>`;
 }
 function totalRow(rows){
   const s = c => rows.reduce((a,r)=>a+(Number(r[c])||0),0);
@@ -289,8 +301,9 @@ function pintarLiq(l, d){
           ${fila('Adicional '+esc(d.salud||'Isapre')+' (plan '+String(d.plan_isapre_uf||'').replace('.',',')+' UF)', d.desc_salud_adicional)}
           ${fila('Seguro cesantía AFC ('+String(d.afc_pct||0).replace('.',',')+'%)', d.desc_afc)}
           ${fila('Impuesto único 2ª categoría' + (d.apv_deducible>0 ? ` (base rebajada por APV ${$(d.apv_deducible)})` : ''), d.impuesto)}
-          ${(d.descuentos_detalle||[]).length ? d.descuentos_detalle.map(x=>fila(esc(x.glosa), x.monto)).join('') : fila('Otros descuentos', d.otros_descuentos)}
+          ${(d.descuentos_detalle||[]).length ? d.descuentos_detalle.map(x=>fila(esc(x.glosa) + (x.no_descontado ? ` <span style="color:#b91c1c;font-weight:700">(parcial: ${$(x.no_descontado)} no descontado)</span>` : ''), x.monto)).join('') : fila('Otros descuentos', d.otros_descuentos)}
           ${sub('TOTAL DESCUENTOS', d.total_descuentos)}
+          ${(d.descuentos_omitidos||[]).length ? `<tr><td colspan="2" style="padding:6px 0 0;font-size:.72rem;color:#b91c1c"><b>Prelación legal:</b> ${d.descuentos_omitidos.map(o=>esc(o.glosa)+' — '+$(o.no_descontado)+' no descontado ('+esc(o.motivo)+')').join('; ')}.</td></tr>` : ''}
         </table>
       </div>
       <div style="background:#012d70;color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center">
