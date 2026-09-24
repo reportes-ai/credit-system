@@ -169,7 +169,23 @@ const CHECKS_AUTO = {
      otorgada del mes con comisión sin provisión ni documento, y saldo del motor = cuenta 2106011. */
   async PROVISION_DEALER(mes) { return CHECKS_AUTO._provision(mes, 'DEALER'); },
   async PROVISION_PARQUE(mes) { return CHECKS_AUTO._provision(mes, 'PARQUE'); },
-  async PROVISION_EJECUTIVO(mes) { return CHECKS_AUTO._provision(mes, 'EJECUTIVO'); },
+  /* Ejecutivos (mensual): cada ejecutivo con comisión del motor tiene su aprobación (devengo real) o su provisión al cierre */
+  async PROVISION_EJECUTIVO(mes) {
+    const prov = require('../../../contabilidad/src/provisiones');
+    const c = await prov.cuadro(mes, 'EJECUTIVO');
+    if (mes < c.desde) return { ok: true, detalle: `Mes anterior a ${c.desde}: no se provisiona` };
+    if (mes >= require('../../../../shared/fecha-chile').hoyISO().slice(0, 7)) return { ok: true, detalle: 'El mes no ha terminado: la provisión se constituye al cierre' };
+    const filas = await prov.comisionesMotorMes(mes);
+    const falta = [];
+    for (const f of filas) {
+      const [[a]] = await pool.query("SELECT 1 v FROM comisiones_aprobaciones WHERE ejecutivo=? AND mes=? AND estado='aprobado'", [f.ejecutivo, mes]);
+      if (a) continue;
+      const [[p]] = await pool.query("SELECT 1 v FROM ctb_provisiones WHERE concepto='EJECUTIVO' AND origen_tipo='EJECUTIVO_MES' AND origen_id=?", [`${String(f.ejecutivo).toUpperCase().trim()}|${mes}`]);
+      if (!p) falta.push(`${f.ejecutivo} ($${f.total.toLocaleString('es-CL')})`);
+    }
+    if (!falta.length) return { ok: true, detalle: `${filas.length} ejecutivo(s) con comisión: todos aprobados o provisionados (cuenta ${c.cuenta_provision}: $${c.saldo_final.toLocaleString('es-CL')})` };
+    return { ok: false, detalle: `${falta.length} ejecutivo(s) con comisión sin aprobar ni provisionar: ${falta.join(', ').slice(0, 250)} — correr Sincronizar (concepto Comisión ejecutivo)` };
+  },
   /* Sueldos: el mes tiene su libro contabilizado (RRHH o traspaso AVSOFT) o la provisión del cierre */
   async PROVISION_SUELDOS(mes) {
     const prov = require('../../../contabilidad/src/provisiones');
