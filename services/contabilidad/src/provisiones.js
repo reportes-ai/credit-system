@@ -173,34 +173,38 @@ async function sincronizarDealer(usuario = 'Motor provisiones') {
   return out;
 }
 
-/* Cuadro del mes por concepto: SI + constituido − liberado = SF (la cuenta 2106011 debe calzar) + pendientes con antigüedad */
+/* Cuadro del mes por concepto. Los TOTALES salen de la CUENTA contable (2106011 completa: saldo
+   inicial con lo que dejó AVSOFT, haber = constituido, debe = liberado, incluyendo comprobantes
+   manuales), porque el saldo inicial es el de la cuenta y no solo lo del motor (Pato, 24-09-2026).
+   Aparte se informa cuánto del saldo final controla el motor (vigentes) y cuánto es histórico. */
 async function cuadro(mes, concepto = 'DEALER') {
+  const cta = CONCEPTOS[concepto].cuentaProv;
+  const desde = await param(CONCEPTOS[concepto].paramDesde, '2026-09');
   const [[si]] = await pool.query(
-    `SELECT COALESCE(SUM(monto),0) m, COUNT(*) n FROM ctb_provisiones
-      WHERE concepto=? AND DATE_FORMAT(fecha_constitucion,'%Y-%m') < ? AND (estado='CONSTITUIDA' OR DATE_FORMAT(fecha_liberacion,'%Y-%m') >= ?)`, [concepto, mes, mes]);
+    `SELECT COALESCE(SUM(m.haber - m.debe),0) s FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+      WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') < ?`, [cta, mes]);
+  const [[mv]] = await pool.query(
+    `SELECT COALESCE(SUM(m.haber),0) h, COALESCE(SUM(m.debe),0) d,
+            COUNT(DISTINCT CASE WHEN m.haber>0 THEN c.id END) nh, COUNT(DISTINCT CASE WHEN m.debe>0 THEN c.id END) nd
+       FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+      WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') = ?`, [cta, mes]);
+  const saldo_inicial = Number(si.s), constituido = Number(mv.h), liberado = Number(mv.d), saldo_final = saldo_inicial + constituido - liberado;
+  // Lo que controla el motor (sus filas) al cierre del mes
   const [[con]] = await pool.query("SELECT COALESCE(SUM(monto),0) m, COUNT(*) n FROM ctb_provisiones WHERE concepto=? AND DATE_FORMAT(fecha_constitucion,'%Y-%m')=?", [concepto, mes]);
   const [[lib]] = await pool.query("SELECT COALESCE(SUM(monto),0) m, COUNT(*) n FROM ctb_provisiones WHERE concepto=? AND estado='LIBERADA' AND DATE_FORMAT(fecha_liberacion,'%Y-%m')=?", [concepto, mes]);
   const [[sf]] = await pool.query(
     `SELECT COALESCE(SUM(monto),0) m, COUNT(*) n FROM ctb_provisiones
       WHERE concepto=? AND DATE_FORMAT(fecha_constitucion,'%Y-%m') <= ? AND (estado='CONSTITUIDA' OR DATE_FORMAT(fecha_liberacion,'%Y-%m') > ?)`, [concepto, mes, mes]);
-  const cta = CONCEPTOS[concepto].cuentaProv;
-  const desde = await param(CONCEPTOS[concepto].paramDesde, '2026-09');
-  /* La cuenta se compara SOLO desde que el motor la alimenta: antes la movía AVSOFT (el contador
-     provisionaba a mano cada mes en 2106011) y ese saldo histórico se muestra aparte, no se mezcla. */
-  const [[saldoCta]] = await pool.query(
-    `SELECT COALESCE(SUM(m.haber - m.debe),0) s FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
-      WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') BETWEEN ? AND ?`, [cta, desde, mes]);
-  const [[saldoHist]] = await pool.query(
-    `SELECT COALESCE(SUM(m.haber - m.debe),0) s FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
-      WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') < ?`, [cta, desde]);
+  const motor_vigente = Number(sf.m), saldo_historico = saldo_final - motor_vigente;
   const [pendientes] = await pool.query(
     `SELECT p.*, DATEDIFF(CURDATE(), p.fecha_constitucion) dias FROM ctb_provisiones p
       WHERE p.concepto=? AND p.estado='CONSTITUIDA' ORDER BY p.fecha_constitucion, p.id`, [concepto]);
   const [movs] = await pool.query(
     `SELECT * FROM ctb_provisiones WHERE concepto=? AND (DATE_FORMAT(fecha_constitucion,'%Y-%m')=? OR DATE_FORMAT(fecha_liberacion,'%Y-%m')=?) ORDER BY fecha_constitucion DESC, id DESC LIMIT 500`, [concepto, mes, mes]);
   return { mes, concepto, nombre: CONCEPTOS[concepto].nombre, cuenta_provision: cta, cuenta_gasto: CONCEPTOS[concepto].cuentaGasto,
-    saldo_inicial: Number(si.m), n_inicial: si.n, constituido: Number(con.m), n_constituido: con.n, liberado: Number(lib.m), n_liberado: lib.n,
-    saldo_final: Number(sf.m), n_final: sf.n, saldo_cuenta: Number(saldoCta.s), saldo_historico: Number(saldoHist.s), pendientes, movimientos: movs, desde };
+    saldo_inicial, constituido, n_constituido: mv.nh, liberado, n_liberado: mv.nd, saldo_final,
+    motor_constituido: Number(con.m), motor_n_constituido: con.n, motor_liberado: Number(lib.m), motor_n_liberado: lib.n,
+    motor_vigente, motor_n_vigente: sf.n, saldo_historico, pendientes, movimientos: movs, desde };
 }
 
 async function tick() {

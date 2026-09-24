@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Provisiones por Devengo — AutoFácil</title>
-  <!-- v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
+  <!-- v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -98,18 +98,16 @@ async function cargar(){
   if (!j.success) { document.getElementById('kpis').innerHTML = `<div class="bad">${esc(j.error)}</div>`; return; }
   const d = j.data;
   document.getElementById('kpis').innerHTML = [
-    ['Saldo inicial', d.saldo_inicial, `${d.n_inicial} provisión(es)`],
-    ['Constituido en el mes', d.constituido, `${d.n_constituido} crédito(s) otorgado(s)`],
-    ['Liberado en el mes', d.liberado, `${d.n_liberado} documento(s)/anulación(es)`],
-    ['Saldo final', d.saldo_final, `${d.n_final} vigente(s)`],
-    ['Cuenta ' + d.cuenta_provision, d.saldo_cuenta, `movimientos del motor desde ${d.desde}`],
+    ['Saldo inicial', d.saldo_inicial, `cuenta ${d.cuenta_provision} al inicio del mes`],
+    ['Constituido en el mes', d.constituido, `${d.n_constituido} comprobante(s) · motor: ${clp(d.motor_constituido)} en ${d.motor_n_constituido} crédito(s)`],
+    ['Liberado en el mes', d.liberado, `${d.n_liberado} comprobante(s) · motor: ${clp(d.motor_liberado)} en ${d.motor_n_liberado}`],
+    ['Saldo final', d.saldo_final, `cuenta ${d.cuenta_provision} al cierre del mes`],
+    ['Del cual controla el motor', d.motor_vigente, `${d.motor_n_vigente} provisión(es) vigente(s) desde ${d.desde}`],
   ].map(([l,v,s]) => `<div class="kpi"><div class="l">${esc(l)}</div><div class="v">${clp(v)}</div><div class="s">${esc(s)}</div></div>`).join('')
-  + (d.saldo_historico ? `<div class="kpi" style="grid-column:span 5;background:#fffbeb;border-color:#fcd34d"><div class="l">Saldo histórico AVSOFT en ${esc(d.cuenta_provision)} (antes de ${esc(d.desde)})</div><div class="v" style="color:#92400e">${clp(d.saldo_historico)}</div><div class="s">Provisiones que el contador constituyó a mano en AVSOFT para operaciones anteriores a ${esc(d.desde)}. No las controla este motor: se liberan cuando lleguen esas facturas, con comprobante manual, hasta dejarlas en cero.</div></div>` : '');
-  const calza = Math.abs(d.saldo_final - d.saldo_cuenta) < 1;
-  document.getElementById('cuadre').innerHTML = calza
-    ? `<span class="ok"><i class="bi bi-check-circle"></i> Cuadra: SI ${clp(d.saldo_inicial)} + constituido ${clp(d.constituido)} − liberado ${clp(d.liberado)} = SF ${clp(d.saldo_final)} = cuenta ${d.cuenta_provision}</span>`
-    : `<span class="bad"><i class="bi bi-x-circle"></i> No cuadra: saldo final del motor ${clp(d.saldo_final)} vs cuenta ${d.cuenta_provision} ${clp(d.saldo_cuenta)} (diferencia ${clp(d.saldo_final - d.saldo_cuenta)})</span>`
-    + ` <span class="text-muted ms-2">Provisiona desde ${esc(d.desde)}</span>`;
+  + (Math.abs(d.saldo_historico) >= 1 ? `<div class="kpi" style="grid-column:span 5;background:#fffbeb;border-color:#fcd34d"><div class="l">Saldo histórico AVSOFT en ${esc(d.cuenta_provision)} (fuera del motor)</div><div class="v" style="color:#92400e">${clp(d.saldo_historico)}</div><div class="s">Saldo final menos lo que controla el motor: provisiones que el contador constituyó a mano en AVSOFT para operaciones anteriores a ${esc(d.desde)}. Se liberan con comprobante manual a la cuenta ${esc(d.cuenta_provision)} a medida que llegan esas facturas, hasta dejarlo en cero.</div></div>` : '');
+  document.getElementById('cuadre').innerHTML =
+    `<span class="ok"><i class="bi bi-check-circle"></i> Cuenta ${d.cuenta_provision}: SI ${clp(d.saldo_inicial)} + constituido ${clp(d.constituido)} − liberado ${clp(d.liberado)} = SF ${clp(d.saldo_final)}</span>`
+    + ` <span class="text-muted ms-2">= motor ${clp(d.motor_vigente)} + histórico ${clp(d.saldo_historico)}</span>`;
   document.getElementById('nPend').textContent = `— ${d.pendientes.length} · ${clp(d.pendientes.reduce((s,p)=>s+Number(p.monto),0))}`;
   document.getElementById('pendBody').innerHTML = d.pendientes.length ? d.pendientes.map(p => `<tr>
     <td class="mono">${esc(p.num_op||p.origen_id)}</td><td>${esc(p.tercero||'—')}</td><td>${esc(p.mes)}</td><td>${fch(p.fecha_constitucion)}</td>

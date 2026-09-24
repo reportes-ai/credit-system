@@ -173,11 +173,16 @@ const CHECKS_AUTO = {
         LEFT JOIN postventa_facturas_comision fc ON fc.num_op=c.num_op AND fc.monto_liquido IS NOT NULL
        WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND COALESCE(c.comdea_real,0)>0
          AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND fc.id_seguimiento IS NULL`, [mes]);
-    const dif = Math.round(c.saldo_final - c.saldo_cuenta);
-    if (sin.n === 0 && dif === 0) return { ok: true, detalle: `${c.n_final} provisión(es) vigentes por $${c.saldo_final.toLocaleString('es-CL')}, cuadra con la cuenta ${c.cuenta_provision}` };
+    // Los asientos del motor en la cuenta deben calzar con sus filas (constituido y liberado del mes)
+    const [[asi]] = await pool.query(
+      `SELECT COALESCE(SUM(CASE WHEN c.origen='PROV_DEALER' THEN m.haber END),0) h, COALESCE(SUM(CASE WHEN c.origen='PROV_DEALER_LIB' THEN m.debe END),0) d
+         FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+        WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m')=? AND c.origen IN ('PROV_DEALER','PROV_DEALER_LIB')`, [c.cuenta_provision, mes]);
+    const dif = Math.round((c.motor_constituido - Number(asi.h)) + (c.motor_liberado - Number(asi.d)));
+    if (sin.n === 0 && dif === 0) return { ok: true, detalle: `Cuenta ${c.cuenta_provision}: SF $${c.saldo_final.toLocaleString('es-CL')} (motor $${c.motor_vigente.toLocaleString('es-CL')} en ${c.motor_n_vigente} vigente(s) + histórico $${c.saldo_historico.toLocaleString('es-CL')}); asientos del motor calzan con sus provisiones` };
     const partes = [];
     if (sin.n) partes.push(`${sin.n} otorgada(s) sin provisión ni documento: ${String(sin.ops || '').slice(0, 200)}`);
-    if (dif) partes.push(`motor $${c.saldo_final.toLocaleString('es-CL')} vs cuenta ${c.cuenta_provision} $${c.saldo_cuenta.toLocaleString('es-CL')} (dif. $${dif.toLocaleString('es-CL')})`);
+    if (dif) partes.push(`asientos del motor en ${c.cuenta_provision} no calzan con sus provisiones (dif. $${dif.toLocaleString('es-CL')}: revisar log en Reglas de Centralización)`);
     return { ok: false, detalle: partes.join(' · ') };
   },
   async PROVISIONES(mes) {
