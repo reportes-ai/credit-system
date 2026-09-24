@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Provisiones por Devengo — AutoFácil</title>
-  <!-- v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
+  <!-- v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -74,8 +74,8 @@
     <ul class="mb-0">
       <li><b>Constitución</b> → al <b>otorgar</b> un crédito con comisión dealer (carta, carga Trinidad, digitación): DEBE 4001127 Comisiones dealer / HABER 2106011 Provisión comisiones dealer, por el <b>neto</b> de <code>comdea_real</code> (la comisión del sistema es bruta, IVA incluido). Regla <b>PROV_DEALER</b> en <a href="/contabilidad/reglas/">Reglas de Centralización</a>.</li>
       <li><b>Liberación</b> → al registrar la <b>factura o boleta</b> en <a href="/postventa/seguimiento/">Post Venta → Seguimiento</a> (entra el devengo real por COMISION_DEV_*) o si la operación se <b>anula</b>: reversa íntegra, regla <b>PROV_DEALER_LIB</b>. La diferencia entre lo provisionado y lo real queda en el resultado del mes de la liberación.</li>
-      <li><b>Motor automático</b> <code>provisiones-dealer</code> (cada 6 h) → red de seguridad para todas las vías; "Sincronizar ahora" lo ejecuta a mano. Se apaga con <code>MOTORES=off</code> como los demás.</li>
-      <li><b>Desde cuándo</b> → parámetro <code>prov_dealer_desde</code> (ctb_config, hoy 2026-09): lo anterior ya venía devengado por documento y no se provisiona.</li>
+      <li><b>Motor automático</b> <code>provisiones-devengo</code> (cada 6 h) → red de seguridad para todas las vías; "Sincronizar ahora" lo ejecuta a mano. Se apaga con <code>MOTORES=off</code> como los demás.</li>
+      <li><b>Desde cuándo</b> → parámetro <code>prov_dealer_desde</code> (ctb_config, hoy 2026-09). Lo anterior lo provisionó el contador en AVSOFT: su detalle está cargado como provisiones con badge <b>AVSOFT</b> (sin asiento, ya vivían en la cuenta) y se liberan solas por lo que él provisionó cuando se registra la factura de esa OP. La <b>diferencia cuenta vs detalle</b> es lo que él debe conciliar.</li>
       <li><b>Parques</b> → al otorgar un crédito de parque se provisionan su comisión parque (<code>com_parque</code> → 4001100) y su arriendo prorrateado (<code>arriendo_parque</code> → 4002100) contra <b>2106013</b> (regla <b>PROV_PARQUE</b>); se liberan al <b>aprobar el pago del parque del mes</b> en <a href="/postventa/comisiones-parques/">Comisiones Parques</a> (entra el devengo real por COMISION_PARQUES contra 2106012, el "por pagar") o al anular (<b>PROV_PARQUE_LIB</b>). Parámetro <code>prov_parque_desde</code>.</li>
       <li><b>Cuadratura</b> → el cuadro lee la cuenta de provisión completa (saldo inicial + constituido − liberado = saldo final, comprobantes manuales incluidos) y separa cuánto controla el motor; el Cierre de Mes revisa que los asientos del motor calcen con sus provisiones (ver log en Reglas de Centralización).</li>
       <li><b>Pendientes</b> → una provisión con muchos días sin documento es un dealer que no ha facturado su comisión: revisar en <a href="/postventa/seguimiento/">Seguimiento Post Venta</a>.</li>
@@ -103,12 +103,12 @@ async function cargar(){
     ['Constituido en el mes', d.constituido, `${d.n_constituido} comprobante(s) · motor: ${clp(d.motor_constituido)} en ${d.motor_n_constituido} crédito(s)`],
     ['Liberado en el mes', d.liberado, `${d.n_liberado} comprobante(s) · motor: ${clp(d.motor_liberado)} en ${d.motor_n_liberado}`],
     ['Saldo final', d.saldo_final, `cuenta ${d.cuenta_provision} al cierre del mes`],
-    ['Del cual controla el motor', d.motor_vigente, `${d.motor_n_vigente} provisión(es) vigente(s) desde ${d.desde}`],
+    ['Detalle vigente (por operación)', d.motor_vigente, `${d.motor_n_vigente} provisión(es): ${clp(d.motor_vigente - d.avsoft_vigente)} del motor desde ${d.desde}` + (d.avsoft_n ? ` + ${clp(d.avsoft_vigente)} detalle AVSOFT (${d.avsoft_n})` : '')],
   ].map(([l,v,s]) => `<div class="kpi"><div class="l">${esc(l)}</div><div class="v">${clp(v)}</div><div class="s">${esc(s)}</div></div>`).join('')
-  + (Math.abs(d.saldo_historico) >= 1 ? `<div class="kpi" style="grid-column:span 5;background:#fffbeb;border-color:#fcd34d"><div class="l">Saldo histórico AVSOFT en ${esc(d.cuenta_provision)} (fuera del motor)</div><div class="v" style="color:#92400e">${clp(d.saldo_historico)}</div><div class="s">Saldo final menos lo que controla el motor: provisiones que el contador constituyó a mano en AVSOFT para operaciones anteriores a ${esc(d.desde)}. Se liberan con comprobante manual a la cuenta ${esc(d.cuenta_provision)} a medida que llegan esas facturas, hasta dejarlo en cero.</div></div>` : '');
+  + (Math.abs(d.saldo_historico) >= 1 ? `<div class="kpi" style="grid-column:span 5;background:#fffbeb;border-color:#fcd34d"><div class="l">Diferencia cuenta ${esc(d.cuenta_provision)} vs detalle por operación</div><div class="v" style="color:#92400e">${clp(d.saldo_historico)}</div><div class="s">Saldo final de la cuenta menos el detalle vigente (motor + detalle AVSOFT del contador). ${d.saldo_historico > 0 ? 'Provisión en la cuenta sin detalle por operación.' : 'El detalle del contador supera lo que hay en la cuenta: filas que ya se rebajaron en AVSOFT sin marcarse en su planilla.'} Lo concilia el contador; hasta entonces queda a la vista.</div></div>` : '');
   document.getElementById('cuadre').innerHTML =
     `<span class="ok"><i class="bi bi-check-circle"></i> Cuenta ${d.cuenta_provision}: SI ${clp(d.saldo_inicial)} + constituido ${clp(d.constituido)} − liberado ${clp(d.liberado)} = SF ${clp(d.saldo_final)}</span>`
-    + ` <span class="text-muted ms-2">= motor ${clp(d.motor_vigente)} + histórico ${clp(d.saldo_historico)}</span>`;
+    + ` <span class="text-muted ms-2">= detalle ${clp(d.motor_vigente)} + diferencia ${clp(d.saldo_historico)}</span>`;
   const esParque = concepto === 'PARQUE';
   document.getElementById('thTercero').textContent = esParque ? 'Parque' : 'Dealer';
   document.getElementById('thBase').textContent = esParque ? 'Comisión + arriendo' : 'Bruto';
@@ -116,7 +116,7 @@ async function cargar(){
   const base = p => { if (!esParque) return clp(p.base_bruta); try { const m = JSON.parse(p.montos_json||'{}'); return `${clp(m.comision)} + ${clp(m.arriendo)}`; } catch(_) { return '—'; } };
   document.getElementById('nPend').textContent = `— ${d.pendientes.length} · ${clp(d.pendientes.reduce((s,p)=>s+Number(p.monto),0))}`;
   document.getElementById('pendBody').innerHTML = d.pendientes.length ? d.pendientes.map(p => `<tr>
-    <td class="mono">${esc(p.num_op||p.origen_id)}</td><td>${esc(p.tercero||'—')}</td><td>${esc(p.mes)}</td><td>${fch(p.fecha_constitucion)}</td>
+    <td class="mono">${esc(p.num_op||'—')}${p.origen_tipo==='AVSOFT'?' <span class="b" style="background:#fef3c7;color:#92400e" title="Detalle del contador (AVSOFT), fila '+esc(p.origen_id)+' de su planilla; sin asiento propio, ya vivía en la cuenta">AVSOFT</span>':''}</td><td>${esc(p.tercero||'—')}</td><td>${esc(p.mes)}</td><td>${fch(p.fecha_constitucion)}</td>
     <td class="r">${base(p)}</td><td class="r fw-bold">${clp(p.monto)}</td><td class="r ${p.dias>60?'bad':''}">${p.dias}</td><td>${comp(p.id_comprobante_constitucion)}</td>
     <td><button class="btn btn-sm btn-outline-secondary py-0" onclick="liberar(${p.id}, '${esc(p.num_op||p.origen_id)}')" title="Liberar a mano (queda auditado)">Liberar</button></td></tr>`).join('')
     : '<tr><td colspan="9" class="text-center text-muted py-3">No hay provisiones vigentes</td></tr>';

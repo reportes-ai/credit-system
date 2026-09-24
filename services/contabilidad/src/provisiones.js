@@ -104,12 +104,16 @@ async function fechaContable(iso) {
 const contabilizar = (...a) => require('./motor-asientos').contabilizar(...a);
 
 /* ¿La comisión de esta OP ya tiene documento registrado en Post Venta? → { tipo, fecha } | null */
-async function documentoDealer(num_op) {
+async function documentoDealer(num_op, registradoDesde = null) {
   if (!num_op) return null;
   const [[d]] = await pool.query(
     `SELECT fc.es_boleta, DATE_FORMAT(COALESCE(fc.fecha_factura, fc.created_at),'%Y-%m-%d') f
-       FROM postventa_facturas_comision fc WHERE fc.num_op=? AND fc.monto_liquido IS NOT NULL ORDER BY fc.created_at DESC LIMIT 1`, [num_op]);
-  return d ? { tipo: Number(d.es_boleta) ? 'BOLETA' : 'FACTURA', fecha: d.f } : null;
+       FROM postventa_facturas_comision fc WHERE fc.num_op=? AND fc.monto_liquido IS NOT NULL ${registradoDesde ? 'AND fc.created_at >= ?' : ''}
+      ORDER BY fc.created_at DESC LIMIT 1`, registradoDesde ? [num_op, registradoDesde] : [num_op]);
+  if (!d) return null;
+  // Nunca antes del arranque del motor: una factura vieja no puede mandar el asiento a un mes ya informado
+  const fecha = registradoDesde && d.f < registradoDesde ? registradoDesde : d.f;
+  return { tipo: Number(d.es_boleta) ? 'BOLETA' : 'FACTURA', fecha };
 }
 
 /* Constituye la provisión de comisión dealer de UN crédito otorgado. Idempotente. Devuelve la fila o null (con motivo). */
@@ -148,27 +152,44 @@ async function constituirDealer(idCredito, usuario = 'Motor provisiones') {
 }
 
 /* Libera (reversa íntegra) la provisión CONSTITUIDA de un crédito. motivo: FACTURA | BOLETA | ANULACION | MANUAL */
-async function liberarDealer(idCredito, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones') {
+/* Libera UNA fila de provisión dealer (del motor: origen CREDITO, o del detalle AVSOFT del contador:
+   origen AVSOFT, cargado el 24-09-2026 sin asiento porque ya vivía en la cuenta). Ref idempotente por fila. */
+async function _liberarFilaDealer(p, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones') {
   const C = CONCEPTOS.DEALER;
   try {
-    const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto='DEALER' AND origen_tipo='CREDITO' AND origen_id=? AND estado='CONSTITUIDA'", [idCredito]);
-    if (!p) return { skip: 'sin provisión constituida' };
     const fecha = await fechaContable(fechaISO || hoyISO());
     const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'", [motivo, fecha, p.id]);
     if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
+    const ref = p.origen_tipo === 'CREDITO' ? `PROV-DEALER-${p.origen_id}-LIB` : `PROV-DEALER-${p.origen_tipo}-${p.origen_id}-LIB`;
     const id = await contabilizar({
-      evento: C.reglaLib, fecha, ref: `PROV-DEALER-${idCredito}-LIB`, montos: { monto: Number(p.monto) },
-      glosa: `Liberación provisión comisión dealer OP ${p.num_op || idCredito} — ${p.tercero || ''} (${motivo.toLowerCase()})`.slice(0, 300),
+      evento: C.reglaLib, fecha, ref, montos: { monto: Number(p.monto) },
+      glosa: `Liberación provisión comisión dealer OP ${p.num_op || p.origen_id} — ${p.tercero || ''} (${motivo.toLowerCase()}${p.origen_tipo === 'AVSOFT' ? ', provisión AVSOFT' : ''})`.slice(0, 300),
       num_op: p.num_op || null, rut: p.rut_tercero || null,
-      detalle: `OP ${p.num_op || idCredito} · ${p.tercero || 'dealer'} · ${motivo} · por ${usuario}`,
+      detalle: `OP ${p.num_op || p.origen_id} · ${p.tercero || 'dealer'} · ${motivo} · ${p.origen_tipo === 'AVSOFT' ? 'provisionada en AVSOFT ' + p.mes + ' · ' : ''}por ${usuario}`,
     });
     await pool.query('UPDATE ctb_provisiones SET id_comprobante_liberacion=? WHERE id=?', [id, p.id]);
     return { id: p.id, monto: Number(p.monto), id_comprobante: id };
-  } catch (e) { console.error('[provisiones liberarDealer]', idCredito, e.message); return { error: e.message }; }
+  } catch (e) { console.error('[provisiones liberarDealer]', p.id, e.message); return { error: e.message }; }
+}
+/* Libera (reversa íntegra) la provisión CONSTITUIDA de un crédito: la del motor y, si existe, la de AVSOFT amarrada a su OP */
+async function liberarDealer(idCredito, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones') {
+  const [[c]] = await pool.query('SELECT num_op FROM creditos WHERE id=?', [idCredito]);
+  const [filas] = await pool.query(
+    `SELECT * FROM ctb_provisiones WHERE concepto='DEALER' AND estado='CONSTITUIDA'
+       AND ((origen_tipo='CREDITO' AND origen_id=?) OR (origen_tipo='AVSOFT' AND num_op IS NOT NULL AND num_op=?))`, [idCredito, c ? c.num_op : null]);
+  if (!filas.length) return { skip: 'sin provisión constituida' };
+  let out = null;
+  for (const p of filas) { const r = await _liberarFilaDealer(p, motivo, fechaISO, usuario); if (r && r.id) out = out ? { ...out, monto: out.monto + r.monto, n: (out.n || 1) + 1 } : r; }
+  return out || { skip: 'nada liberado' };
 }
 async function liberarDealerPorNumOp(num_op, motivo, fechaISO, usuario) {
   const [[c]] = await pool.query('SELECT id FROM creditos WHERE num_op=? LIMIT 1', [num_op]);
   return c ? liberarDealer(c.id, motivo, fechaISO, usuario) : { skip: 'sin crédito' };
+}
+async function liberarFilaPorId(idFila, motivo, fechaISO, usuario) {
+  const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE id=? AND estado='CONSTITUIDA'", [idFila]);
+  if (!p) return { skip: 'sin provisión constituida' };
+  return p.concepto === 'PARQUE' ? liberarParque(p.origen_id, motivo, fechaISO, usuario) : _liberarFilaDealer(p, motivo, fechaISO, usuario);
 }
 
 /* Red de seguridad: constituye lo otorgado sin provisión y libera lo facturado o anulado. */
@@ -181,13 +202,17 @@ async function sincronizarDealer(usuario = 'Motor provisiones') {
      WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND COALESCE(c.comdea_real,0)>0
        AND DATE_FORMAT(COALESCE(c.mes, c.fecha_otorgado),'%Y-%m') >= ? AND p.id IS NULL`, [desde]);
   for (const r of pend) { const x = await constituirDealer(r.id, usuario); if (x && x.id && !x.skip) out.constituidas++; else out.omitidas++; }
+  // Del motor: se liberan por documento o por anulación. De AVSOFT (contador): SOLO por documento —
+  // el estado de un crédito antiguo no dice si su comisión se pagó o no.
   const [abiertas] = await pool.query(
-    `SELECT p.origen_id id, p.num_op, UPPER(COALESCE(c.estado_credito,'')) est FROM ctb_provisiones p
-      JOIN creditos c ON c.id=p.origen_id WHERE p.concepto='DEALER' AND p.estado='CONSTITUIDA'`);
+    `SELECT p.*, UPPER(COALESCE(c.estado_credito,'')) est FROM ctb_provisiones p
+      LEFT JOIN creditos c ON c.id = CASE WHEN p.origen_tipo='CREDITO' THEN p.origen_id END
+     WHERE p.concepto='DEALER' AND p.estado='CONSTITUIDA' AND (p.origen_tipo='CREDITO' OR p.num_op IS NOT NULL)`);
   for (const p of abiertas) {
-    if (p.est !== 'OTORGADO') { const x = await liberarDealer(p.id, 'ANULACION', null, usuario); if (x && x.id) out.liberadas++; continue; }
-    const d = await documentoDealer(p.num_op);
-    if (d) { const x = await liberarDealer(p.id, d.tipo, d.fecha, usuario); if (x && x.id) out.liberadas++; }
+    if (p.origen_tipo === 'CREDITO' && p.est !== 'OTORGADO') { const x = await _liberarFilaDealer(p, 'ANULACION', null, usuario); if (x && x.id) out.liberadas++; continue; }
+    // AVSOFT: solo documentos registrados desde que el motor manda (los anteriores ya los rebajó el contador o son parte de su diferencia)
+    const d = await documentoDealer(p.num_op, p.origen_tipo === 'AVSOFT' ? `${desde}-01` : null);
+    if (d) { const x = await _liberarFilaDealer(p, d.tipo, d.fecha, usuario); if (x && x.id) out.liberadas++; }
   }
   return out;
 }
@@ -309,9 +334,12 @@ async function cuadro(mes, concepto = 'DEALER') {
   const [[con]] = await pool.query("SELECT COALESCE(SUM(monto),0) m, COUNT(*) n FROM ctb_provisiones WHERE concepto=? AND DATE_FORMAT(fecha_constitucion,'%Y-%m')=?", [concepto, mes]);
   const [[lib]] = await pool.query("SELECT COALESCE(SUM(monto),0) m, COUNT(*) n FROM ctb_provisiones WHERE concepto=? AND estado='LIBERADA' AND DATE_FORMAT(fecha_liberacion,'%Y-%m')=?", [concepto, mes]);
   const [[sf]] = await pool.query(
-    `SELECT COALESCE(SUM(monto),0) m, COUNT(*) n FROM ctb_provisiones
+    `SELECT COALESCE(SUM(monto),0) m, COUNT(*) n,
+            COALESCE(SUM(CASE WHEN origen_tipo='AVSOFT' THEN monto END),0) av, SUM(origen_tipo='AVSOFT') nav
+       FROM ctb_provisiones
       WHERE concepto=? AND DATE_FORMAT(fecha_constitucion,'%Y-%m') <= ? AND (estado='CONSTITUIDA' OR DATE_FORMAT(fecha_liberacion,'%Y-%m') > ?)`, [concepto, mes, mes]);
-  const motor_vigente = Number(sf.m), saldo_historico = saldo_final - motor_vigente;
+  // motor_vigente incluye el detalle AVSOFT cargado (24-09-2026); la diferencia contra la cuenta es lo que el contador debe conciliar
+  const motor_vigente = Number(sf.m), avsoft_vigente = Number(sf.av), avsoft_n = Number(sf.nav) || 0, saldo_historico = saldo_final - motor_vigente;
   const [pendientes] = await pool.query(
     `SELECT p.*, DATEDIFF(CURDATE(), p.fecha_constitucion) dias FROM ctb_provisiones p
       WHERE p.concepto=? AND p.estado='CONSTITUIDA' ORDER BY p.fecha_constitucion, p.id`, [concepto]);
@@ -320,7 +348,7 @@ async function cuadro(mes, concepto = 'DEALER') {
   return { mes, concepto, nombre: CONCEPTOS[concepto].nombre, cuenta_provision: cta, cuenta_gasto: CONCEPTOS[concepto].cuentaGasto,
     saldo_inicial, constituido, n_constituido: mv.nh, liberado, n_liberado: mv.nd, saldo_final,
     motor_constituido: Number(con.m), motor_n_constituido: con.n, motor_liberado: Number(lib.m), motor_n_liberado: lib.n,
-    motor_vigente, motor_n_vigente: sf.n, saldo_historico, pendientes, movimientos: movs, desde };
+    motor_vigente, motor_n_vigente: sf.n, avsoft_vigente, avsoft_n, saldo_historico, pendientes, movimientos: movs, desde };
 }
 
 const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque };
@@ -338,5 +366,5 @@ async function tick() {
 }
 require('../../../shared/scheduler.js').programar('provisiones-devengo', tick, 6 * 60 * 60 * 1000, { arranqueMs: 3 * 60 * 1000 });
 
-module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constituirDealer, liberarDealer, liberarDealerPorNumOp, sincronizarDealer,
+module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constituirDealer, liberarDealer, liberarDealerPorNumOp, liberarFilaPorId, sincronizarDealer,
   constituirParque, liberarParque, liberarParquePorPago, sincronizarParque, cuadro };
