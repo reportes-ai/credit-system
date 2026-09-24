@@ -135,14 +135,14 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
       }
     } catch (e) { console.error('[provisiones parche sueldos]', e.message); }
   }
-  // Card en Contabilidad (mismos perfiles que Libros Legales: Administrador + contabilidad/tesorería)
+  // Card en Contabilidad: Administrador, Finanzas (Analista Financiero, Gerente de Finanzas), Gerente General y Gerente de Operaciones y Crédito (Pato, 24-09-2026)
   const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_provisiones' LIMIT 1");
   let idf = ex?.id_funcionalidad;
   if (!idf) {
     const [r] = await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003,'Provisiones por Devengo','ctb_provisiones','/contabilidad/provisiones/','bi-hourglass-split')");
     idf = r.insertId;
   }
-  for (const idp of [1, 90003, 90007, 90009])
+  for (const idp of [1, 90003, 90007, 90008, 90009])
     await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
 });
 
