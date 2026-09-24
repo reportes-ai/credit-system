@@ -5610,10 +5610,10 @@ function buildColocMensual(vista) {
   lista.forEach(([, mm]) => meses.forEach(m => { if (mm[m]) { totMes[m].n += mm[m].n; totMes[m].monto += mm[m].monto; } }));
 
   const FILTROS = [['todo','Todo'],['u3','Últimos 3 meses'],['u6','Últimos 6 meses'],['u12','Últimos 12 meses'],['2026','2026'],['2025','2025']];
-  const botones = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;background:#12213f;padding:8px 12px;border-radius:8px">
+  const botones = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;background:linear-gradient(90deg,#012d70,#0255c5);padding:8px 12px">
     ${FILTROS.map(([f, lbl]) => `<button onclick="setColocFiltro('${vista}','${f}')"
       style="border:1px solid ${f === filtro ? '#4fc3f7' : '#2a4070'};background:${f === filtro ? '#4fc3f7' : '#fff'};color:${f === filtro ? '#12213f' : '#33507e'};border-radius:16px;padding:4px 14px;font-size:11.5px;font-weight:700;cursor:pointer">${lbl}</button>`).join('')}
-    ${esDealers ? `<span style="border-left:1px solid #2a4070;margin:0 4px"></span><span style="font-size:11px;color:#8fb4dd;align-self:center">Categoría:</span>
+    ${esDealers ? `<span style="border-left:1px solid rgba(255,255,255,.35);margin:0 4px"></span><span style="font-size:11px;color:#fff;align-self:center">Categoría:</span>
     <button onclick="togColocCat(null)" style="border:1px solid ${!catSel ? '#4fc3f7' : '#2a4070'};background:${!catSel ? '#4fc3f7' : '#fff'};color:${!catSel ? '#12213f' : '#33507e'};border-radius:16px;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer">Todas</button>
     ${[['SP','SP · Super Partner','#b45309'],['P','P · Partner','#0d2f6b'],['S','S · Socio','#64748b'],['—','Sin categoría','#94a3b8']].map(([c, lbl, col]) => `<button onclick="togColocCat('${c}')" title="Ver solo esta categoría (pincha de nuevo para ver todas)"
       style="border:1px solid ${catSel === c ? col : '#c6d3e8'};background:${catSel === c ? col : '#fff'};color:${catSel === c ? '#fff' : col};border-radius:16px;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer">${lbl}</button>`).join('')}` : ''}
