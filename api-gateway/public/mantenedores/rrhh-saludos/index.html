@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saludos y Certificados RRHH — Mantenedores</title>
-  <!-- v1.7 — los datos de la empresa del finiquito pasan a Datos de la Empresa; certificado con {empresa} {rut_empresa}. v1.6 — Finiquito: el firmante se elige en cada finiquito; el representante del mantenedor es respaldo. v1.5 — card Finiquito: texto legal completo (encabezado, cláusulas 1ª-6ª, pie), datos de la empresa y anexo de cálculo. v1.4 navbar migrada al componente topnav -->
+  <!-- v1.8 — card Avisos de prelación de descuentos (plantillas a la Caja y al trabajador). v1.7 — los datos de la empresa del finiquito pasan a Datos de la Empresa; certificado con {empresa} {rut_empresa}. v1.6 — Finiquito: el firmante se elige en cada finiquito; el representante del mantenedor es respaldo. v1.5 — card Finiquito: texto legal completo (encabezado, cláusulas 1ª-6ª, pie), datos de la empresa y anexo de cálculo. v1.4 navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -96,6 +96,13 @@
     <div class="switch-row"><input type="checkbox" id="finiq_anexo" class="form-check-input"> Imprimir hoja adicional "Anexo — detalle del cálculo" (fuente de la base, meses, topes, años, feriado, préstamos)</div>
   </div>
 
+  <div class="card-box">
+    <h5><i class="bi bi-envelope-exclamation"></i> Avisos de prelación de descuentos</h5>
+    <p style="font-size:.78rem;color:#64748b;margin:0 0 12px">Cuando la liquidación no puede descontar una cuota completa por el orden de prelación legal (legales → pensión de alimentos → Caja → empresa, topes del art. 58 CT y Ley 14.908), <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a> lo marca en rojo y ofrece descargar este aviso. Variables: <code>{empresa}</code> <code>{rut_empresa}</code> <code>{representante}</code> <code>{ciudad}</code> <code>{trabajador}</code> <code>{rut}</code> <code>{mes}</code> <code>{fecha}</code> <code>{concepto}</code> <code>{cuota}</code> <code>{retenido}</code> <code>{no_retenido}</code> <code>{motivo}</code> <code>{acreedor}</code>.</p>
+    <div class="fld"><label>Aviso a la Caja de Compensación (sin capacidad de descuento — paga directo por caja)</label><textarea id="aviso_prelacion_caja" rows="9"></textarea></div>
+    <div class="fld"><label>Aviso al trabajador (préstamo de la empresa u otro voluntario — reprogramar)</label><textarea id="aviso_prelacion_empresa" rows="9"></textarea></div>
+  </div>
+
   <div style="text-align:right;margin-bottom:22px"><button class="btn-navy" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar cambios</button></div>
 
   <div class="afecta">
@@ -105,6 +112,7 @@
       <li><b>Aviso a compañeros</b> → <b>banner superior</b> (mismo formato del anuncio de créditos nuevos) al conectarse cada usuario, 1 vez al día por cumpleañero.</li>
       <li><b>Ventana de próximos cumpleaños</b> → sección <b>Cumpleaños</b> del panel <a href="/mi-dia/">Mi Día</a> (mismos datos del popup: <code>usuarios.fecha_nacimiento</code>, sin los ocultos en la ficha).</li>
       <li><b>Mínimo de meses y cooldown</b> → regulan el botón "Emitir mi certificado ahora" en <a href="/recursos-humanos/antiguedad/">Certificado de Antigüedad</a>.</li>
+      <li><b>Avisos de prelación de descuentos</b> → texto .txt que descarga el botón <b>Aviso a la Caja / al trabajador</b> en <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a> cuando una cuota no cabe en la liquidación por el orden legal (legales → pensión → Caja → empresa; topes en <a href="/mantenedores/remuneraciones/">Indicadores de Remuneraciones</a>). Cada descarga queda auditada.</li>
       <li><b>Cuerpo/cierre del certificado</b> → texto del PDF con QR verificable en <a href="/verificar/">/verificar</a> (fecha de ingreso y cargo se editan en <a href="/usuarios/">Usuarios</a>).</li>
       <li><b>Texto del finiquito y anexo de cálculo</b> (los datos de la empresa viven en <a href="/mantenedores/empresa/">Datos de la Empresa</a>) → documento que imprimen <b>Vista previa</b> e <b>Imprimir y cerrar</b> en <a href="/recursos-humanos/contratos/">Contratos → Finiquitos</a> (los montos salen del motor: base según liquidaciones o Libro de Remuneraciones AVSOFT, topes de <code>rh_config</code>; la causal, de <code>rh_finiquito_causales</code>). Un finiquito ya cerrado no cambia aunque se edite el texto después.</li>
     </ul>
@@ -119,7 +127,7 @@
   const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
   const CAMPOS=['cumple_popup_activo','cumple_musica','cumple_campana_activo','finiq_anexo'];
   const TEXTOS=['cumple_titulo','cumple_linea1','cumple_linea2','cumple_aviso_titulo','cumple_aviso_msg','cumple_aviso_tarde','cumple_dias_tope','cumple_midia_dias','cumple_banner_dur','cumple_banner_sonido','cert_min_meses','cert_cooldown_dias','cert_cuerpo','cert_cierre',
-    'finiq_encabezado','finiq_c1','finiq_c2','finiq_c3','finiq_c4','finiq_c5','finiq_c6','finiq_pie'];
+    'finiq_encabezado','finiq_c1','finiq_c2','finiq_c3','finiq_c4','finiq_c5','finiq_c6','finiq_pie','aviso_prelacion_caja','aviso_prelacion_empresa'];
   async function cargar(){
     const j=await(await fetch('/api/rrhh/config',{headers:H})).json(); const c=j.data||{};
     CAMPOS.forEach(k=>{ const el=document.getElementById(k); if(el) el.checked=c[k]==='1'; });

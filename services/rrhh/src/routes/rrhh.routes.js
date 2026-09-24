@@ -228,6 +228,8 @@ router.put('/remuneraciones/adicionales/ficha-asignacion', verifyToken, requireF
 router.put('/remuneraciones/adicionales/conceptos/proporcional', verifyToken, requireFunc('rh_remuneraciones'), rem.proporcionalConceptoAdic);   // casilla 30avos por concepto
 router.post('/remuneraciones/descuentos/conceptos',  verifyToken, requireFunc('rh_remuneraciones'), rem.crearConceptoDesc);
 router.get('/remuneraciones/descuentos',         verifyToken, requireFunc('rh_remuneraciones'), rem.getDescuentos);
+router.get('/remuneraciones/descuentos/prelacion', verifyToken, requireFunc('rh_remuneraciones'), rem.prelacionDescuentos);   // qué no cabe en la liquidación (prelación legal)
+router.get('/remuneraciones/descuentos/:id/aviso-prelacion', verifyToken, requireFunc('rh_remuneraciones'), rem.avisoPrelacion);   // .txt aviso al acreedor / trabajador
 router.post('/remuneraciones/descuentos',        verifyToken, requireFunc('rh_remuneraciones'), rem.crearDescuento);
 router.post('/remuneraciones/descuentos/importar-caja', verifyToken, requireFunc('rh_remuneraciones'), rem.importarNominaCaja);   // nómina de retenciones de la Caja (Excel)
 router.post('/remuneraciones/descuentos/:id/convenio', verifyToken, requireFunc('rh_remuneraciones'), rem.subirConvenioDescuento);

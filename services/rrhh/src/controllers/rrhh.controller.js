@@ -515,7 +515,7 @@ require('../../../../shared/migrate').migrar('rrhh-cert-empresa-variables', asyn
 
 /* ════════════ CONFIG RRHH (rh_config) ════════════ */
 async function getConfig() {
-  const [rows] = await pool.query('SELECT clave, valor FROM rh_config LIMIT 100');
+  const [rows] = await pool.query('SELECT clave, valor FROM rh_config LIMIT 500');   // 100 dejaba fuera claves nuevas (aviso_prelacion_*, 24-09-2026)
   const cfg = {}; rows.forEach(r => cfg[r.clave] = r.valor);
   // Razón social, RUT, ciudad y representante del finiquito: FUENTE ÚNICA Datos de la Empresa (ya no se editan en rh_config)
   try {
@@ -556,7 +556,9 @@ const setConfigApi = async (req, res) => {
     const b = req.body || {};
     const PERMITIDAS = ['cert_min_meses', 'cert_cooldown_dias', 'cert_cuerpo', 'cert_cierre', 'cumple_popup_activo', 'cumple_campana_activo', 'cumple_musica', 'cumple_titulo', 'cumple_linea1', 'cumple_linea2', 'cumple_aviso_titulo', 'cumple_aviso_msg', 'cumple_aviso_tarde', 'cumple_dias_tope', 'cumple_midia_dias', 'cumple_banner_dur', 'cumple_banner_sonido',
       // Texto del finiquito (mantenedor Saludos y Certificados RRHH → card Finiquito)
-      'finiq_encabezado', 'finiq_c1', 'finiq_c2', 'finiq_c3', 'finiq_c4', 'finiq_c5', 'finiq_c6', 'finiq_pie', 'finiq_anexo'];
+      'finiq_encabezado', 'finiq_c1', 'finiq_c2', 'finiq_c3', 'finiq_c4', 'finiq_c5', 'finiq_c6', 'finiq_pie', 'finiq_anexo',
+      // Avisos de prelación de descuentos (24-09-2026): a la Caja / al trabajador cuando la cuota no cabe en la liquidación
+      'aviso_prelacion_caja', 'aviso_prelacion_empresa'];
     for (const [k, v] of Object.entries(b)) {
       if (!PERMITIDAS.includes(k)) continue;
       await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(v == null ? '' : v)]);

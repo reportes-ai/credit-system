@@ -99,6 +99,13 @@ require('../../../../shared/migrate').enFila('rrhh-remuneraciones', async () => 
       ('rem_dcto_vivienda', 'APV'),
       ('rem_dcto_caja', 'CAJA LOS ANDES'),
       ('rem_tope_pension_base', 'LIQUIDO')`);
+    /* Avisos de prelación (texto descargable; editables en Saludos y Certificados RRHH). Variables:
+       {empresa} {rut_empresa} {representante} {ciudad} {trabajador} {rut} {mes} {fecha} {concepto}
+       {cuota} {retenido} {no_retenido} {motivo} {acreedor} */
+    await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES
+      ('aviso_prelacion_caja', ?), ('aviso_prelacion_empresa', ?)`, [
+      `{ciudad}, {fecha}\n\nSeñores\n{acreedor}\nPresente\n\nRef.: Capacidad de descuento por planilla — {trabajador}, RUT {rut}\n\nDe nuestra consideración:\n\nComunicamos a ustedes que, en la remuneración de {mes}, {empresa}, RUT {rut_empresa}, no pudo retener íntegramente por planilla la cuota de {concepto} de nuestro trabajador {trabajador}, RUT {rut}.\n\nCuota informada: {cuota}\nMonto retenido: {retenido}\nMonto no retenido: {no_retenido}\nMotivo: {motivo}.\n\nConforme al orden de prelación establecido por la Dirección del Trabajo (descuentos legales, luego retenciones judiciales por pensión de alimentos —Ley 14.908— y después los descuentos convencionales, con los topes del artículo 58 del Código del Trabajo), el trabajador no cuenta con capacidad de descuento suficiente para cubrir la cuota completa. La deuda con ustedes subsiste y el saldo no retenido deberá ser pagado directamente por el trabajador.\n\nSin otro particular, saluda atentamente,\n\n\n{representante}\n{empresa}\nRUT {rut_empresa}`,
+      `{ciudad}, {fecha}\n\nSeñor(a)\n{trabajador}\nRUT {rut}\nPresente\n\nRef.: Reprogramación de {concepto}\n\nEstimado(a) {trabajador}:\n\nLe informamos que en su remuneración de {mes} no fue posible descontar íntegramente la cuota de {concepto}.\n\nCuota pactada: {cuota}\nMonto descontado: {retenido}\nMonto pendiente: {no_retenido}\nMotivo: {motivo}.\n\nDe acuerdo con el orden de prelación de los descuentos (legales, retenciones judiciales por pensión de alimentos y luego los descuentos convencionales, con los topes del artículo 58 del Código del Trabajo), el saldo pendiente no se descuenta este mes. Le pedimos acercarse a Recursos Humanos para reprogramar el pago del saldo en las cuotas siguientes, dentro de los topes legales.\n\nAtentamente,\n\n\n{representante}\n{empresa}\nRUT {rut_empresa}`]);
     // Haberes no imponibles fijos en la ficha
     await pool.query('ALTER TABLE rh_fichas ADD COLUMN colacion DECIMAL(10,0) NULL').catch(() => {});
     await pool.query('ALTER TABLE rh_fichas ADD COLUMN movilizacion DECIMAL(10,0) NULL').catch(() => {});
@@ -2270,15 +2277,18 @@ async function getNominaBanco(req, res) {
    La usa tope-descuento.js como base de los topes legales (Pato, 24-09-2026: la base debe ser la
    liquidación que el descuento va a afectar, no la última emitida ni el sueldo base).
    Devuelve { mes, total_haberes, total_imponible } o null si la persona no entra al libro. */
-async function haberesProyectados(idUsuario) {
-  const mes = await proximaLiquidacion();
+async function haberesProyectados(idUsuario, mesPedido) {
+  const mes = /^\d{4}-\d{2}$/.test(mesPedido || '') ? mesPedido : await proximaLiquidacion();
   const [[emp]] = await pool.query(
     `SELECT u.id_usuario, CONCAT(UPPER(COALESCE(u.nombre,'')), ' ', UPPER(COALESCE(u.apellido,''))) AS nombre_corto,
             u.fecha_ingreso, u.fecha_baja, fi.sueldo_base, fi.afp, fi.salud, fi.tipo_contrato, fi.pensionado, fi.colacion, fi.movilizacion, fi.plan_isapre_uf
        FROM usuarios u JOIN rh_fichas fi ON fi.id_usuario = u.id_usuario WHERE u.id_usuario = ?`, [idUsuario]);
   if (!emp || !(Number(emp.sueldo_base) > 0)) return null;
-  const [[ya]] = await pool.query("SELECT total_haberes, total_imponible FROM rh_liquidaciones WHERE id_usuario=? AND mes=? AND estado='EMITIDA'", [idUsuario, mes]);
-  if (ya) return { mes, total_haberes: Number(ya.total_haberes) || 0, total_imponible: Number(ya.total_imponible) || 0 };
+  const [[ya]] = await pool.query("SELECT total_haberes, total_imponible, detalle FROM rh_liquidaciones WHERE id_usuario=? AND mes=? AND estado='EMITIDA'", [idUsuario, mes]);
+  if (ya) {
+    let calc = {}; try { calc = typeof ya.detalle === 'string' ? JSON.parse(ya.detalle) : (ya.detalle || {}); } catch (_) {}
+    return { mes, total_haberes: Number(ya.total_haberes) || 0, total_imponible: Number(ya.total_imponible) || 0, calc, emitida: true };
+  }
   const ind = await indicadores(mes);
   const comis = await comisionesDelMes(mes);
   const adics = await adicionalesDelMes(mes);
@@ -2303,10 +2313,63 @@ async function haberesProyectados(idUsuario) {
   aplicarGarantiaComision(inp, adics[emp.id_usuario]);
   aplicarLiquidosImponibles(inp, adics[emp.id_usuario], ind);
   const calc = calcLiquidacion(inp, ind);
-  return { mes, total_haberes: Number(calc.total_haberes) || 0, total_imponible: Number(calc.total_imponible) || 0 };
+  return { mes, total_haberes: Number(calc.total_haberes) || 0, total_imponible: Number(calc.total_imponible) || 0, calc, emitida: false };
 }
+
+/* GET /remuneraciones/descuentos/prelacion?mes=YYYY-MM → qué descuentos NO se pueden aplicar (o solo en
+   parte) en la liquidación de ese mes por la prelación legal, por id de descuento (Pato, 24-09-2026:
+   la página de Descuentos lo marca en rojo parpadeante y ofrece el aviso al acreedor). */
+const prelacionDescuentos = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : await proximaLiquidacion();
+    const [us] = await pool.query("SELECT DISTINCT id_usuario FROM rh_descuentos WHERE estado='VIGENTE'");
+    const por_id = {};
+    for (const u of us) {
+      let p = null;
+      try { p = await haberesProyectados(u.id_usuario, mes); } catch (e) { console.error('[prelacion]', u.id_usuario, e.message); }
+      for (const it of (p?.calc?.descuentos_detalle || [])) if (it.id && it.no_descontado > 0)
+        por_id[it.id] = { id_usuario: u.id_usuario, cuota: it.cuota_original, descontado: it.monto, no_descontado: it.no_descontado, motivo: it.motivo, categoria: it.categoria, emitida: !!p.emitida };
+    }
+    ok(res, { mes, por_id });
+  } catch (e) { console.error('[rrhh prelacionDescuentos]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* GET /remuneraciones/descuentos/:id/aviso-prelacion?mes= → texto del aviso al acreedor (Caja) o al
+   trabajador (préstamo de la empresa), armado desde las plantillas aviso_prelacion_* de rh_config
+   (editables en Mantenedores → Saludos y Certificados RRHH). Se descarga como .txt. */
+const avisoPrelacion = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [[d]] = await pool.query(
+      `SELECT d.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut FROM rh_descuentos d JOIN usuarios u ON u.id_usuario=d.id_usuario WHERE d.id=?`, [id]);
+    if (!d) return fail(res, 'Descuento no existe', 404);
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : await proximaLiquidacion();
+    const p = await haberesProyectados(d.id_usuario, mes);
+    const it = (p?.calc?.descuentos_detalle || []).find(x => x.id === id);
+    if (!it || !(it.no_descontado > 0)) return fail(res, 'Este descuento se aplica completo en ' + mes + ': no hay aviso que emitir', 400);
+    const [cfg] = await pool.query("SELECT clave, valor FROM rh_config WHERE clave IN ('aviso_prelacion_caja','aviso_prelacion_empresa')");
+    const T = {}; cfg.forEach(r => T[r.clave] = r.valor);
+    const e = await require('../../../../shared/empresa').datosEmpresa();
+    const { fmtRut } = require('../../../../shared/empresa');
+    const co = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
+    const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const mesTxt = `${MESES[Number(mes.slice(5, 7)) - 1]} de ${mes.slice(0, 4)}`;
+    const hoy = new Date(); const fecha = `${hoy.getDate()} de ${MESES[hoy.getMonth()]} de ${hoy.getFullYear()}`;
+    const esCaja = it.categoria === 'CAJA';
+    const vars = { empresa: e.razon_social || '', rut_empresa: e.rut_formateado || '', representante: e.representante || '', ciudad: e.ciudad || 'Santiago',
+      trabajador: d.nombre, rut: fmtRut ? fmtRut(d.rut) : d.rut, mes: mesTxt, fecha, concepto: it.glosa,
+      cuota: co(it.cuota_original), retenido: co(it.monto), no_retenido: co(it.no_descontado), motivo: it.motivo,
+      acreedor: esCaja ? (d.subtipo || 'Caja de Compensación') : (e.razon_social || '') };
+    const plantilla = String(T[esCaja ? 'aviso_prelacion_caja' : 'aviso_prelacion_empresa'] || '');
+    const texto = plantilla.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="aviso-${esCaja ? 'caja' : 'trabajador'}-${String(d.nombre).replace(/\s+/g, '_')}-${mes}.txt"`);
+    auditar({ req, accion: 'DESCARGAR', modulo: 'rrhh', entidad: 'rh_descuentos', entidad_id: id, detalle: `Aviso de prelación (${esCaja ? 'Caja' : 'trabajador'}) ${d.nombre} ${mes}: ${co(it.no_descontado)} no descontado` });
+    res.send(texto);
+  } catch (e) { console.error('[rrhh avisoPrelacion]', e.message); fail(res, 'Error interno del servidor'); }
+};
 
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic, editarAdicional, asignacionFicha,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
-  permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion, haberesProyectados,
+  permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion, haberesProyectados, prelacionDescuentos, avisoPrelacion,
   getDescuentos, crearDescuento, anularDescuento, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };

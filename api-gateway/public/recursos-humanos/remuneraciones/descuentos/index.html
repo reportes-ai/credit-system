@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.16 — orden de prelación legal en la liquidación. v1.15 — topes sobre la liquidación por emitir. v1.14 — topes legales al guardar (15/30/45% art. 58, 50% pensión Ley 14.908) desde el mantenedor de Indicadores. v1.13 — convenio de descuento con razón social y RUT desde Datos de la Empresa. v1.12 — tipo Descuentos varios (glosa libre obligatoria, N cuotas). v1.11 — la nómina Caja muestra CUOTA 49 de 60 (no PERMANENTE) · v1.10 — numeración REAL de la cuota (cuota_desde/cuotas_total): un plan que venía andando muestra "cuota 3 de 4" y no "2 de 3"; la nómina Caja la toma de "17/27" · v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
+  <!-- v1.17 — cuota que no cabe por la prelación: aviso rojo parpadeante «No se puede descontar: supera el XX%» + botón Aviso a la Caja / al trabajador (.txt). v1.16 — orden de prelación legal en la liquidación. v1.15 — topes sobre la liquidación por emitir. v1.14 — topes legales al guardar (15/30/45% art. 58, 50% pensión Ley 14.908) desde el mantenedor de Indicadores. v1.13 — convenio de descuento con razón social y RUT desde Datos de la Empresa. v1.12 — tipo Descuentos varios (glosa libre obligatoria, N cuotas). v1.11 — la nómina Caja muestra CUOTA 49 de 60 (no PERMANENTE) · v1.10 — numeración REAL de la cuota (cuota_desde/cuotas_total): un plan que venía andando muestra "cuota 3 de 4" y no "2 de 3"; la nómina Caja la toma de "17/27" · v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -28,6 +28,9 @@
     .card-kpi .v { font-family:Consolas,monospace; font-weight:800; font-size:1.1rem; color:var(--navy); }
     .card-kpi .l { font-size:.7rem; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
     .preview { background:#eff6ff; border-left:4px solid var(--navy); border-radius:8px; padding:10px 14px; font-size:.85rem; }
+    /* Prelación legal: la cuota no cabe en la liquidación → aviso rojo parpadeante (Pato, 24-09-2026) */
+    .parpadea { color:#dc2626; font-weight:800; font-size:.78rem; animation:parpadeo 1.1s step-start infinite; }
+    @keyframes parpadeo { 50% { opacity:0; } }
   </style>
 </head>
 <body>
@@ -270,7 +273,27 @@ async function cargar(){
   }
   document.getElementById('lblTmc').textContent = D.tmc!=null ? `(TMC ${String(D.tmc).replace('.',',')}%)` : '';
   document.getElementById('lblBloq').innerHTML = D.bloqueado ? '<span class="pill ANULADO"><i class="bi bi-lock-fill"></i> MES EMITIDO</span>' : '';
+  await cargarPrelacion();
   render(); preview();
+}
+
+/* Prelación legal del mes: qué descuentos NO caben (o solo en parte) en la liquidación por emitir.
+   Se marca en rojo parpadeante en la lista y se ofrece el aviso al acreedor (.txt). */
+let PREL = {};
+async function cargarPrelacion(){
+  PREL = {};
+  try {
+    const j = await (await fetch('/api/rrhh/remuneraciones/descuentos/prelacion?mes=' + encodeURIComponent(D.mes), { headers:{ Authorization:'Bearer ' + token } })).json();
+    if (j.success && j.data && j.data.por_id) PREL = j.data.por_id;
+  } catch (e) {}
+}
+async function avisoPrelacion(id){
+  const r = await fetch('/api/rrhh/remuneraciones/descuentos/' + id + '/aviso-prelacion?mes=' + encodeURIComponent(D.mes), { headers:{ Authorization:'Bearer ' + token } });
+  if (!r.ok) { let m = 'No se pudo generar el aviso'; try { m = (await r.json()).error || m; } catch (e) {} return alert(m); }
+  const blob = await r.blob();
+  const cd = r.headers.get('Content-Disposition') || ''; const mm = /filename="([^"]+)"/.exec(cd);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = mm ? mm[1] : 'aviso-prelacion.txt'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
 const tipoTxt = d => d.tipo==='PAGO_EXCESO' ? `Pago en exceso ${d.mes_referencia||''}` : d.tipo==='VARIOS' ? 'Varios' : d.tipo==='PERMANENTE' ? `Permanente · ${d.subtipo||''}` : d.tipo==='ANTICIPO' ? 'Anticipo' : 'Préstamo';
@@ -278,6 +301,8 @@ const MESES_TX=['','ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGO
 const mesTxt = m => (MESES_TX[Number(String(m).slice(5,7))]||m);
 /* Bajo el formulario: los descuentos YA CONSIDERADOS en el mes elegido —
    para verlos antes de ingresar uno nuevo y no duplicar. */
+// "tope 50% de la remuneración líquida para pensión…" → "SUPERA EL 50% DE LA REMUNERACIÓN LÍQUIDA"; sin tope → el motivo tal cual
+const motivoCorto = m => { const x = /tope\s+(\d+)%\s+de\s+la\s+([^(]+?)\s+para/i.exec(m || ''); return x ? `supera el ${x[1]}% de la ${x[2].trim()}` : (m || 'sin capacidad de descuento').replace(/\s*—.*$/, ''); };
 function renderListaIng(){
   const tot = D.del_mes.reduce((s,d)=>s+d.cuota_mes,0);
   document.getElementById('listaIng').innerHTML = D.del_mes.length
@@ -294,6 +319,8 @@ function renderListaIng(){
         : d.cuotas>1
         ? `<span class="pill" style="background:#dbeafe;color:#1e40af">CUOTA ${d.cuota_num} de ${d.cuotas_total||d.cuotas}</span>`
         : `<span class="pill" style="background:#fef3c7;color:#92400e">SOLO ${mesTxt(d.mes_inicio)}</span>`}
+      ${PREL[d.id] ? `<span class="parpadea" title="${esc(PREL[d.id].motivo||'')}"><i class="bi bi-exclamation-triangle-fill"></i> NO SE PUEDE DESCONTAR ${PREL[d.id].descontado>0?'$'+fmt(PREL[d.id].no_descontado)+' DE LA CUOTA':'ESTA CUOTA'}: ${esc(motivoCorto(PREL[d.id].motivo))}</span>
+      <button class="btn btn-sm btn-outline-dark py-0" onclick="avisoPrelacion(${d.id})" title="Descarga el texto del aviso ${PREL[d.id].categoria==='CAJA'?'a la Caja de Compensación (sin capacidad de descuento)':'al trabajador (reprogramar el saldo)'} — plantilla editable en Mantenedores → Saludos y Certificados RRHH"><i class="bi bi-file-earmark-text me-1"></i>Aviso ${PREL[d.id].categoria==='CAJA'?'a la Caja':'al trabajador'}</button>` : ''}
       <span style="margin-left:auto">
         <button class="btn btn-sm btn-outline-danger py-0" onclick="anular(${d.id})" title="${d.tipo==='PERMANENTE'?'Desmarcar: deja de descontarse desde ahora':'Detiene las cuotas futuras'}">${d.tipo==='PERMANENTE'?'Desmarcar':'Anular'}</button>
       </span>
