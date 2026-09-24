@@ -3883,6 +3883,16 @@ function adminSubTab(sec) {
 
 function renderTablaPermisos() {
   const permisos = JSON.parse(sessionStorage.getItem('af_tab_permisos') || '{}');
+  /* Los perfiles de las columnas se leen AQUÍ, no al cargar el script: en una sesión nueva
+     el sessionStorage aún estaba vacío cuando corría el bloque de arranque y la tabla
+     dibujaba los 4 perfiles genéricos de fábrica, que no calzan con ninguno guardado —
+     todo aparecía sin marcar aunque la configuración estaba intacta (Pato, 24-09-2026). */
+  if (Array.isArray(permisos._perfiles) && permisos._perfiles.length) PERFILES_SISTEMA = permisos._perfiles.slice();
+  else {
+    const vistos = new Set(PERFILES_SISTEMA);
+    Object.keys(permisos).filter(k => !k.startsWith('_') && Array.isArray(permisos[k])).forEach(k => permisos[k].forEach(p => vistos.add(p)));
+    PERFILES_SISTEMA = Array.from(vistos);
+  }
   var html = '<thead><tr style="background:#1a3a6a;color:#fff;font-size:11px">' +
     '<th style="padding:10px 8px;text-align:center;width:30px"></th>' +
     '<th style="padding:10px 12px;text-align:left;width:220px">Pestaña</th>';
