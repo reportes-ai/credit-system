@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Provisiones por Devengo — AutoFácil</title>
-  <!-- v1.13 — pop-ups: Tercero, formato por columna (días y comprobantes sin $), Creado por, desglose legible. v1.12 — cuadro con columna Ajustes al motor (no son constituciones ni liberaciones). v1.11 — sueldos + leyes sociales. v1.10 — mensaje de sincronización con ajustes al motor. v1.9 — ejecutivos mensual. v1.8 — concepto SUELDOS. v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
+  <!-- v1.14 — pestaña Resumen por concepto (filtro de mes, totalizado, Excel) + Detalle; días nunca negativos; OP solo en filas por crédito. v1.13 — pop-ups: Tercero, formato por columna (días y comprobantes sin $), Creado por, desglose legible. v1.12 — cuadro con columna Ajustes al motor (no son constituciones ni liberaciones). v1.11 — sueldos + leyes sociales. v1.10 — mensaje de sincronización con ajustes al motor. v1.9 — ejecutivos mensual. v1.8 — concepto SUELDOS. v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -33,6 +33,10 @@
     .tg { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:8px; padding:3px 10px; font-size:.76rem; font-weight:700; }
     .tg.on { background:var(--navy); color:#fff; border-color:var(--navy); }
     #dlgTabla th, #dlgTabla td { white-space:nowrap; }
+    .tab-btn { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:10px; padding:7px 16px; font-size:.84rem; font-weight:700; }
+    .tab-btn.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+    #tblResumen tbody tr { cursor:pointer; } #tblResumen tbody tr:hover { background:#f8fafc; }
+    #tblResumen tfoot td { font-weight:800; background:#f1f5f9; border-top:2px solid #cbd5e1; padding:8px 10px; }
     @media (max-width:900px){ .kpis{ grid-template-columns:repeat(2,1fr);} .kpi[style*='span 6']{grid-column:span 2 !important;} .main-content{padding:16px;} }
   </style>
 </head>
@@ -44,11 +48,30 @@
 <div class="main-content">
   <div class="page-banner"><i class="bi bi-hourglass-split"></i><div><h2>Provisiones por Devengo</h2><p>El gasto se reconoce cuando nace la obligación, no cuando llega el documento. La provisión es el puente: se constituye sola y se libera sola cuando entra el asiento definitivo.</p></div></div>
 
+  <div class="d-flex gap-2 mb-3">
+    <button class="tab-btn on" id="tabResumen" onclick="verTab('resumen')"><i class="bi bi-layers me-1"></i>Resumen por concepto</button>
+    <button class="tab-btn" id="tabDetalle" onclick="verTab('detalle')"><i class="bi bi-list-columns me-1"></i>Detalle por concepto</button>
+  </div>
+
+  <div class="panel" id="paneResumen">
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+      <div><label class="form-label small fw-bold mb-1">Mes</label><input type="month" id="mesR" class="form-control form-control-sm" onchange="cargarResumen()"></div>
+      <div class="ms-auto"><button class="btn btn-sm btn-outline-success py-0" onclick="excelResumen()"><i class="bi bi-file-earmark-excel"></i> Excel</button></div>
+    </div>
+    <div style="overflow:auto"><table id="tblResumen">
+      <thead><tr><th>Concepto</th><th>Cuenta</th><th class="r">Saldo inicial</th><th class="r">Constituido</th><th class="r">Ajustes</th><th class="r">Liberado</th><th class="r">Saldo final</th><th class="r">Vigentes</th><th class="r">Detalle vigente</th><th class="r">Diferencia</th></tr></thead>
+      <tbody id="resBody"><tr><td colspan="10" class="text-center text-muted py-3">Cargando…</td></tr></tbody>
+      <tfoot id="resFoot"></tfoot>
+    </table></div>
+    <div class="small text-muted mt-2">Saldo inicial + constituido ± ajustes − liberado = saldo final (cuenta contable completa). "Detalle vigente" es lo que el motor controla fila por fila; "Diferencia" es lo que hay en la cuenta sin detalle (o al revés), a conciliar. Haz clic en un concepto para ir a su detalle.</div>
+  </div>
+
+  <div id="paneDetalle" style="display:none">
   <div class="panel">
     <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
       <div><label class="form-label small fw-bold mb-1">Concepto</label>
         <select id="concepto" class="form-select form-select-sm" onchange="cargar()"><option value="DEALER">Comisión dealer</option><option value="PARQUE">Comisión y arriendo parque</option><option value="EJECUTIVO">Comisión ejecutivo</option><option value="SUELDOS">Sueldos (libro de remuneraciones)</option></select></div>
-      <div><label class="form-label small fw-bold mb-1">Mes</label><input type="month" id="mes" class="form-control form-control-sm" onchange="cargar()"></div>
+      <div><label class="form-label small fw-bold mb-1">Mes</label><input type="month" id="mes" class="form-control form-control-sm" onchange="document.getElementById('mesR').value=this.value; cargar()"></div>
       <div class="ms-auto d-flex gap-2 align-items-end">
         <button class="btn-navy" id="btnSync" onclick="sincronizar()" title="Constituye lo otorgado sin provisión y libera lo facturado o anulado (el motor lo hace solo cada 6 horas)"><i class="bi bi-arrow-repeat me-1"></i>Sincronizar ahora</button>
         <span id="syncMsg" class="small fw-semibold"></span>
@@ -72,7 +95,7 @@
       </div>
     </div>
     <div style="overflow:auto"><table>
-      <thead><tr><th>OP</th><th id="thTercero">Dealer</th><th>Mes curse</th><th>Constituida</th><th class="r" id="thBase">Bruto</th><th class="r" id="thProv">Provisión (neto)</th><th class="r">Días</th><th>Comprobante</th><th></th></tr></thead>
+      <thead><tr><th>OP</th><th id="thTercero">Dealer</th><th>Mes</th><th>Constituida</th><th class="r" id="thBase">Bruto</th><th class="r" id="thProv">Provisión (neto)</th><th class="r">Días</th><th>Comprobante</th><th></th></tr></thead>
       <tbody id="pendBody"><tr><td colspan="9" class="text-center text-muted py-3">Cargando…</td></tr></tbody>
     </table></div>
   </div>
@@ -80,7 +103,7 @@
   <div class="panel">
     <h6 class="fw-bold mb-2"><i class="bi bi-list-ul me-1"></i>Movimientos del mes (constituidas o liberadas en el mes)</h6>
     <div style="overflow:auto"><table>
-      <thead><tr><th>OP</th><th>Dealer</th><th>Constituida</th><th class="r">Provisión</th><th>Estado</th><th>Liberada</th><th>Motivo</th><th>Liberada contra</th><th>Comprobantes</th></tr></thead>
+      <thead><tr><th>OP</th><th>Tercero</th><th>Constituida</th><th class="r">Provisión</th><th>Estado</th><th>Liberada</th><th>Motivo</th><th>Liberada contra</th><th>Comprobantes</th></tr></thead>
       <tbody id="movBody"><tr><td colspan="9" class="text-center text-muted py-3">—</td></tr></tbody>
     </table></div>
   </div>
@@ -93,6 +116,8 @@
     </div>
     <div style="overflow:auto;max-height:calc(90vh - 60px);padding:0 8px 8px"><table id="dlgTabla"></table></div>
   </dialog>
+
+  </div><!-- /paneDetalle -->
 
   <div class="footer-afecta">
     <h6 class="fw-bold"><i class="bi bi-diagram-3 me-1"></i>Cómo funciona y qué afecta</h6>
@@ -145,7 +170,7 @@ async function cargar(){
   document.getElementById('thProv').textContent = (esParque || concepto === 'EJECUTIVO' || concepto === 'SUELDOS') ? 'Provisión' : 'Provisión (neto)';
   renderPend();
   document.getElementById('movBody').innerHTML = d.movimientos.length ? d.movimientos.map(p => `<tr>
-    <td class="mono">${esc(p.num_op||p.origen_id)}${badgeAv(p)}</td><td>${esc(p.tercero||'—')}</td><td>${fch(p.fecha_constitucion)}</td><td class="r">${clp(p.monto)}</td>
+    <td class="mono">${esc(p.num_op || (p.origen_tipo==='CREDITO' ? p.origen_id : '—'))}${badgeAv(p)}</td><td>${esc(p.tercero||'—')}</td><td>${fch(p.fecha_constitucion)}</td><td class="r">${clp(p.monto)}</td>
     <td><span class="b b-${esc(p.estado)}">${esc(p.estado)}</span></td><td>${fch(p.fecha_liberacion)}</td><td>${esc(p.motivo_liberacion||'—')}</td>
     <td style="white-space:normal;max-width:360px;font-size:.76rem">${esc(p.liberada_contra||'')}</td>
     <td>${comp(p.id_comprobante_constitucion)} ${p.id_comprobante_liberacion ? '→ ' + comp(p.id_comprobante_liberacion) : ''}</td></tr>`).join('')
@@ -162,7 +187,7 @@ function renderPend(){
   document.getElementById('nPend').textContent = `— ${rows.length} · ${clp(rows.reduce((s,p)=>s+Number(p.monto),0))}` + (ANIO ? ` (de ${d.pendientes.length} · ${clp(d.pendientes.reduce((s,p)=>s+Number(p.monto),0))})` : '');
   document.getElementById('pendBody').innerHTML = rows.length ? rows.map(p => `<tr>
     <td class="mono">${esc(p.num_op||'—')}${badgeAv(p)}</td><td>${esc(p.tercero||'—')}</td><td>${esc(p.mes)}</td><td>${fch(p.fecha_constitucion)}</td>
-    <td class="r">${typeof baseTxt(p)==='number' ? clp(baseTxt(p)) : (baseTxt(p)||'—')}</td><td class="r fw-bold">${clp(p.monto)}</td><td class="r ${p.dias>60?'bad':''}">${p.dias}</td><td>${comp(p.id_comprobante_constitucion)}</td>
+    <td class="r">${typeof baseTxt(p)==='number' ? clp(baseTxt(p)) : (baseTxt(p)||'—')}</td><td class="r fw-bold">${clp(p.monto)}</td><td class="r ${p.dias>60?'bad':''}">${p.dias < 0 ? '0' : p.dias}</td><td>${comp(p.id_comprobante_constitucion)}</td>
     <td><button class="btn btn-sm btn-outline-secondary py-0" onclick="liberar(${p.id}, '${esc(p.num_op||p.origen_id)}')" title="Liberar a mano (queda auditado)">Liberar</button></td></tr>`).join('')
     : '<tr><td colspan="9" class="text-center text-muted py-3">No hay provisiones vigentes' + (ANIO ? ' en ' + ANIO : '') + '</td></tr>';
 }
@@ -207,7 +232,40 @@ async function liberar(id, op){
   const j = await fetch(`/api/contabilidad/provisiones/${id}/liberar`, { method:'POST', headers:H, body: JSON.stringify({ motivo }) }).then(r=>r.json());
   if (!j.success) alert(j.error); cargar();
 }
-cargar();
+let RES = null;
+function verTab(t){
+  document.getElementById('paneResumen').style.display = t === 'resumen' ? '' : 'none';
+  document.getElementById('paneDetalle').style.display = t === 'detalle' ? '' : 'none';
+  document.getElementById('tabResumen').classList.toggle('on', t === 'resumen');
+  document.getElementById('tabDetalle').classList.toggle('on', t === 'detalle');
+  try { AF_TOPNAV_HOJA(t === 'resumen' ? 'Resumen por concepto' : 'Detalle por concepto'); } catch(_) {}
+  if (t === 'resumen') cargarResumen(); else cargar();
+}
+function irConcepto(k){ document.getElementById('concepto').value = k; document.getElementById('mes').value = document.getElementById('mesR').value; verTab('detalle'); }
+async function cargarResumen(){
+  const mes = document.getElementById('mesR').value;
+  const j = await fetch('/api/contabilidad/provisiones/resumen?mes=' + mes, { headers:H }).then(r=>r.json());
+  if (!j.success) { document.getElementById('resBody').innerHTML = '<tr><td colspan="10" class="bad">' + esc(j.error) + '</td></tr>'; return; }
+  RES = j.data.filas;
+  const sg = n => n < 0 ? '<span class="bad">' + clp(n) + '</span>' : clp(n);
+  document.getElementById('resBody').innerHTML = RES.map(c => '<tr onclick="irConcepto(\'' + c.concepto + '\')" title="Ver detalle">' +
+    '<td><b>' + esc(c.nombre) + '</b><div class="small text-muted">gasto ' + esc(c.cuenta_gasto) + '</div></td><td class="mono">' + esc(c.cuenta_provision) + '</td>' +
+    '<td class="r">' + clp(c.saldo_inicial) + '</td><td class="r">' + clp(c.constituido) + '<div class="small text-muted">' + c.n_constituido + '</div></td>' +
+    '<td class="r">' + sg(c.ajustes) + '</td><td class="r">' + clp(c.liberado) + '<div class="small text-muted">' + c.n_liberado + '</div></td>' +
+    '<td class="r fw-bold">' + clp(c.saldo_final) + '</td><td class="r">' + c.motor_n_vigente + '</td><td class="r">' + clp(c.motor_vigente) + '</td>' +
+    '<td class="r">' + (Math.abs(c.saldo_historico) >= 1 ? '<span class="bad">' + clp(c.saldo_historico) + '</span>' : '<span class="ok">$0</span>') + '</td></tr>').join('');
+  const T = k => RES.reduce((s, c) => s + Number(c[k] || 0), 0);
+  document.getElementById('resFoot').innerHTML = '<tr><td colspan="2">TOTAL</td><td class="r">' + clp(T('saldo_inicial')) + '</td><td class="r">' + clp(T('constituido')) + '</td><td class="r">' + sg(T('ajustes')) + '</td><td class="r">' + clp(T('liberado')) + '</td><td class="r">' + clp(T('saldo_final')) + '</td><td class="r">' + T('motor_n_vigente') + '</td><td class="r">' + clp(T('motor_vigente')) + '</td><td class="r">' + sg(T('saldo_historico')) + '</td></tr>';
+}
+function excelResumen(){
+  if (!RES) return;
+  const cols = [['nombre','Concepto'],['cuenta_provision','Cuenta provisión'],['cuenta_gasto','Cuenta gasto'],['saldo_inicial','Saldo inicial',null,'clp'],['constituido','Constituido',null,'clp'],['n_constituido','N° constituidos',null,'int'],['ajustes','Ajustes',null,'clp'],['liberado','Liberado',null,'clp'],['n_liberado','N° liberados',null,'int'],['saldo_final','Saldo final',null,'clp'],['motor_n_vigente','Vigentes',null,'int'],['motor_vigente','Detalle vigente',null,'clp'],['saldo_historico','Diferencia',null,'clp']];
+  const T = k => RES.reduce((s, c) => s + Number(c[k] || 0), 0);
+  const tot = { nombre: 'TOTAL', cuenta_provision: '', cuenta_gasto: '' }; for (const c of cols.slice(3)) tot[c[0]] = T(c[0]);
+  aExcel([...RES, tot], cols, 'provisiones-resumen-' + document.getElementById('mesR').value);
+}
+document.getElementById('mesR').value = document.getElementById('mes').value;
+verTab('resumen');
 </script>
 </body>
 </html>

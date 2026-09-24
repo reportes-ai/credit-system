@@ -166,6 +166,15 @@ router.get('/provisiones', verifyToken, requireFunc('ctb_provisiones', 'ctb_cier
     res.json({ success: true, data: await prov.cuadro(mes, concepto), error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 });
+// Resumen por concepto del mes (todas las cuentas de provisión, totalizado)
+router.get('/provisiones/resumen', verifyToken, requireFunc('ctb_provisiones', 'ctb_cierre_mes', 'ctb_estados'), async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : require('../../../../shared/fecha-chile').hoyISO().slice(0, 7);
+    const filas = [];
+    for (const k of Object.keys(prov.CONCEPTOS)) { const { pendientes, movimientos, ...c } = await prov.cuadro(mes, k); filas.push(c); }
+    res.json({ success: true, data: { mes, filas }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+});
 router.get('/provisiones/detalle', verifyToken, requireFunc('ctb_provisiones', 'ctb_cierre_mes', 'ctb_estados'), async (req, res) => {
   try {
     const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : require('../../../../shared/fecha-chile').hoyISO().slice(0, 7);
