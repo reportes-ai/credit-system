@@ -595,7 +595,9 @@ async function proyeccionSueldos(mes) {
       if (!h || !(Number(h.total_haberes) > 0)) continue;
       const c = h.calc || {};
       const R = v => Math.round(Number(v) || 0);
-      filas.push({ id_usuario: e.id_usuario, nombre: e.nombre, haberes: R(h.total_haberes), sis: R(c.aporte_sis), afc: R(c.aporte_afc_emp), mutual: R(c.aporte_mutual) + R(c.aporte_sanna), emitida: !!h.emitida });
+      // Las comisiones (mes vencido) que trae la liquidación YA están provisionadas en el concepto EJECUTIVO y
+      // devengan por COMISION_EJECUTIVOS al aprobarse: acá se provisiona el resto de los haberes (Pato, 24-09-2026).
+      filas.push({ id_usuario: e.id_usuario, nombre: e.nombre, haberes: R(h.total_haberes) - R(c.comisiones), comisiones: R(c.comisiones), sis: R(c.aporte_sis), afc: R(c.aporte_afc_emp), mutual: R(c.aporte_mutual) + R(c.aporte_sanna), emitida: !!h.emitida });
     } catch (err) { console.error('[provisiones sueldos] haberes', e.id_usuario, err.message); }
   }
   const sum = k => filas.reduce((s, f) => s + f[k], 0);
