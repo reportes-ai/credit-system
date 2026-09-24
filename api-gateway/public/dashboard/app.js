@@ -5611,7 +5611,7 @@ function buildColocMensual(vista) {
       style="border:1px solid ${f === filtro ? '#0d2f6b' : '#c6d3e8'};background:${f === filtro ? '#0d2f6b' : '#fff'};color:${f === filtro ? '#fff' : '#33507e'};border-radius:16px;padding:4px 14px;font-size:11.5px;font-weight:700;cursor:pointer">${lbl}</button>`).join('')}
   </div>`;
 
-  cont.innerHTML = botones + `<table id="t-coloc-${vista}" style="width:max-content;min-width:100%;border-collapse:collapse;font-size:11.5px">
+  cont.innerHTML = botones + `<table id="t-coloc-${vista}" style="width:max-content;border-collapse:collapse;font-size:11.5px">
     <thead>
       <tr>
         <th rowspan="2" style="position:sticky;left:0;background:#12213f;color:#fff;padding:6px 10px;text-align:left;z-index:2">${esDealers ? 'Dealer' : 'Parque'}</th>
