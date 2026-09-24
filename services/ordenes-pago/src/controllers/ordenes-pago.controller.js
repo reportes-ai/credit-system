@@ -973,6 +973,31 @@ const getDocumento = async (req, res) => {
   }
 };
 
+/* Datos del documento Solicitud de Pago de una orden (cualquier origen), para armarlo en el
+   SERVIDOR con el motor único /js/odp-documento.js (correo de emisión de la ODP de parque).
+   Mismo contenido que getDocumento: snapshot si está congelada, adjuntos y traza en vivo. */
+async function datosDocumento(ocId) {
+  const [[oc]] = await pool.query('SELECT * FROM op_correlativos WHERE id=?', [ocId]);
+  if (!oc) return null;
+  let data = null;
+  if (oc.snapshot_json) { try { data = JSON.parse(oc.snapshot_json); data.congelada = true; } catch (_) { data = null; } }
+  if (!data) data = await construirDocumento(oc);
+  if (!data) return null;
+  try {
+    let facturas = [];
+    if (oc.origen === 'GENERAL') [facturas] = await pool.query("SELECT id, nombre FROM postventa_factura_docs WHERE origen='ODP' AND ref_id=? ORDER BY id", [oc.origen_id]);
+    else if (oc.origen === 'PARQUE') [facturas] = await pool.query("SELECT id, nombre FROM postventa_factura_docs WHERE origen='PARQUE' AND ref_id=? ORDER BY id", [oc.origen_id]);
+    data.facturas = facturas;
+  } catch (_) { data.facturas = []; }
+  try { data.traza = await construirTraza(oc); } catch (_) {}
+  return data;
+}
+/* HTML del documento (motor único) — null si la orden no existe */
+async function htmlDocumento(ocId) {
+  const data = await datosDocumento(ocId);
+  return data ? require('../../../../api-gateway/public/js/odp-documento').html(data) : null;
+}
+
 // Congela el documento "en duro": guarda el snapshot inmutable en el libro central.
 // Idempotente (no re-congela si ya tiene snapshot). Se llama al pagar.
 async function congelarDocumento(ocId) {
@@ -1299,8 +1324,18 @@ const enviarCorreoOrden = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Falta el contenido del correo' });
     if (html.length > 500000)
       return res.status(400).json({ success: false, data: null, error: 'El contenido del correo es demasiado grande' });
-    const [[o]] = await pool.query('SELECT numero FROM ordenes_pago WHERE id=?', [id]);
-    if (!o) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+    /* El id que manda el historial es el del libro central (op_correlativos), que sirve para
+       CUALQUIER origen (GENERAL, PARQUE…). Antes solo se buscaba en ordenes_pago y una ODP
+       de parque no se podía reenviar desde el Historial (Jorge, 24-09-2026). */
+    let numero = null, origenAdj = 'ODP', refAdj = id;
+    const [[oc]] = await pool.query('SELECT id, numero, origen, origen_id FROM op_correlativos WHERE id=?', [id]);
+    if (oc) { numero = oc.numero; if (oc.origen === 'PARQUE') { origenAdj = 'PARQUE'; refAdj = oc.origen_id; } else if (oc.origen === 'GENERAL') refAdj = oc.origen_id; }
+    else {
+      const [[o]] = await pool.query('SELECT numero FROM ordenes_pago WHERE id=?', [id]);
+      if (!o) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+      numero = o.numero;
+    }
+    const o = { numero };
 
     // Para + CC del mantenedor (correo_contabilidad / correo_contabilidad_cc); quien envía siempre queda en CC
     const { to, cc } = await require('../../../../shared/correo-contabilidad')
@@ -1309,7 +1344,7 @@ const enviarCorreoOrden = async (req, res) => {
     // Documento de respaldo (factura/boleta subida a la orden): viaja adjunto
     let attachments;
     try {
-      attachments = await require('../../../postventa/src/controllers/postventa.controller').adjuntosFactura('ODP', [id]);
+      attachments = await require('../../../postventa/src/controllers/postventa.controller').adjuntosFactura(origenAdj, [refAdj]);
       if (!attachments.length) attachments = undefined;
     } catch (_) {}
     const r = await enviarCorreo({ to, cc, subject: asunto || `Orden de Pago ${o.numero || ''} — AutoFácil`, html, attachments });
@@ -1666,6 +1701,7 @@ module.exports = {
   listarOrdenes, getOrden, getDocumento, crearOrden, cambiarEstadoOrden, estadisticas, enviarCorreoOrden,
   pagarOrden, miCajaOP, anularOrdenPostventa,
   calcularDoc,   // motor único del impuesto de la ODP (lo reusa Pagos Recurrentes)
+  datosDocumento, htmlDocumento,   // documento Solicitud de Pago armado en el servidor (correo ODP parque)
   adjuntarRespaldo,
   quitarRespaldo,
   getComprasAPagar, enviarComprasAPago, deshacerEnvioCompras, getFondosCompras, setFondosCompras,

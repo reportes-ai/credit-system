@@ -1,4 +1,4 @@
-/* v1.5 — tacho junto a cada adjunto cuando la orden lo permite (puede_borrar_adjuntos + hook AF_ODP_QUITAR_ADJUNTO). v1.4 — tabla "Ajuste de cartola" (adicionales/descuentos aprobados con su glosa) en la orden de comisión. v1.3 — montos negativos como "− $x" (retención de boleta que se descuenta). v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
+/* v1.6 — isomorfo: module.exports + BASE para el logo (correo ODP parque desde el servidor). v1.5 — tacho junto a cada adjunto cuando la orden lo permite (puede_borrar_adjuntos + hook AF_ODP_QUITAR_ADJUNTO). v1.4 — tabla "Ajuste de cartola" (adicionales/descuentos aprobados con su glosa) en la orden de comisión. v1.3 — montos negativos como "− $x" (retención de boleta que se descuenta). v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
    ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    MOTOR ÚNICO del documento "Solicitud de Pago" (Orden de Pago)
 
@@ -11,6 +11,8 @@
    La orden se obtiene de GET /api/ordenes-pago/ordenes/:id/documento
    ───────────────────────────────────────────────────────────────── */
 (function () {
+// Isomorfo (24-09-2026): en el servidor arma el MISMO documento para el correo de la ODP de parque
+const BASE = (typeof location !== 'undefined' && location.origin) || 'https://afbs.autofacilchile.cl';
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 // Negativos como descuento legible: "− $38.565" (la retención de una boleta se descuenta)
 const fmtMon = n => { const v = Number(n||0); return (v < 0 ? '− ' : '') + '$' + Math.abs(v).toLocaleString('es-CL'); };
@@ -59,7 +61,7 @@ function docHTML(o){
   const fechaPagar = fdate(o.fecha_pago || o.fecha_emision);
   const tipoGasto = (o.categoria || 'PAGO A PROVEEDOR').toUpperCase();
   const Sdoc='position:relative;font-family:Arial,sans-serif;color:#1e293b;font-size:11px;border:2px solid #93c5fd;border-radius:8px;padding:14px 16px;display:block;width:100%;box-sizing:border-box';
-  const sello = (o.pago && window.timbrePagado) ? `<div style="position:absolute;right:30px;bottom:22px;z-index:3">${timbrePagado(o.pago)}</div>` : '';
+  const sello = (o.pago && typeof window !== 'undefined' && window.timbrePagado) ? `<div style="position:absolute;right:30px;bottom:22px;z-index:3">${timbrePagado(o.pago)}</div>` : '';
   const Smeta='border-collapse:collapse;font-size:11px';
   const Slbl='color:#64748b;font-weight:700;text-transform:uppercase;font-size:9px;padding:1px 8px;white-space:nowrap';
   const Smv='padding:1px 8px;font-size:11px';
@@ -110,7 +112,7 @@ function docHTML(o){
         <tr><td style="${Slbl}">Fecha</td><td style="${Smv}">${fdate(o.fecha_emision)}</td></tr>
       </tbody></table></td>
       <td style="vertical-align:top;text-align:right">
-        <img width="150" height="34" style="height:34px;width:auto" src="${location.origin}/img/logo-autofacil.png" onerror="this.src='${location.origin}/img/logo.png'">
+        <img width="150" height="34" style="height:34px;width:auto" src="${BASE}/img/logo-autofacil.png" onerror="this.src='${BASE}/img/logo.png'">
       </td>
     </tr></tbody></table>
     ${tablaDetalle}
@@ -156,5 +158,7 @@ async function verFactura(id){
     setTimeout(() => URL.revokeObjectURL(u), 60000);
   } catch (_) { alert('No se pudo abrir la factura adjunta.'); }
 }
-window.AF_ODP_DOC = { html: docHTML, impInfo, verFactura };
+const AF_ODP_API = { html: docHTML, impInfo, verFactura };
+if (typeof window !== 'undefined') window.AF_ODP_DOC = AF_ODP_API;
+if (typeof module !== 'undefined' && module.exports) module.exports = AF_ODP_API;
 })();

@@ -530,11 +530,17 @@ const emitir = async (req, res) => {
     // (admin@sistema.cl, admin@admin.cl, Tesorera) y Contabilidad nunca la recibía.
     // Factura(s) del parque subidas a este pago: viajan adjuntas a Contabilidad
     const adjuntos = await require('./postventa.controller').adjuntosFactura('PARQUE', [e.id]).catch(() => []);
+    // El documento Solicitud de Pago (motor único odp-documento) va DENTRO del correo, igual que en las
+    // demás ODP; antes Contabilidad recibía solo el texto (Jorge, 24-09-2026).
+    let docHtml = null;
+    try { docHtml = await require('../../../ordenes-pago/src/controllers/ordenes-pago.controller').htmlDocumento(odp.id); }
+    catch (err) { console.error('[comisiones-parques emitir] documento ODP:', err.message); }
     const { to: toCtb, cc: ccCtb } = await require('../../../../shared/correo-contabilidad')
       .destinatariosContabilidad(req.user?.email || []);
     const envio = await require('../../../../shared/plantillas-correo').enviar({
       codigo: 'parque_odp_contabilidad',
       adjuntos: adjuntos.length ? adjuntos : undefined,
+      htmlExtra: docHtml || undefined,
       to: [toCtb], cc: ccCtb || [],
       datos: { ODP: odp.numero, PARQUE: parque, PERIODO: mes, ARRIENDO: CLP(arriendo),
                COMISION: CLP(comision), OPS: e.ops, TOTAL: CLP(total), QUIEN: quien },

@@ -705,7 +705,9 @@ async function correosDePerfiles(csv) {
 
 /* Envía una plantilla. Devuelve { enviado, motivo?, to, cc }.
    NUNCA lanza: un correo que falla no puede voltear la operación que lo dispara. */
-async function enviar({ codigo, to = [], cc: ccExtra = [], datos = {}, adjuntos } = {}) {
+/* `htmlExtra` (opcional): HTML que se agrega DESPUÉS del cuerpo de la plantilla — ej. el documento
+   Solicitud de Pago armado con el motor único odp-documento (correo de la ODP de parque). */
+async function enviar({ codigo, to = [], cc: ccExtra = [], datos = {}, adjuntos, htmlExtra } = {}) {
   try {
     const p = await obtener(codigo);
     if (!p) return { enviado: false, motivo: 'plantilla inexistente: ' + codigo };
@@ -727,7 +729,7 @@ async function enviar({ codigo, to = [], cc: ccExtra = [], datos = {}, adjuntos 
       from: remitentePorClave(p.remitente),   // remitente elegido en el mantenedor
       to: dest, cc: cc.length ? cc : undefined, bcc: cco.length ? cco : undefined,
       subject: render(p.asunto, datos),
-      html: envolverHTML(aHTML(cuerpo)),
+      html: envolverHTML(aHTML(cuerpo) + (htmlExtra ? `<div style="margin:18px 0">${htmlExtra}</div>` : '')),
       text: esHTML(cuerpo) ? undefined : cuerpo,
       attachments: adjuntos,
     });
