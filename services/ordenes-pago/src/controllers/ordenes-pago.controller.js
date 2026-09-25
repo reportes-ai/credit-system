@@ -735,6 +735,10 @@ async function construirDocumento(oc) {
               COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer_nombre,
               COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
               d.cuenta_tipo, d.tipo_cuenta, d.nombre_cuenta, d.rut_pago,
+              /* Clasificación del dealer y hora de los fundantes: con eso el motor único del SLA
+                 (shared/sla-saldo) dice hasta cuándo hay plazo para pagar este saldo precio. */
+              COALESCE(NULLIF(d.categoria_asignada,''), NULLIF(d.categoria_propuesta,'')) AS categoria_dealer,
+              (SELECT MAX(pe.fecha) FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='SALDO' AND pe.etapa='FUNDANTES RECIBIDOS') AS fundantes_recibidos,
               (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS pagado
          FROM postventa_ordenes spo
          JOIN postventa_seguimiento s ON s.id = spo.id_seguimiento
@@ -840,6 +844,20 @@ async function construirDocumento(oc) {
     monto = base + insc + lim; neto = monto; bruto = monto;
   }
 
+  /* Fecha comprometida de pago del saldo precio: motor único shared/sla-saldo, el mismo que
+     usan Saldo Precio en Proceso de Pago y Saldos Precios a Pagar. Sin fundantes recibidos no
+     hay plazo que mostrar: el reloj todavía no parte. Nunca rompe el documento. */
+  let sla = null;
+  if (!esCom && row.fundantes_recibidos) {
+    try {
+      const SLA = require('../../../../shared/sla-saldo');
+      const cfg = await SLA.config();
+      const v = SLA.vencimiento(row.fundantes_recibidos, row.categoria_dealer, cfg);
+      /* La categoría se informa solo si la ficha la tiene: el motor cae a 72 h cuando falta, y
+         decir "SOCIO" sin que lo sea sería inventar un dato en un documento de pago. */
+      if (v && v.iso) sla = { fecha: v.iso, horas: v.horas, categoria: row.categoria_dealer || null };
+    } catch (e) { console.error('[ordenes-pago SLA saldo]', e.message); }
+  }
   return {
     id: oc.id, origen: oc.origen, origen_label: ORIGEN_LBL[oc.origen] || oc.origen,
     numero: oc.numero, concepto: (oc.concepto || (esCom ? 'Comisión' : 'Saldo Precio')) + (row.financiera ? ' (' + row.financiera + ')' : ''),
@@ -853,6 +871,7 @@ async function construirDocumento(oc) {
     justificacion_descuadre: row.justificacion_descuadre || undefined,   // comentario obligatorio si al emitir no cuadraba
     destino, deposito, sin_datos_banco: !deposito && !destino,
     fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
+    fecha_a_pagar: sla ? sla.fecha : null, sla_horas: sla ? sla.horas : null, sla_categoria: sla ? sla.categoria : null,
     metodo_pago: oc.metodo_pago, cuenta_pago: cuentaPago, estado, usuario_nombre: oc.usuario_nombre,
     anulada_nombre: oc.anulada_nombre, fecha_anulada: oc.fecha_anulada, num_op: row.num_op, _v: DOC_VERSION,
   };

@@ -1,4 +1,4 @@
-/* v1.6 — isomorfo: module.exports + BASE para el logo (correo ODP parque desde el servidor). v1.5 — tacho junto a cada adjunto cuando la orden lo permite (puede_borrar_adjuntos + hook AF_ODP_QUITAR_ADJUNTO). v1.4 — tabla "Ajuste de cartola" (adicionales/descuentos aprobados con su glosa) en la orden de comisión. v1.3 — montos negativos como "− $x" (retención de boleta que se descuenta). v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
+/* v1.7 — los RUT salen con puntos y guion (motor unico rut-core) y "Fecha a pagar" muestra el VENCIMIENTO del compromiso: en el saldo precio, el SLA de la categoria del dealer (Socio 72 h habiles, Partner 48, Super Partner 24, desde los fundantes recibidos). v1.6 — isomorfo: module.exports + BASE para el logo (correo ODP parque desde el servidor). v1.5 — tacho junto a cada adjunto cuando la orden lo permite (puede_borrar_adjuntos + hook AF_ODP_QUITAR_ADJUNTO). v1.4 — tabla "Ajuste de cartola" (adicionales/descuentos aprobados con su glosa) en la orden de comisión. v1.3 — montos negativos como "− $x" (retención de boleta que se descuenta). v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
    ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    MOTOR ÚNICO del documento "Solicitud de Pago" (Orden de Pago)
 
@@ -17,6 +17,14 @@ const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 // Negativos como descuento legible: "− $38.565" (la retención de una boleta se descuenta)
 const fmtMon = n => { const v = Number(n||0); return (v < 0 ? '− ' : '') + '$' + Math.abs(v).toLocaleString('es-CL'); };
 const fdate = d => d? String(d).slice(0,10).split('-').reverse().join('/') : '—';
+/* RUT con puntos y guión. Motor único rut-core: en el navegador viene del <script>, en el
+   servidor por require. Si por lo que sea no está disponible, se muestra tal como vino —
+   nunca se inventa un formato a mano, que es como aparecen los RUT desparejos. */
+const RUT = (function(){
+  if (typeof module !== 'undefined' && module.exports) { try { return require('./rut-core'); } catch (_) { return null; } }
+  return (typeof window !== 'undefined' && window.AF_RUT) || null;
+})();
+const fmtRut = r => { const t = String(r == null ? '' : r).trim(); if (!t) return ''; return (RUT && RUT.formatear && RUT.formatear(t)) || t; };
 /* ── Documento "Solicitud de Pago" (formato AutoFácil) ── */
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const periodoCL = d => { if(!d) return '—'; const x=new Date(String(d).slice(0,10)); if(isNaN(x)) return '—'; return MESES[x.getUTCMonth()]+'-'+String(x.getUTCFullYear()).slice(2); };
@@ -58,7 +66,13 @@ function docHTML(o){
   const i = impInfo(o);
   const docNum = [o.tipo_documento, o.numero_documento].filter(Boolean).join(' ');
   const periodo = periodoCL(o.fecha_documento || o.fecha_emision);
-  const fechaPagar = fdate(o.fecha_pago || o.fecha_emision);
+  /* Fecha a pagar: si ya se pagó, el día del pago. Si no, el VENCIMIENTO del compromiso
+     — en el saldo precio lo fija el SLA de la categoría del dealer (Socio 72 h hábiles,
+     Partner 48, Super Partner 24, desde los fundantes recibidos). Antes se mostraba la fecha
+     de emisión, que solo decía cuándo se pidió el pago, no cuándo hay que hacerlo. */
+  const fechaPagar = fdate(o.fecha_pago || o.fecha_a_pagar || o.fecha_emision);
+  const slaTxt = (!o.fecha_pago && o.fecha_a_pagar && (o.sla_categoria || o.sla_horas))
+    ? ` <span style="color:#64748b;font-weight:400">(${[o.sla_categoria ? escH(o.sla_categoria) : null, o.sla_horas ? o.sla_horas + ' h hábiles' : null].filter(Boolean).join(' · ')})</span>` : '';
   const tipoGasto = (o.categoria || 'PAGO A PROVEEDOR').toUpperCase();
   const Sdoc='position:relative;font-family:Arial,sans-serif;color:#1e293b;font-size:11px;border:2px solid #93c5fd;border-radius:8px;padding:14px 16px;display:block;width:100%;box-sizing:border-box';
   const sello = (o.pago && typeof window !== 'undefined' && window.timbrePagado) ? `<div style="position:absolute;right:30px;bottom:22px;z-index:3">${timbrePagado(o.pago)}</div>` : '';
@@ -79,7 +93,7 @@ function docHTML(o){
       <colgroup><col style="width:30%"><col style="width:22%"><col style="width:33%"><col style="width:15%"></colgroup>
       <thead><tr><th style="${Sth}">Proveedor</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Monto</th></tr></thead>
       <tbody>
-        ${o.desglose.map((d,idx)=>`<tr><td style="${Std}">${idx===0?escH(o.proveedor_nombre||''):''}</td><td style="${Std}">${idx===0?escH(o.proveedor_rut||''):''}</td><td style="${Std}">${escH(d.label||'')}</td><td style="${Snum}">${fmtMon(d.monto)}</td></tr>`).join('')}
+        ${o.desglose.map((d,idx)=>`<tr><td style="${Std}">${idx===0?escH(o.proveedor_nombre||''):''}</td><td style="${Std}">${idx===0?escH(fmtRut(o.proveedor_rut)):''}</td><td style="${Std}">${escH(d.label||'')}</td><td style="${Snum}">${fmtMon(d.monto)}</td></tr>`).join('')}
         <tr><td colspan="3" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">A PAGAR</td><td style="${Snum};font-weight:800;background:#dbeafe;color:#1e3a8a">${fmtMon(i.pagar)}</td></tr>
       </tbody>
     </table>` : `
@@ -87,7 +101,7 @@ function docHTML(o){
       <colgroup><col style="width:23%"><col style="width:12%"><col style="width:21%"><col style="width:8%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>
       <thead><tr><th style="${Sth}">Proveedor</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Mes</th><th style="${Sth}">Monto Bruto</th><th style="${Sth}">${escH(i.lbl)}</th><th style="${Sth}">Monto Neto</th></tr></thead>
       <tbody>
-        <tr><td style="${Std}">${escH(o.proveedor_nombre||'')}</td><td style="${Std}">${escH(o.proveedor_rut||'')}</td>
+        <tr><td style="${Std}">${escH(o.proveedor_nombre||'')}</td><td style="${Std}">${escH(fmtRut(o.proveedor_rut))}</td>
           <td style="${Std}">${escH(o.concepto||'')}</td><td style="${Std}">${periodo}</td>
           <td style="${Snum}">${fmtMon(i.bruto)}</td><td style="${Snum}">${i.esEx?'—':fmtMon(i.imp)}</td><td style="${Snum}">${fmtMon(i.neto)}</td></tr>
         <tr><td colspan="6" style="${Std};text-align:right;font-weight:800;background:#f1f5f9">A PAGAR</td><td style="${Snum};font-weight:800;background:#dbeafe;color:#1e3a8a">${fmtMon(i.pagar)}</td></tr>
@@ -134,13 +148,13 @@ function docHTML(o){
         o.deposito.tipo_cuenta ? escH(o.deposito.tipo_cuenta)
         : '<span style="color:#b45309;font-weight:700">⚠ falta el tipo de cuenta</span>'
       } · Cta. N° <b>${escH(o.deposito.num_cuenta||'')}</b></td></tr>
-      <tr><td style="${SresL}">Titular</td><td style="${SresV}">${escH(o.deposito.titular||'—')}${o.deposito.rut?' · RUT '+escH(o.deposito.rut):''}</td></tr>`
+      <tr><td style="${SresL}">Titular</td><td style="${SresV}">${escH(o.deposito.titular||'—')}${o.deposito.rut?' · RUT '+escH(fmtRut(o.deposito.rut)):''}</td></tr>`
       : o.sin_datos_banco
       ? `<tr><td style="${SresL}">Depositar en</td><td style="${SresV};color:#b91c1c;font-weight:700">⚠ SIN DATOS BANCARIOS — completar banco, tipo y N° de cuenta en la ficha antes de transferir</td></tr>`
       : `<tr><td style="${SresL}">Destino</td><td style="${SresV}">${escH(o.destino||'—')}</td></tr>`}
       ${montoRows}
       <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmtMon(i.pagar)}</td></tr>
-      <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPagar}</td></tr>
+      <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPagar}${slaTxt}</td></tr>
     </tbody></table>
     </div>
     ${trazaHTML(o.traza)}
