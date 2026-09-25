@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v6.0 — TEF y nómina con RUT y nombre del TITULAR de la cuenta (poder a un tercero: COMPRA VENTA VERA → cuenta de Víctor Vera; el banco rechazaba RUT empresa + cuenta persona). v5.9 — celdas apiladas para caber al 100% de zoom: 14 columnas → 8 (N° OP+ID financiera, Dealer+RUT+categoría, Banco+cuenta, Fondos+fecha de pago), tabla de ancho fijo sin scroll horizontal (Pato 17-09-2026). v5.8 — TEF: cupo gratis del mes como badge dentro del botón. v5.7 — fix: el bloque TEF quedó dentro de <script src=timbre-pagado.js> y el navegador lo ignoraba (descargarTEF is not defined). v5.6 — TEF: generar el archivo registra el pago (y sus correos). v5.5 — botón TEF B.Internacional (archivo de transferencias masivas) con el cupo gratis del mes. v5.4 — "Vencen hoy/mañana" con letra chica (clase venc, como "Nada enviado a pago todavía"). v5.3 — cuadro Pendientes de pago: líneas "Vencen hoy" y "Vencen mañana" (ops X monto, según SLA). v5.2 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v6.1 — cuadro Pendientes con línea Vencidas (rojo) sin crecer. v6.0 — TEF y nómina con RUT y nombre del TITULAR de la cuenta (poder a un tercero: COMPRA VENTA VERA → cuenta de Víctor Vera; el banco rechazaba RUT empresa + cuenta persona). v5.9 — celdas apiladas para caber al 100% de zoom: 14 columnas → 8 (N° OP+ID financiera, Dealer+RUT+categoría, Banco+cuenta, Fondos+fecha de pago), tabla de ancho fijo sin scroll horizontal (Pato 17-09-2026). v5.8 — TEF: cupo gratis del mes como badge dentro del botón. v5.7 — fix: el bloque TEF quedó dentro de <script src=timbre-pagado.js> y el navegador lo ignoraba (descargarTEF is not defined). v5.6 — TEF: generar el archivo registra el pago (y sus correos). v5.5 — botón TEF B.Internacional (archivo de transferencias masivas) con el cupo gratis del mes. v5.4 — "Vencen hoy/mañana" con letra chica (clase venc, como "Nada enviado a pago todavía"). v5.3 — cuadro Pendientes de pago: líneas "Vencen hoy" y "Vencen mañana" (ops X monto, según SLA). v5.2 — buscador por el motor único busqueda-core: + ejecutivo; RUT sin puntos/guion. v5.1 — tabla ordenada por días de atraso descendente (los más atrasados primero). v5.0 — cuadro 'Enviadas a pago (por confirmar)' con lo que se pagará (antes 'Seleccionadas' mostraba 0 con ops ya enviadas); las seleccionadas sin enviar quedan como subtítulo. v4.9 — login conserva el destino (?next=). v4.8 — fecha de emision bajo el numero de la Orden de Pago · v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -27,7 +27,8 @@
     .stat.pag .val { color:#15803d; }
     /* Monto del mismo tamaño que el número */
     .stat.pend .sub { font-size:1.5rem; font-weight:800; color:var(--navy); }
-    .stat.pend .sub.venc { font-size:.72rem; font-weight:400; margin-top:2px; color:#64748b; }  /* Vencen hoy / mañana: misma letra que "Nada enviado a pago todavía" */
+    .stat.pend .sub.venc { font-size:.72rem; font-weight:400; margin-top:0; line-height:1.2; color:#64748b; }  /* Vencidas / hoy / mañana: tres líneas en el alto de las dos de antes (Pato 25-09-2026) */
+    .stat.pend .val { margin-top:0; line-height:1.15; }
     .stat.pag  .sub { font-size:1.5rem; font-weight:800; color:#15803d; }
     .stat.selb { border-left-color:#0d9488; }
     .stat.selb .val { color:#0f766e; }
@@ -139,7 +140,8 @@
     <div class="stat pend">
       <div class="lbl">Pendientes de pago</div>
       <div class="val"><span id="cntPend">0</span> ops X <span id="montoPend">$0</span></div>
-      <div class="sub venc" style="margin-top:4px">Vencen hoy: <b><span id="hoyN">0</span> ops X <span id="hoyM">$0</span></b></div>
+      <div class="sub venc" style="margin-top:2px;color:#b91c1c">Vencidas: <b><span id="venN">0</span> ops X <span id="venM">$0</span></b></div>
+      <div class="sub venc">Vencen hoy: <b><span id="hoyN">0</span> ops X <span id="hoyM">$0</span></b></div>
       <div class="sub venc">Vencen mañana: <b><span id="manN">0</span> ops X <span id="manM">$0</span></b></div>
     </div>
     <div class="stat pag">
@@ -371,7 +373,9 @@ function recalc(){
   document.getElementById('montoPend').textContent = fmt(sum(pend));
   /* Pendientes que vencen hoy / mañana según el SLA: hoy = dias_sla 0 (la misma columna Días);
      mañana = el PRÓXIMO DÍA HÁBIL (vence_manana del servidor: un viernes cuenta lo del lunes). */
-  const vHoy = pend.filter(r => r.dias_sla === 0), vMan = pend.filter(r => r.vence_manana);
+  const vHoy = pend.filter(r => r.dias_sla === 0), vMan = pend.filter(r => r.vence_manana), vVen = pend.filter(r => r.dias_sla > 0);
+  document.getElementById('venN').textContent = vVen.length;
+  document.getElementById('venM').textContent = fmt(sum(vVen));
   document.getElementById('hoyN').textContent = vHoy.length;
   document.getElementById('hoyM').textContent = fmt(sum(vHoy));
   document.getElementById('manN').textContent = vMan.length;
