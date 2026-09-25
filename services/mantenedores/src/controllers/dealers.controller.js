@@ -329,9 +329,11 @@ const importar = async (req, res) => {
 /* Formato único de los nombres que llegan del formulario (shared/nombres):
    el dealer y su razón social son EMPRESAS (mayúsculas); el contacto y el titular
    de la cuenta son PERSONAS (Nombre Propio). */
-function normalizarNombresDealer(r) {
+function normalizarNombresDealer(r, cuentaTipoActual) {
   for (const c of ['nombre_indexa', 'nombre_razon', 'ccs_parque']) if (r[c] != null) r[c] = NOM.empresa(r[c]);
-  for (const c of ['contacto', 'nombre_cuenta']) if (r[c] != null) r[c] = NOM.persona(r[c]);
+  if (r.contacto != null) r.contacto = NOM.persona(r.contacto);
+  // El titular de la cuenta sigue la marca "la cuenta es de": una empresa va en mayúsculas
+  if (r.nombre_cuenta != null) r.nombre_cuenta = NOM.titular(r.nombre_cuenta, r.cuenta_tipo != null ? r.cuenta_tipo : cuentaTipoActual);
   return r;
 }
 
@@ -379,8 +381,8 @@ const updateDealer = async (req, res) => {
        case-sensitive: cambiarle el formato acá dejaría las operaciones huérfanas.
        Por eso se conserva tal cual cuando es el mismo nombre escrito distinto; la
        homologación masiva (que además arrastra las copias) va por su script. */
-    const [[antes]] = await pool.query('SELECT nombre_indexa FROM dealers WHERE id_dealer=?', [req.params.id]);
-    normalizarNombresDealer(r);
+    const [[antes]] = await pool.query('SELECT nombre_indexa, cuenta_tipo FROM dealers WHERE id_dealer=?', [req.params.id]);
+    normalizarNombresDealer(r, antes && antes.cuenta_tipo);
     if (antes && NOM.mismoNombre(antes.nombre_indexa, r.nombre_indexa)) r.nombre_indexa = antes.nombre_indexa;
     await pool.query(
       `UPDATE dealers SET numero_ind=?,rut=?,nombre_indexa=?,nombre_razon=?,ccs_parque=?,

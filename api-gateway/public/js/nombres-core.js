@@ -54,7 +54,20 @@
   /* ¿Cambiar el formato de este texto altera algo más que mayúsculas/acentos/espacios? */
   const mismoNombre = (a, b) => comparable(a) === comparable(b);
 
-  const API = { empresa, persona, comparable, mismoNombre, limpiar };
+  /* Titular de una cuenta bancaria: sigue la marca "la cuenta es de" del dealer o de la
+     ficha (cuenta_tipo). EMPRESA → mayúsculas; PERSONA o sin marca → Nombre Propio. */
+  const titular = (s, cuentaTipo) =>
+    String(cuentaTipo || '').trim().toUpperCase() === 'EMPRESA' ? empresa(s) : persona(s);
+
+  /* Regla del sistema (ficha de incorporación): un RUT sobre 50.000.000 es de empresa.
+     Sirve donde no se guarda la marca, solo el RUT de la cuenta. */
+  function cuentaTipoDeRut(rut) {
+    const cuerpo = String(rut || '').replace(/[^0-9kK]/g, '').slice(0, -1).replace(/\D/g, '');
+    if (!cuerpo) return '';
+    return parseInt(cuerpo, 10) > 50000000 ? 'EMPRESA' : 'PERSONA';
+  }
+
+  const API = { empresa, persona, titular, cuentaTipoDeRut, comparable, mismoNombre, limpiar };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   if (raiz) raiz.AF_NOMBRES = API;
 })(typeof window !== 'undefined' ? window : null);

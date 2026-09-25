@@ -554,13 +554,14 @@ function armarValores(body) {
        fantasía son EMPRESAS; el representante legal, los contactos y el titular de la
        cuenta son PERSONAS. Así la ficha, el mantenedor y la carta escriben igual. */
     else if (NOMBRES_EMPRESA.has(k)) v[k] = NOM.empresa(body[k]) || null;
+    else if (k === 'nombre_cuenta') v[k] = NOM.titular(body[k], body.cuenta_tipo) || null;   // sigue "la cuenta es de"
     else if (NOMBRES_PERSONA.has(k)) v[k] = NOM.persona(body[k]) || null;
     else v[k] = norm(body[k]) || null;
   }
   return v;
 }
 const NOMBRES_EMPRESA = new Set(['nombre_razon', 'nombre_fantasia', 'nombre_parque']);
-const NOMBRES_PERSONA = new Set(['rl_nombre', 'cc_nombre', 'cf_nombre', 'nombre_cuenta']);
+const NOMBRES_PERSONA = new Set(['rl_nombre', 'cc_nombre', 'cf_nombre']);   // nombre_cuenta se resuelve con NOM.titular
 
 /* ── GET /ejecutivos — nombres elegibles para la ficha ────────────────────── */
 const ejecutivos = async (req, res) => {
