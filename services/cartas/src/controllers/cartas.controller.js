@@ -58,8 +58,11 @@ function sincronizarCreditoDesdeCarta(c, idCred) {
   }
   // PRODUCTO PREFERENTE marcado/desmarcado en la carta → producto del crédito NO otorgado
   if (c.preferente !== undefined) {
-    pool.query(`UPDATE creditos SET producto = ?, com_ejec_pct = ?, updated_at = NOW() WHERE id = ? AND estado_credito <> 'OTORGADO'`,
-      [c.preferente ? (c.producto || 'AUTOFIN PREFERENTE') : 'NORMAL', (c.comEjecPct != null && c.comEjecPct !== '' ? Number(c.comEjecPct) : null), idCred]
+    /* Preferente → producto de la carta. No preferente → NORMAL solo si el crédito no tiene producto o venía
+       de AUTOFIN PREFERENTE (desmarcado): un producto real cargado desde Trinidad no se pisa (code-review 25-09-2026). */
+    pool.query(`UPDATE creditos SET producto = CASE WHEN ? THEN ? WHEN producto IS NULL OR producto = '' OR producto = 'AUTOFIN PREFERENTE' THEN 'NORMAL' ELSE producto END,
+        com_ejec_pct = ?, updated_at = NOW() WHERE id = ? AND estado_credito <> 'OTORGADO'`,
+      [c.preferente ? 1 : 0, c.preferente ? (c.producto || 'AUTOFIN PREFERENTE') : 'NORMAL', (c.comEjecPct != null && c.comEjecPct !== '' ? Number(c.comEjecPct) : null), idCred]
     ).catch(e => console.error('[carta→credito producto]', e.message));
   }
   // Primas/GPS digitadas o corregidas en la carta → al crédito (0 explícito válido)

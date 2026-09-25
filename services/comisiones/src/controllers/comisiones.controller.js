@@ -995,12 +995,23 @@ const aprobar = async (req, res) => {
          Idempotente por ref: re-aprobar tras un rechazo no duplica el asiento. Nunca bloquea. */
       try {
         const totalReal = Math.round(Number(con_semana_corrida) || Number(incentivo_final) || 0);
-        if (totalReal > 0) await require('../../../contabilidad/src/motor-asientos').contabilizar({
-          evento: 'COMISION_EJECUTIVOS', ref: `COMEJ-${ejecutivo}-${mes}`, montos: { monto: totalReal },
+        const refA = `COMEJ-${ejecutivo}-${mes}`;
+        let idAsiento = null;
+        if (totalReal > 0) idAsiento = await require('../../../contabilidad/src/motor-asientos').contabilizar({
+          evento: 'COMISION_EJECUTIVOS', ref: refA, montos: { monto: totalReal },
           glosa: `Comisión ejecutivo ${ejecutivo} — ${mes} aprobada`, detalle: `${ejecutivo} · ${mes} · incentivo $${Math.round(Number(incentivo_final) || 0).toLocaleString('es-CL')}${Number(con_semana_corrida) ? ' · con semana corrida' : ''}`,
         });
+        /* La provisión se libera solo si el devengo real existe (recién creado o ya contabilizado antes por la misma ref)
+           o si la comisión del mes es 0 (no hay nada que devengar). Si el motor devolvió null por SIN_REGLA / DESCUADRE /
+           MES_CERRADO, la provisión se queda hasta que el asiento entre (code-review 25-09-2026). */
+        let hayAsiento = !!idAsiento || totalReal <= 0;
+        if (!hayAsiento) {
+          const [[ya]] = await pool.query("SELECT id FROM ctb_comprobantes WHERE origen='COMISION_EJECUTIVOS' AND origen_ref=? AND estado='CONTABILIZADO' LIMIT 1", [refA]);
+          hayAsiento = !!ya;
+        }
         const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || 'Revisión de Comisiones';
-        await require('../../../contabilidad/src/provisiones').liberarEjecutivoPorAprobacion(ejecutivo, mes, null, quien, totalReal);
+        if (hayAsiento) await require('../../../contabilidad/src/provisiones').liberarEjecutivoPorAprobacion(ejecutivo, mes, null, quien, totalReal);
+        else console.warn(`[comisiones aprobar→contabilidad] sin asiento ${refA}: provisión del ejecutivo NO liberada (ver ctb_eventos_log)`);
       } catch (e) { console.error('[comisiones aprobar→contabilidad]', e.message); }
       // Saldo de descuentos manuales que la comisión del mes no alcanzó a cubrir → mes siguiente
       traslado = await require('./descuentos.controller').trasladarSaldo(ejecutivo, mes, filaAprobada, req).catch(e => { console.error('[traslado saldo]', e.message); return null; });

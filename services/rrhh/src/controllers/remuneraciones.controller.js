@@ -1491,8 +1491,14 @@ const emitir = async (req, res) => {
       evento: 'REMUNERACIONES', glosa: `Libro de remuneraciones ${mes}`, ref: `REM-${mes}`,
       fecha: (() => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); })(),   // último día del mes del libro (auditoría 24-09-2026, A4)
       montos: { haberes: Number(t.h), liquido: Number(t.l), descuentos: Number(t.d) },
-    }).then(() => {
-      // Entró el devengo real → se libera la provisión de sueldos del mes si el cierre la había constituido (motor único provisiones.js)
+    }).then(async (idAsiento) => {
+      // Entró el devengo real → se libera la provisión de sueldos del mes si el cierre la había constituido (motor único provisiones.js).
+      // Solo si el asiento existe (recién creado o ya contabilizado antes por la misma ref): si el motor devolvió null por
+      // SIN_REGLA / DESCUADRE / MES_CERRADO, la provisión se queda hasta que el asiento entre (code-review 25-09-2026).
+      if (!idAsiento) {
+        const [[ya]] = await pool.query("SELECT id FROM ctb_comprobantes WHERE origen='REMUNERACIONES' AND origen_ref=? AND estado='CONTABILIZADO' LIMIT 1", [`REM-${mes}`]);
+        if (!ya) { console.warn(`[remuneraciones emitir→provisión] sin asiento REMUNERACIONES para ${mes}: provisión de sueldos NO liberada (ver ctb_eventos_log)`); return; }
+      }
       const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || 'RRHH';
       const fLibro = (() => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); })();
       return require('../../../contabilidad/src/provisiones').liberarSueldos(mes, 'LIBRO', fLibro, quien, `Liquidaciones ${mes} emitidas (REMUNERACIONES, haberes $${Math.round(Number(t.h)).toLocaleString('es-CL')})`);
