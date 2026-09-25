@@ -170,6 +170,14 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
       ['4002060', 'DEBE',  'monto', 'Provisión indemnización años de servicio'],
       ['2106031', 'HABER', 'monto', 'Provisión indemnización por años de servicio'],
     ]],
+    ['PROV_IAS_APERTURA', 'Saldo inicial de la indemnización por años de servicio', 'Se usa UNA vez, al reconocer lo devengado en ejercicios anteriores que nunca se provisionó: va contra resultados acumulados (patrimonio), no contra el resultado del mes, porque el gasto se generó en años pasados. De ahí en adelante el devengo mensual entra por PROV_IAS. Campos: monto.', 'TRASPASO', 1, [
+      ['2703010', 'DEBE',  'monto', 'Saldo inicial indemnización años de servicio (ejercicios anteriores)'],
+      ['2106031', 'HABER', 'monto', 'Provisión indemnización por años de servicio'],
+    ]],
+    ['PROV_IAS_TRASPASO', 'Traspaso de una provisión de indemnización ya constituida', 'Mueve a la cuenta 2106031 una provisión de indemnización que ya estaba constituida en Provisión Finiquitos por Pagar (2106070), como el caso con demanda laboral que venía provisionando el contador. No toca resultado: es una reclasificación entre cuentas de pasivo. Campos: monto.', 'TRASPASO', 1, [
+      ['2106070', 'DEBE',  'monto', 'Traspaso desde Provisión Finiquitos por Pagar'],
+      ['2106031', 'HABER', 'monto', 'Provisión indemnización por años de servicio'],
+    ]],
     ['PROV_IAS_LIB', 'Liberación provisión indemnización por años de servicio', 'Se dispara al cerrar el finiquito de la persona (entra el gasto real por FINIQUITO_EMITIDO) o cuando sale sin derecho a indemnización: reversa lo provisionado de ese trabajador. Campos: monto.', 'TRASPASO', 1, [
       ['2106031', 'DEBE',  'monto', 'Liberación provisión indemnización años de servicio'],
       ['4002060', 'HABER', 'monto', 'Abono indemnización provisionada'],
@@ -1182,9 +1190,13 @@ async function liberarIas(idFila, motivo, fechaISO, usuario, contra = null) {
 /* Libera TODO lo acumulado de un trabajador: lo llama el cierre del finiquito (ahí entra el
    gasto real por FINIQUITO_EMITIDO) o la baja de alguien que sale sin indemnización. */
 async function liberarIasDeTrabajador(idUsuario, motivo = 'FINIQUITO', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
+  /* Se libera TODO lo del trabajador: las cuotas mensuales y también su saldo inicial
+     (origen APERTURA). Si quedara la apertura viva, el pasivo seguiría reconocido después
+     de pagado el finiquito. */
   const [filas] = await pool.query(
-    "SELECT * FROM ctb_provisiones WHERE concepto='IAS' AND estado='CONSTITUIDA' AND origen_tipo='TRABAJADOR_MES' AND origen_id LIKE ? ORDER BY mes",
-    [`IAS${Number(idUsuario)}|%`]);
+    `SELECT * FROM ctb_provisiones WHERE concepto='IAS' AND estado='CONSTITUIDA'
+       AND ((origen_tipo='TRABAJADOR_MES' AND origen_id LIKE ?) OR (origen_tipo='APERTURA' AND origen_id = ?)) ORDER BY mes`,
+    [`IAS${Number(idUsuario)}|%`, `IASAP${Number(idUsuario)}`]);
   let liberadas = 0, monto = 0;
   for (const p of filas) { const r = await _liberarFilaIas(p, motivo, fechaISO, usuario, contra); if (r && r.id) { liberadas++; monto += Number(p.monto); } }
   return { liberadas, monto };
@@ -1207,9 +1219,13 @@ async function sincronizarIas(usuario = 'Motor provisiones') {
     if (r && r.id && r.id_comprobante) out.constituidas++; else out.omitidas++;
   }
 
-  const [abiertas] = await pool.query("SELECT DISTINCT origen_id FROM ctb_provisiones WHERE concepto='IAS' AND estado='CONSTITUIDA'");
+  /* Solo las filas de trabajador (cuotas y apertura); las de DEMANDA no tienen usuario
+     y se liberan a mano cuando termina el juicio. */
+  const [abiertas] = await pool.query(
+    "SELECT DISTINCT origen_id FROM ctb_provisiones WHERE concepto='IAS' AND estado='CONSTITUIDA' AND origen_tipo IN ('TRABAJADOR_MES','APERTURA')");
   for (const a of abiertas) {
-    const idU = Number(String(a.origen_id).replace(/^IAS/, '').split('|')[0]);
+    const m = /^IAS(?:AP)?(\d+)/.exec(String(a.origen_id));
+    const idU = m ? Number(m[1]) : 0;
     if (!idU) continue;
     const [[u]] = await pool.query("SELECT DATE_FORMAT(fecha_baja,'%Y-%m-%d') baja FROM usuarios WHERE id_usuario=?", [idU]);
     let fin = null;
@@ -1222,6 +1238,67 @@ async function sincronizarIas(usuario = 'Motor provisiones') {
     out.liberadas += x.liberadas;
   }
   return out;
+}
+
+/* ── Saldo inicial de la IAS (una sola vez) ─────────────────────────────────────
+   Lo devengado hasta `hasta` y nunca provisionado: por trabajador, base del finiquito
+   topada a 90 UF por sus años de servicio (topados a 11), que es exactamente lo que
+   habría que pagarle si se le indemnizara ese día. Va contra resultados acumulados
+   (decisión de Pato, 25-09-2026): es gasto de ejercicios anteriores, no del mes.
+   De ahí en adelante manda la cuota mensual de PROV_IAS. */
+async function constituirAperturaIas(idUsuario, hasta = '2026-08', usuario = 'Apertura IAS') {
+  const C = CONCEPTOS.IAS;
+  try {
+    const origenId = `IASAP${idUsuario}`;
+    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto='IAS' AND origen_tipo='APERTURA' AND origen_id=?", [origenId]);
+    if (ya) return { skip: 'ya ' + ya.estado.toLowerCase(), id: ya.id };
+    const q = await cuotaIas(idUsuario, hasta);
+    if (q.skip) return q;
+    if (!(q.anos > 0)) return { skip: 'sin años completos todavía' };
+    const monto = Math.round(q.base_topada * q.anos);
+    const fecha = await fechaContable(ultimoDiaMes(hasta));
+    const [ins] = await pool.query(
+      `INSERT IGNORE INTO ctb_provisiones (concepto, origen_tipo, origen_id, tercero, rut_tercero, mes, fecha_constitucion, monto, base_bruta, montos_json, creado_por)
+       VALUES ('IAS','APERTURA',?,?,?,?,?,?,?,?,?)`,
+      [origenId, q.nombre, q.rut, hasta, fecha, monto, q.base_topada,
+       JSON.stringify({ montos: { monto }, id_usuario: idUsuario, base: q.base, base_topada: q.base_topada, anos: q.anos, apertura: true }), usuario]);
+    if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
+    const id = await contabilizar({
+      evento: 'PROV_IAS_APERTURA', fecha, ref: `PROV-IAS-AP-${idUsuario}`, montos: { monto },
+      glosa: `Saldo inicial indemnización años de servicio al ${fecha} — ${q.nombre}`.slice(0, 300), rut: q.rut,
+      detalle: `${q.anos} año(s) × base $${q.base_topada.toLocaleString('es-CL')} · devengado de ejercicios anteriores`,
+    });
+    if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); return { error: 'sin asiento (ver log del motor)' }; }
+    await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
+    return { id: ins.insertId, monto, anos: q.anos, id_comprobante: id };
+  } catch (e) { console.error('[provisiones aperturaIas]', idUsuario, e.message); return { error: e.message }; }
+}
+
+/* Provisión de una indemnización que YA estaba constituida en 2106070 (caso con demanda
+   laboral de alguien que ya no trabaja acá). Se traspasa de cuenta, no se vuelve a gastar. */
+async function traspasarDemandaIas({ clave, nombre, rut, monto, detalle, fecha: fechaISO, mes }, usuario = 'Apertura IAS') {
+  try {
+    const origenId = `IASDEM-${String(clave).toUpperCase()}`;
+    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto='IAS' AND origen_tipo='DEMANDA' AND origen_id=?", [origenId]);
+    if (ya) return { skip: 'ya ' + ya.estado.toLowerCase(), id: ya.id };
+    const total = Math.round(Number(monto) || 0);
+    if (total <= 0) return { skip: 'sin monto' };
+    const fecha = await fechaContable(fechaISO);
+    const [ins] = await pool.query(
+      `INSERT IGNORE INTO ctb_provisiones (concepto, origen_tipo, origen_id, tercero, rut_tercero, mes, fecha_constitucion, monto, base_bruta, montos_json, creado_por)
+       VALUES ('IAS','DEMANDA',?,?,?,?,?,?,?,?,?)`,
+      [origenId, nombre, rut || null, mes || fecha.slice(0, 7), fecha, total, total,
+       JSON.stringify({ montos: { monto: total }, demanda: true, detalle: detalle || null }), usuario]);
+    if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
+    const id = await contabilizar({
+      evento: 'PROV_IAS_TRASPASO', fecha, ref: `PROV-IAS-DEM-${String(clave).toUpperCase()}`, montos: { monto: total },
+      glosa: `Traspaso provisión indemnización (demanda laboral) — ${nombre}`.slice(0, 300), rut: rut || null,
+      detalle: detalle || 'Venía en 2106070 Provisión Finiquitos por Pagar',
+    });
+    if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); return { error: 'sin asiento (ver log del motor)' }; }
+    await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
+    return { id: ins.insertId, monto: total, id_comprobante: id };
+  } catch (e) { console.error('[provisiones demandaIas]', e.message); return { error: e.message }; }
 }
 
 /* Detalle detrás de cada cuadro (pop-up y Excel). tipo: INICIAL | CONSTITUIDO | LIBERADO | VIGENTE | CUENTA */
@@ -1265,4 +1342,4 @@ module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constit
   constituirEjecutivoMes, liberarEjecutivo, liberarEjecutivoPorAprobacion, sincronizarEjecutivo, comisionesMotorMes,
   constituirSueldos, liberarSueldos, sincronizarSueldos, proyeccionSueldos,
   constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, tratamientoDe, baseNetaODP, desgloseODP, esProveedorParque, tieneDevengoPropio,
-  cuotaIas, constituirIas, liberarIas, liberarIasDeTrabajador, sincronizarIas, cuadro, detalle };
+  cuotaIas, constituirIas, constituirAperturaIas, traspasarDemandaIas, liberarIas, liberarIasDeTrabajador, sincronizarIas, cuadro, detalle };
