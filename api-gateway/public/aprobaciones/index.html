@@ -1672,12 +1672,17 @@ async function cargarVendedores(rutDealer){
   sel.innerHTML = '<option value="">— Seleccione —</option>' +
     VEND_CACHE.map(v => `<option value="${v.nombre}">${v.nombre}</option>`).join('') +
     '<option value="__NUEVO__">➕ No está en la lista — agregar vendedor…</option>';
-  // si la carta traía un vendedor que no está en la base, conservarlo como opción
-  if (actual && !VEND_CACHE.some(v => v.nombre === actual)) {
+  /* Si la carta traía un vendedor que no está en la base, conservarlo como opción.
+     La comparación ignora mayúsculas y acentos: las cartas viejas guardaron el nombre
+     en MAYÚSCULAS y el maestro está en Nombre Propio — si no, el mismo vendedor
+     aparecía dos veces y el select quedaba sin selección. */
+  const mismo = (a, b) => window.AF_NOMBRES ? AF_NOMBRES.mismoNombre(a, b) : String(a) === String(b);
+  const enBase = actual ? VEND_CACHE.find(v => mismo(v.nombre, actual)) : null;
+  if (actual && !enBase) {
     const o = document.createElement('option'); o.value = o.textContent = actual;
     sel.insertBefore(o, sel.lastElementChild);
   }
-  if (actual) sel.value = actual;
+  if (actual) sel.value = enBase ? enBase.nombre : actual;
   onVendedorSel();
 }
 function onVendedorSel(){
@@ -1704,11 +1709,13 @@ async function resolverVendedorNuevo(){
       body: JSON.stringify({ rut_dealer: rutDealer, nombre, rut, mail }) }).then(r => r.json());
     if (!j.success) { alert(j.error || 'No se pudo agregar el vendedor.'); return false; }
   } catch (e) { alert('No se pudo agregar el vendedor: ' + e.message); return false; }
-  document.getElementById('cVendedor').value = nombre.toUpperCase();
+  // Mismo formato que guarda el servidor (nombres-core): si no, el select no lo encuentra
+  const nomFmt = window.AF_NOMBRES ? AF_NOMBRES.persona(nombre) : nombre;
+  document.getElementById('cVendedor').value = nomFmt;
   await cargarVendedores(rutDealer);
-  document.getElementById('cVendedorSel').value = nombre.toUpperCase();
+  document.getElementById('cVendedorSel').value = nomFmt;
   onVendedorSel();
-  document.getElementById('cVendedor').value = nombre.toUpperCase();
+  document.getElementById('cVendedor').value = nomFmt;
   return true;
 }
 function onTipoCarta(){
@@ -3256,7 +3263,8 @@ async function imprimirCarta(id){
     .val { background:#fff; color:#333; }
     img { max-width:100%; }
     p { margin:2px 0; }
-  </style></head><body>${cartaHTML(c, false, qr)}</body></html>`);
+  </style></head><body>${cartaHTML(c, false, qr)}
+</body></html>`);
   w.document.close();
   setTimeout(() => { w.focus(); w.print(); }, 600);
 }
@@ -4471,5 +4479,6 @@ async function reversarEnvio(id, dealer, mes){
   } catch(e){ alert('Error de conexión'); }
 }
 </script>
+<script src="/js/nombres-core.js"></script>
 </body>
 </html>

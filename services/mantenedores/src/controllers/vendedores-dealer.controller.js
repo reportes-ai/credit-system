@@ -4,6 +4,7 @@
    ejecutivo lo agrega desde la misma carta (nombre + RUT + mail). */
 const pool = require('../../../../shared/config/database');
 const RUT  = require('../../../../api-gateway/public/js/rut-core');
+const NOM  = require('../../../../api-gateway/public/js/nombres-core');   // el vendedor es una PERSONA: Nombre Propio
 
 require('../../../../shared/migrate').enFila('vendedores-dealer', async () => {
   await pool.query(`CREATE TABLE IF NOT EXISTS vendedores_dealer (
@@ -49,7 +50,7 @@ exports.crear = async (req, res) => {
   try {
     let { rut_dealer, nombre, rut, mail } = req.body || {};
     rut_dealer = normRut(rut_dealer);
-    nombre = String(nombre || '').trim().toUpperCase();
+    nombre = NOM.persona(nombre);
     rut = normRut(rut);
     mail = String(mail || '').trim().toLowerCase() || null;
     if (!rut_dealer) return res.status(400).json({ success: false, data: null, error: 'Falta el RUT del dealer' });
@@ -76,7 +77,7 @@ exports.editar = async (req, res) => {
     if (!id) return res.status(400).json({ success: false, data: null, error: 'ID inválido' });
     const b = req.body || {};
     const sets = [], params = [];
-    if (b.nombre !== undefined) { sets.push('nombre=?'); params.push(String(b.nombre).trim().toUpperCase()); }
+    if (b.nombre !== undefined) { sets.push('nombre=?'); params.push(NOM.persona(b.nombre)); }
     if (b.rut !== undefined) {
       const r = normRut(b.rut);
       if (!r || !RUT.validar(r)) return res.status(400).json({ success: false, data: null, error: 'RUT inválido' });
