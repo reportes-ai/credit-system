@@ -201,7 +201,7 @@ router.get('/provisiones/categorias-gasto', verifyToken, requireFunc('ctb_provis
   try {
     const pool = require('../../../../shared/config/database');
     const [filas] = await pool.query(
-      `SELECT g.categoria, g.cuenta, g.activo, c.nombre cuenta_nombre,
+      `SELECT g.categoria, g.cuenta, g.tratamiento, g.activo, c.nombre cuenta_nombre,
               (SELECT COUNT(*) FROM ordenes_pago o WHERE UPPER(TRIM(o.categoria))=g.categoria AND UPPER(COALESCE(o.estado,''))<>'ANULADA') odps
          FROM ctb_gasto_categorias g LEFT JOIN ctb_cuentas c ON c.codigo=g.cuenta
         ORDER BY (g.cuenta IS NULL) DESC, g.categoria`);
@@ -233,6 +233,7 @@ router.get('/provisiones/categorias-gasto/ordenes', verifyToken, requireFunc('ct
       f.es_parque = await prov.esProveedorParque(f.proveedor_rut);
       f.devengo_propio = prov.tieneDevengoPropio(f);   // comisiones, remuneraciones, finiquitos, anticipos y préstamos
       f.categoria = cat;
+      f.base = await prov.baseNetaODP(f);   // lo que se provisionaría con el tratamiento vigente
       f.desde = f.fecha_emision >= `${desde}-01`;
     }
     // Los pagos recurrentes de ese mismo tipo de pago (la categoría también los cubre)
@@ -249,19 +250,28 @@ router.put('/provisiones/categorias-gasto', verifyToken, requireFunc('ctb_provis
     const pool = require('../../../../shared/config/database');
     const categoria = String(req.body?.categoria || '').trim().toUpperCase();
     const cuenta = String(req.body?.cuenta || '').trim() || null;
+    const trat = String(req.body?.tratamiento || '').trim().toUpperCase() || null;
     if (!categoria) return res.status(400).json({ success: false, data: null, error: 'Falta la categoría' });
+    if (trat && !['IVA', 'EXENTO', 'RET'].includes(trat)) return res.status(400).json({ success: false, data: null, error: 'Tratamiento inválido' });
     if (cuenta) {
       const [[c]] = await pool.query("SELECT codigo FROM ctb_cuentas WHERE codigo=? AND imputable=1", [cuenta]);
       if (!c) return res.status(400).json({ success: false, data: null, error: 'La cuenta no existe o no es imputable' });
     }
     const u = req.usuario || {};
     const quien = [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || 'Usuario';
+    /* Se actualiza solo lo que viene: la pantalla manda un campo a la vez (cuenta o tratamiento)
+       y el otro no se puede pisar con null. */
+    const traeCuenta = Object.prototype.hasOwnProperty.call(req.body || {}, 'cuenta');
+    const traeTrat = Object.prototype.hasOwnProperty.call(req.body || {}, 'tratamiento');
     await pool.query(
-      `INSERT INTO ctb_gasto_categorias (categoria, cuenta, updated_at, actualizado_por) VALUES (?,?,NOW(),?)
-       ON DUPLICATE KEY UPDATE cuenta=VALUES(cuenta), updated_at=NOW(), actualizado_por=VALUES(actualizado_por)`, [categoria, cuenta, quien]);
+      `INSERT INTO ctb_gasto_categorias (categoria, cuenta, tratamiento, updated_at, actualizado_por) VALUES (?,?,?,NOW(),?)
+       ON DUPLICATE KEY UPDATE ${traeCuenta ? 'cuenta=VALUES(cuenta),' : ''} ${traeTrat ? 'tratamiento=VALUES(tratamiento),' : ''}
+                               updated_at=NOW(), actualizado_por=VALUES(actualizado_por)`, [categoria, cuenta, trat, quien]);
+    const TXT = { IVA: 'afecto a IVA (se provisiona el neto)', EXENTO: 'exento (se provisiona el total)', RET: 'honorarios (se provisiona el bruto)' };
     require('../../../../shared/audit').auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'provisiones_categoria', entidad_id: categoria,
-      detalle: `Cuenta de gasto de la categoría ${categoria}: ${cuenta || '(sin cuenta)'}` });
-    res.json({ success: true, data: { categoria, cuenta }, error: null });
+      detalle: traeTrat ? `Tratamiento tributario de la categoría ${categoria}: ${TXT[trat] || 'según el documento de la orden'}`
+                        : `Cuenta de gasto de la categoría ${categoria}: ${cuenta || '(sin cuenta)'}` });
+    res.json({ success: true, data: { categoria, cuenta, tratamiento: trat }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 });
 router.post('/provisiones/:id/liberar', verifyToken, requireFunc('ctb_provisiones'), async (req, res) => {

@@ -76,7 +76,12 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
     activo    TINYINT(1) NOT NULL DEFAULT 1,
     updated_at DATETIME NULL, actualizado_por VARCHAR(160) NULL)`);
   // ARRIENDOS es la única inequívoca del plan de cuentas (4002100 ARRIENDOS); el resto nace sin cuenta.
-  await pool.query("INSERT IGNORE INTO ctb_gasto_categorias (categoria, cuenta) VALUES ('ARRIENDOS','4002100'), ('ARRIENDO','4002100')");
+  /* Tratamiento tributario de la categoría: IVA (afecto) | EXENTO | RET (honorarios).
+     NULL = seguir el tipo de documento declarado en la orden, que es lo que se hacía antes.
+     Nació porque el tipo de documento lo escribe quien emite la ODP y a veces no dice "Factura":
+     el arriendo de oficina de $3.496.130 se iba a provisionar al bruto (IVA incluido) por eso. */
+  await pool.query("ALTER TABLE ctb_gasto_categorias ADD COLUMN IF NOT EXISTS tratamiento VARCHAR(10) NULL");
+  await pool.query("INSERT IGNORE INTO ctb_gasto_categorias (categoria, cuenta, tratamiento) VALUES ('ARRIENDOS','4002100','IVA'), ('ARRIENDO','4002100','IVA')");
   await pool.query(`INSERT IGNORE INTO ctb_gasto_categorias (categoria, cuenta)
     SELECT DISTINCT UPPER(TRIM(categoria)), NULL FROM ordenes_pago WHERE categoria IS NOT NULL AND TRIM(categoria) <> ''`).catch(() => {});
   await pool.query(`INSERT IGNORE INTO ctb_gasto_categorias (categoria, cuenta)
@@ -786,13 +791,35 @@ async function cuentaGastoDe(categoria) {
   return r && r.cuenta ? String(r.cuenta) : null;
 }
 
-/* Base del gasto de una ODP: NETO en facturas afectas (el IVA crédito nace con el documento) y
-   TOTAL en boletas, honorarios y exentos, donde no hay IVA que separar (auditoría 24-09, M2). */
+/* Tratamiento tributario configurado para la categoría: 'IVA' | 'EXENTO' | 'RET' | null. */
+async function tratamientoDe(categoria) {
+  const cat = String(categoria || '').trim().toUpperCase();
+  if (!cat) return null;
+  const [[r]] = await pool.query('SELECT tratamiento FROM ctb_gasto_categorias WHERE categoria=? AND activo=1', [cat]);
+  const t = r && r.tratamiento ? String(r.tratamiento).toUpperCase() : null;
+  return ['IVA', 'EXENTO', 'RET'].includes(t) ? t : null;
+}
+/* Tipo de documento equivalente a un tratamiento, para hablarle al motor único calcularDoc. */
+const TIPO_DE_TRAT = { IVA: 'Factura', RET: 'Boleta de Honorarios', EXENTO: 'Factura Exenta' };
+
+/* Base del gasto de una ODP. Manda el tratamiento de la categoría; si no está configurado, se sigue
+   el tipo de documento declarado en la orden (conducta anterior).
+     IVA    → el NETO: el IVA crédito nace recién con la factura.
+     EXENTO → el total, no hay IVA que separar.
+     RET    → el BRUTO de la boleta: el gasto es el honorario completo y la retención es un pasivo
+              (auditoría 24-09, M2: boleta al bruto). */
 async function baseNetaODP(op) {
   const bruto = Math.round(Number(op.monto_bruto) || Number(op.monto) || 0);
-  const td = String(op.tipo_documento || '');
-  const afecta = /factura/i.test(td) && !/exent/i.test(td);
-  if (!afecta) return bruto;
+  const trat = (await tratamientoDe(op.categoria)) ||
+    (/factura/i.test(String(op.tipo_documento || '')) && !/exent/i.test(String(op.tipo_documento || '')) ? 'IVA'
+      : /honorario/i.test(String(op.tipo_documento || '')) ? 'RET' : 'EXENTO');
+  if (trat === 'EXENTO') return bruto;
+  if (trat === 'RET') {
+    if (Math.round(Number(op.monto_bruto) || 0) > 0) return Math.round(Number(op.monto_bruto));
+    const { calcularDoc } = require('../../ordenes-pago/src/controllers/ordenes-pago.controller');
+    const m = await calcularDoc('Boleta de Honorarios', 'NETO', Math.round(Number(op.monto) || 0));   // el monto de la ODP es el líquido
+    return Math.round(Number(m.bruto) || bruto);
+  }
   const neto = Math.round(Number(op.monto_neto) || 0);
   return neto > 0 ? neto : Math.round(bruto / await ivaFactor());
 }
@@ -863,7 +890,8 @@ async function constituirRecurrente(idPago, mes, usuario = 'Motor provisiones') 
     const tc = await require('../../../shared/tipo-cambio').tipoCambio(p.moneda, hoyISO());
     const brutoCLP = Math.round(Number(p.monto_origen) * tc);
     const { calcularDoc } = require('../../ordenes-pago/src/controllers/ordenes-pago.controller');
-    const m = await calcularDoc(p.tipo_documento || 'Factura', 'BRUTO', brutoCLP);
+    const trat = await tratamientoDe(p.tipo_pago);
+    const m = await calcularDoc(trat ? TIPO_DE_TRAT[trat] : (p.tipo_documento || 'Factura'), 'BRUTO', brutoCLP);
     const monto = m.clase === 'IVA' ? Math.round(Number(m.neto) || 0) : Math.round(Number(m.bruto) || brutoCLP);
     if (monto <= 0) return { skip: 'sin monto' };
     const fecha = await fechaContable(p.venc && p.venc.slice(0, 7) === mes ? p.venc : ultimoDiaMes(mes));
@@ -1024,4 +1052,4 @@ module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constit
   constituirParque, liberarParque, liberarParquePorPago, sincronizarParque,
   constituirEjecutivoMes, liberarEjecutivo, liberarEjecutivoPorAprobacion, sincronizarEjecutivo, comisionesMotorMes,
   constituirSueldos, liberarSueldos, sincronizarSueldos, proyeccionSueldos,
-  constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, esProveedorParque, tieneDevengoPropio, cuadro, detalle };
+  constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, tratamientoDe, baseNetaODP, esProveedorParque, tieneDevengoPropio, cuadro, detalle };
