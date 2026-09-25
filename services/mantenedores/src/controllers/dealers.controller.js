@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const almacen = require('../../../../shared/almacen-docs');   // los documentos van al bucket, nunca a un LONGBLOB nuevo
 const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico al guardar
 
 const ensureTable = () => pool.query(`CREATE TABLE IF NOT EXISTS dealers (
@@ -25,6 +26,27 @@ const ensureTable = () => pool.query(`CREATE TABLE IF NOT EXISTS dealers (
 )`);
 
 ensureTable().catch(e => console.error('dealers table init:', e.message));
+
+// Otros documentos de la ficha del dealer (lo que no calza en una categoría fija:
+// poderes, mandatos, correos, respaldos varios). Los archivos van al bucket vía
+// shared/almacen-docs; la columna `data` existe SOLO como fallback cuando no hay
+// GCS_BUCKET (local y staging). Ver docs/ALMACEN-documentos.md.
+require('../../../../shared/migrate').enFila('dealer_documentos', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS dealer_documentos (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    id_dealer   INT          NOT NULL,
+    nombre      VARCHAR(200) NULL,
+    descripcion VARCHAR(300) NULL,
+    mime        VARCHAR(100) NULL,
+    data        LONGBLOB     NULL,
+    doc_storage VARCHAR(10)  NOT NULL DEFAULT 'db',
+    doc_ruta    VARCHAR(500) NULL,
+    doc_bytes   BIGINT       NULL,
+    subido_por  VARCHAR(200) NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_dealer (id_dealer)
+  )`);
+});
 
 // Dealers AMBOS (Calle+Parque): segunda tabla de comisión PARQUE + dirección de parque.
 // Boot-migration para que el cálculo de créditos y el mantenedor lean estas columnas
@@ -716,4 +738,73 @@ const deleteZonaParque = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
 
-module.exports = { getDealers, getDealer, getCcsList, importar, createDealer, updateDealer, deleteDealer, getMapa, geocodificar, getDirecciones, setDireccion, getLocales, saveLocal, deleteLocal, getZonaParque, updateZonaParque, createZonaParque, deleteZonaParque };
+/* ── Otros documentos de la ficha del dealer ──────────────────────────────── */
+const MAX_DOCS = 20;
+const MAX_MB   = 15;
+
+/* GET /api/dealers/:id/documentos — lista (sin el contenido). */
+const getDocumentos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, nombre, descripcion, mime, doc_bytes, subido_por, created_at
+         FROM dealer_documentos WHERE id_dealer=? ORDER BY id DESC`, [Number(req.params.id)]);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { (console.error('[dealer documentos]', e), res.status(500).json({ success:false, data:null, error:'Error interno del servidor' })); }
+};
+
+/* POST /api/dealers/:id/documentos — sube un documento (base64 en el body). */
+const subirDocumento = async (req, res) => {
+  try {
+    const idDealer = Number(req.params.id);
+    const { archivo_nombre, mime_type, archivo_data, descripcion } = req.body || {};
+    if (!archivo_data) return res.status(400).json({ success: false, data: null, error: 'Falta el archivo' });
+    const [[d]] = await pool.query('SELECT id_dealer, rut, nombre_indexa, nombre_razon FROM dealers WHERE id_dealer=?', [idDealer]);
+    if (!d) return res.status(404).json({ success: false, data: null, error: 'Dealer no encontrado' });
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM dealer_documentos WHERE id_dealer=?', [idDealer]);
+    if (n >= MAX_DOCS) return res.status(400).json({ success: false, data: null, error: `Máximo ${MAX_DOCS} documentos por dealer` });
+    const buffer = Buffer.from(String(archivo_data), 'base64');
+    if (!buffer.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
+    if (buffer.length > MAX_MB * 1024 * 1024) return res.status(400).json({ success: false, data: null, error: `El archivo supera los ${MAX_MB} MB` });
+
+    const doc = await almacen.colocar({ ambito: 'dealers-docs', clave: idDealer, buffer, mime: mime_type, nombre: archivo_nombre || 'archivo' });
+    const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || null;
+    const [r] = await pool.query(
+      `INSERT INTO dealer_documentos (id_dealer, nombre, descripcion, mime, data, doc_storage, doc_ruta, doc_bytes, subido_por)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [idDealer, archivo_nombre || 'archivo', (descripcion || '').trim() || null,
+       mime_type || 'application/octet-stream', doc.blob, doc.storage, doc.ruta, doc.bytes, quien]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: idDealer, rut: d.rut,
+      detalle: `Subió documento al dealer "${d.nombre_razon || d.nombre_indexa || ''}": ${archivo_nombre || ''}` });
+    res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) { (console.error('[dealer documento subir]', e), res.status(500).json({ success:false, data:null, error:'Error interno del servidor' })); }
+};
+
+/* GET /api/dealers/:id/documentos/:idDoc — sirve el documento. */
+const verDocumento = async (req, res) => {
+  try {
+    const [[a]] = await pool.query(
+      'SELECT nombre, mime, data, doc_ruta FROM dealer_documentos WHERE id=? AND id_dealer=?',
+      [Number(req.params.idDoc), Number(req.params.id)]);
+    if (!a || (!a.data && !a.doc_ruta)) return res.status(404).json({ success: false, data: null, error: 'Sin archivo' });
+    auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'mantenedores', entidad: 'dealer', entidad_id: Number(req.params.id),
+      detalle: `Visualizó documento del dealer #${req.params.id}: ${a.nombre || ''}` });
+    return almacen.servir(res, { ruta: a.doc_ruta, blob: a.data, nombre: a.nombre || 'archivo', mime: a.mime });
+  } catch (e) { (console.error('[dealer documento ver]', e), res.status(500).json({ success:false, data:null, error:'Error interno del servidor' })); }
+};
+
+/* DELETE /api/dealers/:id/documentos/:idDoc
+   Capturar doc_ruta ANTES del DELETE y borrar el objeto DESPUÉS (regla del almacén). */
+const borrarDocumento = async (req, res) => {
+  try {
+    const idDealer = Number(req.params.id), idDoc = Number(req.params.idDoc);
+    const [[doc]] = await pool.query('SELECT doc_ruta, nombre FROM dealer_documentos WHERE id=? AND id_dealer=?', [idDoc, idDealer]);
+    if (!doc) return res.status(404).json({ success: false, data: null, error: 'Documento no encontrado' });
+    await pool.query('DELETE FROM dealer_documentos WHERE id=? AND id_dealer=?', [idDoc, idDealer]);
+    if (doc.doc_ruta) await almacen.borrar(doc.doc_ruta);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: idDealer,
+      detalle: `Eliminó documento del dealer #${idDealer}: ${doc.nombre || ''}` });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { (console.error('[dealer documento eliminar]', e), res.status(500).json({ success:false, data:null, error:'Error interno del servidor' })); }
+};
+
+module.exports = { getDealers, getDealer, getCcsList, importar, createDealer, updateDealer, deleteDealer, getMapa, geocodificar, getDirecciones, setDireccion, getLocales, saveLocal, deleteLocal, getZonaParque, updateZonaParque, createZonaParque, deleteZonaParque, getDocumentos, subirDocumento, verDocumento, borrarDocumento };

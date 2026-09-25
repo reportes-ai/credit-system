@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.13 — Datos bancarios editables completos: tipo de cuenta, titular de la cuenta y si es de EMPRESA o PERSONA (poder a un tercero); el TEF sale con RUT Pago + titular. v2.12 — Banco de la ficha con lista del mantenedor Bancos de la Plaza. v2.11 — ?ver=<id> abre la ficha directo (link desde Atención Remota → Solicitudes). v2.10 — Zona-Parque-Dealer: razones sociales largas abreviadas a EIRL en BD y columna Sucursal acotada · v2.9 — Potencial: columnas RUT y Zona; posiciones de dealers presentes en Zona-Parque-Dealer se leen de esa base (fuente unica, bloqueadas aqui) · v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.14 — Otros documentos en la ficha del dealer: boton para adjuntar respaldos libres (poderes, mandatos, correos) en creacion y en mantencion; van al bucket via shared/almacen-docs (tabla dealer_documentos) y quedan auditados. v2.13 — Datos bancarios editables completos: tipo de cuenta, titular de la cuenta y si es de EMPRESA o PERSONA (poder a un tercero); el TEF sale con RUT Pago + titular. v2.12 — Banco de la ficha con lista del mantenedor Bancos de la Plaza. v2.11 — ?ver=<id> abre la ficha directo (link desde Atención Remota → Solicitudes). v2.10 — Zona-Parque-Dealer: razones sociales largas abreviadas a EIRL en BD y columna Sucursal acotada · v2.9 — Potencial: columnas RUT y Zona; posiciones de dealers presentes en Zona-Parque-Dealer se leen de esa base (fuente unica, bloqueadas aqui) · v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -365,6 +365,7 @@
     <li><b>Datos del dealer</b> (nombre, RUT, dirección, contacto, cuenta bancaria) → es la <b>fuente única</b>: los lee la carta de aprobación, la cartola de comisiones, la orden de pago al dealer y el <a href="/mantenedores/dealers-mapa/">Mapa de Dealers</a>.</li>
     <li><b>Comisión pactada</b> (calle y parque) → alimenta el cálculo de comisión de cada operación. La tabla base se fija por <a href="/dealers-incorporacion/">ficha aprobada</a>.</li>
     <li><b>Locales del dealer</b> (multi-parque + calle) → cada local tiene su tabla de comisión propia (<code>dealer_comisiones</code>); el motor cobra por el local donde cursó <b>cada operación</b> (columna PARQUE de la op). Afecta el cálculo de comisión dealer al guardar y en el <b>recálculo mensual</b>, la comisión sugerida de la <a href="/cartas-aprobacion/">carta de aprobación</a> y la <a href="/postventa/cartolas-parque/">cartola del parque</a> correspondiente. Calle no paga parque (por eso su % es más alto).</li>
+    <li><b>Otros documentos</b> (bloque al pie de la ficha, en creación y en mantención) → respaldos libres del dealer: poderes para depositar a un tercero, mandatos, correos de autorización. Se guardan en el bucket (<code>dealer_documentos</code>, nunca en la base) y quedan disponibles desde la misma ficha. Subir y eliminar exige el permiso de editar la ficha (<code>dealer_ficha_revisar</code> / <code>dealers_base_editar</code>); toda subida, visualización y borrado queda en <a href="/auditoria/">Auditoría</a>. En un dealer nuevo los archivos quedan en cola y se suben al guardar.</li>
     <li><b>Activo / Inactivo</b> → marca al dealer sin ventas hace 3 meses. <b>No bloquea</b> cursar operaciones: es un indicador comercial.</li>
     <li><b>Categoría asignada</b> → define la pizarra de comisión por defecto y los informes comerciales. Rangos y colores en <a href="/mantenedores/dealer-categorias/">Variables de categorías</a>.</li>
     <li><b>Posiciones y ventas mensuales</b> (pestaña Potencial) → alimentan el <b>potencial de crecimiento</b> por parque y dealer. Si el dealer existe en la base <b>Zona - Parque - Dealer</b>, sus posiciones se leen de allá (fuente única) y aquí quedan bloqueadas. Factor y rangos de diagnóstico en <a href="/mantenedores/potencial-dealer/">Variables del cálculo</a>.</li>
@@ -482,6 +483,24 @@
 
         <div class="section-label">OBSERVACIONES</div>
         <textarea class="form-control form-control-sm" id="fObs" rows="2"></textarea>
+
+        <div class="section-label">OTROS DOCUMENTOS</div>
+        <div class="row g-2 align-items-end">
+          <div class="col-md-8">
+            <label class="form-label">Descripción (opcional)</label>
+            <input type="text" class="form-control form-control-sm" id="fDocDesc" placeholder="Ej: poder para depositar a tercero, mandato, correo de autorización">
+          </div>
+          <div class="col-md-4">
+            <label class="btn-guardar" style="display:block;text-align:center;cursor:pointer;margin:0">
+              <i class="bi bi-paperclip me-1"></i>Subir documento
+              <input type="file" hidden id="fDocInput" onchange="subirDoc(this)">
+            </label>
+          </div>
+          <div class="col-12" style="font-size:.78rem;color:#64748b">
+            <i class="bi bi-info-circle me-1"></i>Hasta 20 documentos por dealer, máximo 15 MB cada uno. Quedan guardados en la ficha y toda subida, descarga y borrado queda auditado.
+          </div>
+        </div>
+        <div id="docsLista" style="margin-top:8px"></div>
       </div>
       <div class="modal-footer" style="border-top:1px solid #f1f5f9">
         <button class="btn-cancelar" data-bs-dismiss="modal">Cancelar</button>
@@ -1325,6 +1344,9 @@ function abrirEditarDirecto(d) {
   document.getElementById('fNombreCuenta').value = d.nombre_cuenta || '';
   document.getElementById('fCuentaTipo').value = d.cuenta_tipo || '';
   document.getElementById('fObs').value        = d.observaciones || '';
+  docsPendientes = [];
+  document.getElementById('fDocDesc').value = '';
+  cargarDocs();
   new bootstrap.Modal(document.getElementById('modalForm')).show();
 }
 
@@ -1337,6 +1359,9 @@ function abrirNuevo() {
   { const _fni = document.getElementById('fNombreIndexa'); _fni.dataset.full = ''; _fni.dataset.parque = ''; }
   document.getElementById('fActivo').value  = '1';
   document.getElementById('fFactura').value = '0';
+  document.getElementById('fDocDesc').value = '';
+  docsPendientes = [];
+  cargarDocs();
   new bootstrap.Modal(document.getElementById('modalForm')).show();
 }
 
@@ -1370,9 +1395,119 @@ async function guardar() {
   const res    = await fetch(url, { method, headers: H, body: JSON.stringify(body) });
   const json   = await res.json();
   if (json.success) {
+    // Dealer nuevo: recién ahora existe el id, así que subimos los documentos que
+    // quedaron en cola mientras se llenaba el formulario.
+    if (!id && json.data?.id_dealer && docsPendientes.length) {
+      const errores = await subirPendientes(json.data.id_dealer);
+      if (errores.length) alert('El dealer se creó, pero no se pudieron subir:\n' + errores.join('\n'));
+    }
+    docsPendientes = [];
     bootstrap.Modal.getInstance(document.getElementById('modalForm')).hide();
     cargar(); cargarCcs();
   } else alert('Error: ' + json.error);
+}
+
+/* ---- OTROS DOCUMENTOS DE LA FICHA ----
+   En edición se suben al tiro. En creación todavía no hay id_dealer, así que quedan
+   en cola y se suben apenas guardar() crea el dealer. */
+let docsPendientes = [];
+
+function tamDoc(b) {
+  if (!b && b !== 0) return '';
+  return b < 1024*1024 ? (b/1024).toFixed(0) + ' KB' : (b/1024/1024).toFixed(1) + ' MB';
+}
+
+function filaDoc(html) {
+  return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;font-size:.84rem">${html}</div>`;
+}
+
+async function cargarDocs() {
+  const cont = document.getElementById('docsLista');
+  const id   = document.getElementById('fId').value;
+  let html = '';
+
+  if (id) {
+    try {
+      const j = await (await fetch(`/api/dealers/${id}/documentos`, { headers: H })).json();
+      (j.data || []).forEach(d => {
+        const meta = [d.descripcion, tamDoc(d.doc_bytes), d.subido_por, (d.created_at || '').slice(0,10)].filter(Boolean).join(' · ');
+        html += filaDoc(`
+          <i class="bi bi-file-earmark-text" style="color:#0141A2"></i>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.nombre || 'archivo'}</div>
+            <div style="color:#64748b;font-size:.76rem">${meta}</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="verDoc(${d.id})"><i class="bi bi-eye"></i></button>
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="borrarDoc(${d.id},'${(d.nombre || '').replace(/'/g, "\\'")}')"><i class="bi bi-trash"></i></button>`);
+      });
+    } catch { html += '<div style="color:#b91c1c;font-size:.82rem">No se pudieron cargar los documentos.</div>'; }
+  }
+
+  docsPendientes.forEach((d, i) => {
+    html += filaDoc(`
+      <i class="bi bi-clock-history" style="color:#b45309"></i>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.archivo_nombre}</div>
+        <div style="color:#b45309;font-size:.76rem">${[d.descripcion, tamDoc(d.bytes)].filter(Boolean).join(' · ')} — se sube al guardar</div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="docsPendientes.splice(${i},1);cargarDocs()"><i class="bi bi-x-lg"></i></button>`);
+  });
+
+  cont.innerHTML = html || '<div style="color:#94a3b8;font-size:.82rem">Sin documentos adjuntos.</div>';
+}
+
+async function subirDoc(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (file.size > 15 * 1024 * 1024) { alert('El archivo supera los 15 MB'); return; }
+
+  const descInput = document.getElementById('fDocDesc');
+  const descripcion = descInput.value.trim();
+  const base64 = await new Promise((ok, fail) => {
+    const rd = new FileReader();
+    rd.onload  = () => ok(String(rd.result).split(',')[1]);
+    rd.onerror = fail;
+    rd.readAsDataURL(file);
+  });
+  const doc = { archivo_nombre: file.name, mime_type: file.type || 'application/octet-stream', archivo_data: base64, descripcion, bytes: file.size };
+
+  const id = document.getElementById('fId').value;
+  if (!id) { docsPendientes.push(doc); descInput.value = ''; cargarDocs(); return; }
+
+  const r = await fetch(`/api/dealers/${id}/documentos`, { method:'POST', headers:H, body: JSON.stringify(doc) });
+  const j = await r.json();
+  if (!j.success) { alert('Error: ' + j.error); return; }
+  descInput.value = '';
+  cargarDocs();
+}
+
+async function subirPendientes(idDealer) {
+  const errores = [];
+  for (const doc of docsPendientes) {
+    try {
+      const j = await (await fetch(`/api/dealers/${idDealer}/documentos`, { method:'POST', headers:H, body: JSON.stringify(doc) })).json();
+      if (!j.success) errores.push(`${doc.archivo_nombre}: ${j.error}`);
+    } catch (e) { errores.push(`${doc.archivo_nombre}: ${e.message}`); }
+  }
+  return errores;
+}
+
+async function verDoc(idDoc) {
+  const id = document.getElementById('fId').value;
+  const r  = await fetch(`/api/dealers/${id}/documentos/${idDoc}`, { headers: H });
+  if (!r.ok) { alert('No se pudo abrir el documento'); return; }
+  const url = URL.createObjectURL(await r.blob());
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+async function borrarDoc(idDoc, nombre) {
+  if (!confirm(`¿Eliminar el documento "${nombre}"? No se puede deshacer.`)) return;
+  const id = document.getElementById('fId').value;
+  const j  = await (await fetch(`/api/dealers/${id}/documentos/${idDoc}`, { method:'DELETE', headers:H })).json();
+  if (!j.success) { alert('Error: ' + j.error); return; }
+  cargarDocs();
 }
 
 // ---- IMPORTAR EXCEL ----

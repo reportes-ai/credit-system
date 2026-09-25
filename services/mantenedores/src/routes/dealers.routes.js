@@ -24,6 +24,12 @@ router.get('/:id',       verifyToken, ctrl.getDealer);
 router.get('/:id/locales',              verifyToken, ctrl.getLocales);
 router.post('/:id/locales',             verifyToken, requireFunc('dealer_ficha_revisar', 'dealers_base_editar'), ctrl.saveLocal);
 router.delete('/:id/locales/:idLocal',  verifyToken, requireFunc('dealer_ficha_revisar', 'dealers_base_editar'), ctrl.deleteLocal);
+// Otros documentos de la ficha (poderes, mandatos, respaldos). Subir y borrar exigen
+// el mismo permiso que editar la ficha; ver y listar basta con sesión. Queda auditado.
+router.get('/:id/documentos',            verifyToken, ctrl.getDocumentos);
+router.post('/:id/documentos',           verifyToken, requireFunc('dealer_ficha_revisar', 'dealers_base_editar'), ctrl.subirDocumento);
+router.get('/:id/documentos/:idDoc',     verifyToken, ctrl.verDocumento);
+router.delete('/:id/documentos/:idDoc',  verifyToken, requireFunc('dealer_ficha_revisar', 'dealers_base_editar'), ctrl.borrarDocumento);
 router.post('/',         verifyToken, requireFunc('mantenedores_dealers', 'dealer_mantener'), ctrl.createDealer);
 // Editar dealer: solo Analista de Operaciones (dealer_ficha_revisar) + Admin (bypass). Las
 // comisiones pactadas NO se editan aquí — solo vía ficha aprobada o BD. (Crear = solo vía ficha.)
