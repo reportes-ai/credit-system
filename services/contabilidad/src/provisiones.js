@@ -763,6 +763,11 @@ const CUENTA_GASTO_REGLA = '4002180';   // la de la regla PROV_OTROS; siempre se
    por cobrar cuando se desembolsan. */
 const EXCLUIR_OTROS = /anticipo|pr[ée]stamo|finiquito|remuneraci|sueldo|comisi[óo]n|comision/i;
 
+/* ¿Este gasto ya tiene su propio devengo por otra vía? (comisiones, remuneraciones, finiquitos,
+   anticipos y préstamos al personal). Lo usan la constitución y las pantallas que muestran qué
+   se provisionaría, para que ambas digan lo mismo. */
+const tieneDevengoPropio = op => EXCLUIR_OTROS.test(`${(op && op.concepto) || ''} ${(op && op.categoria) || ''}`);
+
 /* Los pagos a un PARQUE (su comisión y su arriendo) ya se devengan crédito a crédito por
    PROV_PARQUE, en las mismas cuentas 4001100/4002100. Provisionar además su orden de pago
    duplicaría el gasto, así que se excluye por el RUT de la ficha del parque. */
@@ -801,7 +806,7 @@ async function constituirOdp(idOdp, usuario = 'Motor provisiones') {
               proveedor_nombre, proveedor_rut, DATE_FORMAT(fecha_emision,'%Y-%m-%d') fe FROM ordenes_pago WHERE id=?`, [idOdp]);
     if (!op) return { skip: 'sin orden de pago' };
     if (String(op.estado).toUpperCase() === 'ANULADA') return { skip: 'anulada' };
-    if (EXCLUIR_OTROS.test(`${op.concepto || ''} ${op.categoria || ''}`)) return { skip: 'tiene su propio devengo' };
+    if (tieneDevengoPropio(op)) return { skip: 'tiene su propio devengo' };
     if (await esProveedorParque(op.proveedor_rut)) return { skip: 'pago a parque: ya devengado por PROV_PARQUE' };
     const mes = (op.fe || '').slice(0, 7);
     const desde = await param(C.paramDesde, '2026-09');
@@ -1019,4 +1024,4 @@ module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constit
   constituirParque, liberarParque, liberarParquePorPago, sincronizarParque,
   constituirEjecutivoMes, liberarEjecutivo, liberarEjecutivoPorAprobacion, sincronizarEjecutivo, comisionesMotorMes,
   constituirSueldos, liberarSueldos, sincronizarSueldos, proyeccionSueldos,
-  constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, esProveedorParque, cuadro, detalle };
+  constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, esProveedorParque, tieneDevengoPropio, cuadro, detalle };

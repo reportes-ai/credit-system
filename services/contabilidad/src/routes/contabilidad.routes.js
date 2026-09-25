@@ -209,6 +209,41 @@ router.get('/provisiones/categorias-gasto', verifyToken, requireFunc('ctb_provis
     res.json({ success: true, data: { filas, cuentas }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 });
+/* Las órdenes de pago de una categoría: es lo que se mira para decidir con qué cuenta de gasto
+   mapearla. Marca cuáles ya tienen documento en el auxiliar y cuáles son pagos a un parque. */
+router.get('/provisiones/categorias-gasto/ordenes', verifyToken, requireFunc('ctb_provisiones', 'ctb_cierre_mes', 'ctb_estados'), async (req, res) => {
+  try {
+    const pool = require('../../../../shared/config/database');
+    const cat = String(req.query.categoria || '').trim().toUpperCase();
+    if (!cat) return res.status(400).json({ success: false, data: null, error: 'Falta la categoría' });
+    const desde = await (async () => { const [[r]] = await pool.query("SELECT valor FROM ctb_config WHERE clave='prov_otros_desde'"); return r?.valor || '2026-09'; })();
+    const [filas] = await pool.query(
+      `SELECT o.id, o.numero, o.estado, o.concepto, o.centro_costo, o.tipo_documento, o.numero_documento,
+              o.proveedor_nombre, o.proveedor_rut, o.monto, o.monto_neto,
+              DATE_FORMAT(o.fecha_emision,'%Y-%m-%d') fecha_emision
+         FROM ordenes_pago o
+        WHERE UPPER(TRIM(COALESCE(o.categoria,'(SIN CATEGORÍA)')))=? AND UPPER(COALESCE(o.estado,''))<>'ANULADA'
+        ORDER BY o.fecha_emision DESC, o.id DESC LIMIT 300`, [cat === '(SIN)' ? '(SIN CATEGORÍA)' : cat]);
+    const odpDoc = require('../../../../shared/odp-documento');
+    const prov = require('../provisiones');
+    for (const f of filas) {
+      const doc = await odpDoc.buscar(f);
+      f.documento = doc ? `${doc.tipo_doc || 'Doc'} ${doc.num_doc || ''}`.trim() : null;
+      f.cuenta_documento = doc ? (doc.cuenta_gasto || null) : null;   // con qué cuenta se contabilizó esa compra: la mejor pista para el mapeo
+      f.es_parque = await prov.esProveedorParque(f.proveedor_rut);
+      f.devengo_propio = prov.tieneDevengoPropio(f);   // comisiones, remuneraciones, finiquitos, anticipos y préstamos
+      f.categoria = cat;
+      f.desde = f.fecha_emision >= `${desde}-01`;
+    }
+    // Los pagos recurrentes de ese mismo tipo de pago (la categoría también los cubre)
+    const [recurrentes] = await pool.query(
+      `SELECT r.id, r.apodo, r.periodicidad, r.moneda, r.monto_origen, r.tipo_documento,
+              DATE_FORMAT(r.fecha_proximo_pago,'%Y-%m-%d') proximo, p.nombre proveedor
+         FROM tesoreria_pagos_recurrentes r LEFT JOIN proveedores p ON p.id=r.id_proveedor
+        WHERE r.activo=1 AND UPPER(TRIM(COALESCE(r.tipo_pago,'')))=? ORDER BY r.apodo`, [cat]);
+    res.json({ success: true, data: { categoria: cat, desde, filas, recurrentes }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+});
 router.put('/provisiones/categorias-gasto', verifyToken, requireFunc('ctb_provisiones'), async (req, res) => {
   try {
     const pool = require('../../../../shared/config/database');

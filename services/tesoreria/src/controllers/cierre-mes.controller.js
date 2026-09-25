@@ -216,7 +216,7 @@ const CHECKS_AUTO = {
     const odpDoc = require('../../../../shared/odp-documento');
     const sinCuenta = new Set(), sinProvision = [];
     for (const o of odps) {
-      if (/anticipo|pr[ée]stamo|finiquito|remuneraci|sueldo|comisi[óo]n|comision/i.test(`${o.concepto || ''} ${o.categoria || ''}`)) continue;
+      if (prov.tieneDevengoPropio(o)) continue;                     // comisiones, remuneraciones, finiquitos, anticipos y préstamos
       if (await prov.esProveedorParque(o.proveedor_rut)) continue;   // pago a parque: lo devenga PROV_PARQUE
       if (await odpDoc.buscar(o)) continue;                       // tiene su documento: el devengo real ya entró
       if (!(await prov.cuentaGastoDe(o.categoria))) { sinCuenta.add(String(o.categoria || '(sin categoría)').toUpperCase()); continue; }

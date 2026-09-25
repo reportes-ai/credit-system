@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Provisiones por Devengo — AutoFácil</title>
-  <!-- v1.16 — concepto OTROS GASTOS: ODP emitidas o pagadas sin documento en el auxiliar y pagos recurrentes del mes sin ODP; mapeo parametrico categoria -> cuenta de gasto en la misma pagina. v1.15 — pop-up Ajustes al motor con columnas de la cuenta. v1.14 — pestaña Resumen por concepto (filtro de mes, totalizado, Excel) + Detalle; días nunca negativos; OP solo en filas por crédito. v1.13 — pop-ups: Tercero, formato por columna (días y comprobantes sin $), Creado por, desglose legible. v1.12 — cuadro con columna Ajustes al motor (no son constituciones ni liberaciones). v1.11 — sueldos + leyes sociales. v1.10 — mensaje de sincronización con ajustes al motor. v1.9 — ejecutivos mensual. v1.8 — concepto SUELDOS. v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
+  <!-- v1.17 — las ordenes de cada categoria se ven con un clic (con su documento, centro de costo y la cuenta con que se contabilizo esa compra en el auxiliar) para decidir el mapeo. v1.16 — concepto OTROS GASTOS: ODP emitidas o pagadas sin documento en el auxiliar y pagos recurrentes del mes sin ODP; mapeo parametrico categoria -> cuenta de gasto en la misma pagina. v1.15 — pop-up Ajustes al motor con columnas de la cuenta. v1.14 — pestaña Resumen por concepto (filtro de mes, totalizado, Excel) + Detalle; días nunca negativos; OP solo en filas por crédito. v1.13 — pop-ups: Tercero, formato por columna (días y comprobantes sin $), Creado por, desglose legible. v1.12 — cuadro con columna Ajustes al motor (no son constituciones ni liberaciones). v1.11 — sueldos + leyes sociales. v1.10 — mensaje de sincronización con ajustes al motor. v1.9 — ejecutivos mensual. v1.8 — concepto SUELDOS. v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -202,11 +202,40 @@ async function cargarCategorias(){
     document.getElementById('catsBody').innerHTML = CATS.filas.length ? CATS.filas.map(f => `<tr>
       <td class="fw-semibold">${esc(f.categoria)}</td>
       <td><select class="form-select form-select-sm" style="min-width:320px" onchange="guardarCategoria('${esc(f.categoria)}', this.value)"><option value="">— sin cuenta (no se provisiona) —</option>${ops(f.cuenta)}</select></td>
-      <td class="r">${f.odps || 0}</td>
+      <td class="r"><a href="#" onclick="verOrdenesCat('${esc(f.categoria)}');return false" title="Ver las órdenes de pago de esta categoría">${f.odps || 0} <i class="bi bi-box-arrow-up-right" style="font-size:.7rem"></i></a></td>
       <td>${f.cuenta ? '<span class="ok"><i class="bi bi-check-circle"></i> configurada</span>' : '<span style="color:#b45309"><i class="bi bi-exclamation-triangle"></i> pendiente</span>'}</td></tr>`).join('')
       : '<tr><td colspan="4" class="text-center text-muted py-3">Sin categorías todavía</td></tr>';
   } catch (e) { document.getElementById('catsBody').innerHTML = '<tr><td colspan="4" class="text-danger py-3">No se pudo cargar: ' + esc(e.message) + '</td></tr>'; }
 }
+async function verOrdenesCat(categoria){
+  const j = await (await fetch('/api/contabilidad/provisiones/categorias-gasto/ordenes?categoria=' + encodeURIComponent(categoria), { headers: H })).json();
+  if (!j.success) { alert(j.error); return; }
+  const d = j.data, filas = d.filas || [], recs = d.recurrentes || [];
+  DLG_ROWS = filas; DLG_COLS = COLS_ODP; DLG_NOMBRE = 'ordenes-' + categoria.toLowerCase().replace(/\s+/g,'-');
+  const provisionables = filas.filter(f => f.desde && !f.documento && !f.es_parque && !f.devengo_propio);
+  document.getElementById('dlgTitulo').textContent = 'Órdenes de pago — ' + categoria;
+  document.getElementById('dlgSub').textContent = `${filas.length} orden(es) · ${provisionables.length} se provisionaría(n) al configurar la cuenta · ${clp(provisionables.reduce((s,f)=>s+Number(f.monto||0),0))}`;
+  const badge = f => f.devengo_propio ? '<span class="b" style="background:#ede9fe;color:#5b21b6">tiene su propio devengo</span>'
+    : f.es_parque ? '<span class="b" style="background:#ede9fe;color:#5b21b6">pago a parque</span>'
+    : f.documento ? '<span class="b" style="background:#dcfce7;color:#166534">con documento</span>'
+    : !f.desde ? '<span class="b" style="background:#f1f5f9;color:#475569">anterior a ' + esc(d.desde) + '</span>'
+    : '<span class="b" style="background:#fef3c7;color:#92400e">se provisionaría</span>';
+  document.getElementById('dlgTabla').innerHTML =
+    '<thead><tr><th>ODP</th><th>Emitida</th><th>Proveedor</th><th>Concepto</th><th>Centro de costo</th><th>Documento</th><th>Cuenta del auxiliar</th><th class="r">Monto</th><th>Estado</th><th></th></tr></thead><tbody>' +
+    (filas.length ? filas.map(f => `<tr>
+      <td class="mono">${esc(f.numero || f.id)}</td><td>${esc(f.fecha_emision || '')}</td><td>${esc(f.proveedor_nombre || '')}</td>
+      <td style="white-space:normal;min-width:240px">${esc(f.concepto || '')}</td><td>${esc(f.centro_costo || '—')}</td>
+      <td>${esc(f.documento || '—')}</td><td class="mono">${esc(f.cuenta_documento || '—')}</td>
+      <td class="r">${clp(f.monto)}</td><td>${esc(f.estado || '')}</td><td>${badge(f)}</td></tr>`).join('')
+      : '<tr><td colspan="10" class="text-center text-muted py-3">Sin órdenes en esta categoría</td></tr>') + '</tbody>' +
+    (recs.length ? '<tbody><tr><td colspan="10" class="fw-bold pt-3">Pagos recurrentes de esta categoría</td></tr>' + recs.map(r => `<tr>
+      <td class="mono">REC-${r.id}</td><td>${esc(r.proximo || '')}</td><td>${esc(r.proveedor || '')}</td>
+      <td style="white-space:normal">${esc(r.apodo || '')} · ${esc(String(r.periodicidad || '').toLowerCase())}</td><td>—</td>
+      <td>${esc(r.tipo_documento || '—')}</td><td class="mono">—</td><td class="r">${Number(r.monto_origen).toLocaleString('es-CL')} ${esc(r.moneda)}</td>
+      <td>ACTIVO</td><td><span class="b" style="background:#e0f2fe;color:#075985">recurrente</span></td></tr>`).join('') + '</tbody>' : '');
+  document.getElementById('dlg').showModal();
+}
+const COLS_ODP = [['numero','ODP'],['fecha_emision','Emitida'],['proveedor_nombre','Proveedor'],['proveedor_rut','RUT'],['concepto','Concepto'],['centro_costo','Centro de costo'],['documento','Documento'],['cuenta_documento','Cuenta del auxiliar'],['monto','Monto',null,'clp'],['estado','Estado']];
 async function guardarCategoria(categoria, cuenta){
   const j = await (await fetch('/api/contabilidad/provisiones/categorias-gasto', { method:'PUT', headers:H, body: JSON.stringify({ categoria, cuenta }) })).json();
   if (!j.success) { alert('Error: ' + j.error); }
