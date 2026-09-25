@@ -1093,9 +1093,11 @@ async function cuotaIas(idUsuario, mes) {
   const [[u]] = await pool.query(
     `SELECT u.id_usuario, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) nombre, u.rut,
             DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') ingreso, DATE_FORMAT(u.fecha_baja,'%Y-%m-%d') baja,
-            UPPER(COALESCE(f.tipo_contrato,'')) tipo_contrato
+            UPPER(COALESCE(f.tipo_contrato,'')) tipo_contrato, COALESCE(f.no_mostrar,0) externo
        FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE u.id_usuario=?`, [idUsuario]);
   if (!u) return { skip: 'sin usuario' };
+  // no_mostrar = externo (la misma marca que usa la cartola de vacaciones): no es trabajador de la empresa
+  if (Number(u.externo)) return { skip: 'externo (marcado no_mostrar en la ficha)' };
   if (u.tipo_contrato !== 'INDEFINIDO') return { skip: `contrato ${u.tipo_contrato || 'sin definir'}: no genera indemnización` };
   if (!u.ingreso) return { skip: 'sin fecha de ingreso' };
   const ultimo = ultimoDiaMes(mes);
@@ -1199,7 +1201,7 @@ async function sincronizarIas(usuario = 'Motor provisiones') {
 
   const [gente] = await pool.query(
     `SELECT u.id_usuario FROM usuarios u JOIN rh_fichas f ON f.id_usuario=u.id_usuario
-      WHERE UPPER(COALESCE(f.tipo_contrato,''))='INDEFINIDO' AND u.fecha_ingreso IS NOT NULL`);
+      WHERE UPPER(COALESCE(f.tipo_contrato,''))='INDEFINIDO' AND COALESCE(f.no_mostrar,0)=0 AND u.fecha_ingreso IS NOT NULL`);
   for (const g of gente) for (const m of meses) {
     const r = await constituirIas(g.id_usuario, m, usuario);
     if (r && r.id && r.id_comprobante) out.constituidas++; else out.omitidas++;

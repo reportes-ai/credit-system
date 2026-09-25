@@ -238,7 +238,7 @@ const CHECKS_AUTO = {
     const [gente] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) nombre FROM usuarios u
          JOIN rh_fichas f ON f.id_usuario=u.id_usuario
-        WHERE UPPER(COALESCE(f.tipo_contrato,''))='INDEFINIDO' AND u.fecha_ingreso IS NOT NULL`);
+        WHERE UPPER(COALESCE(f.tipo_contrato,''))='INDEFINIDO' AND COALESCE(f.no_mostrar,0)=0 AND u.fecha_ingreso IS NOT NULL`);
     const falta = [];
     for (const g of gente) {
       const [[p]] = await pool.query("SELECT id FROM ctb_provisiones WHERE concepto='IAS' AND origen_tipo='TRABAJADOR_MES' AND origen_id=?", [`IAS${g.id_usuario}|${mes}`]);
