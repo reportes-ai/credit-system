@@ -1314,7 +1314,8 @@ async function recomendarPlan(mes, plan_uf, uf) {
     }
     const consumo = real + proy;
     const costo = Math.max(t, consumo);
-    return { plan_uf: t, consumo_uf: +consumo.toFixed(4), costo_uf: +costo.toFixed(4), costo_clp: Math.round(costo * (uf || 0)),
+    // consumo_real_uf = lo consumido hasta hoy; consumo_uf = al cierre (igual al real si el mes ya terminó)
+    return { plan_uf: t, consumo_real_uf: +real.toFixed(4), consumo_uf: +consumo.toFixed(4), costo_uf: +costo.toFixed(4), costo_clp: Math.round(costo * (uf || 0)),
              sobre_minimo_uf: +Math.max(0, consumo - t).toFixed(4), minimo_sin_usar_uf: +Math.max(0, t - consumo).toFixed(4) };
   });
   const actual = planes.find(x => x.plan_uf === Number(plan_uf)) || planes.find(x => x.plan_uf === 40);
