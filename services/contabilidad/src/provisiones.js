@@ -145,19 +145,46 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
       ['4001091', 'HABER', 'afc',     'Abono seguro de cesantía empleador provisionado'],
       ['4001092', 'HABER', 'mutual',  'Abono mutual + SANNA provisionado'],
     ]],
-    ['PROV_OTROS', 'Provisión otros gastos (ODP y pagos recurrentes sin documento)', 'Se dispara al cierre del mes (motor provisiones) por cada orden de pago emitida o pagada cuyo gasto todavía no tiene factura/boleta en el auxiliar de compras, y por cada pago recurrente del mes que aún no generó su ODP: reconoce el gasto NETO (boletas, honorarios y exentos por su total) y deja la provisión. La cuenta de gasto 4002180 se reemplaza por la que tenga la categoría en el mapeo Cuentas por categoría. Se libera cuando el documento aparece en el auxiliar o al anular la orden. Campos: monto (neto provisionado).', 'TRASPASO', 1, [
-      ['4002180', 'DEBE',  'monto', 'Provisión otros gastos (sin documento)'],
-      ['2106016', 'HABER', 'monto', 'Provisión otros gastos'],
+    ['PROV_OTROS', 'Provisión otros gastos (ODP y pagos recurrentes sin documento)', 'Al cierre del mes, por cada ODP emitida o pagada sin documento en el auxiliar y por cada recurrente del mes sin ODP. El gasto sigue el tratamiento de la categoría: IVA el neto, exento el total, honorarios el bruto. En boleta ya PAGADA separa la retención (se entera al SII el mes siguiente, F29) y provisiona el líquido. La cuenta 4002180 se reemplaza por la de la categoría. Campos: monto, retencion.', 'TRASPASO', 1, [
+      ['4002180', 'DEBE',  'monto',     'Provisión otros gastos (sin documento)'],
+      ['4002180', 'DEBE',  'retencion', 'Provisión honorarios (parte retenida)'],
+      ['2105070', 'HABER', 'retencion', 'Retención de honorarios por pagar (F29)'],
+      ['2106016', 'HABER', 'monto',     'Provisión otros gastos'],
     ]],
-    ['PROV_OTROS_LIB', 'Liberación provisión otros gastos', 'Se dispara cuando la factura/boleta entra al auxiliar de compras (ahí nace el devengo real con su IVA) o cuando se anula la orden de pago: reversa íntegra la provisión constituida. La cuenta de gasto 4002180 se reemplaza por la misma con que se constituyó. Campos: monto (lo provisionado).', 'TRASPASO', 1, [
-      ['2106016', 'DEBE',  'monto', 'Liberación provisión otros gastos'],
-      ['4002180', 'HABER', 'monto', 'Abono otros gastos provisionados'],
+    ['PROV_OTROS_LIB', 'Liberación provisión otros gastos', 'Cuando la factura/boleta entra al auxiliar de compras (ahí nace el devengo real con su IVA o su retención) o cuando se anula la orden: reversa íntegra lo constituido, retención incluida. La cuenta 4002180 se reemplaza por la misma con que se constituyó. Campos: monto, retencion.', 'TRASPASO', 1, [
+      ['2106016', 'DEBE',  'monto',     'Liberación provisión otros gastos'],
+      ['2105070', 'DEBE',  'retencion', 'Liberación retención de honorarios provisionada'],
+      ['4002180', 'HABER', 'monto',     'Abono otros gastos provisionados'],
+      ['4002180', 'HABER', 'retencion', 'Abono honorarios provisionados (parte retenida)'],
     ]],
   ];
   for (const [evento, nombre, desc, tipo, activa, lineas] of R) {
     const [r] = await pool.query('INSERT IGNORE INTO ctb_reglas (evento, nombre, descripcion, tipo, activa) VALUES (?,?,?,?,?)', [evento, nombre, desc, tipo, activa]);
     if (r.affectedRows) for (const [cuenta, lado, campo, glosa] of lineas)
       await pool.query('INSERT INTO ctb_reglas_lineas (evento, cuenta, lado, campo, glosa) VALUES (?,?,?,?,?)', [evento, cuenta, lado, campo, glosa]);
+  }
+  /* Parche idempotente (25-09-2026): PROV_OTROS nació sin la retención de honorarios. Si la boleta
+     ya se pagó, esa retención se entera al SII al mes siguiente, así que tiene que existir como pasivo
+     desde el devengo. Solo se reescribe si la regla aún no generó ningún asiento. */
+  for (const ev of ['PROV_OTROS', 'PROV_OTROS_LIB']) {
+    try {
+      const def = R.find(r => r[0] === ev);
+      const [ya] = await pool.query('SELECT cuenta, lado, campo FROM ctb_reglas_lineas WHERE evento=?', [ev]);
+      /* Se AGREGAN las líneas que falten, nunca se borra lo que hay: la regla puede llevar
+         asientos emitidos (y el Administrador pudo editarla). Una línea nueva no afecta a los
+         asientos viejos, y en los montos sin retención el motor la salta por venir en cero. */
+      let nuevas = 0;
+      for (const [cuenta, lado, campo, glosa] of def[5]) {
+        if (ya.some(l => l.cuenta === cuenta && l.lado === lado && l.campo === campo)) continue;
+        await pool.query('INSERT INTO ctb_reglas_lineas (evento, cuenta, lado, campo, glosa) VALUES (?,?,?,?,?)', [ev, cuenta, lado, campo, glosa]);
+        nuevas++;
+      }
+      // ctb_reglas.descripcion es VARCHAR(400): recortar acá, si no el UPDATE falla entero
+      const desc = String(def[2]).slice(0, 400);
+      const [[act]] = await pool.query('SELECT descripcion FROM ctb_reglas WHERE evento=?', [ev]);
+      if (!act || act.descripcion !== desc) await pool.query('UPDATE ctb_reglas SET nombre=?, descripcion=? WHERE evento=?', [def[1], desc, ev]);
+      if (nuevas) console.log(`[provisiones] ${ev}: ${nuevas} línea(s) agregada(s) — retención de honorarios separada`);
+    } catch (e) { console.error('[provisiones parche otros]', e.message); }
   }
   // Parche idempotente (24-09-2026): PROV_SUELDOS nació con un solo campo 'monto'; ahora separa haberes y leyes
   // sociales (sis, afc, mutual). Solo si la regla conserva 'monto' y nunca generó un asiento.
@@ -802,6 +829,22 @@ async function tratamientoDe(categoria) {
 /* Tipo de documento equivalente a un tratamiento, para hablarle al motor único calcularDoc. */
 const TIPO_DE_TRAT = { IVA: 'Factura', RET: 'Boleta de Honorarios', EXENTO: 'Factura Exenta' };
 
+/* Desglose de lo que se provisiona de una ODP: cuánto es gasto, cuánto queda provisionado y
+   cuánto es retención de honorarios por enterar al SII.
+   La retención se separa SOLO cuando la boleta ya se pagó: ahí la obligación con el SII ya nació
+   (se entera el mes siguiente en el F29) y lo que queda debiéndose al prestador es el líquido.
+   Si la boleta todavía no se paga, no hay nada retenido: se provisiona el bruto completo. */
+async function desgloseODP(op) {
+  const gasto = await baseNetaODP(op);
+  const trat = (await tratamientoDe(op.categoria)) ||
+    (/honorario/i.test(String(op.tipo_documento || '')) ? 'RET' : null);
+  const pagada = String(op.estado || '').toUpperCase() === 'PAGADA';
+  if (trat !== 'RET' || !pagada) return { gasto, monto: gasto, retencion: 0 };
+  const liquido = Math.round(Number(op.monto) || 0);            // lo que efectivamente se pagó
+  const retencion = Math.max(0, gasto - liquido);
+  return retencion > 0 ? { gasto, monto: liquido, retencion } : { gasto, monto: gasto, retencion: 0 };
+}
+
 /* Base del gasto de una ODP. Manda el tratamiento de la categoría; si no está configurado, se sigue
    el tipo de documento declarado en la orden (conducta anterior).
      IVA    → el NETO: el IVA crédito nace recién con la factura.
@@ -843,7 +886,7 @@ async function constituirOdp(idOdp, usuario = 'Motor provisiones') {
     if (await odpDoc.buscar(op)) return { skip: 'ya tiene documento (devengo real)' };
     const cuenta = await cuentaGastoDe(op.categoria);
     if (!cuenta) return { skip: `sin cuenta de gasto para la categoría "${op.categoria || '(sin categoría)'}"`, pendiente: true };
-    const monto = await baseNetaODP(op);
+    const { gasto, monto, retencion } = await desgloseODP(op);
     if (monto <= 0) return { skip: 'sin monto' };
     const fecha = await fechaContable(op.fe);
     const [ins] = await pool.query(
@@ -851,18 +894,19 @@ async function constituirOdp(idOdp, usuario = 'Motor provisiones') {
        VALUES ('OTROS','ODP',?,?,?,?,?,?,?,?,?)`,
       [String(idOdp), op.proveedor_nombre || null, op.proveedor_rut || null, mes, fecha, monto,
        Math.round(Number(op.monto_bruto) || Number(op.monto) || 0),
-       JSON.stringify({ montos: { monto }, cuenta, categoria: op.categoria || null, odp: op.numero || null, estado_odp: op.estado }), usuario]);
+       JSON.stringify({ montos: { monto, retencion }, gasto, cuenta, categoria: op.categoria || null, odp: op.numero || null, estado_odp: op.estado }), usuario]);
     if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
     const id = await contabilizar({
-      evento: C.regla, fecha, ref: `PROV-OTROS-ODP-${idOdp}`, montos: { monto },
+      evento: C.regla, fecha, ref: `PROV-OTROS-ODP-${idOdp}`, montos: { monto, retencion },
       reemplazos: { [CUENTA_GASTO_REGLA]: cuenta },
       glosa: `Provisión ${op.concepto || 'gasto'} — ${op.proveedor_nombre || ''} (ODP ${op.numero || idOdp})`.slice(0, 300),
       rut: op.proveedor_rut || null,
-      detalle: `ODP ${op.numero || idOdp} · ${op.categoria || 's/categoría'} · ${op.estado} sin documento · cuenta ${cuenta}`,
+      detalle: `ODP ${op.numero || idOdp} · ${op.categoria || 's/categoría'} · ${op.estado} sin documento · cuenta ${cuenta}` +
+        (retencion ? ` · gasto $${gasto.toLocaleString('es-CL')} con retención $${retencion.toLocaleString('es-CL')} por enterar` : ''),
     });
     if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); return { error: 'sin asiento (ver log del motor en Reglas de Centralización)' }; }
     await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
-    return { id: ins.insertId, monto, id_comprobante: id };
+    return { id: ins.insertId, monto, retencion, id_comprobante: id };
   } catch (e) { console.error('[provisiones constituirOdp]', idOdp, e.message); return { error: e.message }; }
 }
 
@@ -932,7 +976,8 @@ async function _liberarFilaOtros(p, motivo = 'MANUAL', fechaISO = null, usuario 
       [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
     if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
     const id = await contabilizar({
-      evento: C.reglaLib, fecha, ref: `PROV-OTROS-${p.origen_tipo}-${p.origen_id}-LIB`, montos: { monto: Number(p.monto) },
+      evento: C.reglaLib, fecha, ref: `PROV-OTROS-${p.origen_tipo}-${p.origen_id}-LIB`,
+      montos: (() => { const m = montosDe(p); return { monto: Math.round(Number(m.monto) || Number(p.monto) || 0), retencion: Math.round(Number(m.retencion) || 0) }; })(),
       reemplazos: cuenta ? { [CUENTA_GASTO_REGLA]: cuenta } : null,
       glosa: `Liberación provisión otros gastos — ${p.tercero || ''} (${motivo.toLowerCase()})`.slice(0, 300),
       rut: p.rut_tercero || null, detalle: `${motivo} · por ${usuario}`,
@@ -1052,4 +1097,4 @@ module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constit
   constituirParque, liberarParque, liberarParquePorPago, sincronizarParque,
   constituirEjecutivoMes, liberarEjecutivo, liberarEjecutivoPorAprobacion, sincronizarEjecutivo, comisionesMotorMes,
   constituirSueldos, liberarSueldos, sincronizarSueldos, proyeccionSueldos,
-  constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, tratamientoDe, baseNetaODP, esProveedorParque, tieneDevengoPropio, cuadro, detalle };
+  constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, tratamientoDe, baseNetaODP, desgloseODP, esProveedorParque, tieneDevengoPropio, cuadro, detalle };

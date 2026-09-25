@@ -233,7 +233,8 @@ router.get('/provisiones/categorias-gasto/ordenes', verifyToken, requireFunc('ct
       f.es_parque = await prov.esProveedorParque(f.proveedor_rut);
       f.devengo_propio = prov.tieneDevengoPropio(f);   // comisiones, remuneraciones, finiquitos, anticipos y préstamos
       f.categoria = cat;
-      f.base = await prov.baseNetaODP(f);   // lo que se provisionaría con el tratamiento vigente
+      const dg = await prov.desgloseODP(f);   // con el tratamiento vigente de la categoría
+      f.base = dg.gasto; f.retencion = dg.retencion;
       f.desde = f.fecha_emision >= `${desde}-01`;
     }
     // Los pagos recurrentes de ese mismo tipo de pago (la categoría también los cubre)
