@@ -761,6 +761,11 @@ require('../../../../shared/migrate').enFila('rrhh-descuentos', async () => {
        el quinto día; el parámetro parte en 3 (Pato, 25-09-2026) para dejar margen ante cualquier
        problema de transferencia — atrasarse expone a multa del doble de lo retenido. */
     await pool.query("INSERT IGNORE INTO rh_config (clave, valor) VALUES ('rem_pension_dia_pago','3')").catch(() => {});
+    /* La orden de pago recuerda de qué causa salió: sin esto habría que reconocerla por el texto
+       del concepto, que es frágil. Con el vínculo, al marcarla PAGADA sale solo el aviso al
+       tribunal que exige la resolución. `jud_aviso_at` lo deja enviado una sola vez. */
+    await pool.query('ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS id_descuento_judicial INT NULL').catch(() => {});
+    await pool.query('ALTER TABLE ordenes_pago ADD COLUMN IF NOT EXISTS jud_aviso_at DATETIME NULL').catch(() => {});
     console.log('[rrhh-descuentos] listo');
   } catch (e) { console.error('[rrhh-descuentos migration]', e.message); }
 });
@@ -1825,12 +1830,59 @@ async function ordenesPagoJudiciales(mes, req) {
       [prov.id, d.ben_nombre, d.ben_rut, concepto, 'Administrativos', 'Nota de Cobro', m.clase, m.bruto, m.neto, m.pct, m.imp, m.aPagar,
        destino, hoy, hoy, obs, u.id_usuario || null, nombreDe(u) || 'Sistema']);
     const { numero } = await emitirCorrelativo({ origen: 'GENERAL', origen_id: r.insertId, concepto, monto: m.aPagar, id_usuario: u.id_usuario || null, usuario_nombre: nombreDe(u) || 'Sistema' });
-    await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
+    await pool.query('UPDATE ordenes_pago SET numero=?, id_descuento_judicial=? WHERE id=?', [numero, d.id, r.insertId]);
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'orden_pago', entidad_id: String(r.insertId),
       detalle: `ODP ${numero} de retención judicial ${d.jud_rit ? 'RIT ' + d.jud_rit : ''} a ${d.ben_nombre} por ${co(monto)} (retenido a ${d.trabajador} en ${mes}), vence ${vence}` });
     out.push({ numero, monto, rit: d.jud_rit, beneficiario: d.ben_nombre, vence, trabajador: d.trabajador, id_descuento: d.id, aviso: d.jud_tribunal_email || null });
   }
   return out;
+}
+
+/* ── AVISO AL TRIBUNAL AL PAGAR LA RETENCIÓN (Pato, 25-09-2026) ────────────────
+   La resolución obliga a comunicar al tribunal cada pago, citando el RIT. Mientras eso dependió
+   de que alguien se acordara, era el eslabón débil de todo el circuito: la retención y la orden
+   ya salían solas. Ahora el aviso sale al marcar la orden como PAGADA — el único momento en que
+   consta que el depósito se hizo.
+   Lo llama el hook `onOdpPagada` de Órdenes de Pago. Nunca rompe el pago y se envía UNA sola vez
+   (jud_aviso_at): un correo repetido a un tribunal es peor que ninguno. */
+async function onOdpPagadaJudicial(idOrdenPago) {
+  const [[o]] = await pool.query(
+    `SELECT o.id, o.numero, o.monto, o.destino, o.metodo_pago, o.jud_aviso_at,
+            DATE_FORMAT(o.fecha_pago,'%d-%m-%Y') pagada,
+            d.jud_rit, d.jud_tribunal, d.jud_tribunal_email, d.ben_nombre, d.ben_rut, d.id_usuario,
+            TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) trabajador, u.rut rut_trabajador
+       FROM ordenes_pago o
+       JOIN rh_descuentos d ON d.id = o.id_descuento_judicial
+       LEFT JOIN usuarios u ON u.id_usuario = d.id_usuario
+      WHERE o.id=? AND o.estado='PAGADA'`, [idOrdenPago]);
+  if (!o) return null;
+  if (o.jud_aviso_at) return { ya: true };
+  if (!o.jud_tribunal_email) { console.warn(`[aviso tribunal] ODP ${o.numero}: la causa no tiene correo de tribunal — hay que comunicar el pago a mano`); return null; }
+  const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
+  const emp = await require('../../../../shared/empresa').datosEmpresa().catch(() => null);
+  const $ = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
+  const fila = (k, v) => `<tr><td style="padding:4px 12px;color:#475569">${k}</td><td style="padding:4px 12px"><b>${v}</b></td></tr>`;
+  const html = `
+    <p>Señor(a) Juez:</p>
+    <p>En cumplimiento de lo resuelto en la causa <b>RIT ${o.jud_rit || 's/n'}</b>${o.jud_tribunal ? ' del ' + o.jud_tribunal : ''},
+       ${emp && emp.razon_social ? emp.razon_social : 'AutoFácil SpA'}${emp && emp.rut ? ' (RUT ' + emp.rut + ')' : ''}
+       informa el pago de la pensión alimenticia retenida:</p>
+    <table style="border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0">
+      ${fila('RIT', o.jud_rit || 's/n')}
+      ${fila('Alimentante', `${o.trabajador || ''}${o.rut_trabajador ? ' — RUT ' + o.rut_trabajador : ''}`)}
+      ${fila('Alimentario(a)', `${o.ben_nombre || ''}${o.ben_rut ? ' — RUT ' + o.ben_rut : ''}`)}
+      ${fila('Monto depositado', $(o.monto))}
+      ${fila('Fecha del depósito', o.pagada || '')}
+      ${fila('Cuenta de destino', o.destino || '')}
+      ${fila('Medio de pago', o.metodo_pago || 'Transferencia')}
+      ${fila('N° de orden de pago', o.numero || '')}
+    </table>
+    <p style="font-size:12px;color:#64748b">El comprobante bancario queda a disposición del Tribunal; puede solicitarse respondiendo este correo.</p>`;
+  const r = await enviarCorreo({ to: o.jud_tribunal_email, subject: `RIT ${o.jud_rit || 's/n'} — Informa pago de pensión alimenticia retenida · ${o.pagada || ''}`, html: envolverHTML ? envolverHTML(html) : html });
+  if (!r || r.ok === false) { console.error(`[aviso tribunal] ODP ${o.numero}: ${r && r.error}`); return null; }
+  await pool.query('UPDATE ordenes_pago SET jud_aviso_at=NOW() WHERE id=?', [o.id]);
+  console.log(`[aviso tribunal] ODP ${o.numero} — RIT ${o.jud_rit}: informado a ${o.jud_tribunal_email}`);
+  return { enviado: true, a: o.jud_tribunal_email, rit: o.jud_rit };
 }
 
 /* ── Correo de liquidación a cada colaborador al emitir el mes ─────────────── */
@@ -2642,4 +2694,4 @@ const avisoPrelacion = async (req, res) => {
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic, editarAdicional, asignacionFicha,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion, haberesProyectados, prelacionDescuentos, avisoPrelacion,
-  getDescuentos, crearDescuento, editarDescuento, anularDescuento, ordenesPagoJudiciales, proveedorBeneficiario, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
+  getDescuentos, crearDescuento, editarDescuento, anularDescuento, ordenesPagoJudiciales, proveedorBeneficiario, onOdpPagadaJudicial, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };

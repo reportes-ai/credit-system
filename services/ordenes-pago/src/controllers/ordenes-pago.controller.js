@@ -1525,6 +1525,13 @@ const pagarOrden = async (req, res) => {
         const pr = require('../../../tesoreria/src/controllers/pagos-recurrentes.controller');
         if (pr.onOdpPagada) await pr.onOdpPagada(oc.origen_id);
       } catch (e) { console.error('[ordenes-pago hook pagos recurrentes]', e.message); }
+      /* Hook Retención judicial: si la orden viene de una causa de alimentos, se informa el pago
+         al tribunal citando el RIT — lo exige la resolución y era el único paso que seguía siendo
+         manual. Aislado: un correo caído jamás debe romper el pago. */
+      try {
+        const rh = require('../../../rrhh/src/controllers/remuneraciones.controller');
+        if (rh.onOdpPagadaJudicial) rh.onOdpPagadaJudicial(oc.origen_id).catch(e => console.error('[ordenes-pago aviso tribunal]', e.message));
+      } catch (e) { console.error('[ordenes-pago hook judicial]', e.message); }
     } else if (oc.origen === 'SALDO') {
       const [[s]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes WHERE id=?', [oc.origen_id]);
       if (s) {
