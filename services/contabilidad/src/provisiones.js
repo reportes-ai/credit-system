@@ -47,6 +47,15 @@ const CONCEPTOS = {
      van por su total. La cuenta de gasto NO está en la ODP: sale del mapeo paramétrico por categoría
      (ctb_gasto_categorias). Sin mapeo no se inventa cuenta: la fila queda pendiente y se ve en el
      cuadro y en el Cierre de Mes. Se libera cuando aparece el documento en el auxiliar o al anular. */
+  /* IAS (25-09-2026, decisión de Pato): indemnización por años de servicio. Cuota mensual simple
+     de un doceavo (8,33%) de la base del finiquito por cada trabajador con contrato INDEFINIDO,
+     con los topes legales: base máxima 90 UF y hasta 11 años de servicio (art. 163 CT, contratos
+     posteriores al 14-08-1981). Los topes se leen de rh_config (finiq_tope_uf / finiq_tope_anos),
+     los MISMOS que usa el finiquito real: una sola fuente. Se libera al finiquitar (ahí entra el
+     gasto real por FINIQUITO_EMITIDO) o cuando la persona sale sin indemnización.
+     NIC 19 actuarial queda pendiente: exige rotación histórica, tasa de descuento y proyección
+     de sueldos validadas con el auditor. El porcentaje es paramétrico (prov_ias_pct). */
+  IAS: { nombre: 'Indemnización por años de servicio', regla: 'PROV_IAS', reglaLib: 'PROV_IAS_LIB', cuentaProv: '2106031', cuentaGasto: '4002060', paramDesde: 'prov_ias_desde' },
   OTROS: { nombre: 'Otros gastos (ODP y pagos recurrentes sin documento)', regla: 'PROV_OTROS', reglaLib: 'PROV_OTROS_LIB', cuentaProv: '2106016', cuentaGasto: 'por categoría', paramDesde: 'prov_otros_desde' },
 };
 
@@ -63,8 +72,8 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
     creado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
     UNIQUE KEY uq_origen (concepto, origen_tipo, origen_id), INDEX idx_estado (concepto, estado), INDEX idx_mes (mes))`);
   await pool.query('CREATE TABLE IF NOT EXISTS ctb_config (clave VARCHAR(60) PRIMARY KEY, valor VARCHAR(200) NOT NULL)');
-  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09'), ('prov_sueldos_desde','2026-09'), ('prov_otros_desde','2026-09')");
-  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1), ('2106015','PROVISION REMUNERACIONES (DEVENGO)','PASIVO',1), ('2106016','PROVISION OTROS GASTOS (DEVENGO)','PASIVO',1)");
+  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09'), ('prov_sueldos_desde','2026-09'), ('prov_otros_desde','2026-09'), ('prov_ias_desde','2026-09'), ('prov_ias_pct','8.33')");
+  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1), ('2106015','PROVISION REMUNERACIONES (DEVENGO)','PASIVO',1), ('2106016','PROVISION OTROS GASTOS (DEVENGO)','PASIVO',1), ('2106031','PROVISION INDEMNIZACION POR ANOS DE SERVICIO','PASIVO',1)");
   /* Mapeo paramétrico categoría de la ODP / tipo de pago recurrente → cuenta de gasto.
      Es lo que permite provisionar un gasto que en la ODP solo tiene categoría y centro de costo.
      Se siembran las categorías que hoy existen; la cuenta la completa el Administrador en
@@ -156,6 +165,14 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
       ['2105070', 'DEBE',  'retencion', 'Liberación retención de honorarios provisionada'],
       ['4002180', 'HABER', 'monto',     'Abono otros gastos provisionados'],
       ['4002180', 'HABER', 'retencion', 'Abono honorarios provisionados (parte retenida)'],
+    ]],
+    ['PROV_IAS', 'Provisión indemnización por años de servicio (mensual)', 'Cada mes, por cada trabajador con contrato indefinido, un doceavo (8,33% param. prov_ias_pct) de la base del finiquito topada a 90 UF, mientras no supere los 11 años de servicio. Se libera al finiquitar (ahí entra el gasto real) o si la persona sale sin indemnización. Campos: monto.', 'TRASPASO', 1, [
+      ['4002060', 'DEBE',  'monto', 'Provisión indemnización años de servicio'],
+      ['2106031', 'HABER', 'monto', 'Provisión indemnización por años de servicio'],
+    ]],
+    ['PROV_IAS_LIB', 'Liberación provisión indemnización por años de servicio', 'Se dispara al cerrar el finiquito de la persona (entra el gasto real por FINIQUITO_EMITIDO) o cuando sale sin derecho a indemnización: reversa lo provisionado de ese trabajador. Campos: monto.', 'TRASPASO', 1, [
+      ['2106031', 'DEBE',  'monto', 'Liberación provisión indemnización años de servicio'],
+      ['4002060', 'HABER', 'monto', 'Abono indemnización provisionada'],
     ]],
   ];
   for (const [evento, nombre, desc, tipo, activa, lineas] of R) {
@@ -329,6 +346,7 @@ async function liberarFilaPorId(idFila, motivo, fechaISO, usuario, contra = null
   if (p.concepto === 'EJECUTIVO') return _liberarFilaEjecutivo(p, motivo, fechaISO, usuario, contra);
   if (p.concepto === 'SUELDOS') return liberarSueldos(p.mes, motivo, fechaISO, usuario, contra);
   if (p.concepto === 'OTROS') return _liberarFilaOtros(p, motivo, fechaISO, usuario, contra);
+  if (p.concepto === 'IAS') return _liberarFilaIas(p, motivo, fechaISO, usuario, contra);
   return _liberarFilaDealer(p, motivo, fechaISO, usuario, contra);
 }
 
@@ -1057,6 +1075,153 @@ async function sincronizarOtros(usuario = 'Motor provisiones') {
   return out;
 }
 
+/* ═══ IAS: indemnización por años de servicio ══════════════════════════════════════════════
+   Cuota mensual simple: un doceavo de la base del finiquito, topada a 90 UF, mientras el
+   trabajador no pase los 11 años. Se reusan los motores que ya existen (Máxima 1):
+   remuneracionBaseDetalle (la base que paga el finiquito de verdad), mesesAntiguedad
+   (la misma de los certificados y del finiquito), getUF y los topes de rh_config. */
+const rhConfig = async (clave, def) => {
+  const [[r]] = await pool.query('SELECT valor FROM rh_config WHERE clave=?', [clave]).catch(() => [[null]]);
+  const v = r && r.valor != null && r.valor !== '' ? Number(r.valor) : NaN;
+  return Number.isFinite(v) ? v : def;
+};
+const idIasMes = (idUsuario, mes) => `IAS${idUsuario}|${mes}`;
+const mesSiguienteDe = mes => { const [y, m] = mes.split('-').map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`; };
+
+/* Cuota del mes de UN trabajador. Devuelve { monto, base, base_topada, anos, ... } o { skip }. */
+async function cuotaIas(idUsuario, mes) {
+  const [[u]] = await pool.query(
+    `SELECT u.id_usuario, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) nombre, u.rut,
+            DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') ingreso, DATE_FORMAT(u.fecha_baja,'%Y-%m-%d') baja,
+            UPPER(COALESCE(f.tipo_contrato,'')) tipo_contrato
+       FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE u.id_usuario=?`, [idUsuario]);
+  if (!u) return { skip: 'sin usuario' };
+  if (u.tipo_contrato !== 'INDEFINIDO') return { skip: `contrato ${u.tipo_contrato || 'sin definir'}: no genera indemnización` };
+  if (!u.ingreso) return { skip: 'sin fecha de ingreso' };
+  const ultimo = ultimoDiaMes(mes);
+  if (u.baja && u.baja < ultimo) return { skip: 'ya no estaba en la dotación' };
+  if (u.ingreso > ultimo) return { skip: 'ingresó después del mes' };
+
+  const topeAnos = await rhConfig('finiq_tope_anos', 11);
+  const topeUFn = await rhConfig('finiq_tope_uf', 90);
+  const meses = require('../../../api-gateway/public/js/rrhh-core').mesesAntiguedad(u.ingreso, ultimo);
+  const anos = Math.floor(meses / 12) + ((meses % 12) >= 6 ? 1 : 0);
+  if (anos >= topeAnos) return { skip: `tope de ${topeAnos} años cumplido`, anos };
+
+  const { base, fuente } = await require('../../rrhh/src/base-remuneracion').remuneracionBaseDetalle(idUsuario, mes);
+  if (!(base > 0)) return { skip: 'sin base de remuneración' };
+  const uf = await require('../../../shared/uf').getUF(ultimo);
+  const topeUF = uf ? Math.round(topeUFn * uf) : null;
+  const baseTopada = topeUF ? Math.min(Math.round(base), topeUF) : Math.round(base);
+  const pct = Number(await param('prov_ias_pct', '8.33'));
+  const monto = Math.round(baseTopada * pct / 100);
+  if (monto <= 0) return { skip: 'cuota en cero' };
+  return { monto, base: Math.round(base), base_topada: baseTopada, tope_uf: topeUF, anos, pct, fuente,
+    nombre: u.nombre || `Trabajador ${idUsuario}`, rut: u.rut || null };
+}
+
+/* Constituye la cuota del mes de UN trabajador. Idempotente por (trabajador, mes). */
+async function constituirIas(idUsuario, mes, usuario = 'Motor provisiones') {
+  const C = CONCEPTOS.IAS;
+  try {
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return { skip: 'mes inválido' };
+    const desde = await param(C.paramDesde, '2026-09');
+    if (mes < desde) return { skip: 'anterior a ' + desde };
+    if (mes > hoyISO().slice(0, 7)) return { skip: 'mes futuro' };
+    const origenId = idIasMes(idUsuario, mes);
+    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto='IAS' AND origen_tipo='TRABAJADOR_MES' AND origen_id=?", [origenId]);
+    if (ya) return { skip: 'ya ' + ya.estado.toLowerCase(), id: ya.id };
+    const q = await cuotaIas(idUsuario, mes);
+    if (q.skip) return q;
+    const fecha = await fechaContable(ultimoDiaMes(mes));
+    const [ins] = await pool.query(
+      `INSERT IGNORE INTO ctb_provisiones (concepto, origen_tipo, origen_id, tercero, rut_tercero, mes, fecha_constitucion, monto, base_bruta, montos_json, creado_por)
+       VALUES ('IAS','TRABAJADOR_MES',?,?,?,?,?,?,?,?,?)`,
+      [origenId, q.nombre, q.rut, mes, fecha, q.monto, q.base_topada,
+       JSON.stringify({ montos: { monto: q.monto }, id_usuario: idUsuario, base: q.base, base_topada: q.base_topada, tope_uf: q.tope_uf, anos: q.anos, pct: q.pct, fuente: q.fuente }), usuario]);
+    if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
+    const topado = q.base_topada !== q.base ? ` topada a $${q.base_topada.toLocaleString('es-CL')} (90 UF)` : '';
+    const id = await contabilizar({
+      evento: C.regla, fecha, ref: `PROV-IAS-${idUsuario}-${mes}`, montos: { monto: q.monto },
+      glosa: `Provisión indemnización años de servicio ${mes} — ${q.nombre}`.slice(0, 300), rut: q.rut,
+      detalle: `${q.anos} año(s) · base $${q.base.toLocaleString('es-CL')}${topado} · ${q.pct}% · base ${String(q.fuente).toLowerCase()}`,
+    });
+    if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); return { error: 'sin asiento (ver log del motor en Reglas de Centralización)' }; }
+    await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
+    return { id: ins.insertId, monto: q.monto, id_comprobante: id };
+  } catch (e) { console.error('[provisiones constituirIas]', idUsuario, mes, e.message); return { error: e.message }; }
+}
+
+/* Libera UNA cuota. El gasto real de la indemnización entra por FINIQUITO_EMITIDO. */
+async function _liberarFilaIas(p, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
+  const C = CONCEPTOS.IAS;
+  try {
+    const fecha = await fechaContable(fechaISO || hoyISO());
+    const [u] = await pool.query(
+      "UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, liberada_contra=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'",
+      [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
+    if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
+    const id = await contabilizar({
+      evento: C.reglaLib, fecha, ref: `PROV-IAS-${p.origen_id}-LIB`, montos: { monto: Number(p.monto) },
+      glosa: `Liberación provisión indemnización años de servicio — ${p.tercero || ''} (${motivo.toLowerCase()})`.slice(0, 300),
+      rut: p.rut_tercero || null, detalle: `${p.mes} · ${motivo} · por ${usuario}`,
+    });
+    if (!id) { await pool.query("UPDATE ctb_provisiones SET estado='CONSTITUIDA', motivo_liberacion=NULL, fecha_liberacion=NULL, liberada_contra=NULL WHERE id=?", [p.id]); return { error: 'sin asiento de liberación (ver log del motor)' }; }
+    await pool.query('UPDATE ctb_provisiones SET id_comprobante_liberacion=? WHERE id=?', [id, p.id]);
+    return { id: p.id, monto: Number(p.monto), id_comprobante: id };
+  } catch (e) { console.error('[provisiones liberarIas]', p.id, e.message); return { error: e.message }; }
+}
+
+async function liberarIas(idFila, motivo, fechaISO, usuario, contra = null) {
+  const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE id=? AND concepto='IAS' AND estado='CONSTITUIDA'", [idFila]);
+  return p ? _liberarFilaIas(p, motivo, fechaISO, usuario, contra) : { skip: 'sin provisión constituida' };
+}
+
+/* Libera TODO lo acumulado de un trabajador: lo llama el cierre del finiquito (ahí entra el
+   gasto real por FINIQUITO_EMITIDO) o la baja de alguien que sale sin indemnización. */
+async function liberarIasDeTrabajador(idUsuario, motivo = 'FINIQUITO', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
+  const [filas] = await pool.query(
+    "SELECT * FROM ctb_provisiones WHERE concepto='IAS' AND estado='CONSTITUIDA' AND origen_tipo='TRABAJADOR_MES' AND origen_id LIKE ? ORDER BY mes",
+    [`IAS${Number(idUsuario)}|%`]);
+  let liberadas = 0, monto = 0;
+  for (const p of filas) { const r = await _liberarFilaIas(p, motivo, fechaISO, usuario, contra); if (r && r.id) { liberadas++; monto += Number(p.monto); } }
+  return { liberadas, monto };
+}
+
+/* Red de seguridad: constituye las cuotas que falten desde el arranque y libera lo de quienes
+   ya salieron (finiquito cerrado o fecha de baja). */
+async function sincronizarIas(usuario = 'Motor provisiones') {
+  const desde = await param(CONCEPTOS.IAS.paramDesde, '2026-09');
+  const out = { constituidas: 0, liberadas: 0, omitidas: 0 };
+  const hasta = hoyISO().slice(0, 7);
+  const meses = [];
+  for (let m = desde; m <= hasta && meses.length < 60; m = mesSiguienteDe(m)) meses.push(m);
+
+  const [gente] = await pool.query(
+    `SELECT u.id_usuario FROM usuarios u JOIN rh_fichas f ON f.id_usuario=u.id_usuario
+      WHERE UPPER(COALESCE(f.tipo_contrato,''))='INDEFINIDO' AND u.fecha_ingreso IS NOT NULL`);
+  for (const g of gente) for (const m of meses) {
+    const r = await constituirIas(g.id_usuario, m, usuario);
+    if (r && r.id && r.id_comprobante) out.constituidas++; else out.omitidas++;
+  }
+
+  const [abiertas] = await pool.query("SELECT DISTINCT origen_id FROM ctb_provisiones WHERE concepto='IAS' AND estado='CONSTITUIDA'");
+  for (const a of abiertas) {
+    const idU = Number(String(a.origen_id).replace(/^IAS/, '').split('|')[0]);
+    if (!idU) continue;
+    const [[u]] = await pool.query("SELECT DATE_FORMAT(fecha_baja,'%Y-%m-%d') baja FROM usuarios WHERE id_usuario=?", [idU]);
+    let fin = null;
+    // El finiquito queda cerrado con cerrado_at (el campo estado no siempre se usa)
+    try { [[fin]] = await pool.query("SELECT DATE_FORMAT(fecha_termino,'%Y-%m-%d') f, estado, cerrado_at FROM rh_finiquitos WHERE id_usuario=? ORDER BY id DESC LIMIT 1", [idU]); } catch (_) {}
+    const cerrado = !!(fin && (fin.cerrado_at || String(fin.estado || '').toUpperCase() === 'CERRADO'));
+    if (!cerrado && !(u && u.baja)) continue;
+    const x = await liberarIasDeTrabajador(idU, cerrado ? 'FINIQUITO' : 'BAJA', (cerrado ? fin.f : u.baja) || null, usuario,
+      cerrado ? `Finiquito cerrado al ${String(fin.f || '').split('-').reverse().join('-')}` : `Baja al ${String(u.baja || '').split('-').reverse().join('-')}`);
+    out.liberadas += x.liberadas;
+  }
+  return out;
+}
+
 /* Detalle detrás de cada cuadro (pop-up y Excel). tipo: INICIAL | CONSTITUIDO | LIBERADO | VIGENTE | CUENTA */
 async function detalle(mes, concepto, tipo) {
   const cta = CONCEPTOS[concepto].cuentaProv;
@@ -1078,8 +1243,8 @@ async function detalle(mes, concepto, tipo) {
   throw new Error('Tipo de detalle desconocido');
 }
 
-const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo, SUELDOS: sincronizarSueldos, OTROS: sincronizarOtros };
-const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, EJECUTIVO: liberarEjecutivo, SUELDOS: liberarSueldos, OTROS: liberarOtros };
+const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo, SUELDOS: sincronizarSueldos, OTROS: sincronizarOtros, IAS: sincronizarIas };
+const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, EJECUTIVO: liberarEjecutivo, SUELDOS: liberarSueldos, OTROS: liberarOtros, IAS: liberarIas };
 /* Al otorgar: todos los conceptos que nacen con el crédito (fire-and-forget, nunca lanza) */
 async function constituirAlOtorgar(idCredito, usuario) {
   const r = { DEALER: await constituirDealer(idCredito, usuario), PARQUE: await constituirParque(idCredito, usuario) };   // EJECUTIVO es mensual (al cierre), no al otorgar
@@ -1097,4 +1262,5 @@ module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constit
   constituirParque, liberarParque, liberarParquePorPago, sincronizarParque,
   constituirEjecutivoMes, liberarEjecutivo, liberarEjecutivoPorAprobacion, sincronizarEjecutivo, comisionesMotorMes,
   constituirSueldos, liberarSueldos, sincronizarSueldos, proyeccionSueldos,
-  constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, tratamientoDe, baseNetaODP, desgloseODP, esProveedorParque, tieneDevengoPropio, cuadro, detalle };
+  constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, tratamientoDe, baseNetaODP, desgloseODP, esProveedorParque, tieneDevengoPropio,
+  cuotaIas, constituirIas, liberarIas, liberarIasDeTrabajador, sincronizarIas, cuadro, detalle };

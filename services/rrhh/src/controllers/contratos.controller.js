@@ -613,6 +613,14 @@ async function efectosDeCierre(req, fq, nombreUsuario) {
       montos: { total },
     });
   } catch (e) { console.error('[finiquito asiento]', e.message); }
+  /* La provisión de indemnización que se venía acumulando mes a mes se libera acá: el gasto real
+     ya entró por FINIQUITO_EMITIDO y dejarla viva lo contaría dos veces. Nunca bloquea el cierre. */
+  try {
+    const r = await require('../../../contabilidad/src/provisiones').liberarIasDeTrabajador(
+      fq.id_usuario, 'FINIQUITO', fq.fecha_termino, nombreUsuario || 'Cierre de finiquito',
+      `Finiquito #${id} cerrado al ${String(fq.fecha_termino || '').split('-').reverse().join('-')}`);
+    if (r && r.liberadas) console.log(`[finiquito] provisión IAS liberada: ${r.liberadas} cuota(s) por $${r.monto}`);
+  } catch (e) { console.error('[finiquito provisión IAS]', e.message); }
   let odp = null;
   try {
     const [[existe]] = await pool.query(`SELECT numero FROM ordenes_pago WHERE categoria='REMUNERACIONES' AND observaciones LIKE ? ORDER BY id DESC LIMIT 1`, [`%finiquito #${id}.%`]);

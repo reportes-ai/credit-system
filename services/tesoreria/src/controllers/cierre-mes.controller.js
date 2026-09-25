@@ -111,6 +111,7 @@ require('../../../../shared/migrate').enFila('cierre-mes', async () => {
       ['PROVISION_EJECUTIVO', 'Provisiones de comisión ejecutivo cuadradas', 'Toda otorgada del mes con comisión de ejecutivo tiene su provisión (o la comisión del mes ya aprobada) y los asientos del motor calzan en la cuenta 2106014.', 10],
       ['PROVISION_SUELDOS', 'Remuneraciones del mes devengadas', 'El libro de remuneraciones del mes está contabilizado (RRHH o AVSOFT) o, si no, existe la provisión de sueldos del cierre en la cuenta 2106015.', 11],
       ['PROVISION_OTROS', 'Otros gastos del mes devengados', 'Toda orden de pago del mes sin documento en el auxiliar de compras, y todo pago recurrente del mes sin su ODP, tienen su provisión en la cuenta 2106016; ninguna categoría quedó sin cuenta de gasto configurada.', 12],
+      ['PROVISION_IAS', 'Indemnización por años de servicio devengada', 'Todo trabajador con contrato indefinido tiene la cuota del mes (un doceavo de su base topada a 90 UF, hasta 11 años) provisionada en la cuenta 2106031.', 13],
     ]) {
       const [[hay]] = await pool.query('SELECT COUNT(*) n FROM cierre_checklist_items WHERE check_auto=?', [auto]);
       if (hay.n) continue;
@@ -227,6 +228,27 @@ const CHECKS_AUTO = {
     if (sinProvision.length) partes.push(`${sinProvision.length} orden(es) de pago sin documento ni provisión: ${sinProvision.join(', ').slice(0, 160)} — correr Sincronizar (concepto Otros gastos)`);
     if (partes.length) return { ok: false, detalle: partes.join(' · ') };
     return { ok: true, detalle: `Cuenta ${c.cuenta_provision}: SF $${c.saldo_final.toLocaleString('es-CL')} — ${c.motor_n_vigente} provisión(es) vigente(s) por $${c.motor_vigente.toLocaleString('es-CL')}; toda ODP del mes tiene documento o provisión` };
+  },
+  /* IAS: cada trabajador indefinido del mes tiene su cuota provisionada (o está fuera por tope
+     de años, sin base o ya finiquitado). */
+  async PROVISION_IAS(mes) {
+    const prov = require('../../../contabilidad/src/provisiones');
+    const c = await prov.cuadro(mes, 'IAS');
+    if (mes < c.desde) return { ok: true, detalle: `Mes anterior a ${c.desde}: no se provisiona` };
+    const [gente] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) nombre FROM usuarios u
+         JOIN rh_fichas f ON f.id_usuario=u.id_usuario
+        WHERE UPPER(COALESCE(f.tipo_contrato,''))='INDEFINIDO' AND u.fecha_ingreso IS NOT NULL`);
+    const falta = [];
+    for (const g of gente) {
+      const [[p]] = await pool.query("SELECT id FROM ctb_provisiones WHERE concepto='IAS' AND origen_tipo='TRABAJADOR_MES' AND origen_id=?", [`IAS${g.id_usuario}|${mes}`]);
+      if (p) continue;
+      const q = await prov.cuotaIas(g.id_usuario, mes);
+      if (q && q.skip) continue;                                   // fuera por tope, baja o sin base: correcto que no tenga cuota
+      falta.push(g.nombre || g.id_usuario);
+    }
+    if (falta.length) return { ok: false, detalle: `${falta.length} trabajador(es) indefinidos sin la cuota del mes: ${falta.join(', ').slice(0, 250)} — correr Sincronizar (concepto Indemnización por años de servicio)` };
+    return { ok: true, detalle: `Cuenta ${c.cuenta_provision}: SF $${c.saldo_final.toLocaleString('es-CL')} — ${c.motor_n_vigente} cuota(s) vigente(s) por $${c.motor_vigente.toLocaleString('es-CL')}; todos los indefinidos con su cuota del mes` };
   },
   async _provision(mes, concepto) {
     const prov = require('../../../contabilidad/src/provisiones');
