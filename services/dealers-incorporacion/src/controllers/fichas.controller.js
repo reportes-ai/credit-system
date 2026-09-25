@@ -554,7 +554,7 @@ function armarValores(body) {
        fantasía son EMPRESAS; el representante legal, los contactos y el titular de la
        cuenta son PERSONAS. Así la ficha, el mantenedor y la carta escriben igual. */
     else if (NOMBRES_EMPRESA.has(k)) v[k] = NOM.empresa(body[k]) || null;
-    else if (k === 'nombre_cuenta') v[k] = NOM.titular(body[k], body.cuenta_tipo) || null;   // sigue "la cuenta es de"
+    else if (k === 'nombre_cuenta') v[k] = NOM.titular(body[k], body.cuenta_tipo != null ? body.cuenta_tipo : body._cuenta_tipo_actual) || null;   // sigue "la cuenta es de"
     else if (NOMBRES_PERSONA.has(k)) v[k] = NOM.persona(body[k]) || null;
     else v[k] = norm(body[k]) || null;
   }
@@ -698,7 +698,7 @@ const crear = async (req, res) => {
 /* ── PUT /fichas/:id — editar (solo dueño, en BORRADOR/RECHAZADA) ──────────── */
 const editar = async (req, res) => {
   try {
-    const [[f]] = await pool.query('SELECT id_ejecutivo, estado FROM dealer_fichas WHERE id=?', [req.params.id]);
+    const [[f]] = await pool.query('SELECT id_ejecutivo, estado, cuenta_tipo FROM dealer_fichas WHERE id=?', [req.params.id]);
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
     if (f.id_ejecutivo !== req.usuario.id_usuario && req.usuario.perfil_nombre !== 'Administrador')
       return res.status(403).json({ success: false, data: null, error: 'Solo el ejecutivo que la creó puede editarla' });
@@ -711,6 +711,9 @@ const editar = async (req, res) => {
     if (!(await DC.puedeAcceder(req.usuario, 'FICHA')))
       return res.status(403).json({ success: false, data: null, error: 'Tu perfil no puede editar fichas de dealer' });
     const { body: cuerpo } = await DC.filtrarCuerpo(req.usuario, 'FICHA', req.body);
+    // Si el cuerpo no trae la marca EMPRESA/PERSONA (permisos por campo o PATCH parcial),
+    // el formato del titular debe seguir la que YA tiene la ficha, no degradarse a persona.
+    if (cuerpo.cuenta_tipo == null) cuerpo._cuenta_tipo_actual = f.cuenta_tipo;
     const v = armarValores(cuerpo);
     const setCols = Object.keys(v).map(k => `${k}=?`);
     const setVals = Object.values(v);

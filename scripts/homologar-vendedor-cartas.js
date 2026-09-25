@@ -55,11 +55,12 @@ const TABLAS = [['cartas_aprobacion', 'id', 'vendedor']];
   try {
     await conn.beginTransaction();
     for (const c of cambios) await conn.query(`UPDATE ${c.tabla} SET ${c.col}=? WHERE ${c.pk}=?`, [c.despues, c.id]);
-    await conn.commit();
+    // El respaldo se escribe ANTES del commit: si falla el disco, se cae en el catch y revierte
     const f = path.join(__dirname, `respaldo-vendedor-cartas-${Date.now()}.json`);
     fs.writeFileSync(f, JSON.stringify(cambios, null, 1), 'utf8');
+    await conn.commit();
     console.log(`\n✓ ${cambios.length} carta(s) homologada(s). Respaldo en ${f}`);
   } catch (e) { await conn.rollback(); console.error('ROLLBACK:', e.message); process.exitCode = 1; }
   finally { conn.release(); }
-  process.exit(0);
+  process.exit(process.exitCode || 0);   // si hubo ROLLBACK, salir distinto de 0
 })().catch(e => { console.error(e); process.exit(1); });

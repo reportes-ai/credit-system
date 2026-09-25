@@ -463,7 +463,7 @@ async function ajustesPendientes(rut, nombre) {
   const [[r]] = await pool.query(
     `SELECT COUNT(*) n FROM cartolas_movimientos
       WHERE movimiento IN ('ADICIONAL','DESCUENTO') AND aprobacion='PENDIENTE' AND mes_cartola IS NULL
-        AND ${rut ? 'rut_dealer = ?' : 'nombre_dealer = ?'}`, [rut || nombre]);
+        AND ${rut ? 'rut_dealer = ?' : 'UPPER(TRIM(nombre_dealer)) = UPPER(TRIM(?))'}`, [rut || nombre]);
   return Number(r.n) || 0;
 }
 const msgPendientes = n => `La cartola tiene ${n} adicional(es)/descuento(s) por aprobar. El supervisor debe aprobarlos o rechazarlos antes de enviarla.`;

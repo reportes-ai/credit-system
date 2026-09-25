@@ -140,6 +140,7 @@
     /* PRODUCTO PREFERENTE: marca de agua "AUTOFIN PREFERENTE" repetida a 45° — deja claro que cambia las comisiones de todos */
     body.pref-bg{ background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><text x='150' y='150' text-anchor='middle' dominant-baseline='middle' font-family='Arial,Helvetica,sans-serif' font-size='24' font-weight='800' fill='%230141A2' fill-opacity='0.28' transform='rotate(-45 150 150)'>AUTOFIN PREFERENTE</text></svg>"); background-repeat:repeat; background-attachment:fixed; }
   </style>
+<script src="/js/nombres-core.js"></script>
 </head>
 <body>
 
@@ -1645,7 +1646,12 @@ function filtrarConcesionarios(){
   sel.innerHTML = '<option value="">— Seleccione —</option>' + delParque.map(opt).join('') +
     (otros.length ? `<optgroup label="── Otros dealers (fuera de este parque) ──">${otros.map(opt).join('')}</optgroup>` : '');
   // Conservar la selección si sigue en la lista; con match único, auto-seleccionar
-  if (actual && list.some(d=>d.nombre===actual)) { sel.value = actual; onConcesionario(); return; }
+  /* La carta guarda el nombre del dealer congelado; el maestro puede tenerlo con otro
+     formato (mayúsculas). Comparar con === dejaba el select VACÍO y al re-guardar la
+     carta se perdía el dealer. Mismo criterio que el selector de vendedor. */
+  const mismoNom = (x, y) => window.AF_NOMBRES ? AF_NOMBRES.mismoNombre(x, y) : String(x) === String(y);
+  const enLista = actual ? list.find(d => mismoNom(d.nombre, actual)) : null;
+  if (enLista) { sel.value = enLista.nombre; onConcesionario(); return; }
   if (txt && list.length === 1) { sel.value = list[0].nombre; onConcesionario(); return; }
   document.getElementById('cRutConc').value = '';
 }
@@ -4060,7 +4066,7 @@ function renderRevCartolas(){
   const grupos = {}, NOMBRE = {};
   PEND.forEach(m=>{
     const rk = rutN(m.rut_conc);
-    const key = rk || ('N:' + (m.concesionario||'(sin concesionario)'));
+    const key = rk || ('N:' + String(m.concesionario||'(sin concesionario)').trim().toUpperCase().replace(/\s+/g,' '));   // sin RUT la llave es el nombre: normalizada, o el mismo dealer se parte en dos cartolas
     (grupos[key] = grupos[key]||[]).push(m);
     if (!NOMBRE[key]) NOMBRE[key] = (rk && (DEALERS.find(d=>rutN(d.rut)===rk)||{}).nombre) || m.concesionario || '(sin concesionario)';
   });
@@ -4479,6 +4485,5 @@ async function reversarEnvio(id, dealer, mes){
   } catch(e){ alert('Error de conexión'); }
 }
 </script>
-<script src="/js/nombres-core.js"></script>
 </body>
 </html>

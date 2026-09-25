@@ -45,11 +45,12 @@ async function main() {
   console.log(APLICAR ? '=== APLICANDO ===' : '=== SIMULACIÓN (no escribe nada) ===\n');
 
   /* ── 1. dealers: razón social (empresa) y personas ─────────────────────── */
-  const [dealers] = await pool.query('SELECT id_dealer, numero, nombre_indexa, nombre_razon, contacto, nombre_cuenta FROM dealers');
+  const [dealers] = await pool.query('SELECT id_dealer, numero, nombre_indexa, nombre_razon, contacto, nombre_cuenta, cuenta_tipo FROM dealers');
   for (const d of dealers) {
     registrar('dealers', 'nombre_razon', d.id_dealer, d.nombre_razon, NOM.empresa(d.nombre_razon));
     registrar('dealers', 'contacto', d.id_dealer, d.contacto, NOM.persona(d.contacto));
-    registrar('dealers', 'nombre_cuenta', d.id_dealer, d.nombre_cuenta, NOM.persona(d.nombre_cuenta));
+    // El titular sigue la marca "la cuenta es de": así el script es idempotente corra cuando corra
+    registrar('dealers', 'nombre_cuenta', d.id_dealer, d.nombre_cuenta, NOM.titular(d.nombre_cuenta, d.cuenta_tipo));
   }
 
   /* ── 2. dealers.nombre_indexa + sus copias ─────────────────────────────── */
@@ -58,11 +59,13 @@ async function main() {
     const antes = d.nombre_indexa, despues = NOM.empresa(antes);
     if (!antes || antes === despues) continue;
     if (!NOM.mismoNombre(antes, despues)) { console.log(`  ⚠ ${d.numero}: "${antes}" → "${despues}" cambia el texto, se salta`); continue; }
+    /* Se guardan los IDS de cada copia, no el conteo: revertir con
+       `WHERE col = despues` tocaría filas que YA tenían ese valor. */
     const copias = {};
     for (const [tabla, col] of COPIAS) {
       try {
-        const [[r]] = await pool.query(`SELECT COUNT(*) n FROM \`${tabla}\` WHERE \`${col}\` = ?`, [antes]);
-        if (r.n) copias[`${tabla}.${col}`] = r.n;
+        const [filas] = await pool.query(`SELECT id FROM \`${tabla}\` WHERE \`${col}\` = ?`, [antes]);
+        if (filas.length) copias[`${tabla}.${col}`] = filas.map(x => x.id);
       } catch (e) { /* la tabla puede no existir en este ambiente */ }
     }
     renombres.push({ id_dealer: d.id_dealer, numero: d.numero, antes, despues, copias });
@@ -103,10 +106,10 @@ async function main() {
 
   console.log(`\nRENOMBRES DE dealers.nombre_indexa (arrastran sus copias): ${renombres.length}`);
   renombres.slice(0, 15).forEach(r => {
-    const cop = Object.entries(r.copias).map(([k, n]) => `${k}=${n}`).join(', ') || 'sin copias';
+    const cop = Object.entries(r.copias).map(([k, ids]) => `${k}=${ids.length}`).join(', ') || 'sin copias';
     console.log(`    N°${r.numero}: "${r.antes}" → "${r.despues}"  [${cop}]`);
   });
-  const totalCopias = renombres.reduce((s, r) => s + Object.values(r.copias).reduce((a, b) => a + b, 0), 0);
+  const totalCopias = renombres.reduce((s, r) => s + Object.values(r.copias).reduce((a, b) => a + b.length, 0), 0);
   console.log(`  Filas de copias a mover: ${totalCopias}`);
 
   if (!APLICAR) { console.log('\nSimulación: no se escribió nada. Correr con --apply para aplicar.'); process.exit(0); }
@@ -130,9 +133,10 @@ async function main() {
         try { await conn.query(`UPDATE \`${tabla}\` SET \`${col}\` = ? WHERE \`${col}\` = ?`, [r.despues, r.antes]); } catch (e) {}
       }
     }
-    await conn.commit();
+    // El respaldo se escribe ANTES del commit: si falla el disco, se cae en el catch y revierte
     const f = path.join(__dirname, `respaldo-nombres-dealers-${Date.now()}.json`);
     fs.writeFileSync(f, JSON.stringify(respaldo, null, 1), 'utf8');
+    await conn.commit();
     console.log(`\n✓ Aplicado. Respaldo en ${f}`);
   } catch (e) {
     await conn.rollback();

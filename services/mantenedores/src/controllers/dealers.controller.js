@@ -237,7 +237,7 @@ const getDealers = async (req, res) => {
       conds.push('(LOWER(d.nombre_indexa) LIKE ? OR LOWER(d.nombre_razon) LIKE ? OR LOWER(d.rut) LIKE ?)');
       params.push(ql, ql, ql);
     }
-    if (ccs)    { conds.push('d.ccs_parque = ?'); params.push(ccs); }
+    if (ccs)    { conds.push('UPPER(TRIM(d.ccs_parque)) = UPPER(TRIM(?))'); params.push(ccs); }
     if (activo !== undefined && activo !== '') { conds.push('d.activo = ?'); params.push(parseInt(activo)); }
     if (categoria) {
       if (categoria === 'SIN') conds.push("(d.categoria_asignada IS NULL OR d.categoria_asignada = '')");
@@ -326,6 +326,16 @@ const importar = async (req, res) => {
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
+/* Dónde vive copiado el nombre del dealer. Un renombre real tiene que moverlas todas:
+   el enlace operación ↔ dealer es por TEXTO (creditos.automotora) y la base distingue
+   mayúsculas. Misma lista que usa scripts/homologar-nombres-dealers.js. */
+const COPIAS_NOMBRE_DEALER = [
+  ['creditos', 'automotora'],
+  ['cartas_aprobacion', 'nombre_dealer'],
+  ['cartolas_movimientos', 'nombre_dealer'],
+  ['postventa_seguimiento', 'nombre_dealer'],
+];
+
 /* Formato único de los nombres que llegan del formulario (shared/nombres):
    el dealer y su razón social son EMPRESAS (mayúsculas); el contacto y el titular
    de la cuenta son PERSONAS (Nombre Propio). */
@@ -370,20 +380,23 @@ const updateDealer = async (req, res) => {
     if (!(await DC.puedeAcceder(req.usuario, 'DEALER')))
       return res.status(403).json({ success: false, data: null, error: 'Tu perfil no puede editar dealers' });
     const { quitados } = await DC.filtrarCuerpo(req.usuario, 'DEALER', req.body);
-    if (quitados.length) {
-      const [[actual]] = await pool.query('SELECT * FROM dealers WHERE id_dealer=?', [req.params.id]);
-      if (actual) quitados.forEach(c => { req.body[c] = actual[c]; });
-    }
+    const [[antes]] = await pool.query('SELECT * FROM dealers WHERE id_dealer=?', [req.params.id]);
     const r = req.body;
     r.rut = RUT.normalizar(r.rut) || r.rut;
     r.rut_pago = RUT.normalizar(r.rut_pago) || r.rut_pago;
-    /* `nombre_indexa` es la LLAVE de match con creditos.automotora y la base es
-       case-sensitive: cambiarle el formato acá dejaría las operaciones huérfanas.
-       Por eso se conserva tal cual cuando es el mismo nombre escrito distinto; la
-       homologación masiva (que además arrastra las copias) va por su script. */
-    const [[antes]] = await pool.query('SELECT nombre_indexa, cuenta_tipo FROM dealers WHERE id_dealer=?', [req.params.id]);
+    /* El formato se aplica ANTES de reponer los campos bloqueados: si no, un perfil que
+       no puede tocar la razón social igual le cambiaba el formato al editar otra cosa,
+       y la auditoría lo registraba como edición suya. */
     normalizarNombresDealer(r, antes && antes.cuenta_tipo);
-    if (antes && NOM.mismoNombre(antes.nombre_indexa, r.nombre_indexa)) r.nombre_indexa = antes.nombre_indexa;
+    if (quitados.length && antes) quitados.forEach(c => { req.body[c] = antes[c]; });
+    /* `nombre_indexa` es la LLAVE de match con creditos.automotora y la base es
+       case-sensitive. Si el cambio es SOLO de mayúsculas se conserva el valor guardado
+       (no vale la pena mover las copias por eso). Si el nombre cambió de verdad —incluida
+       una tilde o una ñ, que antes se descartaban en silencio— se renombra y se arrastran
+       las copias, igual que hace el script de homologación. */
+    const soloFormato = antes && String(antes.nombre_indexa || '').toUpperCase() === String(r.nombre_indexa || '').toUpperCase();
+    if (soloFormato) r.nombre_indexa = antes.nombre_indexa;
+    const renombre = antes && !soloFormato && antes.nombre_indexa && r.nombre_indexa ? { de: antes.nombre_indexa, a: r.nombre_indexa } : null;
     await pool.query(
       `UPDATE dealers SET numero_ind=?,rut=?,nombre_indexa=?,nombre_razon=?,ccs_parque=?,
        direccion=?,fecha_incorporacion=?,contacto=?,telefono=?,correo=?,
@@ -401,7 +414,21 @@ const updateDealer = async (req, res) => {
        r.activo ? 1 : 0, r.tiene_factura ? 1 : 0, r.observaciones || null,
        req.params.id]
     );
-    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.id, detalle: `Editó el dealer ${await etiquetaDealer(req.params.id)}`, rut: r.rut, meta: req.body });
+    /* El nombre del dealer vive copiado en las operaciones y sus documentos: si cambió
+       de verdad, hay que moverlas todas o las ops quedan huérfanas (el match es por texto). */
+    let copiasMovidas = 0;
+    if (renombre) {
+      for (const [tabla, col] of COPIAS_NOMBRE_DEALER) {
+        try {
+          const [u] = await pool.query(`UPDATE \`${tabla}\` SET \`${col}\`=? WHERE \`${col}\`=?`, [renombre.a, renombre.de]);
+          copiasMovidas += u.affectedRows || 0;
+        } catch (e) { console.error('[dealer renombre]', tabla, e.message); }
+      }
+    }
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.id,
+      detalle: `Editó el dealer ${await etiquetaDealer(req.params.id)}`
+        + (renombre ? ` · RENOMBRADO de "${renombre.de}" a "${renombre.a}" (${copiasMovidas} fila(s) de operaciones y documentos actualizadas)` : ''),
+      rut: r.rut, meta: req.body });
     res.json({ success: true, data: { id_dealer: req.params.id }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };

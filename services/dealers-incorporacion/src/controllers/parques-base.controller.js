@@ -16,6 +16,7 @@
  */
 const pool = require('../../../../shared/config/database');
 const RUT = require('../../../../api-gateway/public/js/rut-core');
+const NOM = require('../../../../api-gateway/public/js/nombres-core');   // empresas en MAYÚSCULAS, personas en Nombre Propio
 const { auditar } = require('../../../../shared/audit');
 const almacen = require('../../../../shared/almacen-docs');
 
@@ -111,7 +112,13 @@ function limpiarFicha(body) {
     if (!n) return { error: `El ${c === 'rut' ? 'RUT del parque' : 'RUT de la cuenta'} no es válido` };
     f[c] = n;
   }
-  if (f.razon_social) f.razon_social = f.razon_social.toUpperCase();
+  /* Formato único de los nombres (nombres-core), igual que dealers y la ficha de
+     incorporación: la razón social es EMPRESA y los contactos son PERSONAS. El titular
+     de la cuenta sigue el RUT de la cuenta, porque acá `cuenta_tipo` guarda el tipo de
+     cuenta (Corriente/Vista), no la marca EMPRESA/PERSONA. */
+  if (f.razon_social != null) f.razon_social = NOM.empresa(f.razon_social);
+  for (const c of ['rl_nombre', 'cc_nombre', 'cf_nombre']) if (f[c] != null) f[c] = NOM.persona(f[c]);
+  if (f.nombre_cuenta != null) f.nombre_cuenta = NOM.titular(f.nombre_cuenta, NOM.cuentaTipoDeRut(f.rut_cuenta));
   return { f };
 }
 

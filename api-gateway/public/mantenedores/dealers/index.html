@@ -477,7 +477,7 @@
           </div>
           <div class="col-md-4">
             <label class="form-label">La cuenta es de</label>
-            <select class="form-select form-select-sm" id="fCuentaTipo"><option value="">—</option><option value="EMPRESA">EMPRESA (misma razón social)</option><option value="PERSONA">PERSONA (socio / tercero con poder)</option></select>
+            <select class="form-select form-select-sm" id="fCuentaTipo" onchange="window.AF_FORMATEAR_NOMBRE &amp;&amp; AF_FORMATEAR_NOMBRE(document.getElementById('fNombreCuenta'))"><option value="">—</option><option value="EMPRESA">EMPRESA (misma razón social)</option><option value="PERSONA">PERSONA (socio / tercero con poder)</option></select>
           </div>
           <div class="col-12" style="font-size:.78rem;color:#64748b"><i class="bi bi-info-circle me-1"></i>El archivo TEF y la nómina bancaria salen con el <b>RUT Pago</b> y el <b>Titular de la cuenta</b> cuando el RUT Pago es distinto del RUT del dealer (poder para depositar a un tercero). El banco valida RUT + nombre contra la cuenta: si no coinciden, rechaza la transferencia.</div>
         </div>

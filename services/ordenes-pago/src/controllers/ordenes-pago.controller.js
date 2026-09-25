@@ -753,7 +753,7 @@ async function construirDocumento(oc) {
   if (!dep.num_cuenta && (row.dealer_rut || row.dealer_nombre)) {
     const [[d2]] = await pool.query(
       `SELECT banco, num_cuenta, cuenta_tipo, tipo_cuenta, nombre_cuenta, rut_pago, rut, nombre_razon
-         FROM dealers WHERE (rut = ? AND ? != '') OR nombre_razon = ? OR nombre_indexa = ? LIMIT 1`,
+         FROM dealers WHERE (rut = ? AND ? != '') OR UPPER(TRIM(nombre_razon)) = UPPER(TRIM(?)) OR UPPER(TRIM(nombre_indexa)) = UPPER(TRIM(?)) LIMIT 1`,
       [row.dealer_rut || '', row.dealer_rut || '', row.dealer_nombre || '', row.dealer_nombre || '']);
     if (d2) {
       dep = { banco: d2.banco, num_cuenta: d2.num_cuenta, cuenta_tipo: d2.cuenta_tipo,

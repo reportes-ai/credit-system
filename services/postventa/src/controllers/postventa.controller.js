@@ -1283,7 +1283,7 @@ async function replicarFacturaComision(idTitular, usuario) {
     WHERE s.id <> ?
       AND (
         (? IS NOT NULL AND REPLACE(REPLACE(UPPER(COALESCE(c.rut_dealer, d.rut, s.rut_dealer,'')),'.',''),'-','') = REPLACE(REPLACE(UPPER(?),'.',''),'-',''))
-        OR (? IS NULL AND s.nombre_dealer = ?)
+        OR (? IS NULL AND UPPER(TRIM(s.nombre_dealer)) = UPPER(TRIM(?)))
       )
       AND NOT EXISTS (SELECT 1 FROM postventa_etapas ef
         WHERE ef.id_seguimiento = s.id AND ef.track='COMISION' AND ef.etapa='FACTURA RECIBIDA')`,

@@ -2549,7 +2549,7 @@ const corregirCarta = async (req, res) => {
        nueva con la ficha del dealer viejo y la ODP salía a la cuenta errada). */
     let propDealer = null;
     try {
-      const dealerCambio = String(nueva.nombre_dealer || '') !== String(orig.nombre_dealer || '')
+      const dealerCambio = !require('../../../../api-gateway/public/js/nombres-core').mismoNombre(nueva.nombre_dealer, orig.nombre_dealer)
                         || String(nueva.rut_dealer || '') !== String(orig.rut_dealer || '');
       if (dealerCambio && nueva.rut_dealer)
         propDealer = await propagarDealerCredito(orig.id_credito_creado, nueva.nombre_dealer, String(nueva.rut_dealer).trim().toUpperCase(), nueva.parque);
