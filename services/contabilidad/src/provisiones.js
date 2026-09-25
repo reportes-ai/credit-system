@@ -1322,6 +1322,47 @@ async function detalle(mes, concepto, tipo) {
   throw new Error('Tipo de detalle desconocido');
 }
 
+/* ── Las demás cuentas de provisión (las que NO tiene el motor) ──────────────────
+   El pasivo provisionado no es solo el que controla este módulo: quedan vivas las
+   cuentas que mantiene el contador en AVSOFT (vacaciones, provisión de gastos, las del
+   asiento de apertura) y las "por pagar" que dejan los devengos reales. Mostrarlas acá
+   evita que se pierdan de vista, que es justo lo que había pasado con la indemnización.
+   No tienen detalle por fila: solo saldo contable. */
+async function otrasCuentas(mes) {
+  const conMotor = new Set(Object.values(CONCEPTOS).map(c => c.cuentaProv));
+  const [cuentas] = await pool.query(
+    `SELECT c.codigo, c.nombre FROM ctb_cuentas c
+      WHERE c.imputable=1 AND (c.codigo LIKE '2106%' OR UPPER(c.nombre) LIKE 'PROVISION%') ORDER BY c.codigo`);
+  const fin = ultimoDiaMes(mes);
+  const out = [];
+  for (const c of cuentas) {
+    if (conMotor.has(c.codigo)) continue;
+    const [[m]] = await pool.query(
+      `SELECT COALESCE(SUM(CASE WHEN cp.fecha < ? THEN mv.haber - mv.debe END),0) inicial,
+              COALESCE(SUM(CASE WHEN DATE_FORMAT(cp.fecha,'%Y-%m') = ? THEN mv.haber END),0) constituido,
+              COALESCE(SUM(CASE WHEN DATE_FORMAT(cp.fecha,'%Y-%m') = ? THEN mv.debe END),0) liberado,
+              COALESCE(SUM(CASE WHEN cp.fecha <= ? THEN mv.haber - mv.debe END),0) final,
+              MAX(CASE WHEN cp.fecha <= ? THEN DATE_FORMAT(cp.fecha,'%Y-%m-%d') END) ultimo,
+              COUNT(CASE WHEN cp.fecha <= ? THEN 1 END) n
+         FROM ctb_movimientos mv JOIN ctb_comprobantes cp ON cp.id = mv.id_comprobante
+        WHERE mv.cuenta = ? AND cp.estado='CONTABILIZADO'`,
+      [`${mes}-01`, mes, mes, fin, fin, fin, c.codigo]);
+    if (!Number(m.final) && !Number(m.constituido) && !Number(m.liberado)) continue;
+    // Quién la mueve: el traspaso de AVSOFT, un motor propio o digitación
+    const [origenes] = await pool.query(
+      `SELECT cp.origen, COUNT(*) n FROM ctb_movimientos mv JOIN ctb_comprobantes cp ON cp.id = mv.id_comprobante
+        WHERE mv.cuenta = ? AND cp.estado='CONTABILIZADO' AND cp.fecha <= ? GROUP BY cp.origen ORDER BY n DESC LIMIT 2`,
+      [c.codigo, fin]);
+    out.push({
+      cuenta: c.codigo, nombre: c.nombre,
+      saldo_inicial: Number(m.inicial), constituido: Number(m.constituido), liberado: Number(m.liberado),
+      saldo_final: Number(m.final), ultimo_movimiento: m.ultimo, movimientos: Number(m.n),
+      origen: origenes.map(o => `${o.origen} (${o.n})`).join(' · '),
+    });
+  }
+  return out.sort((a, b) => Math.abs(b.saldo_final) - Math.abs(a.saldo_final));
+}
+
 const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo, SUELDOS: sincronizarSueldos, OTROS: sincronizarOtros, IAS: sincronizarIas };
 const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, EJECUTIVO: liberarEjecutivo, SUELDOS: liberarSueldos, OTROS: liberarOtros, IAS: liberarIas };
 /* Al otorgar: todos los conceptos que nacen con el crédito (fire-and-forget, nunca lanza) */
@@ -1342,4 +1383,4 @@ module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constit
   constituirEjecutivoMes, liberarEjecutivo, liberarEjecutivoPorAprobacion, sincronizarEjecutivo, comisionesMotorMes,
   constituirSueldos, liberarSueldos, sincronizarSueldos, proyeccionSueldos,
   constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, tratamientoDe, baseNetaODP, desgloseODP, esProveedorParque, tieneDevengoPropio,
-  cuotaIas, constituirIas, constituirAperturaIas, traspasarDemandaIas, liberarIas, liberarIasDeTrabajador, sincronizarIas, cuadro, detalle };
+  cuotaIas, constituirIas, constituirAperturaIas, traspasarDemandaIas, liberarIas, liberarIasDeTrabajador, sincronizarIas, cuadro, detalle, otrasCuentas };

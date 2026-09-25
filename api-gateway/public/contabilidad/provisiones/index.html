@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Provisiones por Devengo — AutoFácil</title>
-  <!-- v1.22 — IAS: saldo inicial al 31-08-2026 contra resultados acumulados y traspaso del caso con demanda desde 2106070. v1.21 — IAS: los externos (no_mostrar en la ficha) quedan fuera de la provision, igual que en la cartola de vacaciones. v1.20 — concepto IAS: indemnizacion por anos de servicio, cuota mensual de 8,33% por trabajador indefinido con topes de 90 UF y 11 anos (mismos parametros del finiquito); libera al cerrar el finiquito. v1.19 — boleta de honorarios ya pagada: el asiento separa la retencion (2105070) que se entera al SII el mes siguiente y provisiona solo el liquido; el pop-up muestra gasto y retencion por orden. v1.18 — tratamiento tributario por categoria (afecto a IVA / exento / honorarios): decide si la provision va por el neto, el total o el bruto, sin depender del tipo de documento escrito en la orden; el pop-up muestra cuanto se provisionaria de cada una. v1.17 — las ordenes de cada categoria se ven con un clic (con su documento, centro de costo y la cuenta con que se contabilizo esa compra en el auxiliar) para decidir el mapeo. v1.16 — concepto OTROS GASTOS: ODP emitidas o pagadas sin documento en el auxiliar y pagos recurrentes del mes sin ODP; mapeo parametrico categoria -> cuenta de gasto en la misma pagina. v1.15 — pop-up Ajustes al motor con columnas de la cuenta. v1.14 — pestaña Resumen por concepto (filtro de mes, totalizado, Excel) + Detalle; días nunca negativos; OP solo en filas por crédito. v1.13 — pop-ups: Tercero, formato por columna (días y comprobantes sin $), Creado por, desglose legible. v1.12 — cuadro con columna Ajustes al motor (no son constituciones ni liberaciones). v1.11 — sueldos + leyes sociales. v1.10 — mensaje de sincronización con ajustes al motor. v1.9 — ejecutivos mensual. v1.8 — concepto SUELDOS. v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
+  <!-- v1.23 — el resumen muestra tambien las otras cuentas de provision (sin motor): vacaciones, provision de gastos, por pagar de parques y ejecutivos, finiquitos, con marca de dormida. v1.22 — IAS: saldo inicial al 31-08-2026 contra resultados acumulados y traspaso del caso con demanda desde 2106070. v1.21 — IAS: los externos (no_mostrar en la ficha) quedan fuera de la provision, igual que en la cartola de vacaciones. v1.20 — concepto IAS: indemnizacion por anos de servicio, cuota mensual de 8,33% por trabajador indefinido con topes de 90 UF y 11 anos (mismos parametros del finiquito); libera al cerrar el finiquito. v1.19 — boleta de honorarios ya pagada: el asiento separa la retencion (2105070) que se entera al SII el mes siguiente y provisiona solo el liquido; el pop-up muestra gasto y retencion por orden. v1.18 — tratamiento tributario por categoria (afecto a IVA / exento / honorarios): decide si la provision va por el neto, el total o el bruto, sin depender del tipo de documento escrito en la orden; el pop-up muestra cuanto se provisionaria de cada una. v1.17 — las ordenes de cada categoria se ven con un clic (con su documento, centro de costo y la cuenta con que se contabilizo esa compra en el auxiliar) para decidir el mapeo. v1.16 — concepto OTROS GASTOS: ODP emitidas o pagadas sin documento en el auxiliar y pagos recurrentes del mes sin ODP; mapeo parametrico categoria -> cuenta de gasto en la misma pagina. v1.15 — pop-up Ajustes al motor con columnas de la cuenta. v1.14 — pestaña Resumen por concepto (filtro de mes, totalizado, Excel) + Detalle; días nunca negativos; OP solo en filas por crédito. v1.13 — pop-ups: Tercero, formato por columna (días y comprobantes sin $), Creado por, desglose legible. v1.12 — cuadro con columna Ajustes al motor (no son constituciones ni liberaciones). v1.11 — sueldos + leyes sociales. v1.10 — mensaje de sincronización con ajustes al motor. v1.9 — ejecutivos mensual. v1.8 — concepto SUELDOS. v1.7 — topnav completo (app-version.js: badge de versión, campana y menú). v1.6 — concepto EJECUTIVO. v1.5 — full width. v1.4 — toggles por año, cuadros clicables con pop-up y Excel, columna "Liberada contra". v1.3 — detalle AVSOFT del contador cargado como provisiones (badge AVSOFT), diferencia cuenta vs detalle. v1.2 — concepto PARQUE (comisión + arriendo al otorgar, libera al aprobar el pago del parque). v1.1 — el cuadro lee la cuenta completa (saldo inicial con AVSOFT), motor e histórico aparte. v1.0 — provisión comisión dealer: constituye al otorgar, libera con la factura/boleta o la anulación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -64,6 +64,14 @@
       <tfoot id="resFoot"></tfoot>
     </table></div>
     <div class="small text-muted mt-2">Saldo inicial + constituido ± ajustes − liberado = saldo final (cuenta contable completa). "Detalle vigente" es lo que el motor controla fila por fila; "Diferencia" es lo que hay en la cuenta sin detalle (o al revés), a conciliar. Haz clic en un concepto para ir a su detalle.</div>
+
+    <h6 class="fw-bold mt-4 mb-1"><i class="bi bi-inboxes me-1"></i>Otras cuentas de provisión <span class="text-muted fw-normal small">— sin motor: las mantiene el contador o son el "por pagar" de un devengo</span></h6>
+    <div class="small text-muted mb-2">Acá está el resto del pasivo provisionado. No tienen detalle fila por fila: solo el saldo contable. Se listan para que ninguna quede fuera de la vista al cerrar el mes.</div>
+    <div style="overflow:auto"><table id="tblOtras">
+      <thead><tr><th>Cuenta</th><th>Nombre</th><th class="r">Saldo inicial</th><th class="r">Constituido</th><th class="r">Liberado</th><th class="r">Saldo final</th><th>Último movimiento</th><th>Quién la mueve</th></tr></thead>
+      <tbody id="otrasBody"><tr><td colspan="8" class="text-center text-muted py-3">Cargando…</td></tr></tbody>
+      <tfoot id="otrasFoot"></tfoot>
+    </table></div>
   </div>
 
   <div id="paneDetalle" style="display:none">
@@ -142,6 +150,7 @@
       <li><b>Tratamiento tributario por categoría</b> → en el mismo mapeo: <b>afecto a IVA</b> provisiona el neto, <b>exento</b> el total y <b>honorarios</b> el bruto de la boleta. En una boleta de honorarios <b>ya pagada</b> el asiento separa la <b>retención</b> contra <b>2105070 Retención de honorarios por pagar</b> —hay que enterarla al SII el mes siguiente en el F29— y provisiona solo el líquido que se le debe al prestador; si todavía no se paga, no hay nada retenido y se provisiona el bruto completo. Si queda "según el documento", manda el tipo de documento escrito en la orden, que no siempre viene bien. Aplica igual a los pagos recurrentes de ese tipo.</li>
       <li><b>Cuentas de gasto por categoría</b> → mapeo paramétrico <code>ctb_gasto_categorias</code> que se edita en esta misma página (solo visible en el concepto Otros gastos): define con qué cuenta se provisiona cada categoría de <a href="/ordenes-pago/">Órdenes de Pago</a> y cada tipo de <a href="/tesoreria/pagos-recurrentes.html">pago recurrente</a>. Sin cuenta configurada la provisión no se constituye y la categoría queda a la vista.</li>
       <li><b>Indemnización por años de servicio</b> → concepto mensual por trabajador con contrato <b>indefinido</b>: un doceavo de la base del finiquito (<code>prov_ias_pct</code>, hoy 8,33%) contra <b>2106031</b>, gasto 4002060 (regla <b>PROV_IAS</b>). Se aplican los topes legales con los <b>mismos parámetros del finiquito</b> (<code>rh_config</code>: base máxima 90 UF y hasta 11 años de servicio), y la base es la que paga el finiquito de verdad (motor único <code>remuneracionBaseDetalle</code>). Se libera al <b>cerrar el finiquito</b> de esa persona —ahí entra el gasto real por FINIQUITO_EMITIDO— o si sale sin derecho a indemnización (<b>PROV_IAS_LIB</b>). Los contratos a plazo fijo y los honorarios no se provisionan porque no generan indemnización, y los <b>externos</b> (marcados <code>no_mostrar</code> en la ficha) tampoco, porque no son trabajadores de la empresa. Parámetro <code>prov_ias_desde</code>. El <b>saldo inicial</b> al 31-08-2026 ($125.706.866 de 18 trabajadores) se reconoció contra <b>2703010 Resultados Acumulados</b>, porque es devengo de ejercicios anteriores y no gasto del mes (regla <b>PROV_IAS_APERTURA</b>). La provisión del caso con <b>demanda laboral</b> (Ricardo Pino, $14.407.606) se traspasó desde 2106070, donde la mantenía el contador, sin tocar resultado (<b>PROV_IAS_TRASPASO</b>): queda marcada como demanda, el motor mensual no la toca y se libera cuando termine el juicio. Pendiente: el cálculo actuarial de NIC 19 (rotación, tasa de descuento y proyección de sueldos) para contabilidad completa bajo IFRS.</li>
+      <li><b>Otras cuentas de provisión</b> → al pie del resumen se listan las cuentas de provisión que <b>no tienen motor</b>: las que mantiene el contador en AVSOFT (vacaciones, provisión de gastos, las que vienen del asiento de apertura) y las "por pagar" que dejan los devengos reales (comisiones de parque y de ejecutivos, finiquitos). No tienen detalle fila por fila, solo saldo contable, y se marcan como <b>dormidas</b> si no se mueven hace más de cuatro meses. Están a la vista justamente porque el pasivo por indemnizaciones estuvo años sin reconocerse y nadie lo notaba.</li>
       <li><b>Cuadratura</b> → el cuadro lee la cuenta de provisión completa (saldo inicial + constituido − liberado = saldo final, comprobantes manuales incluidos) y separa cuánto controla el motor; el Cierre de Mes revisa que los asientos del motor calcen con sus provisiones (ver log en Reglas de Centralización).</li>
       <li><b>Pendientes</b> → una provisión con muchos días sin documento es un dealer que no ha facturado su comisión: revisar en <a href="/postventa/seguimiento/">Seguimiento Post Venta</a>.</li>
     </ul>
@@ -191,7 +200,7 @@ async function cargar(){
     <td>${comp(p.id_comprobante_constitucion)} ${p.id_comprobante_liberacion ? '→ ' + comp(p.id_comprobante_liberacion) : ''}</td></tr>`).join('')
     : '<tr><td colspan="9" class="text-center text-muted py-3">Sin movimientos en el mes</td></tr>';
 }
-let DATA = null, ANIO = '';
+let DATA = null, ANIO = '', OTRAS = null;
 const badgeAv = p => p.origen_tipo==='AVSOFT' ? ' <span class="b" style="background:#fef3c7;color:#92400e" title="Detalle del contador (AVSOFT), fila '+esc(p.origen_id)+' de su planilla; sin asiento propio, ya vivía en la cuenta">AVSOFT</span>' : '';
 const enAnio = p => { const a = String(p.mes||'').slice(0,4); return !ANIO ? true : ANIO === '<2025' ? a < '2025' : a === ANIO; };
 const baseTxt = p => { if (document.getElementById('concepto').value !== 'PARQUE') return p.base_bruta != null ? Number(p.base_bruta) : ''; try { const m = JSON.parse(p.montos_json||'{}'); return `${clp(m.comision)} + ${clp(m.arriendo)}`; } catch(_) { return ''; } };
@@ -315,6 +324,7 @@ async function cargarResumen(){
   const j = await fetch('/api/contabilidad/provisiones/resumen?mes=' + mes, { headers:H }).then(r=>r.json());
   if (!j.success) { document.getElementById('resBody').innerHTML = '<tr><td colspan="10" class="bad">' + esc(j.error) + '</td></tr>'; return; }
   RES = j.data.filas;
+  pintarOtras(j.data.otras);
   const sg = n => n < 0 ? '<span class="bad">' + clp(n) + '</span>' : clp(n);
   document.getElementById('resBody').innerHTML = RES.map(c => '<tr onclick="irConcepto(\'' + c.concepto + '\')" title="Ver detalle">' +
     '<td><b>' + esc(c.nombre) + '</b><div class="small text-muted">gasto ' + esc(c.cuenta_gasto) + '</div></td><td class="mono">' + esc(c.cuenta_provision) + '</td>' +
@@ -325,12 +335,28 @@ async function cargarResumen(){
   const T = k => RES.reduce((s, c) => s + Number(c[k] || 0), 0);
   document.getElementById('resFoot').innerHTML = '<tr><td colspan="2">TOTAL</td><td class="r">' + clp(T('saldo_inicial')) + '</td><td class="r">' + clp(T('constituido')) + '</td><td class="r">' + sg(T('ajustes')) + '</td><td class="r">' + clp(T('liberado')) + '</td><td class="r">' + clp(T('saldo_final')) + '</td><td class="r">' + T('motor_n_vigente') + '</td><td class="r">' + clp(T('motor_vigente')) + '</td><td class="r">' + sg(T('saldo_historico')) + '</td></tr>';
 }
+function pintarOtras(otras){
+  const hoy = new Date().toISOString().slice(0,10);
+  const viejo = f => f && (new Date(hoy) - new Date(f)) / 86400000 > 120;   // sin moverse hace más de 4 meses
+  document.getElementById('otrasBody').innerHTML = (otras && otras.length) ? otras.map(o => `<tr>
+    <td class="mono">${esc(o.cuenta)}</td><td>${esc(o.nombre)}</td>
+    <td class="r">${clp(o.saldo_inicial)}</td><td class="r">${clp(o.constituido)}</td><td class="r">${clp(o.liberado)}</td>
+    <td class="r fw-bold">${clp(o.saldo_final)}</td>
+    <td>${esc(o.ultimo_movimiento || '—')} ${viejo(o.ultimo_movimiento) ? '<span class="b" style="background:#fef3c7;color:#92400e" title="Sin movimiento hace más de 4 meses">dormida</span>' : ''}</td>
+    <td class="small text-muted">${esc(o.origen || '')}</td></tr>`).join('')
+    : '<tr><td colspan="8" class="text-center text-muted py-3">Sin otras cuentas con saldo</td></tr>';
+  const T = k => (otras || []).reduce((s, o) => s + Number(o[k] || 0), 0);
+  document.getElementById('otrasFoot').innerHTML = `<tr><td colspan="2">TOTAL sin motor</td><td class="r">${clp(T('saldo_inicial'))}</td><td class="r">${clp(T('constituido'))}</td><td class="r">${clp(T('liberado'))}</td><td class="r">${clp(T('saldo_final'))}</td><td colspan="2"></td></tr>`;
+  OTRAS = otras || [];
+}
 function excelResumen(){
   if (!RES) return;
   const cols = [['nombre','Concepto'],['cuenta_provision','Cuenta provisión'],['cuenta_gasto','Cuenta gasto'],['saldo_inicial','Saldo inicial',null,'clp'],['constituido','Constituido',null,'clp'],['n_constituido','N° constituidos',null,'int'],['ajustes','Ajustes',null,'clp'],['liberado','Liberado',null,'clp'],['n_liberado','N° liberados',null,'int'],['saldo_final','Saldo final',null,'clp'],['motor_n_vigente','Vigentes',null,'int'],['motor_vigente','Detalle vigente',null,'clp'],['saldo_historico','Diferencia',null,'clp']];
   const T = k => RES.reduce((s, c) => s + Number(c[k] || 0), 0);
   const tot = { nombre: 'TOTAL', cuenta_provision: '', cuenta_gasto: '' }; for (const c of cols.slice(3)) tot[c[0]] = T(c[0]);
-  aExcel([...RES, tot], cols, 'provisiones-resumen-' + document.getElementById('mesR').value);
+  const otras = (OTRAS || []).map(o => ({ nombre: o.nombre + ' (sin motor)', cuenta_provision: o.cuenta, cuenta_gasto: '',
+    saldo_inicial: o.saldo_inicial, constituido: o.constituido, ajustes: 0, liberado: o.liberado, saldo_final: o.saldo_final }));
+  aExcel([...RES, tot, ...otras], cols, 'provisiones-resumen-' + document.getElementById('mesR').value);
 }
 document.getElementById('mesR').value = document.getElementById('mes').value;
 verTab('resumen');

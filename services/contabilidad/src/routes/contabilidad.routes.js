@@ -172,7 +172,9 @@ router.get('/provisiones/resumen', verifyToken, requireFunc('ctb_provisiones', '
     const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : require('../../../../shared/fecha-chile').hoyISO().slice(0, 7);
     const filas = [];
     for (const k of Object.keys(prov.CONCEPTOS)) { const { pendientes, movimientos, ...c } = await prov.cuadro(mes, k); filas.push(c); }
-    res.json({ success: true, data: { mes, filas }, error: null });
+    // Las demás cuentas de provisión vivas (sin motor): el pasivo completo, no solo lo que controlamos
+    const otras = await prov.otrasCuentas(mes);
+    res.json({ success: true, data: { mes, filas, otras }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 });
 router.get('/provisiones/detalle', verifyToken, requireFunc('ctb_provisiones', 'ctb_cierre_mes', 'ctb_estados'), async (req, res) => {
