@@ -757,8 +757,10 @@ require('../../../../shared/migrate').enFila('rrhh-descuentos', async () => {
       'ben_tipo_cuenta VARCHAR(40) NULL', 'ben_numero_cuenta VARCHAR(40) NULL', 'ben_email VARCHAR(160) NULL',
       'id_proveedor INT NULL'])
       await pool.query(`ALTER TABLE rh_descuentos ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
-    // Día del mes siguiente en que se debe pagar la retención judicial (la resolución dice "los primeros cinco días")
-    await pool.query("INSERT IGNORE INTO rh_config (clave, valor) VALUES ('rem_pension_dia_pago','5')").catch(() => {});
+    /* Día del mes siguiente en que se paga la retención judicial. La resolución da plazo hasta
+       el quinto día; el parámetro parte en 3 (Pato, 25-09-2026) para dejar margen ante cualquier
+       problema de transferencia — atrasarse expone a multa del doble de lo retenido. */
+    await pool.query("INSERT IGNORE INTO rh_config (clave, valor) VALUES ('rem_pension_dia_pago','3')").catch(() => {});
     console.log('[rrhh-descuentos] listo');
   } catch (e) { console.error('[rrhh-descuentos migration]', e.message); }
 });
@@ -1788,7 +1790,7 @@ async function ordenesPagoJudiciales(mes, req) {
     for (const x of (det.descuentos_detalle || [])) if (x && x.id) retenido.set(Number(x.id), Math.round(Number(x.monto) || 0));
   }
   const [[cfg]] = await pool.query("SELECT valor FROM rh_config WHERE clave='rem_pension_dia_pago'").catch(() => [[null]]);
-  const dia = Math.max(1, Math.min(28, Number(cfg && cfg.valor) || 5));
+  const dia = Math.max(1, Math.min(28, Number(cfg && cfg.valor) || 3));
   const [y, mm] = mes.split('-').map(Number);
   const vence = `${mm === 12 ? y + 1 : y}-${String(mm === 12 ? 1 : mm + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
   const co = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
@@ -1809,7 +1811,7 @@ async function ordenesPagoJudiciales(mes, req) {
     const m = await calcularDoc('Nota de Cobro', 'BRUTO', monto);   // sin impuesto: es un traspaso de lo retenido
     const destino = [d.ben_tipo_cuenta || 'Cuenta de ahorro', d.ben_numero_cuenta].join(' ') + (d.ben_banco ? ' · ' + d.ben_banco : '');
     const obs = `Generada automáticamente al EMITIR las liquidaciones de ${mes}.\n` +
-      `PAGAR HASTA EL ${vence.split('-').reverse().join('-')} (la resolución ordena depositar dentro de los primeros ${dia} días del mes).\n` +
+      `PAGAR HASTA EL ${vence.split('-').reverse().join('-')} (la resolución da plazo hasta el quinto día del mes; la empresa se fija el día ${dia} para dejar margen).\n` +
       `Causa: ${d.jud_rit ? 'RIT ' + d.jud_rit : 's/RIT'}${d.jud_tribunal ? ' · ' + d.jud_tribunal : ''}\n` +
       `Alimentante: ${d.trabajador} (${d.rut_trabajador || '—'})\n` +
       `Beneficiario: ${d.ben_nombre} (${d.ben_rut}) — ${destino}\n` +
