@@ -1554,8 +1554,9 @@ async function otrasCuentas(mes) {
   const conMotor = new Set(Object.values(CONCEPTOS).map(c => c.cuentaProv));
   /* Dos familias, para que no quede fuera nada del pasivo devengado:
        · PROVISION  → 2106* y cualquier cuenta cuyo nombre hable de provisión (el LIKE
-         va con comodín en el medio porque en el plan de AVSOFT hay nombres con la Ó
-         mal codificada: "PROVISIàN IMPUESTO DIFERIDO").
+         va con comodín en el medio: en el plan heredado de AVSOFT hubo nombres con la Ó
+         mal codificada —"PROVISIàN IMPUESTO DIFERIDO"— que se corrigieron el 25-09-2026
+         con scripts/arreglar-nombres-cuentas.js; el comodín queda por si aparece otro).
        · IMPUESTOS  → 2105* imposiciones y retenciones, 2107* impuestos por pagar y
          2109* impuesto diferido. Son obligaciones devengadas igual que una provisión,
          y es donde vive la retención de honorarios que alimenta el módulo. */
