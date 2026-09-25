@@ -502,12 +502,15 @@ const editarAdicional = async (req, res) => {
     const conAnt = !!b.pagado_anticipo && !a.permanente;
     const pagado = conAnt ? Math.round(Number(b.monto_pagado) || (esLiquido ? monto : 0)) : 0;
     if (conAnt && !(pagado > 0)) return fail(res, 'Indica el monto que se pagó como anticipo (en un haber bruto no se puede deducir solo)', 400);
-    await pool.query('UPDATE rh_adicionales SET monto=?, es_liquido=?, imponible=? WHERE id=?', [monto, esLiquido, imponible, a.id]);
+    /* La glosa del TEXTO LIBRE también se edita (Pato, 25-09-2026: "déjame poder editarlos"):
+       antes el lápiz traía el texto al formulario pero al guardar se perdía. */
+    const causalTexto = a.causal === 'OTRO' && b.causal_texto != null ? (String(b.causal_texto).trim().slice(0, 200) || a.causal_texto) : a.causal_texto;
+    await pool.query('UPDATE rh_adicionales SET monto=?, es_liquido=?, imponible=?, causal_texto=? WHERE id=?', [monto, esLiquido, imponible, causalTexto, a.id]);
     // Descuento por anticipo: sigue a la casilla
     const [[dAnt]] = await pool.query("SELECT id, valor_cuota FROM rh_descuentos WHERE id_adicional=? AND estado='VIGENTE' LIMIT 1", [a.id]);
     let txtAnt = '';
     if (conAnt) {
-      const glosa = (a.causal === 'OTRO' ? String(a.causal_texto || '').trim() : a.causal).slice(0, 200);
+      const glosa = (a.causal === 'OTRO' ? String(causalTexto || '').trim() : a.causal).slice(0, 200);
       if (dAnt) await pool.query('UPDATE rh_descuentos SET monto_total=?, valor_cuota=?, detalle_texto=? WHERE id=?', [pagado, pagado, glosa, dAnt.id]);
       else await pool.query(`INSERT INTO rh_descuentos (id_usuario, tipo, detalle_texto, monto_total, cuotas, valor_cuota, mes_inicio, creado_por, moneda, id_adicional)
                              VALUES (?,'ANTICIPO',?,?,1,?,?,?,'CLP',?)`, [a.id_usuario, glosa, pagado, pagado, a.mes, nombreDe(req.usuario || {}), a.id]);
@@ -742,8 +745,20 @@ require('../../../../shared/migrate').enFila('rrhh-descuentos', async () => {
          liquidación (aguinaldo transferido el 16-09). El haber igual va a la liquidación, y este
          descuento ANTICIPO de 1 cuota por lo pagado lo neutraliza. id_adicional ata los dos:
          al eliminar el adicional se elimina el descuento. */
-      'id_adicional INT NULL'])
+      'id_adicional INT NULL',
+      /* RETENCIÓN JUDICIAL (Pato, 25-09-2026, causa RIT Z-988-2019): la resolución no solo
+         manda retener — manda DEPOSITAR directamente al alimentario dentro de los primeros
+         cinco días del mes, y comunicar al tribunal citando el RIT. Sin estos datos el
+         descuento quedaba en la liquidación y el pago se hacía a mano, con multa del doble
+         de lo retenido si se atrasa (art. 13 ley 14.908). Con ellos la orden de pago se emite
+         sola al emitir las liquidaciones. */
+      'jud_rit VARCHAR(40) NULL', 'jud_tribunal VARCHAR(160) NULL', 'jud_tribunal_email VARCHAR(160) NULL',
+      'ben_nombre VARCHAR(200) NULL', 'ben_rut VARCHAR(20) NULL', 'ben_banco VARCHAR(80) NULL',
+      'ben_tipo_cuenta VARCHAR(40) NULL', 'ben_numero_cuenta VARCHAR(40) NULL', 'ben_email VARCHAR(160) NULL',
+      'id_proveedor INT NULL'])
       await pool.query(`ALTER TABLE rh_descuentos ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
+    // Día del mes siguiente en que se debe pagar la retención judicial (la resolución dice "los primeros cinco días")
+    await pool.query("INSERT IGNORE INTO rh_config (clave, valor) VALUES ('rem_pension_dia_pago','5')").catch(() => {});
     console.log('[rrhh-descuentos] listo');
   } catch (e) { console.error('[rrhh-descuentos migration]', e.message); }
 });
@@ -799,8 +814,10 @@ const getDescuentos = async (req, res) => {
         cuota_num: (d.tipo === 'PERMANENTE' && !(Number(d.cuotas) > 0)) ? null : (Number(d.cuota_desde) || 1) + difMeses(d.mes_inicio, mes),
         cuotas_total: Number(d.cuotas_total) || Number(d.cuotas) || null }));
     const total_mes = delMes.reduce((s, d) => s + d.cuota_mes, 0);
+    // La pantalla necesita saber qué subtipos son judiciales para pedir los datos del beneficiario
+    const T = await require('../tope-descuento').topes();
     ok(res, { mes, descuentos: rows, del_mes: delMes, total_mes, bloqueado: await mesEmitido(mes), tmc: await tmcVigente(), subtipos: await subtiposDesc(),
-      monedas: TC.MONEDAS, tc_mes: tc, tc_hoy: tcHoy });
+      judiciales: T.judiciales, monedas: TC.MONEDAS, tc_mes: tc, tc_hoy: tcHoy });
   } catch (e) { console.error('[rrhh descuentos get]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -841,40 +858,12 @@ const crearDescuento = async (req, res) => {
     const colab = destinos[0];
     // Parte en la PRÓXIMA liquidación que se emita (el mes en curso si aún no está emitida)
     const mesInicio = await proximaLiquidacion();
-    let cuotas = 1, valorCuota = monto, tasa = null, subtipo = null, detalle = null, mesRef = null;
-    let cuotaOrigen = montoOrigen;   // cuota en la moneda de origen (la que se convierte cada mes)
-    if (tipo === 'ANTICIPO') {
-      cuotas = Math.max(1, Math.min(24, Number(b.cuotas) || 1));
-      valorCuota = Math.round(monto / cuotas);
-      cuotaOrigen = montoOrigen / cuotas;
-    } else if (tipo === 'PRESTAMO') {
-      cuotas = Math.max(1, Math.min(48, Number(b.cuotas) || 1));
-      tasa = Number(b.tasa_pct);
-      if (!(tasa >= 0)) return fail(res, 'Indica la tasa de interés mensual', 400);
-      const tmc = await tmcVigente();
-      if (tmc != null && tasa > tmc) return fail(res, `La tasa (${tasa}% mensual) supera la TMC vigente (${tmc}% mensual). Máximo legal: ${tmc}%.`, 400);
-      valorCuota = cuotaFrancesa(monto, tasa, cuotas);
-      // En moneda extranjera la cuota francesa se calcula sobre el monto de origen y
-      // se convierte cada mes; en pesos es la de siempre.
-      cuotaOrigen = moneda === 'CLP' ? valorCuota : (valorCuota / tcHoy);
-    } else if (tipo === 'PAGO_EXCESO') {
-      if (!/^\d{4}-\d{2}$/.test(b.mes_referencia || '')) return fail(res, 'Indica el mes del pago en exceso', 400);
-      mesRef = b.mes_referencia;
-      cuotas = Math.max(1, Math.min(12, Number(b.cuotas) || 1));
-      valorCuota = Math.round(monto / cuotas);
-      cuotaOrigen = montoOrigen / cuotas;
-    } else if (tipo === 'VARIOS') {
-      // Descuentos varios (Pato 15-09-2026): glosa libre obligatoria, es lo que sale en la liquidación
-      if (!String(b.detalle_texto || '').trim()) return fail(res, 'Escribe la glosa del descuento', 400);
-      cuotas = Math.max(1, Math.min(24, Number(b.cuotas) || 1));
-      valorCuota = Math.round(monto / cuotas);
-      cuotaOrigen = montoOrigen / cuotas;
-    } else { // PERMANENTE
-      subtipo = String(b.subtipo || '').toUpperCase();
-      if (!(await subtiposDesc()).includes(subtipo)) return fail(res, 'Subtipo inválido', 400);
-      if (subtipo === 'OTRO' && !String(b.detalle_texto || '').trim()) return fail(res, 'Describe el descuento (texto libre)', 400);
-      cuotas = 0; valorCuota = monto; // mensual indefinido hasta anular
-    }
+    // Motor único del plan de cuotas (el mismo que usa la edición)
+    let plan;
+    try { plan = await planDeCuotas({ tipo, monto, montoOrigen, moneda, tcHoy, cuotas: b.cuotas, tasa_pct: b.tasa_pct, mes_referencia: b.mes_referencia, detalle_texto: b.detalle_texto, subtipo: b.subtipo }); }
+    catch (e) { return fail(res, e.message, 400); }
+    let detalle = null;
+    const { cuotas, valorCuota, cuotaOrigen, tasa, subtipo, mesRef } = plan;
     /* Topes legales (motor único tope-descuento.js, paramétricos en Indicadores de Remuneraciones):
        15% otros acordados / 30% vivienda-ahorro / 45% suma de voluntarios (art. 58 CT) y 50% para
        pensión de alimentos y retenciones judiciales (Ley 14.908). Antes solo anticipos y préstamos al
@@ -906,6 +895,137 @@ const crearDescuento = async (req, res) => {
     ok(res, { id: r.insertId, valor_cuota: valorCuota, cuotas, mes_inicio: mesInicio, moneda, monto_origen: montoOrigen, valor_cuota_origen: cuotaOrigen, tc_hoy: tcHoy, creados: todos ? creados : undefined, personas: todos ? nombres : undefined });
   } catch (e) { console.error('[rrhh descuentos crear]', e.message); fail(res, 'Error interno del servidor'); }
 };
+
+/* Plan de cuotas de un descuento: cuántas, de cuánto y en qué moneda. Motor único — lo usan
+   el alta y la edición, para que editar un préstamo no recalcule la cuota con otra fórmula que
+   la que lo creó. Lanza Error con el mensaje para el usuario si algo no cuadra. */
+async function planDeCuotas({ tipo, monto, montoOrigen, moneda, cuotas, tasa_pct, mes_referencia, detalle_texto, subtipo, tcHoy }) {
+  const out = { cuotas: 1, valorCuota: monto, cuotaOrigen: montoOrigen, tasa: null, subtipo: null, mesRef: null };
+  const tope = { ANTICIPO: 24, PRESTAMO: 48, PAGO_EXCESO: 12, VARIOS: 24 }[tipo];
+  if (tipo === 'PRESTAMO') {
+    out.cuotas = Math.max(1, Math.min(tope, Number(cuotas) || 1));
+    out.tasa = Number(tasa_pct);
+    if (!(out.tasa >= 0)) throw new Error('Indica la tasa de interés mensual');
+    const tmc = await tmcVigente();
+    if (tmc != null && out.tasa > tmc) throw new Error(`La tasa (${out.tasa}% mensual) supera la TMC vigente (${tmc}% mensual). Máximo legal: ${tmc}%.`);
+    out.valorCuota = cuotaFrancesa(monto, out.tasa, out.cuotas);
+    out.cuotaOrigen = moneda === 'CLP' ? out.valorCuota : (out.valorCuota / tcHoy);
+  } else if (tipo === 'PERMANENTE') {
+    out.subtipo = String(subtipo || '').toUpperCase();
+    if (!(await subtiposDesc()).includes(out.subtipo)) throw new Error('Subtipo inválido');
+    if (out.subtipo === 'OTRO' && !String(detalle_texto || '').trim()) throw new Error('Describe el descuento (texto libre)');
+    out.cuotas = 0; out.valorCuota = monto;   // mensual indefinido hasta anular
+  } else {
+    if (tipo === 'PAGO_EXCESO') {
+      if (!/^\d{4}-\d{2}$/.test(mes_referencia || '')) throw new Error('Indica el mes del pago en exceso');
+      out.mesRef = mes_referencia;
+    }
+    if (tipo === 'VARIOS' && !String(detalle_texto || '').trim()) throw new Error('Escribe la glosa del descuento');
+    out.cuotas = Math.max(1, Math.min(tope || 24, Number(cuotas) || 1));
+    out.valorCuota = Math.round(monto / out.cuotas);
+    out.cuotaOrigen = montoOrigen / out.cuotas;
+  }
+  return out;
+}
+
+/* ── PUT /remuneraciones/descuentos/:id — editar un descuento vigente ────────────
+   Pato (25-09-2026): "tanto en los descuentos como adicionales, déjame poder editarlos".
+   Hasta ahora un descuento solo se podía anular y volver a crear, y eso pierde el historial
+   y la numeración real de la cuota. El caso que lo pidió: un tribunal SUBE la pensión de
+   alimentos — es el mismo descuento de la misma causa, con otro monto.
+   Las liquidaciones ya emitidas NO cambian: guardan su propia foto. El cambio rige desde la
+   próxima que se emita. */
+const editarDescuento = async (req, res) => {
+  try {
+    const u = req.usuario || {}, b = req.body || {};
+    const [[d]] = await pool.query(
+      `SELECT d.*, TRIM(CONCAT_WS(' ', us.nombre, us.apellido)) nombre_actual
+         FROM rh_descuentos d LEFT JOIN usuarios us ON us.id_usuario=d.id_usuario
+        WHERE d.id=? AND d.estado='VIGENTE'`, [req.params.id]);
+    if (!d) return fail(res, 'No existe o está anulado', 404);
+    const moneda = b.moneda && TC.MONEDAS.includes(String(b.moneda).toUpperCase()) ? String(b.moneda).toUpperCase() : (d.moneda || 'CLP');
+    let tcHoy = 1;
+    if (moneda !== 'CLP') {
+      try { tcHoy = await TC.tipoCambio(moneda, hoyChile()); }
+      catch (e) { return fail(res, e.message, 400); }
+    }
+    const montoBruto = b.monto != null && b.monto !== '' ? Number(b.monto)
+      : (moneda === 'CLP' ? Number(d.monto_total) : Number(d.monto_origen));
+    const montoOrigen = moneda === 'CLP' ? Math.round(montoBruto || 0) : Math.round((montoBruto || 0) * 10000) / 10000;
+    if (!(montoOrigen > 0)) return fail(res, 'Monto inválido', 400);
+    const monto = TC.aCLP(montoOrigen, tcHoy);
+    let plan;
+    try {
+      plan = await planDeCuotas({ tipo: d.tipo, monto, montoOrigen, moneda, tcHoy,
+        cuotas: b.cuotas != null && b.cuotas !== '' ? b.cuotas : d.cuotas,
+        tasa_pct: b.tasa_pct != null && b.tasa_pct !== '' ? b.tasa_pct : d.tasa_pct,
+        mes_referencia: b.mes_referencia || d.mes_referencia,
+        detalle_texto: b.detalle_texto != null ? b.detalle_texto : d.detalle_texto,
+        subtipo: b.subtipo || d.subtipo });
+    } catch (e) { return fail(res, e.message, 400); }
+    // Los topes legales se revalidan con el monto NUEVO: subir una cuota puede dejarla fuera del art. 58
+    try { await require('../tope-descuento').validarTope({ idUsuario: d.id_usuario, valorCuota: plan.valorCuota, tipo: d.tipo, subtipo: plan.subtipo, excluirId: d.id }); }
+    catch (e) { return fail(res, e.message, 400); }
+    const detalle = b.detalle_texto != null ? (String(b.detalle_texto).trim().slice(0, 200) || null) : d.detalle_texto;
+    const T = v => v == null || v === '' ? null : String(v).trim().slice(0, 200);
+    const campos = {
+      monto_total: monto, valor_cuota: plan.valorCuota, cuotas: plan.cuotas, tasa_pct: plan.tasa,
+      subtipo: plan.subtipo || d.subtipo, detalle_texto: detalle, mes_referencia: plan.mesRef,
+      moneda, monto_origen: moneda === 'CLP' ? null : montoOrigen, valor_cuota_origen: moneda === 'CLP' ? null : plan.cuotaOrigen,
+      jud_rit: 'jud_rit' in b ? T(b.jud_rit) : d.jud_rit,
+      jud_tribunal: 'jud_tribunal' in b ? T(b.jud_tribunal) : d.jud_tribunal,
+      jud_tribunal_email: 'jud_tribunal_email' in b ? T(b.jud_tribunal_email) : d.jud_tribunal_email,
+      ben_nombre: 'ben_nombre' in b ? T(b.ben_nombre) : d.ben_nombre,
+      ben_rut: 'ben_rut' in b ? T(b.ben_rut) : d.ben_rut,
+      ben_banco: 'ben_banco' in b ? T(b.ben_banco) : d.ben_banco,
+      ben_tipo_cuenta: 'ben_tipo_cuenta' in b ? T(b.ben_tipo_cuenta) : d.ben_tipo_cuenta,
+      ben_numero_cuenta: 'ben_numero_cuenta' in b ? T(b.ben_numero_cuenta) : d.ben_numero_cuenta,
+      ben_email: 'ben_email' in b ? T(b.ben_email) : d.ben_email,
+    };
+    if (campos.ben_rut) {
+      const RUT = require('../../../../api-gateway/public/js/rut-core');
+      if (!RUT.validar(campos.ben_rut)) return fail(res, 'El RUT del beneficiario no es válido', 400);
+      campos.ben_rut = RUT.formatear(campos.ben_rut);
+    }
+    const cols = Object.keys(campos);
+    await pool.query(`UPDATE rh_descuentos SET ${cols.map(c => c + '=?').join(', ')} WHERE id=?`, [...cols.map(c => campos[c]), d.id]);
+    // El beneficiario tiene que existir como proveedor para que la orden de pago sepa a quién transferir
+    let proveedor = null;
+    if (campos.ben_rut && campos.ben_nombre) proveedor = await proveedorBeneficiario({ ...d, ...campos }, nombreDe(u));
+    const $ = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
+    const cambios = [];
+    if (Math.round(Number(d.valor_cuota)) !== plan.valorCuota) cambios.push(`cuota ${$(d.valor_cuota)} → ${$(plan.valorCuota)}`);
+    if (Number(d.cuotas) !== plan.cuotas) cambios.push(`cuotas ${d.cuotas || '∞'} → ${plan.cuotas || '∞'}`);
+    if ((d.detalle_texto || '') !== (detalle || '')) cambios.push(`glosa "${d.detalle_texto || ''}" → "${detalle || ''}"`);
+    for (const k of ['jud_rit', 'ben_nombre', 'ben_rut', 'ben_numero_cuenta', 'ben_email', 'jud_tribunal_email'])
+      if ((d[k] || '') !== (campos[k] || '')) cambios.push(`${k} "${d[k] || ''}" → "${campos[k] || ''}"`);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'descuento', entidad_id: d.id,
+      detalle: `Editó ${d.tipo}${campos.subtipo ? '/' + campos.subtipo : ''} de ${d.nombre_actual || d.nombre}: ${cambios.join(' · ') || 'sin cambios de monto'} — rige desde la próxima liquidación; las emitidas no se tocan` });
+    ok(res, { id: d.id, valor_cuota: plan.valorCuota, cuotas: plan.cuotas, moneda, proveedor });
+  } catch (e) { console.error('[rrhh descuentos editar]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* El beneficiario de una retención judicial es un PROVEEDOR como cualquier otro: así la orden de
+   pago, el archivo TEF y el correo salen por el mismo camino que el resto de los pagos y nadie
+   tiene que acordarse de transferir a mano. El correo de aviso es el del tribunal (la resolución
+   exige comunicarle cada pago citando el RIT). */
+async function proveedorBeneficiario(d, quien) {
+  const rutPlano = String(d.ben_rut || '').replace(/[.\-]/g, '').toUpperCase();
+  if (!rutPlano || !d.ben_nombre) return null;
+  const email = d.jud_tribunal_email || d.ben_email || null;
+  const [[ya]] = await pool.query("SELECT id FROM proveedores WHERE UPPER(REPLACE(REPLACE(rut,'.',''),'-',''))=? LIMIT 1", [rutPlano]);
+  const datos = [d.ben_nombre, d.ben_banco || null, d.ben_tipo_cuenta || null, d.ben_numero_cuenta || null, email];
+  if (ya) {
+    await pool.query('UPDATE proveedores SET nombre=?, banco=COALESCE(?,banco), tipo_cuenta=COALESCE(?,tipo_cuenta), numero_cuenta=COALESCE(?,numero_cuenta), email=COALESCE(?,email), activo=1 WHERE id=?', [...datos, ya.id]);
+    await pool.query('UPDATE rh_descuentos SET id_proveedor=? WHERE id=?', [ya.id, d.id]);
+    return { id: ya.id, creado: false };
+  }
+  const [r] = await pool.query(
+    'INSERT INTO proveedores (rut, nombre, banco, tipo_cuenta, numero_cuenta, email, activo, comentario) VALUES (?,?,?,?,?,?,1,?)',
+    [d.ben_rut, ...datos, `Beneficiario de retención judicial${d.jud_rit ? ' RIT ' + d.jud_rit : ''}${d.jud_tribunal ? ' · ' + d.jud_tribunal : ''}. Creado desde Descuentos de Remuneración por ${quien || 'el sistema'}.`]);
+  await pool.query('UPDATE rh_descuentos SET id_proveedor=? WHERE id=?', [r.insertId, d.id]);
+  return { id: r.insertId, creado: true };
+}
 
 const anularDescuento = async (req, res) => {
   try {
@@ -1573,7 +1693,10 @@ const emitir = async (req, res) => {
     // Máxima 4: lo retenido a la Caja es una obligación con la Caja → orden de pago con detalle
     let odpCaja = null;
     try { odpCaja = await ordenPagoCaja(mes, req); } catch (e) { console.error('[remuneraciones ODP Caja]', e.message); }
-    ok(res, { emitidas: r.affectedRows, odp_caja: odpCaja });
+    // Retenciones judiciales: una orden por causa, al beneficiario que fijó el tribunal
+    let odpJud = [];
+    try { odpJud = await ordenesPagoJudiciales(mes, req); } catch (e) { console.error('[remuneraciones ODP judicial]', e.message); }
+    ok(res, { emitidas: r.affectedRows, odp_caja: odpCaja, odp_judiciales: odpJud });
   } catch (e) { console.error('[rrhh remuneraciones emitir]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -1637,6 +1760,75 @@ async function ordenPagoCaja(mes, req) {
   auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'orden_pago', entidad_id: String(r.insertId),
     detalle: `ODP ${numero} a la Caja Los Andes por ${co(total)} (retenciones de ${items.length} colaboradores, remuneraciones ${mes}), generada al emitir las liquidaciones` });
   return { numero, total, personas: items.length, vence };
+}
+
+/* ── ÓRDENES DE PAGO DE LAS RETENCIONES JUDICIALES (Pato, 25-09-2026) ─────────────
+   La resolución de alimentos no manda solo retener: manda DEPOSITAR al alimentario dentro de
+   los primeros cinco días del mes y comunicarle cada pago al tribunal citando el RIT. Atrasarse
+   expone a multa del doble de lo retenido (art. 13 ley 14.908), así que el pago no puede
+   depender de que alguien se acuerde.
+   Al EMITIR las liquidaciones, cada descuento judicial con datos de transferencia genera SU
+   orden de pago al beneficiario — una por causa, porque cada una va a una cuenta distinta —,
+   por lo que REALMENTE se retuvo (la prelación legal puede haber dejado la cuota parcial), con
+   vencimiento el día `rem_pension_dia_pago` del mes siguiente y el RIT como referencia.
+   Idempotente: si ya existe la orden de ese mes y esa causa, no crea otra. */
+async function ordenesPagoJudiciales(mes, req) {
+  const T = await require('../tope-descuento').topes();
+  const [cands] = await pool.query(
+    `SELECT d.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) trabajador, u.rut rut_trabajador
+       FROM rh_descuentos d JOIN usuarios u ON u.id_usuario=d.id_usuario
+      WHERE d.estado='VIGENTE' AND d.tipo='PERMANENTE' AND d.ben_numero_cuenta IS NOT NULL AND d.ben_rut IS NOT NULL`);
+  const jud = cands.filter(d => require('../tope-descuento').categoriaDe(d.tipo, d.subtipo, T) === 'JUDICIAL');
+  if (!jud.length) return [];
+  // Lo REALMENTE retenido en el mes, por descuento (el ítem del snapshot lleva su id)
+  const [liqs] = await pool.query("SELECT id_usuario, detalle FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
+  const retenido = new Map();
+  for (const l of liqs) {
+    let det = {}; try { det = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) {}
+    for (const x of (det.descuentos_detalle || [])) if (x && x.id) retenido.set(Number(x.id), Math.round(Number(x.monto) || 0));
+  }
+  const [[cfg]] = await pool.query("SELECT valor FROM rh_config WHERE clave='rem_pension_dia_pago'").catch(() => [[null]]);
+  const dia = Math.max(1, Math.min(28, Number(cfg && cfg.valor) || 5));
+  const [y, mm] = mes.split('-').map(Number);
+  const vence = `${mm === 12 ? y + 1 : y}-${String(mm === 12 ? 1 : mm + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+  const co = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
+  const { calcularDoc } = require('../../../ordenes-pago/src/controllers/ordenes-pago.controller');
+  const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
+  const u = (req && req.usuario) || {};
+  const hoy = hoyChile();
+  const out = [];
+  for (const d of jud) {
+    const monto = retenido.has(Number(d.id)) ? retenido.get(Number(d.id)) : null;
+    if (monto == null) { console.warn(`[ODP judicial] descuento ${d.id} sin línea en las liquidaciones de ${mes}: no se emite orden`); continue; }
+    if (!(monto > 0)) { console.warn(`[ODP judicial] ${d.trabajador}: la prelación dejó la retención en cero en ${mes} — hay que informarlo al tribunal`); continue; }
+    const concepto = `Retención judicial ${d.jud_rit ? 'RIT ' + d.jud_rit : d.subtipo} — ${d.trabajador} — remuneraciones ${mes}`;
+    const [[ya]] = await pool.query("SELECT numero FROM ordenes_pago WHERE concepto=? AND estado<>'ANULADA' LIMIT 1", [concepto]);
+    if (ya) { out.push({ numero: ya.numero, monto, existente: true, rit: d.jud_rit }); continue; }
+    const prov = await proveedorBeneficiario(d, nombreDe(u));
+    if (!prov) { console.error(`[ODP judicial] descuento ${d.id}: no se pudo crear el proveedor beneficiario`); continue; }
+    const m = await calcularDoc('Nota de Cobro', 'BRUTO', monto);   // sin impuesto: es un traspaso de lo retenido
+    const destino = [d.ben_tipo_cuenta || 'Cuenta de ahorro', d.ben_numero_cuenta].join(' ') + (d.ben_banco ? ' · ' + d.ben_banco : '');
+    const obs = `Generada automáticamente al EMITIR las liquidaciones de ${mes}.\n` +
+      `PAGAR HASTA EL ${vence.split('-').reverse().join('-')} (la resolución ordena depositar dentro de los primeros ${dia} días del mes).\n` +
+      `Causa: ${d.jud_rit ? 'RIT ' + d.jud_rit : 's/RIT'}${d.jud_tribunal ? ' · ' + d.jud_tribunal : ''}\n` +
+      `Alimentante: ${d.trabajador} (${d.rut_trabajador || '—'})\n` +
+      `Beneficiario: ${d.ben_nombre} (${d.ben_rut}) — ${destino}\n` +
+      `Retenido en la liquidación de ${mes}: ${co(monto)}\n` +
+      (d.jud_tribunal_email ? `Enviar el comprobante a ${d.jud_tribunal_email} citando el RIT.` : 'Sin correo de tribunal registrado: completar en el descuento.');
+    // La fecha límite va en las observaciones y en el concepto: ordenes_pago no tiene columna de vencimiento
+    const [r] = await pool.query(
+      `INSERT INTO ordenes_pago (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento, tratamiento,
+          monto_bruto, monto_neto, impuesto_pct, impuesto_monto, monto, destino, fecha_emision, fecha_documento, metodo_pago, estado, observaciones, id_usuario, usuario_nombre)
+       VALUES (?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?,'Transferencia','EMITIDA',?,?,?)`,
+      [prov.id, d.ben_nombre, d.ben_rut, concepto, 'Administrativos', 'Nota de Cobro', m.clase, m.bruto, m.neto, m.pct, m.imp, m.aPagar,
+       destino, hoy, hoy, obs, u.id_usuario || null, nombreDe(u) || 'Sistema']);
+    const { numero } = await emitirCorrelativo({ origen: 'GENERAL', origen_id: r.insertId, concepto, monto: m.aPagar, id_usuario: u.id_usuario || null, usuario_nombre: nombreDe(u) || 'Sistema' });
+    await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'orden_pago', entidad_id: String(r.insertId),
+      detalle: `ODP ${numero} de retención judicial ${d.jud_rit ? 'RIT ' + d.jud_rit : ''} a ${d.ben_nombre} por ${co(monto)} (retenido a ${d.trabajador} en ${mes}), vence ${vence}` });
+    out.push({ numero, monto, rit: d.jud_rit, beneficiario: d.ben_nombre, vence, trabajador: d.trabajador, id_descuento: d.id, aviso: d.jud_tribunal_email || null });
+  }
+  return out;
 }
 
 /* ── Correo de liquidación a cada colaborador al emitir el mes ─────────────── */
@@ -2448,4 +2640,4 @@ const avisoPrelacion = async (req, res) => {
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic, editarAdicional, asignacionFicha,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion, haberesProyectados, prelacionDescuentos, avisoPrelacion,
-  getDescuentos, crearDescuento, anularDescuento, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
+  getDescuentos, crearDescuento, editarDescuento, anularDescuento, ordenesPagoJudiciales, proveedorBeneficiario, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };

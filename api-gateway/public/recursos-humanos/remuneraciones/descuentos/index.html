@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.17 — cuota que no cabe por la prelación: aviso rojo parpadeante «No se puede descontar: supera el XX%» + botón Aviso a la Caja / al trabajador (.txt). v1.16 — orden de prelación legal en la liquidación. v1.15 — topes sobre la liquidación por emitir. v1.14 — topes legales al guardar (15/30/45% art. 58, 50% pensión Ley 14.908) desde el mantenedor de Indicadores. v1.13 — convenio de descuento con razón social y RUT desde Datos de la Empresa. v1.12 — tipo Descuentos varios (glosa libre obligatoria, N cuotas). v1.11 — la nómina Caja muestra CUOTA 49 de 60 (no PERMANENTE) · v1.10 — numeración REAL de la cuota (cuota_desde/cuotas_total): un plan que venía andando muestra "cuota 3 de 4" y no "2 de 3"; la nómina Caja la toma de "17/27" · v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
+  <!-- v1.18 — EDITAR un descuento vigente (monto, cuotas, tasa y glosa) sin anularlo y volver a crearlo; en las retenciones judiciales se piden ademas el RIT, el tribunal con su correo y la cuenta del beneficiario, se crea al beneficiario como proveedor y la orden de pago sale sola al emitir las liquidaciones. v1.17 — cuota que no cabe por la prelación: aviso rojo parpadeante «No se puede descontar: supera el XX%» + botón Aviso a la Caja / al trabajador (.txt). v1.16 — orden de prelación legal en la liquidación. v1.15 — topes sobre la liquidación por emitir. v1.14 — topes legales al guardar (15/30/45% art. 58, 50% pensión Ley 14.908) desde el mantenedor de Indicadores. v1.13 — convenio de descuento con razón social y RUT desde Datos de la Empresa. v1.12 — tipo Descuentos varios (glosa libre obligatoria, N cuotas). v1.11 — la nómina Caja muestra CUOTA 49 de 60 (no PERMANENTE) · v1.10 — numeración REAL de la cuota (cuota_desde/cuotas_total): un plan que venía andando muestra "cuota 3 de 4" y no "2 de 3"; la nómina Caja la toma de "17/27" · v1.9 — Importar nómina Caja (Excel de retenciones de la Caja Los Andes): vista previa por RUT, cuadre contra el TOTAL y confirmación; cada fila = Permanente / CAJA LOS ANDES de una cuota en el mes del período · v1.8 — TEXTO LIBRE (subtipo OTRO renombrado; detalle opcional en todos los tipos) + ★ TODO EL PERSONAL · v1.7 — pestaña Anulados (fecha y quién anuló) separada de Todos los descuentos · v1.6 — formulario de ingreso en UNA sola fila (flex sin salto) · v1.5 — moneda del descuento (Pesos / UF / UTM / Dólares): se guarda en origen y cada mes se convierte al indicador del mes (motor único shared/tipo-cambio.js) · v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -322,6 +322,7 @@ function renderListaIng(){
       ${PREL[d.id] ? `<span class="parpadea" title="${esc(PREL[d.id].motivo||'')}"><i class="bi bi-exclamation-triangle-fill"></i> NO SE PUEDE DESCONTAR ${PREL[d.id].descontado>0?'$'+fmt(PREL[d.id].no_descontado)+' DE LA CUOTA':'ESTA CUOTA'}: ${esc(motivoCorto(PREL[d.id].motivo))}</span>
       <button class="btn btn-sm btn-outline-dark py-0" onclick="avisoPrelacion(${d.id})" title="Descarga el texto del aviso ${PREL[d.id].categoria==='CAJA'?'a la Caja de Compensación (sin capacidad de descuento)':'al trabajador (reprogramar el saldo)'} — plantilla editable en Mantenedores → Saludos y Certificados RRHH"><i class="bi bi-file-earmark-text me-1"></i>Aviso ${PREL[d.id].categoria==='CAJA'?'a la Caja':'al trabajador'}</button>` : ''}
       <span style="margin-left:auto">
+        <button class="btn btn-sm btn-outline-primary py-0 me-1" onclick="abrirEditar(${d.id})" title="Editar monto, cuotas, glosa y, en una retención judicial, los datos de la transferencia"><i class="bi bi-pencil"></i> Editar</button>
         <button class="btn btn-sm btn-outline-danger py-0" onclick="anular(${d.id})" title="${d.tipo==='PERMANENTE'?'Desmarcar: deja de descontarse desde ahora':'Detiene las cuotas futuras'}">${d.tipo==='PERMANENTE'?'Desmarcar':'Anular'}</button>
       </span>
     </div>`).join('')
@@ -427,7 +428,51 @@ function imprimirConvenio(d){
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">${esc(d.nombre_actual||d.nombre)}<br>Trabajador — acepto y autorizo</div>
     </div>
     <p style="font-size:10px;color:#777;margin-top:26px">Descuento N° ${d.id} · Generado por el Business Suite. Una vez firmado, subir el escaneado con el botón 📤 de la columna Convenio — quedará en la carpeta digital del colaborador.</p>
-    <script>print()</'+'script></body></html>`);
+    <script>print()</'+'script>
+<dialog id="dlgEditar" style="border:0;border-radius:14px;padding:0;max-width:760px;width:94%;box-shadow:0 18px 50px rgba(0,0,0,.25)">
+  <form method="dialog" style="margin:0">
+    <div style="background:linear-gradient(90deg,#0141A2,#0d6efd);color:#fff;padding:12px 18px;border-radius:14px 14px 0 0;display:flex;align-items:center;gap:10px">
+      <i class="bi bi-pencil-square"></i><b>Editar descuento</b>
+      <span id="edTitulo" style="opacity:.9;font-size:.85rem"></span>
+      <button value="cancel" style="margin-left:auto;background:transparent;border:0;color:#fff;font-size:1.2rem;line-height:1">&times;</button>
+    </div>
+    <div style="padding:16px 18px">
+      <div class="small text-muted mb-2">El cambio rige desde la <b>pr&oacute;xima liquidaci&oacute;n que se emita</b>. Las ya emitidas no se tocan: guardan su propia foto.</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <div><label class="form-label small mb-0" id="edLblMonto">Monto</label>
+          <div class="input-group input-group-sm" style="width:190px"><span class="input-group-text" id="edMoneda">$</span><input id="edMonto" type="number" step="0.0001" class="form-control"></div></div>
+        <div id="edWrapCuotas"><label class="form-label small mb-0">Cuotas</label><input id="edCuotas" type="number" min="1" class="form-control form-control-sm" style="width:100px"></div>
+        <div id="edWrapTasa"><label class="form-label small mb-0">Tasa mensual %</label><input id="edTasa" type="number" step="0.001" class="form-control form-control-sm" style="width:130px"></div>
+        <div style="flex:1;min-width:220px"><label class="form-label small mb-0">Glosa (sale en la liquidaci&oacute;n)</label><input id="edDetalle" class="form-control form-control-sm"></div>
+      </div>
+      <div id="edJud" style="display:none;margin-top:14px;border-top:1px dashed #cbd5e1;padding-top:12px">
+        <div class="fw-bold small mb-1"><i class="bi bi-bank me-1"></i>Retenci&oacute;n judicial &mdash; dep&oacute;sito al beneficiario</div>
+        <div class="small text-muted mb-2">La resoluci&oacute;n ordena <b>depositar directamente</b> al alimentario dentro de los primeros d&iacute;as del mes y comunicar el pago al tribunal citando el RIT. Con estos datos la <b>orden de pago se emite sola</b> al emitir las liquidaciones, y el beneficiario queda creado como proveedor.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div><label class="form-label small mb-0">RIT de la causa</label><input id="ed_jud_rit" class="form-control form-control-sm" style="width:160px" placeholder="Z-988-2019"></div>
+          <div style="flex:1;min-width:230px"><label class="form-label small mb-0">Tribunal</label><input id="ed_jud_tribunal" class="form-control form-control-sm" placeholder="2&deg; Juzgado de Familia de Santiago"></div>
+          <div style="flex:1;min-width:220px"><label class="form-label small mb-0">Correo del tribunal (aviso del pago)</label><input id="ed_jud_tribunal_email" class="form-control form-control-sm" placeholder="jfsantiago2@pjud.cl"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <div style="flex:1;min-width:240px"><label class="form-label small mb-0">Beneficiario</label><input id="ed_ben_nombre" class="form-control form-control-sm"></div>
+          <div><label class="form-label small mb-0">RUT</label><input id="ed_ben_rut" class="form-control form-control-sm" style="width:140px"></div>
+          <div style="flex:1;min-width:200px"><label class="form-label small mb-0">Correo del beneficiario</label><input id="ed_ben_email" class="form-control form-control-sm"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <div><label class="form-label small mb-0">Banco</label><input id="ed_ben_banco" class="form-control form-control-sm" style="width:180px" placeholder="Banco Estado"></div>
+          <div><label class="form-label small mb-0">Tipo de cuenta</label><input id="ed_ben_tipo_cuenta" class="form-control form-control-sm" style="width:190px" placeholder="Cuenta de ahorro a la vista"></div>
+          <div><label class="form-label small mb-0">N&deg; de cuenta</label><input id="ed_ben_numero_cuenta" class="form-control form-control-sm" style="width:190px"></div>
+        </div>
+      </div>
+      <div id="edMsg" class="mt-2"></div>
+      <div class="mt-3 d-flex gap-2 justify-content-end">
+        <button value="cancel" class="btn btn-sm btn-light">Cancelar</button>
+        <button id="edBtn" type="button" class="btn btn-sm btn-primary" onclick="guardarEdicion()"><i class="bi bi-check2 me-1"></i>Guardar cambios</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+</body></html>`);
 }
 function subirConvenio(id){
   const inp = document.createElement('input'); inp.type='file'; inp.accept='.pdf,image/*';
@@ -440,6 +485,50 @@ function subirConvenio(id){
     alert('Convenio firmado guardado en la carpeta digital del colaborador ✓'); cargar();
   };
   inp.click();
+}
+/* ── EDITAR un descuento vigente (Pato, 25-09-2026) ───────────────────────────
+   Antes solo se podía anular y volver a crear, y eso perdía el historial y la numeración
+   real de la cuota. El caso que lo pidió: un tribunal SUBE la pensión de alimentos — es el
+   mismo descuento de la misma causa, con otro monto.
+   En los descuentos JUDICIALES se piden además los datos que exige la resolución: a qué
+   cuenta se deposita, a nombre de quién, el RIT y el correo del tribunal. Con eso la orden
+   de pago al beneficiario se emite sola al emitir las liquidaciones. */
+const esJudicial = d => (D.judiciales||[]).some(j => String(d.subtipo||'').toUpperCase().includes(j));
+let EDIT = null;
+function abrirEditar(id){
+  const d = (D.descuentos||[]).find(x=>Number(x.id)===Number(id)) || (D.del_mes||[]).find(x=>Number(x.id)===Number(id));
+  if(!d) return;
+  EDIT = d;
+  const jud = esJudicial(d);
+  const mon = d.moneda||'CLP';
+  const montoOri = mon==='CLP' ? Math.round(Number(d.monto_total)||0) : Number(d.monto_origen||0);
+  document.getElementById('edTitulo').textContent = (d.nombre_actual||d.nombre||'') + ' — ' + tipoTxt(d);
+  document.getElementById('edMonto').value = montoOri;
+  document.getElementById('edMoneda').textContent = mon;
+  document.getElementById('edLblMonto').textContent = d.tipo==='PERMANENTE' ? 'Monto mensual' : 'Monto total';
+  document.getElementById('edCuotas').value = Number(d.cuotas)||1;
+  document.getElementById('edWrapCuotas').style.display = d.tipo==='PERMANENTE' ? 'none' : '';
+  document.getElementById('edTasa').value = d.tasa_pct!=null ? d.tasa_pct : '';
+  document.getElementById('edWrapTasa').style.display = d.tipo==='PRESTAMO' ? '' : 'none';
+  document.getElementById('edDetalle').value = d.detalle_texto||'';
+  document.getElementById('edJud').style.display = jud ? '' : 'none';
+  for(const k of ['jud_rit','jud_tribunal','jud_tribunal_email','ben_nombre','ben_rut','ben_banco','ben_tipo_cuenta','ben_numero_cuenta','ben_email'])
+    document.getElementById('ed_'+k).value = d[k]||'';
+  document.getElementById('edMsg').innerHTML = '';
+  document.getElementById('dlgEditar').showModal();
+}
+async function guardarEdicion(){
+  if(!EDIT) return;
+  const g = id => document.getElementById(id).value.trim();
+  const body = { monto: document.getElementById('edMonto').value, cuotas: document.getElementById('edCuotas').value,
+    tasa_pct: document.getElementById('edTasa').value, detalle_texto: document.getElementById('edDetalle').value };
+  if (esJudicial(EDIT)) for(const k of ['jud_rit','jud_tribunal','jud_tribunal_email','ben_nombre','ben_rut','ben_banco','ben_tipo_cuenta','ben_numero_cuenta','ben_email']) body[k] = g('ed_'+k);
+  const btn = document.getElementById('edBtn'); btn.disabled = true;
+  const r = await fetch('/api/rrhh/remuneraciones/descuentos/'+EDIT.id, {method:'PUT', headers:H, body:JSON.stringify(body)});
+  const j = await r.json(); btn.disabled = false;
+  if(!j.success){ document.getElementById('edMsg').innerHTML = '<div class="alert alert-danger py-1 px-2 small mb-0">'+esc(j.error||'No se pudo guardar')+'</div>'; return; }
+  document.getElementById('dlgEditar').close();
+  cargar();
 }
 async function anular(id){
   if (!confirm('¿Anular este descuento? Deja de descontarse desde ahora (lo ya descontado no se toca).')) return;

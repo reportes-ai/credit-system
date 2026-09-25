@@ -233,6 +233,7 @@ router.get('/remuneraciones/descuentos/:id/aviso-prelacion', verifyToken, requir
 router.post('/remuneraciones/descuentos',        verifyToken, requireFunc('rh_remuneraciones'), rem.crearDescuento);
 router.post('/remuneraciones/descuentos/importar-caja', verifyToken, requireFunc('rh_remuneraciones'), rem.importarNominaCaja);   // nómina de retenciones de la Caja (Excel)
 router.post('/remuneraciones/descuentos/:id/convenio', verifyToken, requireFunc('rh_remuneraciones'), rem.subirConvenioDescuento);
+router.put('/remuneraciones/descuentos/:id',      verifyToken, requireFunc('rh_remuneraciones'), rem.editarDescuento);   // monto, cuotas, glosa y datos del beneficiario judicial
 router.post('/remuneraciones/descuentos/:id/anular', verifyToken, requireFunc('rh_remuneraciones'), rem.anularDescuento);
 router.get('/remuneraciones/catalogo',        verifyToken, rem.getCatalogo);   // AFP/Isapres/Bancos con código: selectores de la ficha (cualquier usuario logueado)
 router.get('/remuneraciones/indicadores',     verifyToken, requireFunc('mant_remuneraciones', 'rh_remuneraciones'), rem.getIndicadores);
