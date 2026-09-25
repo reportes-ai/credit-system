@@ -1468,6 +1468,67 @@ const guardar = async (req, res) => {
   } catch (e) { console.error('[rrhh remuneraciones guardar]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
+/* Totales del libro del mes para la CENTRALIZACIÓN, cuenta por cuenta. La liquidación ya calcula
+   persona por persona la AFP, la salud, el seguro de cesantía, el impuesto único y los aportes del
+   empleador: acá solo se suman y se agrupan como los espera la regla REMUNERACIONES. Antes todo
+   esto viajaba en UN campo "descuentos" y las cuentas de AFP, isapres, ISP e impuesto único
+   aparecían movidas solo por AVSOFT — al reemplazarlo se habría perdido el detalle con que se
+   paga Previred y se declara el F29.
+   La salud se separa por institución (Fonasa a la 2105010, isapres a la 2105040) con el mismo
+   criterio del archivo Previred, y los otros descuentos se reparten por su categoría: la
+   retención judicial tiene cuenta propia, y los anticipos y préstamos REBAJAN el activo que se
+   entregó (1105010 / 1105020), no son un pasivo nuevo. */
+const esFonasaNombre = n => /fonasa/i.test(String(n || ''));
+async function totalesLibro(mes) {
+  const [liqs] = await pool.query(
+    "SELECT id_usuario, detalle, total_haberes, liquido FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
+  const m = { sueldo_base: 0, gratificacion: 0, comisiones: 0, otros_imponibles: 0, colacion: 0, movilizacion: 0, otros_no_imponibles: 0,
+              aporte_sis: 0, aporte_afc_emp: 0, aporte_mutual: 0,
+              liquido: 0, afp: 0, fonasa: 0, isapre: 0, afc: 0, mutual: 0, impuesto: 0, judicial: 0, anticipos: 0, prestamos: 0, otros_descuentos: 0 };
+  const R = v => Math.round(Number(v) || 0);
+  for (const l of liqs) {
+    let d = {}; try { d = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) {}
+    m.sueldo_base += R(d.sueldo_base);
+    m.gratificacion += R(d.gratificacion);
+    m.comisiones += R(d.comisiones);
+    m.otros_imponibles += R(d.otros_imponibles) + R(d.feriado_variable);
+    m.colacion += R(d.colacion);
+    m.movilizacion += R(d.movilizacion);
+    m.otros_no_imponibles += R(d.otros_no_imponibles);
+    m.aporte_sis += R(d.aporte_sis);
+    m.aporte_afc_emp += R(d.aporte_afc_emp);
+    m.aporte_mutual += R(d.aporte_mutual) + R(d.aporte_sanna);
+    m.liquido += R(l.liquido != null ? l.liquido : d.liquido);
+    m.afp += R(d.desc_afp);
+    const salud = R(d.desc_salud) + R(d.desc_salud_adicional);
+    if (esFonasaNombre(d.salud)) m.fonasa += salud; else m.isapre += salud;
+    m.afc += R(d.desc_afc);
+    m.impuesto += R(d.impuesto);
+    /* Reparto de los "otros descuentos" por su categoría (la misma de la prelación legal).
+       Si la liquidación no trae el desglose, todo queda en la bolsa genérica: nunca se pierde
+       plata, solo se pierde detalle, y el asiento igual cuadra. */
+    const det = Array.isArray(d.descuentos_detalle) ? d.descuentos_detalle : [];
+    const sumaDet = det.reduce((a, x) => a + R(x.monto), 0);
+    if (det.length && sumaDet === R(d.otros_descuentos)) {
+      for (const x of det) {
+        const g = String(x.subtipo || x.glosa || '').toUpperCase();
+        if (x.categoria === 'JUDICIAL') m.judicial += R(x.monto);
+        else if (/ANTICIPO/.test(g)) m.anticipos += R(x.monto);
+        else if (/PR[EÉ]STAMO/.test(g)) m.prestamos += R(x.monto);
+        else m.otros_descuentos += R(x.monto);
+      }
+    } else m.otros_descuentos += R(d.otros_descuentos);
+  }
+  // El SIS se entera junto con la cotización de AFP, y el AFC del empleador junto con el del trabajador
+  m.afp += m.aporte_sis;
+  m.afc += m.aporte_afc_emp;
+  m.mutual = m.aporte_mutual;
+  const debe = m.sueldo_base + m.gratificacion + m.comisiones + m.otros_imponibles + m.colacion + m.movilizacion + m.otros_no_imponibles
+             + m.aporte_sis + m.aporte_afc_emp + m.aporte_mutual;
+  const haber = m.liquido + m.afp + m.fonasa + m.isapre + m.afc + m.mutual + m.impuesto + m.judicial + m.anticipos + m.prestamos + m.otros_descuentos;
+  return { montos: m, personas: liqs.length, debe, haber, cuadra: debe === haber };
+}
+
 /* ── POST /api/rrhh/remuneraciones/emitir { mes } — congela el mes ──────────── */
 const emitir = async (req, res) => {
   try {
@@ -1484,13 +1545,16 @@ const emitir = async (req, res) => {
       "UPDATE rh_liquidaciones SET estado='EMITIDA', emitido_por=?, emitido_at=NOW() WHERE mes=? AND estado='BORRADOR'",
       [nombreDe(u), mes]);
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'liquidaciones', detalle: `EMITIÓ las liquidaciones de ${mes} (${r.affectedRows}) — quedan congeladas` });
-    // Centralización: asiento del libro de remuneraciones (haberes = líquidos + descuentos)
+    // Centralización: asiento del libro de remuneraciones, cuenta por cuenta (haberes a su gasto,
+    // descuentos a su institución, aportes patronales al gasto y al pasivo) — motor único totalesLibro
     const [[t]] = await pool.query(
       "SELECT COALESCE(SUM(total_haberes),0) h, COALESCE(SUM(liquido),0) l, COALESCE(SUM(total_descuentos),0) d FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
+    const libro = await totalesLibro(mes);
+    if (!libro.cuadra) console.error(`[remuneraciones emitir] el libro ${mes} no cuadra: debe $${libro.debe} ≠ haber $${libro.haber} — el motor de asientos lo va a rechazar como DESCUADRE (ver ctb_eventos_log)`);
     require('../../../contabilidad/src/motor-asientos').contabilizar({
-      evento: 'REMUNERACIONES', glosa: `Libro de remuneraciones ${mes}`, ref: `REM-${mes}`,
+      evento: 'REMUNERACIONES', glosa: `Libro de remuneraciones ${mes} (${libro.personas} colaboradores)`, ref: `REM-${mes}`,
       fecha: (() => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); })(),   // último día del mes del libro (auditoría 24-09-2026, A4)
-      montos: { haberes: Number(t.h), liquido: Number(t.l), descuentos: Number(t.d) },
+      montos: libro.montos,
     }).then(async (idAsiento) => {
       // Entró el devengo real → se libera la provisión de sueldos del mes si el cierre la había constituido (motor único provisiones.js).
       // Solo si el asiento existe (recién creado o ya contabilizado antes por la misma ref): si el motor devolvió null por

@@ -152,10 +152,38 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['2106030', 'DEBE', 'liberacion', 'Rebaja provisión de vacaciones'],
         ['4002030', 'HABER', 'liberacion', 'Abono gasto provisión de vacaciones'],
       ]],
-      ['REMUNERACIONES', 'Emisión de liquidaciones del mes', 'Se dispara al EMITIR las liquidaciones en RRHH. Campos: haberes (total haberes), liquido (líquidos a pagar), descuentos (AFP+salud+AFC+impuesto+otros).', 'TRASPASO', 1, [
-        ['4001060', 'DEBE', 'haberes', 'Gasto remuneraciones del mes'],
-        ['2104010', 'HABER', 'liquido', 'Líquidos por pagar'],
-        ['2210904', 'HABER', 'descuentos', 'Leyes sociales e impuestos por pagar'],
+      /* ── LIBRO DE REMUNERACIONES ───────────────────────────────────────────
+         El asiento reproduce el traspaso mensual que hacía AVSOFT, cuenta por
+         cuenta: cada haber a su gasto, cada descuento a la institución que lo
+         recibe y los aportes patronales al gasto y al pasivo que corresponden.
+         Todo esto ya lo calcula la liquidación persona por persona — antes se
+         resumía en una sola línea "leyes sociales por pagar" y se perdía el
+         detalle con que se paga Previred y se declara el F29.
+         El SIS se entera junto con la cotización de AFP (por eso comparte la
+         2105030) y el seguro de cesantía de ambas partes queda en la 2210904,
+         que es donde vive el histórico. */
+      ['REMUNERACIONES', 'Emisión de liquidaciones del mes', 'Se dispara al EMITIR las liquidaciones en RRHH: traspasa el libro completo. Cada haber a su gasto, cada descuento a su institución (AFP, Fonasa, isapre, impuesto único, retención judicial) y los aportes del empleador (SIS, AFC, mutual) al gasto y al pasivo. El SIS se entera con la AFP; el AFC de trabajador y empleador va a 2210904, como en AVSOFT.', 'TRASPASO', 1, [
+        ['4001060', 'DEBE',  'sueldo_base',        'Sueldo base'],
+        ['4001070', 'DEBE',  'gratificacion',      'Gratificación'],
+        ['4001100', 'DEBE',  'comisiones',         'Comisiones (incluye semana corrida)'],
+        ['4001061', 'DEBE',  'otros_imponibles',   'Bonos y otros haberes imponibles'],
+        ['4001083', 'DEBE',  'colacion',           'Asignación de colación'],
+        ['4001084', 'DEBE',  'movilizacion',       'Asignación de movilización'],
+        ['4001087', 'DEBE',  'otros_no_imponibles', 'Otras asignaciones no imponibles'],
+        ['4001093', 'DEBE',  'aporte_sis',         'SIS (aporte del empleador)'],
+        ['4001091', 'DEBE',  'aporte_afc_emp',     'Seguro de cesantía (aporte del empleador)'],
+        ['4001092', 'DEBE',  'aporte_mutual',      'Mutual de seguridad y SANNA (aporte del empleador)'],
+        ['2104010', 'HABER', 'liquido',            'Líquidos por pagar'],
+        ['2105030', 'HABER', 'afp',                'Cotizaciones AFP y SIS por pagar'],
+        ['2105010', 'HABER', 'fonasa',             'Salud Fonasa por pagar'],
+        ['2105040', 'HABER', 'isapre',             'Isapres por pagar (7% y adicional)'],
+        ['2210904', 'HABER', 'afc',                'Seguro de cesantía por pagar (trabajador y empleador)'],
+        ['2105020', 'HABER', 'mutual',             'Mutual de seguridad y SANNA por pagar'],
+        ['2107020', 'HABER', 'impuesto',           'Impuesto único de los trabajadores'],
+        ['2105110', 'HABER', 'judicial',           'Retención judicial de alimentos'],
+        ['1105010', 'HABER', 'anticipos',          'Anticipos de remuneración descontados'],
+        ['1105020', 'HABER', 'prestamos',          'Préstamos al personal descontados'],
+        ['2210904', 'HABER', 'otros_descuentos',   'Otros descuentos por pagar'],
       ]],
       /* ── COMISIÓN A DEALER ────────────────────────────────────────────────
          La comisión calculada es BRUTA (IVA incluido) y se desagrega con el motor
@@ -314,6 +342,34 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         console.log('[contabilidad] PREPAGO: capital, interés, mora y comisión separados');
       }
     } catch (e) { console.error('[contabilidad parche prepago]', e.message); }
+    /* Parche (25-09-2026): el libro de remuneraciones nacía con TRES líneas — gasto, líquido y
+       un único "leyes sociales por pagar". Pero el motor de remuneraciones calcula persona por
+       persona la AFP, la salud, el seguro de cesantía, el impuesto único y los aportes del
+       empleador, y esas cuentas aparecían movidas SOLO por AVSOFT: al reemplazarlo se habría
+       perdido el detalle con que se paga Previred y se declara el F29. Se reescribe la regla
+       completa solo si aún no generó ningún asiento (hoy: ninguno, el libro lo trae AVSOFT). */
+    try {
+      await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('4001087','OTRAS ASIGNACIONES NO IMPONIBLES','GASTO',1)");
+      const [[usada]] = await pool.query("SELECT COUNT(*) n FROM ctb_comprobantes WHERE origen='REMUNERACIONES' AND estado='CONTABILIZADO'");
+      if (!usada.n) {
+        const def = R.find(r => r[0] === 'REMUNERACIONES');
+        // Las tres líneas del modelo viejo (un solo campo 'descuentos') se van; el resto se COMPLETA
+        // línea a línea, no se reescribe de una: si la migración se corta a la mitad, la vuelta
+        // siguiente termina el trabajo en vez de dejar la regla coja.
+        await pool.query("DELETE FROM ctb_reglas_lineas WHERE evento='REMUNERACIONES' AND campo IN ('descuentos','haberes')");
+        const [ya] = await pool.query("SELECT cuenta, lado, campo FROM ctb_reglas_lineas WHERE evento='REMUNERACIONES'");
+        let nuevas = 0;
+        for (const [cuenta, lado, campo, glosa] of def[5]) {
+          if (ya.some(l => l.cuenta === cuenta && l.lado === lado && l.campo === campo)) continue;
+          await pool.query('INSERT INTO ctb_reglas_lineas (evento, cuenta, lado, campo, glosa) VALUES (?,?,?,?,?)', ['REMUNERACIONES', cuenta, lado, campo, glosa]);
+          nuevas++;
+        }
+        const desc = String(def[2]).slice(0, 400);
+        const [[act]] = await pool.query("SELECT descripcion FROM ctb_reglas WHERE evento='REMUNERACIONES'");
+        if (!act || act.descripcion !== desc) await pool.query('UPDATE ctb_reglas SET nombre=?, descripcion=? WHERE evento=?', [def[1], desc, 'REMUNERACIONES']);
+        if (nuevas) console.log(`[contabilidad] REMUNERACIONES: ${nuevas} l\u00ednea(s) \u2014 libro desglosado por instituci\u00f3n (AFP, salud, AFC, impuesto \u00fanico, aportes patronales)`);
+      }
+    } catch (e) { console.error('[contabilidad parche remuneraciones]', e.message); }
     console.log('[contabilidad] motor de asientos listo');
   } catch (e) { console.error('[contabilidad-motor migration]', e.message); }
 });
