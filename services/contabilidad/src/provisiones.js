@@ -1330,9 +1330,21 @@ async function detalle(mes, concepto, tipo) {
    No tienen detalle por fila: solo saldo contable. */
 async function otrasCuentas(mes) {
   const conMotor = new Set(Object.values(CONCEPTOS).map(c => c.cuentaProv));
+  /* Dos familias, para que no quede fuera nada del pasivo devengado:
+       · PROVISION  → 2106* y cualquier cuenta cuyo nombre hable de provisión (el LIKE
+         va con comodín en el medio porque en el plan de AVSOFT hay nombres con la Ó
+         mal codificada: "PROVISIàN IMPUESTO DIFERIDO").
+       · IMPUESTOS  → 2105* imposiciones y retenciones, 2107* impuestos por pagar y
+         2109* impuesto diferido. Son obligaciones devengadas igual que una provisión,
+         y es donde vive la retención de honorarios que alimenta el módulo. */
   const [cuentas] = await pool.query(
-    `SELECT c.codigo, c.nombre FROM ctb_cuentas c
-      WHERE c.imputable=1 AND (c.codigo LIKE '2106%' OR UPPER(c.nombre) LIKE 'PROVISION%') ORDER BY c.codigo`);
+    `SELECT c.codigo, c.nombre,
+            CASE WHEN c.codigo LIKE '2105%' OR c.codigo LIKE '2107%' OR c.codigo LIKE '2109%'
+                 THEN 'IMPUESTOS' ELSE 'PROVISION' END grupo
+       FROM ctb_cuentas c
+      WHERE c.imputable=1 AND (c.codigo LIKE '2106%' OR c.codigo LIKE '2105%' OR c.codigo LIKE '2107%'
+             OR c.codigo LIKE '2109%' OR UPPER(c.nombre) LIKE '%PROVISI%N%')
+      ORDER BY c.codigo`);
   const fin = ultimoDiaMes(mes);
   const out = [];
   for (const c of cuentas) {
@@ -1354,13 +1366,13 @@ async function otrasCuentas(mes) {
         WHERE mv.cuenta = ? AND cp.estado='CONTABILIZADO' AND cp.fecha <= ? GROUP BY cp.origen ORDER BY n DESC LIMIT 2`,
       [c.codigo, fin]);
     out.push({
-      cuenta: c.codigo, nombre: c.nombre,
+      cuenta: c.codigo, nombre: c.nombre, grupo: c.grupo || 'PROVISION',
       saldo_inicial: Number(m.inicial), constituido: Number(m.constituido), liberado: Number(m.liberado),
       saldo_final: Number(m.final), ultimo_movimiento: m.ultimo, movimientos: Number(m.n),
       origen: origenes.map(o => `${o.origen} (${o.n})`).join(' · '),
     });
   }
-  return out.sort((a, b) => Math.abs(b.saldo_final) - Math.abs(a.saldo_final));
+  return out.sort((a, b) => (a.grupo === b.grupo ? Math.abs(b.saldo_final) - Math.abs(a.saldo_final) : (a.grupo === 'PROVISION' ? -1 : 1)));
 }
 
 const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo, SUELDOS: sincronizarSueldos, OTROS: sincronizarOtros, IAS: sincronizarIas };
