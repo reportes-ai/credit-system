@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ayuda — Mantenedor — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 — pie "Qué afecta este mantenedor": botón "?", ayuda por pestaña, cursos de la Academia y quién manda sobre el texto (lo guardado aquí ya no lo pisa el sistema). v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -83,6 +83,17 @@
 
   <div class="card-af">
     <div class="field" style="margin:0"><label>¿Y después? (a dónde ir)</label><textarea id="fSig"></textarea></div>
+  </div>
+
+  <!-- QUÉ AFECTA ESTE MANTENEDOR -->
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #0141A2;border-radius:10px;padding:14px 18px;font-size:.85rem;color:#475569;margin-top:18px">
+    <div style="font-weight:700;color:#0f2a52;margin-bottom:6px"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
+    <ul style="margin:0;padding-left:18px">
+      <li><b>Título, descripción, pasos, submódulos y ¿Y después?</b> → el panel del botón <b>"?"</b> de la página cuya <b>ruta</b> coincide, para todos los usuarios, apenas se guarda.</li>
+      <li><b>Ruta con pestaña</b> (ej. <code>/dashboard/v1b/</code>) → la ayuda de una pestaña dentro de una página: el <a href="/dashboard/">Dashboard</a> pide una distinta por pestaña (Otorgados, Rentabilidades, Proyección Pro…).</li>
+      <li><b>Cada página con ayuda</b> → es también un <b>curso</b> de la <a href="/academia/">Academia</a>: los pasos y submódulos se convierten en sus lecciones.</li>
+      <li><b>Quién manda sobre el texto</b> → algunas ayudas las escribe el sistema y se actualizan solas en cada versión (hoy, las del Dashboard). <b>Al guardar una aquí pasa a ser tuya</b> y las actualizaciones del sistema dejan de pisarla, para no perder tu corrección.</li>
+    </ul>
   </div>
 </div>
 

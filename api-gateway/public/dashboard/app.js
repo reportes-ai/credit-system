@@ -143,7 +143,21 @@ const chOpts = (extra={}) => ({
 });
 
 // ======== SHOW VIEW ========
+/* Ayuda por pestaña (Pato, 25-09-2026): el botón "?" mostraba el mismo texto genérico en las
+   veinte pestañas. Cada vista tiene su entrada en ayuda_paginas con clave /dashboard/<id>/
+   (contenido en services/ayuda/src/ayuda-dashboard.js). afAyudaSet lo define app-version.js
+   al cargar; si todavía no existe, se reintenta un momento después. */
+function ayudaTab(id) {
+  const k = '/dashboard/' + id + '/';
+  if (typeof window.afAyudaSet === 'function') window.afAyudaSet(k);
+  else setTimeout(() => { if (typeof window.afAyudaSet === 'function') window.afAyudaSet(k); }, 800);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const act = document.querySelector('.tab.active[data-viewid]');
+  if (act) setTimeout(() => ayudaTab(act.dataset.viewid), 300);
+});
 function showV(id, el) {
+  ayudaTab(id);
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById(id).classList.add('active');

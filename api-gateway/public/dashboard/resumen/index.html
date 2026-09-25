@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.7 — gauge del presupuesto: proyeccion en tono claro y brecha al presupuesto en rojo · v2.6 — hoy muestra real + meta del dia (borde destacado) · v2.5 — restauracion tras truncado + carrera por operaciones por defecto · v2.3 — mes contra mes (a igual dia) bajo el año contra año · v2.2 — heatmap con Q requerido para la proyeccion (solo dias futuros), layout rebalanceado (mix+embudo apilados, YoY arriba, records junto a podios) · v2.1 — Q esperado en el heatmap (peso por dia de semana), radiografia del mes, año contra año, salon de records, pantalla completa · v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
+<!-- v2.8 — el pie apunta al mantenedor de Presupuesto (la pestana del dashboard solo lo muestra). v2.7 — gauge del presupuesto: proyeccion en tono claro y brecha al presupuesto en rojo · v2.6 — hoy muestra real + meta del dia (borde destacado) · v2.5 — restauracion tras truncado + carrera por operaciones por defecto · v2.3 — mes contra mes (a igual dia) bajo el año contra año · v2.2 — heatmap con Q requerido para la proyeccion (solo dias futuros), layout rebalanceado (mix+embudo apilados, YoY arriba, records junto a podios) · v2.1 — Q esperado en el heatmap (peso por dia de semana), radiografia del mes, año contra año, salon de records, pantalla completa · v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -484,7 +484,7 @@ function pintar(){
     </div>
   </div>
 
-  <div class="foot"><i class="bi bi-info-circle"></i> Misma fuente que el <a href="/dashboard/">Dashboard</a> (deduplicado por operación, desde ene-2025; otorgada = OTORGADO/PREPAGADO). Los KPIs comparan contra el mes anterior <b>a igual día</b>; la curva gris muestra el recorrido completo del mes anterior. Presupuesto editable en Dashboard → Presupuesto.</div>`;
+  <div class="foot"><i class="bi bi-info-circle"></i> Misma fuente que el <a href="/dashboard/">Dashboard</a> (deduplicado por operación, desde ene-2025; otorgada = OTORGADO/PREPAGADO). Los KPIs comparan contra el mes anterior <b>a igual día</b>; la curva gris muestra el recorrido completo del mes anterior. Presupuesto editable en <a href="/mantenedores/presupuesto/">Mantenedores → Presupuesto</a>.</div>`;
 }
 cargar();
 </script>

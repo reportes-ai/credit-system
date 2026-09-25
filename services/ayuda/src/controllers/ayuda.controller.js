@@ -326,6 +326,38 @@ require('../../../../shared/migrate').enFila('academia', async () => {
   } catch (e) { console.error('[academia migration]', e.message); }
 });
 
+/* ── Ayuda del Dashboard: una entrada por pestaña, convergida desde el código ───────────
+   El contenido vive en ../ayuda-dashboard.js (escrito desde el Glosario y los cuadros reales).
+   `origen` decide quién manda sobre cada fila, igual que en el banco Dónde·Cómo·Quién:
+   SISTEMA = la escribe el código en cada arranque (así una corrección llega sola con el
+   deploy); USUARIO = la editó el Administrador en el mantenedor y el código ya no la pisa.
+   Sin esa marca, reescribir en cada arranque borraría en silencio lo que alguien corrigió. */
+require('../../../../shared/migrate').enFila('ayuda-dashboard', async () => {
+  try {
+    try { await pool.query("ALTER TABLE ayuda_paginas ADD COLUMN origen VARCHAR(10) NOT NULL DEFAULT 'SISTEMA'"); }
+    catch (e) { if (e.errno !== 1060) throw e; }
+    const ENTRADAS = require('../ayuda-dashboard');
+    let escritas = 0;
+    for (const a of ENTRADAS) {
+      const vals = [a.titulo, a.icono || 'bi-question-circle', a.descripcion || null,
+        JSON.stringify(a.pasos || []), JSON.stringify(a.submodulos || []), a.siguiente || null];
+      const [r] = await pool.query(
+        `INSERT INTO ayuda_paginas (ruta, titulo, icono, descripcion, pasos, submodulos, siguiente, origen)
+         VALUES (?,?,?,?,?,?,?,'SISTEMA')
+         ON DUPLICATE KEY UPDATE
+           titulo      = IF(origen='USUARIO', titulo,      VALUES(titulo)),
+           icono       = IF(origen='USUARIO', icono,       VALUES(icono)),
+           descripcion = IF(origen='USUARIO', descripcion, VALUES(descripcion)),
+           pasos       = IF(origen='USUARIO', pasos,       VALUES(pasos)),
+           submodulos  = IF(origen='USUARIO', submodulos,  VALUES(submodulos)),
+           siguiente   = IF(origen='USUARIO', siguiente,   VALUES(siguiente))`,
+        [a.ruta, ...vals]);
+      if (r.affectedRows) escritas++;
+    }
+    console.log(`[ayuda] dashboard: ${ENTRADAS.length} pantallas convergidas (${escritas} con cambios)`);
+  } catch (e) { console.error('[ayuda-dashboard]', e.message); }
+});
+
 const parse = (s, def) => { try { return JSON.parse(s); } catch { return def; } };
 const normRuta = r => { let x = String(r || '').split('?')[0].split('#')[0]; if (!x.endsWith('/')) x += '/'; return x; };
 
@@ -421,10 +453,10 @@ const upsertAyuda = async (req, res) => {
     const { titulo, icono, descripcion, pasos, submodulos, siguiente } = req.body;
     if (!titulo) return res.status(400).json({ success: false, data: null, error: 'titulo requerido' });
     await pool.query(
-      `INSERT INTO ayuda_paginas (ruta, titulo, icono, descripcion, pasos, submodulos, siguiente)
-       VALUES (?,?,?,?,?,?,?)
+      `INSERT INTO ayuda_paginas (ruta, titulo, icono, descripcion, pasos, submodulos, siguiente, origen)
+       VALUES (?,?,?,?,?,?,?,'USUARIO')
        ON DUPLICATE KEY UPDATE titulo=VALUES(titulo), icono=VALUES(icono), descripcion=VALUES(descripcion),
-         pasos=VALUES(pasos), submodulos=VALUES(submodulos), siguiente=VALUES(siguiente)`,
+         pasos=VALUES(pasos), submodulos=VALUES(submodulos), siguiente=VALUES(siguiente), origen='USUARIO'`,
       [ruta, titulo, icono || 'bi-question-circle', descripcion || null,
        JSON.stringify(pasos || []), JSON.stringify(submodulos || []), siguiente || null]);
     res.json({ success: true, data: { ruta }, error: null });
