@@ -73,9 +73,9 @@
     <div style="text-align:center;font-size:12px;font-weight:bold;color:#0141A2;letter-spacing:.5px;margin-bottom:7px;text-transform:uppercase">CARTA DE APROBACIÓN DE CRÉDITO</div>
     <p style="font-size:9px;text-align:justify;line-height:1.5;margin:0 0 7px">${esc(opts.intro || '').replace(/\{\{ACREEDOR\}\}/g, acreedor)}</p>
     <table class="data-tbl">
-      <tr><td class="lbl" style="width:13%">FECHA</td><td class="val" style="width:18%">${fechaF(c.fecha)}</td><td class="lbl" style="width:18%">VALIDEZ APROBACIÓN</td><td class="val">${esc(opts.validezStr || '')}</td></tr>
+      <tr><td class="lbl" style="width:12%">FECHA</td><td class="val" style="width:26%">${fechaF(c.fecha)}</td><td class="lbl" style="width:20%">VALIDEZ APROBACIÓN</td><td class="val">${esc(opts.validezStr || '')}</td></tr>
       <tr><td class="lbl">EJECUTIVO</td><td class="val">${esc(c.ejecutivoNombre || '')}</td><td class="lbl">TELÉFONO</td><td class="val">${esc(c.ejecutivoTel || '')}</td></tr>
-      <tr><td class="lbl">CORREO</td><td class="val">${esc(c.ejecutivoMail || '')}</td><td class="lbl">N° CARTA</td><td class="val"><strong>${esc(c.opCarta || '')}</strong>${c.numeroCreditoCreado ? ` &nbsp;<span style="color:#475569;font-weight:normal;font-size:8.5px">· Crédito: <b>${esc(c.numeroCreditoCreado)}</b></span>` : ''}</td></tr>
+      <tr><td class="lbl">CORREO</td><td class="val" style="word-break:break-all;line-height:1.25">${esc(c.ejecutivoMail || '')}</td><td class="lbl">N° CARTA</td><td class="val"><strong>${esc(c.opCarta || '')}</strong>${c.numeroCreditoCreado ? ` &nbsp;<span style="color:#475569;font-weight:normal;font-size:8.5px">· Crédito: <b>${esc(c.numeroCreditoCreado)}</b></span>` : ''}</td></tr>
     </table>
     ${c.preferente ? `<div style="margin:2px 0 7px;padding:4px 8px;border:1.5px solid #0141A2;border-radius:5px;background:#eff6ff;font-size:9.5px;font-weight:bold;color:#0141A2;text-align:center;letter-spacing:.6px;text-transform:uppercase">★ PRODUCTO PREFERENTE${c.producto ? ' — ' + esc(c.producto) : ''}</div>` : ''}
     <div class="sec-title">DATOS DEL CLIENTE</div>
