@@ -112,6 +112,8 @@ require('../../../../shared/migrate').enFila('cierre-mes', async () => {
       ['PROVISION_SUELDOS', 'Remuneraciones del mes devengadas', 'El libro de remuneraciones del mes está contabilizado (RRHH o AVSOFT) o, si no, existe la provisión de sueldos del cierre en la cuenta 2106015.', 11],
       ['PROVISION_OTROS', 'Otros gastos del mes devengados', 'Toda orden de pago del mes sin documento en el auxiliar de compras, y todo pago recurrente del mes sin su ODP, tienen su provisión en la cuenta 2106016; ninguna categoría quedó sin cuenta de gasto configurada.', 12],
       ['PROVISION_IAS', 'Indemnización por años de servicio devengada', 'Todo trabajador con contrato indefinido tiene la cuota del mes (un doceavo de su base topada a 90 UF, hasta 11 años) provisionada en la cuenta 2106031.', 13],
+      ['PROVISION_INGRESOS', 'Ingresos del mes devengados', 'La comisión por colocación y por seguros de las operaciones cursadas está reconocida: facturada de verdad, o devengada como activo por facturar en 1106015 y 1106011. Así el mes no queda con todo su costo y sin su ingreso.', 14],
+      ['PROVISION_INTERES', 'Interés devengado deteriorado', 'El interés devengado por cobrar de la cartera propia está deteriorado con el mismo tramo de mora con que se provisiona su capital (cuenta 1104125).', 15],
     ]) {
       const [[hay]] = await pool.query('SELECT COUNT(*) n FROM cierre_checklist_items WHERE check_auto=?', [auto]);
       if (hay.n) continue;
@@ -249,6 +251,33 @@ const CHECKS_AUTO = {
     }
     if (falta.length) return { ok: false, detalle: `${falta.length} trabajador(es) indefinidos sin la cuota del mes: ${falta.join(', ').slice(0, 250)} — correr Sincronizar (concepto Indemnización por años de servicio)` };
     return { ok: true, detalle: `Cuenta ${c.cuenta_provision}: SF $${c.saldo_final.toLocaleString('es-CL')} — ${c.motor_n_vigente} cuota(s) vigente(s) por $${c.motor_vigente.toLocaleString('es-CL')}; todos los indefinidos con su cuota del mes` };
+  },
+  /* Ingresos por facturar: lo producido en el mes está reconocido, sea facturado de verdad o
+     devengado por el motor. Si falta devengo el mes queda con su costo y sin su ingreso. */
+  async PROVISION_INGRESOS(mes) {
+    const prov = require('../../../contabilidad/src/provisiones');
+    const c = await prov.cuadro(mes, 'INGRESOS');
+    if (mes < c.desde) return { ok: true, detalle: `Mes anterior a ${c.desde}: no se devenga` };
+    const partes = [], faltan = [];
+    for (const [k, nom] of [['COL', 'colocaci\u00f3n'], ['SEG', 'seguros']]) {
+      const st = await prov.stockIngresos(mes, k);
+      const [[fila]] = await pool.query("SELECT COALESCE(SUM(monto),0) m FROM ctb_provisiones WHERE concepto='INGRESOS' AND origen_tipo='MES' AND origen_id LIKE ? AND mes <= ?", [k + '-%', mes]);
+      const enLibros = Math.round(Number(fila.m));
+      partes.push(`${nom}: producido $${st.neto.toLocaleString('es-CL')} neto, facturado $${st.facturado.toLocaleString('es-CL')}, devengado $${enLibros.toLocaleString('es-CL')}`);
+      if (Math.abs(st.stock - enLibros) > 1000) faltan.push(`${nom} (faltan $${(st.stock - enLibros).toLocaleString('es-CL')})`);
+    }
+    if (faltan.length) return { ok: false, detalle: `Devengo desajustado en ${faltan.join(' y ')} \u2014 correr "Sincronizar" en Provisiones por Devengo (concepto Ingresos por facturar) \u00b7 ${partes.join(' \u00b7 ')}` };
+    return { ok: true, detalle: `${partes.join(' \u00b7 ')} \u00b7 cuentas ${c.cuenta_provision}` };
+  },
+  /* Deterioro del interés devengado: el saldo de 1104125 sigue al cálculo del mes. */
+  async PROVISION_INTERES(mes) {
+    const prov = require('../../../contabilidad/src/provisiones');
+    const c = await prov.cuadro(mes, 'INTERES');
+    if (mes < c.desde) return { ok: true, detalle: `Mes anterior a ${c.desde}: no se provisiona` };
+    const d = await prov.deterioroInteres(mes);
+    const dif = d.stock - c.saldo_final;
+    if (Math.abs(dif) > 1000) return { ok: false, detalle: `El deterioro calculado ($${d.stock.toLocaleString('es-CL')} sobre $${Math.round(d.pendiente_total || 0).toLocaleString('es-CL')} de inter\u00e9s devengado pendiente) no calza con la cuenta 1104125 ($${c.saldo_final.toLocaleString('es-CL')}): diferencia $${dif.toLocaleString('es-CL')} \u2014 correr "Sincronizar" (concepto Deterioro del inter\u00e9s devengado)` };
+    return { ok: true, detalle: `Cuenta 1104125: $${c.saldo_final.toLocaleString('es-CL')} sobre $${Math.round(d.pendiente_total || 0).toLocaleString('es-CL')} de inter\u00e9s devengado pendiente en ${d.creditos} operaci\u00f3n(es)` };
   },
   async _provision(mes, concepto) {
     const prov = require('../../../contabilidad/src/provisiones');

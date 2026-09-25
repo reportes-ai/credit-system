@@ -550,4 +550,6 @@ function nombreUsuario(req) {
   return `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.email || ('Usuario ' + u.id_usuario);
 }
 
-module.exports = { solicitar, aprobar, anular, porOperacion, historial, resolver, contable, cerrarMesContable, detalleProvision, variacionProvision };
+/* calcularDetalleProvision se exporta para que el deterioro del interés devengado use EL MISMO
+   tramo de mora con que se provisiona el capital (un solo motor, no dos tablas de tramos). */
+module.exports = { solicitar, aprobar, anular, porOperacion, historial, resolver, contable, cerrarMesContable, detalleProvision, variacionProvision, calcularDetalleProvision };

@@ -57,6 +57,21 @@ const CONCEPTOS = {
      de sueldos validadas con el auditor. El porcentaje es paramétrico (prov_ias_pct). */
   IAS: { nombre: 'Indemnización por años de servicio', regla: 'PROV_IAS', reglaLib: 'PROV_IAS_LIB', cuentaProv: '2106031', cuentaGasto: '4002060', paramDesde: 'prov_ias_desde' },
   OTROS: { nombre: 'Otros gastos (ODP y pagos recurrentes sin documento)', regla: 'PROV_OTROS', reglaLib: 'PROV_OTROS_LIB', cuentaProv: '2106016', cuentaGasto: 'por categoría', paramDesde: 'prov_otros_desde' },
+  /* INGRESOS (25-09-2026): el otro lado del devengo. La comisión por colocación y por seguros se GANA
+     al cursar la operación —ahí prestamos el servicio de intermediación—, pero el ingreso solo entraba
+     a la contabilidad cuando alguien pedía la factura en Post Venta (o cuando el contador la centralizaba
+     desde AVSOFT). Mientras tanto el mes ya cargaba TODO su costo: comisión dealer, parque y ejecutivo se
+     provisionan al otorgar. Este concepto cierra el descalce: lo producido y no facturado queda como
+     ACTIVO devengado (1106015 colocación / 1106011 seguros) contra su cuenta de ingreso, y el saldo se
+     apaga solo a medida que las facturas reales entran a 3001073 / 3001075. Es un pasivo al revés: no
+     se libera fila por fila, sigue un stock. */
+  INGRESOS: { nombre: 'Ingresos por facturar a la financiera', regla: 'PROV_INGRESOS', reglaLib: 'PROV_INGRESOS_LIB', cuentaProv: '1106015', cuentaGasto: '3001073 / 3001075', paramDesde: 'prov_ingresos_desde', cuentasProv: ['1106015', '1106011'], signo: -1, stock: true },
+  /* INTERES (25-09-2026): deterioro del interés devengado por cobrar. El devengo de intereses reconoce
+     el interés ganado aunque el cliente no pague y lo deja en 1104120; la provisión de incobrables, en
+     cambio, solo castiga CAPITAL (saldo insoluto × tramo de mora). Un crédito que se va a pérdida dejaba
+     su interés devengado intacto en el activo. Acá se le aplica el MISMO porcentaje de su tramo (motor
+     único de cobranza) contra la cuenta correctora 1104125, y 100% a lo castigado. */
+  INTERES: { nombre: 'Deterioro del interés devengado por cobrar', regla: 'PROV_INTERES', reglaLib: 'PROV_INTERES_LIB', cuentaProv: '1104125', cuentaGasto: '4001190', paramDesde: 'prov_interes_desde', stock: true },
 };
 
 require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
@@ -72,8 +87,8 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
     creado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
     UNIQUE KEY uq_origen (concepto, origen_tipo, origen_id), INDEX idx_estado (concepto, estado), INDEX idx_mes (mes))`);
   await pool.query('CREATE TABLE IF NOT EXISTS ctb_config (clave VARCHAR(60) PRIMARY KEY, valor VARCHAR(200) NOT NULL)');
-  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09'), ('prov_sueldos_desde','2026-09'), ('prov_otros_desde','2026-09'), ('prov_ias_desde','2026-09'), ('prov_ias_pct','8.33')");
-  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1), ('2106015','PROVISION REMUNERACIONES (DEVENGO)','PASIVO',1), ('2106016','PROVISION OTROS GASTOS (DEVENGO)','PASIVO',1), ('2106031','PROVISION INDEMNIZACION POR ANOS DE SERVICIO','PASIVO',1)");
+  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09'), ('prov_sueldos_desde','2026-09'), ('prov_otros_desde','2026-09'), ('prov_ias_desde','2026-09'), ('prov_ias_pct','8.33'), ('prov_ingresos_desde','2026-09'), ('prov_interes_desde','2026-09')");
+  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1), ('2106015','PROVISION REMUNERACIONES (DEVENGO)','PASIVO',1), ('2106016','PROVISION OTROS GASTOS (DEVENGO)','PASIVO',1), ('2106031','PROVISION INDEMNIZACION POR ANOS DE SERVICIO','PASIVO',1), ('1106015','PRODUCCION COMISION DEVENGADA NO FACTURADA','ACTIVO',1), ('1104125','PROVISION INTERESES DEVENGADOS POR COBRAR','ACTIVO',1)");
   /* Mapeo paramétrico categoría de la ODP / tipo de pago recurrente → cuenta de gasto.
      Es lo que permite provisionar un gasto que en la ODP solo tiene categoría y centro de costo.
      Se siembran las categorías que hoy existen; la cuenta la completa el Administrador en
@@ -181,6 +196,22 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
     ['PROV_IAS_LIB', 'Liberación provisión indemnización por años de servicio', 'Se dispara al cerrar el finiquito de la persona (entra el gasto real por FINIQUITO_EMITIDO) o cuando sale sin derecho a indemnización: reversa lo provisionado de ese trabajador. Campos: monto.', 'TRASPASO', 1, [
       ['2106031', 'DEBE',  'monto', 'Liberación provisión indemnización años de servicio'],
       ['4002060', 'HABER', 'monto', 'Abono indemnización provisionada'],
+    ]],
+    ['PROV_INGRESOS', 'Ingresos devengados por facturar a la financiera', 'Al cierre del mes reconoce la comisión por colocación y por seguros YA GANADA (operaciones cursadas) que todavía no se factura: el neto queda como activo devengado contra su cuenta de ingreso, para que el mes tenga su ingreso junto al costo que ya se provisionó al otorgar. El IVA no entra: nace con la factura. En seguros las cuentas se reemplazan por 1106011 y 3001075. Campos: monto (neto).', 'INGRESO', 1, [
+      ['1106015', 'DEBE',  'monto', 'Producción comisión devengada no facturada'],
+      ['3001073', 'HABER', 'monto', 'Comisión de producción devengada'],
+    ]],
+    ['PROV_INGRESOS_LIB', 'Baja del ingreso devengado por facturar', 'Cuando las facturas reales del período entran a la cuenta de ingreso (solicitud de facturación en Post Venta o centralización del contador), el devengo estimado sobra y se rebaja por la diferencia. Mismo reemplazo de cuentas en seguros. Campos: monto.', 'INGRESO', 1, [
+      ['3001073', 'DEBE',  'monto', 'Rebaja ingreso devengado ya facturado'],
+      ['1106015', 'HABER', 'monto', 'Baja producción devengada no facturada'],
+    ]],
+    ['PROV_INTERES', 'Deterioro del interés devengado por cobrar', 'Al cierre del mes aplica al interés devengado pendiente de cada crédito el MISMO porcentaje de su tramo de mora que usa la provisión de incobrables (100% si está castigado). Sin esto el capital se deterioraba y su interés quedaba entero en el activo. Se contabiliza solo la variación del mes. Campos: monto.', 'TRASPASO', 1, [
+      ['4001190', 'DEBE',  'monto', 'Deterioro interés devengado por cobrar'],
+      ['1104125', 'HABER', 'monto', 'Provisión intereses devengados por cobrar'],
+    ]],
+    ['PROV_INTERES_LIB', 'Liberación del deterioro del interés devengado', 'Cuando el interés devengado se cobra, se castiga o la mora mejora, el deterioro estimado baja: se reversa por la diferencia del mes. Campos: monto.', 'TRASPASO', 1, [
+      ['1104125', 'DEBE',  'monto', 'Liberación provisión intereses devengados'],
+      ['4001190', 'HABER', 'monto', 'Abono deterioro interés devengado'],
     ]],
   ];
   for (const [evento, nombre, desc, tipo, activa, lineas] of R) {
@@ -501,11 +532,18 @@ async function sincronizarParque(usuario = 'Motor provisiones') {
    manuales), porque el saldo inicial es el de la cuenta y no solo lo del motor (Pato, 24-09-2026).
    Aparte se informa cuánto del saldo final controla el motor (vigentes) y cuánto es histórico. */
 async function cuadro(mes, concepto = 'DEALER') {
-  const cta = CONCEPTOS[concepto].cuentaProv;
-  const desde = await param(CONCEPTOS[concepto].paramDesde, '2026-09');
+  const C0 = CONCEPTOS[concepto];
+  const cta = C0.cuentaProv;
+  /* Casi todos los conceptos viven en una cuenta de PASIVO (saldo acreedor) y en una sola cuenta.
+     Los ingresos por facturar son la excepción: son un ACTIVO devengado (saldo deudor) y usan dos
+     cuentas, una por concepto facturable. `signo` da vuelta el cuadro para que "constituido" siga
+     significando lo que se provisionó y "liberado" lo que se dio de baja. */
+  const ctas = C0.cuentasProv || [cta];
+  const sg = C0.signo === -1 ? -1 : 1;
+  const desde = await param(C0.paramDesde, '2026-09');
   const [[si]] = await pool.query(
     `SELECT COALESCE(SUM(m.haber - m.debe),0) s FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
-      WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') < ?`, [cta, mes]);
+      WHERE m.cuenta IN (?) AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') < ?`, [ctas, mes]);
   /* Los AJUSTES al motor (refs -AJn: la provisión del mes en curso siguiendo al cálculo) no son constituciones
      ni liberaciones: van en su propia columna, con signo. Así "constituido" y "liberado" cuentan solo lo real
      (Pato, 24-09-2026: "se constituyen en el mes y se pagan el 31"). */
@@ -515,8 +553,9 @@ async function cuadro(mes, concepto = 'DEALER') {
             COUNT(DISTINCT CASE WHEN m.haber>0 AND c.origen_ref NOT LIKE '%-AJ%' THEN c.id END) nh, COUNT(DISTINCT CASE WHEN m.debe>0 AND c.origen_ref NOT LIKE '%-AJ%' THEN c.id END) nd,
             COUNT(DISTINCT CASE WHEN c.origen_ref LIKE '%-AJ%' THEN c.id END) naj
        FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
-      WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') = ?`, [cta, mes]);
-  const saldo_inicial = Number(si.s), constituido = Number(mv.h), liberado = Number(mv.d), ajustes = Number(mv.aj), saldo_final = saldo_inicial + constituido + ajustes - liberado;
+      WHERE m.cuenta IN (?) AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') = ?`, [ctas, mes]);
+  const saldo_inicial = sg * Number(si.s), constituido = sg < 0 ? Number(mv.d) : Number(mv.h), liberado = sg < 0 ? Number(mv.h) : Number(mv.d),
+        ajustes = sg * Number(mv.aj), saldo_final = saldo_inicial + constituido + ajustes - liberado;
   // Lo que controla el motor (sus filas) al cierre del mes
   const [[con]] = await pool.query("SELECT COALESCE(SUM(monto),0) m, COUNT(*) n FROM ctb_provisiones WHERE concepto=? AND DATE_FORMAT(fecha_constitucion,'%Y-%m')=?", [concepto, mes]);
   const [[lib]] = await pool.query("SELECT COALESCE(SUM(monto),0) m, COUNT(*) n FROM ctb_provisiones WHERE concepto=? AND estado='LIBERADA' AND DATE_FORMAT(fecha_liberacion,'%Y-%m')=?", [concepto, mes]);
@@ -532,8 +571,8 @@ async function cuadro(mes, concepto = 'DEALER') {
       WHERE p.concepto=? AND p.estado='CONSTITUIDA' ORDER BY p.fecha_constitucion, p.id`, [concepto]);
   const [movs] = await pool.query(
     `SELECT * FROM ctb_provisiones WHERE concepto=? AND (DATE_FORMAT(fecha_constitucion,'%Y-%m')=? OR DATE_FORMAT(fecha_liberacion,'%Y-%m')=?) ORDER BY fecha_constitucion DESC, id DESC LIMIT 500`, [concepto, mes, mes]);
-  return { mes, concepto, nombre: CONCEPTOS[concepto].nombre, cuenta_provision: cta, cuenta_gasto: CONCEPTOS[concepto].cuentaGasto,
-    saldo_inicial, constituido, n_constituido: mv.nh, liberado, n_liberado: mv.nd, ajustes, n_ajustes: mv.naj, saldo_final,
+  return { mes, concepto, nombre: C0.nombre, cuenta_provision: ctas.join(' / '), cuenta_gasto: C0.cuentaGasto,
+    saldo_inicial, constituido, n_constituido: sg < 0 ? mv.nd : mv.nh, liberado, n_liberado: sg < 0 ? mv.nh : mv.nd, ajustes, n_ajustes: mv.naj, saldo_final,
     motor_constituido: Number(con.m), motor_n_constituido: con.n, motor_liberado: Number(lib.m), motor_n_liberado: lib.n,
     motor_vigente, motor_n_vigente: sf.n, avsoft_vigente, avsoft_n, saldo_historico, pendientes, movimientos: movs, desde };
 }
@@ -1303,7 +1342,7 @@ async function traspasarDemandaIas({ clave, nombre, rut, monto, detalle, fecha: 
 
 /* Detalle detrás de cada cuadro (pop-up y Excel). tipo: INICIAL | CONSTITUIDO | LIBERADO | VIGENTE | CUENTA */
 async function detalle(mes, concepto, tipo) {
-  const cta = CONCEPTOS[concepto].cuentaProv;
+  const cta = CONCEPTOS[concepto].cuentasProv || [CONCEPTOS[concepto].cuentaProv];
   const cols = 'p.*, DATEDIFF(CURDATE(), p.fecha_constitucion) dias';
   const q = {
     INICIAL:     [`SELECT ${cols} FROM ctb_provisiones p WHERE p.concepto=? AND DATE_FORMAT(p.fecha_constitucion,'%Y-%m') < ? AND (p.estado='CONSTITUIDA' OR DATE_FORMAT(p.fecha_liberacion,'%Y-%m') >= ?) ORDER BY p.fecha_constitucion, p.id`, [concepto, mes, mes]],
@@ -1316,10 +1355,193 @@ async function detalle(mes, concepto, tipo) {
     const [r] = await pool.query(
       `SELECT c.id id_comprobante, DATE_FORMAT(c.fecha,'%Y-%m-%d') fecha, c.tipo, c.numero, c.origen, c.origen_ref, c.glosa, m.glosa glosa_linea, m.debe, m.haber, m.num_op, m.rut
          FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
-        WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') = ? ${tipo === 'AJUSTES' ? "AND c.origen_ref LIKE '%-AJ%'" : ''} ORDER BY c.fecha, c.id`, [cta, mes]);
+        WHERE m.cuenta IN (?) AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m') = ? ${tipo === 'AJUSTES' ? "AND c.origen_ref LIKE '%-AJ%'" : ''} ORDER BY c.fecha, c.id`, [cta, mes]);
     return r;
   }
   throw new Error('Tipo de detalle desconocido');
+}
+
+/* ═══ PROVISIONES DE STOCK: ingresos por facturar y deterioro del interés ═══════
+   Las seis provisiones anteriores nacen y mueren fila por fila: se constituyen por un hecho
+   (un crédito otorgado, una orden de pago) y se liberan cuando llega su documento. Estas dos
+   son distintas: son un SALDO que se vuelve a medir en cada cierre, como la provisión de
+   incobrables. Por eso se contabiliza solo la DIFERENCIA contra el mes anterior, y la fila del
+   mes guarda esa diferencia con signo; la suma de las filas es siempre el saldo de la cuenta.
+   Medir el stock completo cada mes (y no el movimiento) evita el problema de corte: da lo mismo
+   que una factura de septiembre llegue en octubre, porque lo que se compara es el acumulado. */
+async function aplicarStock(concepto, clave, mes, o, usuario = 'Motor provisiones') {
+  const C = CONCEPTOS[concepto];
+  try {
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return { skip: 'mes inválido' };
+    const desde = await param(C.paramDesde, '2026-09');
+    if (mes < desde) return { skip: 'anterior a ' + desde };
+    if (mes > hoyISO().slice(0, 7)) return { skip: 'mes futuro' };
+    const origenId = clave + '-' + mes;
+    const objetivo = Math.max(0, Math.round(Number(o.stock) || 0));
+    const [[ant]] = await pool.query(
+      "SELECT COALESCE(SUM(monto),0) m FROM ctb_provisiones WHERE concepto=? AND origen_tipo='MES' AND origen_id LIKE ? AND mes < ?",
+      [concepto, clave + '-%', mes]);
+    const [[ya]] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto=? AND origen_tipo='MES' AND origen_id=?", [concepto, origenId]);
+    const enMes = ya ? Math.round(Number(ya.monto)) : 0;
+    const delta = objetivo - Math.round(Number(ant.m)) - enMes;
+    if (!delta) return { skip: 'sin cambios', stock: objetivo };
+    let mj = {}; try { mj = JSON.parse((ya && ya.montos_json) || '{}'); } catch (_) {}
+    const n = ya ? (Number(mj.ajustes) || 0) + 1 : 0;
+    const fecha = await fechaContable(ultimoDiaMes(mes));
+    const id = await contabilizar({
+      evento: delta > 0 ? C.regla : C.reglaLib, fecha, ref: 'PROV-' + concepto + '-' + origenId + (n ? '-AJ' + n : ''),
+      montos: { monto: Math.abs(delta) }, reemplazos: o.reemplazos || null,
+      glosa: (o.glosa + ' — saldo $' + objetivo.toLocaleString('es-CL') + (n ? ' (ajuste ' + n + ')' : '')).slice(0, 300),
+      detalle: String(o.detalle || '').slice(0, 300),
+    });
+    if (!id) return { error: 'sin asiento (ver log del motor en Reglas de Centralización)' };
+    mj = { ...mj, stock: objetivo, ajustes: n, ...(o.extra || {}) };
+    const json = JSON.stringify(mj).slice(0, 400);
+    if (ya) await pool.query('UPDATE ctb_provisiones SET monto=?, tercero=?, montos_json=?, updated_at=NOW() WHERE id=?', [enMes + delta, o.tercero, json, ya.id]);
+    else await pool.query(
+      "INSERT INTO ctb_provisiones (concepto, origen_tipo, origen_id, tercero, mes, fecha_constitucion, monto, montos_json, id_comprobante_constitucion, creado_por) VALUES (?,'MES',?,?,?,?,?,?,?,?)",
+      [concepto, origenId, o.tercero, mes, fecha, delta, json, id, usuario]);
+    return { id_comprobante: id, delta, stock: objetivo };
+  } catch (e) { console.error('[provisiones aplicarStock]', concepto, clave, mes, e.message); return { error: e.message }; }
+}
+
+/* ── INGRESOS POR FACTURAR ────────────────────────────────────────── */
+/* Los dos conceptos que factura AutoFácil, cada uno con su par de cuentas. La comisión por
+   seguros solo la paga AutoFin; Unidad paga colocación. Misma base que muestra Post Venta ->
+   Facturación AutoFácil: una sola fuente, si cambia el cálculo cambian las dos pantallas. */
+const INGRESOS_SUB = {
+  COL: { nombre: 'colocación', activo: '1106015', ingreso: '3001073' },
+  SEG: { nombre: 'seguros',     activo: '1106011', ingreso: '3001075' },
+};
+const FIN_FACT = "UPPER(COALESCE(financiera,'')) IN ('AUTOFIN','UNIDAD DE CREDITO') AND UPPER(COALESCE(estado_credito,''))='OTORGADO' AND mes IS NOT NULL";
+/* Producción BRUTA (IVA incluido, como la calcula el sistema) de las operaciones cursadas entre
+   dos meses, por concepto. */
+async function produccionFacturable(clave, desdeMes, hastaMes) {
+  const campo = clave === 'SEG'
+    ? "CASE WHEN UPPER(COALESCE(financiera,''))='AUTOFIN' THEN COALESCE(com_rdh,0)+COALESCE(com_cesantia,0)+COALESCE(com_reparaciones,0) ELSE 0 END"
+    : 'COALESCE(monto_comision_fin,0)';
+  const [[r]] = await pool.query(
+    `SELECT COALESCE(ROUND(SUM(${campo})),0) bruto, COUNT(*) ops FROM creditos
+      WHERE ${FIN_FACT} AND DATE_FORMAT(mes,'%Y-%m') BETWEEN ? AND ?`, [desdeMes, hastaMes]);
+  return { bruto: Math.round(Number(r.bruto)), ops: Number(r.ops) };
+}
+/* Lo que YA entró como ingreso real a la cuenta en el período: la solicitud de facturación de
+   Post Venta (FACTURACION_AF_*), la centralización del contador o cualquier otra vía. Se excluyen
+   nuestros propios asientos: si no, la provisión se vería a sí misma como ingreso facturado. */
+async function ingresoFacturado(cuenta, desdeMes, hastaMes) {
+  const C = CONCEPTOS.INGRESOS;
+  const [[r]] = await pool.query(
+    `SELECT COALESCE(SUM(m.haber - m.debe),0) n FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+      WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND c.origen NOT IN (?,?)
+        AND DATE_FORMAT(c.fecha,'%Y-%m') BETWEEN ? AND ?`, [cuenta, C.regla, C.reglaLib, desdeMes, hastaMes]);
+  return Math.round(Number(r.n));
+}
+/* Stock al cierre del mes: todo lo ganado desde el arranque menos todo lo facturado desde el
+   arranque. Nunca negativo: si se facturó más de lo producido (un mes anterior, un ajuste de la
+   financiera), el devengo simplemente se apaga. */
+async function stockIngresos(mes, clave) {
+  const desde = await param(CONCEPTOS.INGRESOS.paramDesde, '2026-09');
+  const sub = INGRESOS_SUB[clave];
+  const prod = await produccionFacturable(clave, desde, mes);
+  const neto = Math.round(prod.bruto / await ivaFactor());
+  const facturado = await ingresoFacturado(sub.ingreso, desde, mes);
+  return { stock: Math.max(0, neto - facturado), neto, bruto: prod.bruto, ops: prod.ops, facturado, desde };
+}
+async function constituirIngresos(mes, usuario = 'Motor provisiones') {
+  const out = {};
+  for (const clave of Object.keys(INGRESOS_SUB)) {
+    const sub = INGRESOS_SUB[clave];
+    const st = await stockIngresos(mes, clave);
+    const reemplazos = clave === 'SEG' ? { '1106015': sub.activo, '3001073': sub.ingreso } : null;
+    out[clave] = await aplicarStock('INGRESOS', clave, mes, {
+      stock: st.stock, reemplazos,
+      tercero: 'Comisión por ' + sub.nombre + ' devengada y no facturada',
+      glosa: 'Ingreso devengado por facturar — comisión por ' + sub.nombre + ' ' + mes,
+      detalle: 'Producido desde ' + st.desde + ' $' + st.neto.toLocaleString('es-CL') + ' neto (' + st.ops + ' ops) · facturado $' + st.facturado.toLocaleString('es-CL'),
+      extra: { neto: st.neto, facturado: st.facturado, ops: st.ops },
+    }, usuario);
+  }
+  return out;
+}
+/* Mes en curso y anterior: el devengo del mes que corre se ajusta a medida que se cursan
+   operaciones, y el anterior se apaga cuando entran sus facturas. */
+async function sincronizarIngresos(usuario = 'Motor provisiones') {
+  const out = { constituidas: 0, liberadas: 0, omitidas: 0 };
+  const desde = await param(CONCEPTOS.INGRESOS.paramDesde, '2026-09');
+  const actual = hoyISO().slice(0, 7);
+  for (const m of [mesAnteriorDe(actual), actual]) {
+    if (m < desde) continue;
+    const r = await constituirIngresos(m, usuario);
+    for (const k of Object.keys(r)) { const x = r[k]; if (x && x.delta > 0) out.constituidas++; else if (x && x.delta < 0) out.liberadas++; else out.omitidas++; }
+  }
+  return out;
+}
+
+/* ── DETERIORO DEL INTERÉS DEVENGADO POR COBRAR ─────────────────────────── */
+/* Interés devengado que sigue por cobrar al cierre, crédito a crédito: lo reconocido por el motor
+   de devengo menos lo que ya se cobró (aplicaciones DEV vivas). */
+async function interesPendiente(mes) {
+  const fin = ultimoDiaMes(mes);
+  const [dev] = await pool.query(
+    "SELECT id_credito, MAX(num_op) num_op, COALESCE(SUM(interes),0) dev FROM ctb_devengo_intereses WHERE mes <= ? GROUP BY id_credito", [mes]);
+  if (!dev.length) return [];
+  const [apl] = await pool.query(
+    "SELECT id_credito, COALESCE(SUM(monto),0) m FROM ctb_devengo_aplicaciones WHERE tipo='DEV' AND reversado=0 AND DATE(created_at) <= ? AND id_credito IN (?) GROUP BY id_credito",
+    [fin, dev.map(d => d.id_credito)]);
+  const pagado = new Map(apl.map(a => [a.id_credito, Math.round(Number(a.m))]));
+  return dev.map(d => ({ id_credito: d.id_credito, num_op: d.num_op, pendiente: Math.max(0, Math.round(Number(d.dev)) - (pagado.get(d.id_credito) || 0)) }))
+            .filter(d => d.pendiente > 0);
+}
+/* El porcentaje NO se inventa: es el mismo tramo de mora con que se provisiona el capital
+   (motor único de Cierre de Mes -> provisiones de incobrables). Del mes cerrado se usa su
+   snapshot; del mes en curso, el cálculo de hoy. Lo castigado va al 100%. */
+async function deterioroInteres(mes) {
+  const filas = await interesPendiente(mes);
+  if (!filas.length) return { stock: 0, filas: [], creditos: 0, pendiente_total: 0 };
+  let pct = new Map();
+  const [snap] = await pool.query('SELECT id_credito, pct FROM provisiones_detalle WHERE mes=?', [mes]);
+  if (snap.length) pct = new Map(snap.map(r => [r.id_credito, Number(r.pct)]));
+  else {
+    try {
+      const det = await require('../../creditos/src/controllers/castigos.controller').calcularDetalleProvision();
+      pct = new Map(det.map(r => [r.id_credito, Number(r.pct)]));
+    } catch (e) { console.error('[provisiones deterioroInteres] tramos', e.message); }
+  }
+  let castigados = new Set();
+  try {
+    const [cast] = await pool.query(
+      "SELECT DISTINCT id_credito FROM castigos_contables WHERE estado='APROBADO' AND id_credito IN (?)", [filas.map(f => f.id_credito)]);
+    castigados = new Set(cast.map(c => c.id_credito));
+  } catch (_) {}
+  const out = [];
+  for (const f of filas) {
+    const p = castigados.has(f.id_credito) ? 100 : (pct.get(f.id_credito) || 0);
+    if (!p) continue;
+    out.push({ ...f, pct: p, castigado: castigados.has(f.id_credito), provision: Math.round(f.pendiente * p / 100) });
+  }
+  return { stock: out.reduce((s, r) => s + r.provision, 0), filas: out, creditos: out.length,
+           pendiente_total: filas.reduce((s, r) => s + r.pendiente, 0) };
+}
+async function constituirInteres(mes, usuario = 'Motor provisiones') {
+  const d = await deterioroInteres(mes);
+  return aplicarStock('INTERES', 'INT', mes, {
+    stock: d.stock,
+    tercero: 'Interés devengado deteriorado (' + d.creditos + ' operación(es) en mora)',
+    glosa: 'Deterioro del interés devengado por cobrar ' + mes,
+    detalle: 'Interés devengado pendiente $' + Math.round(d.pendiente_total || 0).toLocaleString('es-CL') + ' · deteriorado $' + d.stock.toLocaleString('es-CL') + ' en ' + d.creditos + ' operación(es), tramos de cobranza',
+    extra: { creditos: d.creditos, pendiente: Math.round(d.pendiente_total || 0) },
+  }, usuario);
+}
+async function sincronizarInteres(usuario = 'Motor provisiones') {
+  const out = { constituidas: 0, liberadas: 0, omitidas: 0 };
+  const desde = await param(CONCEPTOS.INTERES.paramDesde, '2026-09');
+  const actual = hoyISO().slice(0, 7);
+  for (const m of [mesAnteriorDe(actual), actual]) {
+    if (m < desde) continue;
+    const x = await constituirInteres(m, usuario);
+    if (x && x.delta > 0) out.constituidas++; else if (x && x.delta < 0) out.liberadas++; else out.omitidas++;
+  }
+  return out;
 }
 
 /* ── Las demás cuentas de provisión (las que NO tiene el motor) ──────────────────
@@ -1375,7 +1597,7 @@ async function otrasCuentas(mes) {
   return out.sort((a, b) => (a.grupo === b.grupo ? Math.abs(b.saldo_final) - Math.abs(a.saldo_final) : (a.grupo === 'PROVISION' ? -1 : 1)));
 }
 
-const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo, SUELDOS: sincronizarSueldos, OTROS: sincronizarOtros, IAS: sincronizarIas };
+const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo, SUELDOS: sincronizarSueldos, OTROS: sincronizarOtros, IAS: sincronizarIas, INGRESOS: sincronizarIngresos, INTERES: sincronizarInteres };
 const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, EJECUTIVO: liberarEjecutivo, SUELDOS: liberarSueldos, OTROS: liberarOtros, IAS: liberarIas };
 /* Al otorgar: todos los conceptos que nacen con el crédito (fire-and-forget, nunca lanza) */
 async function constituirAlOtorgar(idCredito, usuario) {
@@ -1395,4 +1617,6 @@ module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constit
   constituirEjecutivoMes, liberarEjecutivo, liberarEjecutivoPorAprobacion, sincronizarEjecutivo, comisionesMotorMes,
   constituirSueldos, liberarSueldos, sincronizarSueldos, proyeccionSueldos,
   constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, tratamientoDe, baseNetaODP, desgloseODP, esProveedorParque, tieneDevengoPropio,
-  cuotaIas, constituirIas, constituirAperturaIas, traspasarDemandaIas, liberarIas, liberarIasDeTrabajador, sincronizarIas, cuadro, detalle, otrasCuentas };
+  cuotaIas, constituirIas, constituirAperturaIas, traspasarDemandaIas, liberarIas, liberarIasDeTrabajador, sincronizarIas,
+  constituirIngresos, sincronizarIngresos, stockIngresos, constituirInteres, sincronizarInteres, deterioroInteres,
+  cuadro, detalle, otrasCuentas };
