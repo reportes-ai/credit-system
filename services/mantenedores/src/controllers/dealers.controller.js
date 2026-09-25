@@ -1,7 +1,8 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const almacen = require('../../../../shared/almacen-docs');
-const { etiqueta: etiquetaDealer } = require('../../../../shared/dealer-etiqueta');   // motor único del nombre del dealer en la auditoría   // los documentos van al bucket, nunca a un LONGBLOB nuevo
+const { etiqueta: etiquetaDealer } = require('../../../../shared/dealer-etiqueta');   // motor único del nombre del dealer en la auditoría
+const NOM = require('../../../../api-gateway/public/js/nombres-core');   // formato único: empresas en MAYÚSCULAS, personas en Nombre Propio   // los documentos van al bucket, nunca a un LONGBLOB nuevo
 const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico al guardar
 
 const ensureTable = () => pool.query(`CREATE TABLE IF NOT EXISTS dealers (
@@ -325,11 +326,21 @@ const importar = async (req, res) => {
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
+/* Formato único de los nombres que llegan del formulario (shared/nombres):
+   el dealer y su razón social son EMPRESAS (mayúsculas); el contacto y el titular
+   de la cuenta son PERSONAS (Nombre Propio). */
+function normalizarNombresDealer(r) {
+  for (const c of ['nombre_indexa', 'nombre_razon', 'ccs_parque']) if (r[c] != null) r[c] = NOM.empresa(r[c]);
+  for (const c of ['contacto', 'nombre_cuenta']) if (r[c] != null) r[c] = NOM.persona(r[c]);
+  return r;
+}
+
 const createDealer = async (req, res) => {
   try {
     const r = req.body;
     r.rut = RUT.normalizar(r.rut) || r.rut;
     r.rut_pago = RUT.normalizar(r.rut_pago) || r.rut_pago;
+    normalizarNombresDealer(r);
     const [[{ maxN }]] = await pool.query('SELECT COALESCE(MAX(numero),0)+1 AS maxN FROM dealers');
     const [result] = await pool.query(
       `INSERT INTO dealers (numero,numero_ind,rut,nombre_indexa,nombre_razon,ccs_parque,
@@ -364,6 +375,13 @@ const updateDealer = async (req, res) => {
     const r = req.body;
     r.rut = RUT.normalizar(r.rut) || r.rut;
     r.rut_pago = RUT.normalizar(r.rut_pago) || r.rut_pago;
+    /* `nombre_indexa` es la LLAVE de match con creditos.automotora y la base es
+       case-sensitive: cambiarle el formato acá dejaría las operaciones huérfanas.
+       Por eso se conserva tal cual cuando es el mismo nombre escrito distinto; la
+       homologación masiva (que además arrastra las copias) va por su script. */
+    const [[antes]] = await pool.query('SELECT nombre_indexa FROM dealers WHERE id_dealer=?', [req.params.id]);
+    normalizarNombresDealer(r);
+    if (antes && NOM.mismoNombre(antes.nombre_indexa, r.nombre_indexa)) r.nombre_indexa = antes.nombre_indexa;
     await pool.query(
       `UPDATE dealers SET numero_ind=?,rut=?,nombre_indexa=?,nombre_razon=?,ccs_parque=?,
        direccion=?,fecha_incorporacion=?,contacto=?,telefono=?,correo=?,

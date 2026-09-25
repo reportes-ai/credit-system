@@ -7,6 +7,7 @@
  * el ejecutivo corrige/apela y reenvía).
  */
 const pool = require('../../../../shared/config/database');
+const NOM = require('../../../../api-gateway/public/js/nombres-core');   // empresas en MAYÚSCULAS, personas en Nombre Propio
 const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 const { auditar } = require('../../../../shared/audit');
 const almacen = require('../../../../shared/almacen-docs');
@@ -517,7 +518,7 @@ function normSocios(body) {
   if (!Array.isArray(s)) return [];
   return s.slice(0, 3).map(x => ({
     rut: String((x && x.rut) || '').trim(),
-    nombre: String((x && x.nombre) || '').trim(),
+    nombre: NOM.persona((x && x.nombre) || ''),   // formato único (shared/nombres)
   })).filter(x => x.rut || x.nombre);
 }
 
@@ -549,10 +550,17 @@ function armarValores(body) {
       })).filter(l => l.ubicacion);
       v[k] = arr.length ? JSON.stringify(arr) : null;
     }
+    /* Formato único de los nombres (shared/nombres): la razón social y el nombre de
+       fantasía son EMPRESAS; el representante legal, los contactos y el titular de la
+       cuenta son PERSONAS. Así la ficha, el mantenedor y la carta escriben igual. */
+    else if (NOMBRES_EMPRESA.has(k)) v[k] = NOM.empresa(body[k]) || null;
+    else if (NOMBRES_PERSONA.has(k)) v[k] = NOM.persona(body[k]) || null;
     else v[k] = norm(body[k]) || null;
   }
   return v;
 }
+const NOMBRES_EMPRESA = new Set(['nombre_razon', 'nombre_fantasia', 'nombre_parque']);
+const NOMBRES_PERSONA = new Set(['rl_nombre', 'cc_nombre', 'cf_nombre', 'nombre_cuenta']);
 
 /* ── GET /ejecutivos — nombres elegibles para la ficha ────────────────────── */
 const ejecutivos = async (req, res) => {

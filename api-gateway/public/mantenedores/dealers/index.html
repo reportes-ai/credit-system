@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.14 — Otros documentos en la ficha del dealer: boton para adjuntar respaldos libres (poderes, mandatos, correos) en creacion y en mantencion; van al bucket via shared/almacen-docs (tabla dealer_documentos) y quedan auditados. v2.13 — Datos bancarios editables completos: tipo de cuenta, titular de la cuenta y si es de EMPRESA o PERSONA (poder a un tercero); el TEF sale con RUT Pago + titular. v2.12 — Banco de la ficha con lista del mantenedor Bancos de la Plaza. v2.11 — ?ver=<id> abre la ficha directo (link desde Atención Remota → Solicitudes). v2.10 — Zona-Parque-Dealer: razones sociales largas abreviadas a EIRL en BD y columna Sucursal acotada · v2.9 — Potencial: columnas RUT y Zona; posiciones de dealers presentes en Zona-Parque-Dealer se leen de esa base (fuente unica, bloqueadas aqui) · v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.15 — formato automatico de nombres: empresas en MAYUSCULAS y personas en Nombre Propio, con motor unico nombres-core.js compartido con el backend. v2.14 — Otros documentos en la ficha del dealer: boton para adjuntar respaldos libres (poderes, mandatos, correos) en creacion y en mantencion; van al bucket via shared/almacen-docs (tabla dealer_documentos) y quedan auditados. v2.13 — Datos bancarios editables completos: tipo de cuenta, titular de la cuenta y si es de EMPRESA o PERSONA (poder a un tercero); el TEF sale con RUT Pago + titular. v2.12 — Banco de la ficha con lista del mantenedor Bancos de la Plaza. v2.11 — ?ver=<id> abre la ficha directo (link desde Atención Remota → Solicitudes). v2.10 — Zona-Parque-Dealer: razones sociales largas abreviadas a EIRL en BD y columna Sucursal acotada · v2.9 — Potencial: columnas RUT y Zona; posiciones de dealers presentes en Zona-Parque-Dealer se leen de esa base (fuente unica, bloqueadas aqui) · v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -365,6 +365,7 @@
     <li><b>Datos del dealer</b> (nombre, RUT, dirección, contacto, cuenta bancaria) → es la <b>fuente única</b>: los lee la carta de aprobación, la cartola de comisiones, la orden de pago al dealer y el <a href="/mantenedores/dealers-mapa/">Mapa de Dealers</a>.</li>
     <li><b>Comisión pactada</b> (calle y parque) → alimenta el cálculo de comisión de cada operación. La tabla base se fija por <a href="/dealers-incorporacion/">ficha aprobada</a>.</li>
     <li><b>Locales del dealer</b> (multi-parque + calle) → cada local tiene su tabla de comisión propia (<code>dealer_comisiones</code>); el motor cobra por el local donde cursó <b>cada operación</b> (columna PARQUE de la op). Afecta el cálculo de comisión dealer al guardar y en el <b>recálculo mensual</b>, la comisión sugerida de la <a href="/cartas-aprobacion/">carta de aprobación</a> y la <a href="/postventa/cartolas-parque/">cartola del parque</a> correspondiente. Calle no paga parque (por eso su % es más alto).</li>
+    <li><b>Formato de los nombres</b> → motor único <code>/js/nombres-core.js</code>, el mismo que usa el servidor al guardar: las <b>empresas</b> (nombre del dealer, razón social, parque) van en <b>MAYÚSCULAS</b> y las <b>personas</b> (contacto, titular de la cuenta, socios y representante legal de la ficha) en <b>Nombre Propio</b>, con las partículas en minúscula ("Juan de la Fuente"). El campo se formatea solo al salir de él, así que da lo mismo cómo se escriba. Ojo: el <b>Nombre Dealer</b> es la llave que enlaza al dealer con sus operaciones (<code>creditos.automotora</code>) y la base distingue mayúsculas, por eso al editar se conserva tal cual si solo cambió el formato; la homologación masiva va por <code>scripts/homologar-nombres-dealers.js</code>, que mueve también las copias.</li>
     <li><b>Otros documentos</b> (bloque al pie de la ficha, en creación y en mantención) → respaldos libres del dealer: poderes para depositar a un tercero, mandatos, correos de autorización. Se guardan en el bucket (<code>dealer_documentos</code>, nunca en la base) y quedan disponibles desde la misma ficha. Subir y eliminar exige el permiso de editar la ficha (<code>dealer_ficha_revisar</code> / <code>dealers_base_editar</code>); toda subida, visualización y borrado queda en <a href="/auditoria/">Auditoría</a>. En un dealer nuevo los archivos quedan en cola y se suben al guardar.</li>
     <li><b>Activo / Inactivo</b> → marca al dealer sin ventas hace 3 meses. <b>No bloquea</b> cursar operaciones: es un indicador comercial.</li>
     <li><b>Categoría asignada</b> → define la pizarra de comisión por defecto y los informes comerciales. Rangos y colores en <a href="/mantenedores/dealer-categorias/">Variables de categorías</a>.</li>
@@ -404,11 +405,11 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">Nombre Dealer <span class="required-star">*</span></label>
-            <input type="text" class="form-control form-control-sm" id="fNombreIndexa">
+            <input type="text" class="form-control form-control-sm" id="fNombreIndexa" data-nombre="empresa">
           </div>
           <div class="col-md-6">
             <label class="form-label">Nombre Razón Social <span class="required-star">*</span></label>
-            <input type="text" class="form-control form-control-sm" id="fNombreRazon">
+            <input type="text" class="form-control form-control-sm" id="fNombreRazon" data-nombre="empresa">
           </div>
           <div class="col-md-5">
             <label class="form-label">CCS / Parque</label>
@@ -441,7 +442,7 @@
         <div class="row g-3">
           <div class="col-md-5">
             <label class="form-label">Contacto Comercial</label>
-            <input type="text" class="form-control form-control-sm" id="fContacto">
+            <input type="text" class="form-control form-control-sm" id="fContacto" data-nombre="persona">
           </div>
           <div class="col-md-3">
             <label class="form-label">Teléfono</label>
@@ -472,7 +473,7 @@
           </div>
           <div class="col-md-4">
             <label class="form-label">Titular de la cuenta</label>
-            <input type="text" class="form-control form-control-sm" id="fNombreCuenta" placeholder="Nombre del dueño de la cuenta">
+            <input type="text" class="form-control form-control-sm" id="fNombreCuenta" placeholder="Nombre del dueño de la cuenta" data-nombre="persona">
           </div>
           <div class="col-md-4">
             <label class="form-label">La cuenta es de</label>
@@ -1632,6 +1633,8 @@ Promise.all([cargarCategorias(), cargarPizarraDef(), cargarPermisos()]).then(asy
 });
 cargarCcs();
 </script>
+<script src="/js/nombres-core.js"></script>
+<script src="/js/nombres.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>

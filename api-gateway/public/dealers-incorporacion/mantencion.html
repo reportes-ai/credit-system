@@ -95,13 +95,13 @@
     <input type="hidden" id="d_id">
     <div class="grid2">
       <div class="fld"><label>RUT</label><input id="d_rut"></div>
-      <div class="fld"><label>Nombre Razón Social</label><input id="d_nombre_razon"></div>
-      <div class="fld"><label>Nombre Dealer</label><input id="d_nombre_indexa"></div>
+      <div class="fld"><label>Nombre Razón Social</label><input id="d_nombre_razon" data-nombre="empresa"></div>
+      <div class="fld"><label>Nombre Dealer</label><input id="d_nombre_indexa" data-nombre="empresa"></div>
       <!-- Mismas listas que la ficha original (regla 13-08): parque desde el mantenedor
            Arriendos y Comisiones + CALLE/PARTICULAR; banco desde la lista oficial. -->
       <div class="fld"><label>Categoría (CCS/Parque)</label><input id="d_ccs_parque" list="d_parquesLista" placeholder="Escribe para buscar…" autocomplete="off" onblur="dCanonico('d_ccs_parque','d_parquesLista')"><datalist id="d_parquesLista"><option>CALLE</option><option>PARTICULAR</option></datalist></div>
       <div class="fld full"><label>Dirección</label><input id="d_direccion"></div>
-      <div class="fld"><label>Contacto</label><input id="d_contacto"></div>
+      <div class="fld"><label>Contacto</label><input id="d_contacto" data-nombre="persona"></div>
       <div class="fld"><label>Teléfono</label><input id="d_telefono"></div>
       <div class="fld"><label>Correo</label><input id="d_correo"></div>
       <div class="fld"><label>Banco</label><input id="d_banco" list="d_bancosLista" placeholder="Escribe para buscar…" autocomplete="off" onblur="dBancoCanonico()"><datalist id="d_bancosLista"><!-- MOTOR ÚNICO: se llena desde /js/bancos-cl.js -->
@@ -749,5 +749,7 @@ init();
 </script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
+<script src="/js/nombres-core.js"></script>
+<script src="/js/nombres.js"></script>
 </body>
 </html>

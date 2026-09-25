@@ -176,8 +176,8 @@
         <small class="hint">Si el concesionario ya existe, la ficha pasa a <b>Modificación de Dealer</b> y precarga sus datos.</small>
       </div>
       <div class="fld"><label>RUT de Concesionario *</label><input id="rut" placeholder="76.123.456-7" maxlength="12" oninput="onRutInput(this,'rutHint')" onchange="detectarDealerRut()"><small id="rutHint" class="vmsg"></small></div>
-      <div class="fld"><label>Nombre Razón Social *</label><input id="nombre_razon"></div>
-      <div class="fld"><label>Nombre de Fantasía</label><input id="nombre_fantasia"></div>
+      <div class="fld"><label>Nombre Razón Social *</label><input id="nombre_razon" data-nombre="empresa"></div>
+      <div class="fld"><label>Nombre de Fantasía</label><input id="nombre_fantasia" data-nombre="empresa"></div>
       <div class="fld"><label id="lblDir">Dirección de Sucursal</label><input id="direccion"></div>
       <div class="fld"><label id="lblCom">Comuna de Sucursal</label>
         <input id="comuna" list="comunasList" placeholder="Escribe o elige la comuna…" oninput="onComuna()">
@@ -191,7 +191,7 @@
     <h3><i class="bi bi-car-front me-1"></i> Datos del Parque Automotriz</h3>
     <div class="card-body grid">
       <div class="fld full"><label>Nombre del Parque Automotriz *</label>
-        <input id="nombre_parque" list="parquesList" placeholder="Escribe o elige el parque…" autocomplete="off">
+        <input id="nombre_parque" list="parquesList" placeholder="Escribe o elige el parque…" autocomplete="off" data-nombre="empresa">
         <datalist id="parquesList"></datalist>
         <small class="hint">Elige un parque registrado (mantenedor de Parques) para que los créditos hechos ahí calculen su comisión.</small></div>
       <div class="fld full" id="fldDirParque"><label>Dirección de Parque</label><input id="direccion_parque"></div>
@@ -218,7 +218,7 @@
   <div class="card-sec">
     <h3><i class="bi bi-telephone me-1"></i> Contacto Comercial</h3>
     <div class="card-body grid">
-      <div class="fld"><label>Nombre</label><input id="cc_nombre"></div>
+      <div class="fld"><label>Nombre</label><input id="cc_nombre" data-nombre="persona"></div>
       <div class="fld"><label>Teléfono</label><input id="cc_telefono" inputmode="tel" placeholder="+56 9 1234 5678" oninput="onTel(this,'ccTelHint')"><small id="ccTelHint" class="vmsg"></small></div>
       <div class="fld full"><label>Email</label><input id="cc_email" type="email" oninput="onEmail(this,'ccEmailHint')"><small id="ccEmailHint" class="vmsg"></small></div>
       <div class="fld full"><label class="repchk"><input type="checkbox" id="cc_rep" onchange="onRepToggle('cc')"> <i class="bi bi-person-badge"></i> Este contacto es el <b>Representante Legal</b></label></div>
@@ -228,7 +228,7 @@
   <div class="card-sec">
     <h3><i class="bi bi-cash-stack me-1"></i> Contacto Financiero</h3>
     <div class="card-body grid">
-      <div class="fld"><label>Nombre</label><input id="cf_nombre"></div>
+      <div class="fld"><label>Nombre</label><input id="cf_nombre" data-nombre="persona"></div>
       <div class="fld"><label>Teléfono</label><input id="cf_telefono" inputmode="tel" placeholder="+56 9 1234 5678" oninput="onTel(this,'cfTelHint')"><small id="cfTelHint" class="vmsg"></small></div>
       <div class="fld full"><label>Email</label><input id="cf_email" type="email" oninput="onEmail(this,'cfEmailHint')"><small id="cfEmailHint" class="vmsg"></small></div>
       <div class="fld full"><label class="repchk"><input type="checkbox" id="cf_rep" onchange="onRepToggle('cf')"> <i class="bi bi-person-badge"></i> Este contacto es el <b>Representante Legal</b></label></div>
@@ -238,7 +238,7 @@
   <div class="card-sec" id="cardRepLegal">
     <h3><i class="bi bi-person-badge me-1"></i> Representante Legal</h3>
     <div class="card-body grid">
-      <div class="fld"><label>Nombre</label><input id="rl_nombre"></div>
+      <div class="fld"><label>Nombre</label><input id="rl_nombre" data-nombre="persona"></div>
       <div class="fld"><label>Teléfono</label><input id="rl_telefono" inputmode="tel" placeholder="+56 9 1234 5678" oninput="onTel(this,'rlTelHint')"><small id="rlTelHint" class="vmsg"></small></div>
       <div class="fld full"><label>Email</label><input id="rl_email" type="email" oninput="onEmail(this,'rlEmailHint')"><small id="rlEmailHint" class="vmsg"></small></div>
     </div>
@@ -294,7 +294,7 @@
           <select id="tipo_cuenta" onchange="onTipoCuenta()">
             <option>Cuenta Corriente</option><option>Cuenta Vista</option><option>Cuenta RUT</option>
           </select></div>
-        <div class="fld"><label>Nombre de la cuenta</label><input id="nombre_cuenta" placeholder="Titular de la cuenta"></div>
+        <div class="fld"><label>Nombre de la cuenta</label><input id="nombre_cuenta" placeholder="Titular de la cuenta" data-nombre="persona"></div>
         <div class="fld"><label>Banco de Transferencia</label>
           <!-- input+datalist (no select): permite BUSCAR escribiendo cualquier parte del
                nombre ("chile" encuentra Banco de Chile) y acepta bancos fuera de la lista.
@@ -714,7 +714,7 @@ function renderSocios(){
       <div class="fld"><label>RUT Socio ${i}</label>
         <input id="socio_rut_${i}" placeholder="76.123.456-7" maxlength="12" oninput="onRutInput(this,'socioHint_${i}')" onchange="buscarSocio(${i})">
         <small id="socioHint_${i}" class="vmsg"></small></div>
-      <div class="fld"><label>Nombre Socio ${i}</label><input id="socio_nombre_${i}" placeholder="Se autocompleta desde clientes"></div>
+      <div class="fld"><label>Nombre Socio ${i}</label><input id="socio_nombre_${i}" data-nombre="persona" placeholder="Se autocompleta desde clientes"></div>
     </div>`;
   w.innerHTML=html; w.dataset.done='1';
 }
@@ -1333,5 +1333,7 @@ cargar().then(aplicarPermisosCampos);
 </script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
+<script src="/js/nombres-core.js"></script>
+<script src="/js/nombres.js"></script>
 </body>
 </html>
