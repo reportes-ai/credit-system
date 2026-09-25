@@ -195,6 +195,40 @@ router.post('/provisiones/sincronizar', verifyToken, requireFunc('ctb_provisione
     res.json({ success: true, data: r, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 });
+/* Cuentas de gasto por categoría (mapeo paramétrico que usa la provisión de otros gastos: la ODP
+   solo trae categoría y centro de costo, no cuenta contable). Sin cuenta configurada no se provisiona. */
+router.get('/provisiones/categorias-gasto', verifyToken, requireFunc('ctb_provisiones', 'ctb_cierre_mes', 'ctb_estados'), async (req, res) => {
+  try {
+    const pool = require('../../../../shared/config/database');
+    const [filas] = await pool.query(
+      `SELECT g.categoria, g.cuenta, g.activo, c.nombre cuenta_nombre,
+              (SELECT COUNT(*) FROM ordenes_pago o WHERE UPPER(TRIM(o.categoria))=g.categoria AND UPPER(COALESCE(o.estado,''))<>'ANULADA') odps
+         FROM ctb_gasto_categorias g LEFT JOIN ctb_cuentas c ON c.codigo=g.cuenta
+        ORDER BY (g.cuenta IS NULL) DESC, g.categoria`);
+    const [cuentas] = await pool.query("SELECT codigo, nombre FROM ctb_cuentas WHERE imputable=1 AND codigo LIKE '4%' ORDER BY codigo");
+    res.json({ success: true, data: { filas, cuentas }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+});
+router.put('/provisiones/categorias-gasto', verifyToken, requireFunc('ctb_provisiones'), async (req, res) => {
+  try {
+    const pool = require('../../../../shared/config/database');
+    const categoria = String(req.body?.categoria || '').trim().toUpperCase();
+    const cuenta = String(req.body?.cuenta || '').trim() || null;
+    if (!categoria) return res.status(400).json({ success: false, data: null, error: 'Falta la categoría' });
+    if (cuenta) {
+      const [[c]] = await pool.query("SELECT codigo FROM ctb_cuentas WHERE codigo=? AND imputable=1", [cuenta]);
+      if (!c) return res.status(400).json({ success: false, data: null, error: 'La cuenta no existe o no es imputable' });
+    }
+    const u = req.usuario || {};
+    const quien = [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || 'Usuario';
+    await pool.query(
+      `INSERT INTO ctb_gasto_categorias (categoria, cuenta, updated_at, actualizado_por) VALUES (?,?,NOW(),?)
+       ON DUPLICATE KEY UPDATE cuenta=VALUES(cuenta), updated_at=NOW(), actualizado_por=VALUES(actualizado_por)`, [categoria, cuenta, quien]);
+    require('../../../../shared/audit').auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'provisiones_categoria', entidad_id: categoria,
+      detalle: `Cuenta de gasto de la categoría ${categoria}: ${cuenta || '(sin cuenta)'}` });
+    res.json({ success: true, data: { categoria, cuenta }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+});
 router.post('/provisiones/:id/liberar', verifyToken, requireFunc('ctb_provisiones'), async (req, res) => {
   try {
     const u = req.usuario || {};

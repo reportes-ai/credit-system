@@ -38,6 +38,16 @@ const CONCEPTOS = {
      real de remuneraciones fechado en el mes (importación AVSOFT). Hoy AVSOFT contabiliza el libro el último
      día del mes, así que normalmente no hay nada que provisionar: es la red de seguridad del devengo. */
   SUELDOS: { nombre: 'Sueldos (libro de remuneraciones)', regla: 'PROV_SUELDOS', reglaLib: 'PROV_SUELDOS_LIB', cuentaProv: '2106015', cuentaGasto: '4001060', paramDesde: 'prov_sueldos_desde' },
+  /* OTROS (25-09-2026, decisión de Pato): el resto del gasto que ya se debe y todavía no tiene
+     documento. Tres orígenes, todos al cierre del mes:
+       · ODP EMITIDA sin factura/boleta en el auxiliar de compras → la obligación nació al emitirla;
+       · ODP PAGADA sin documento → el pago dejó la CxP 2102010 en debe sin devengo que la respalde;
+       · pago recurrente cuyo vencimiento cae en el mes y todavía no generó su ODP.
+     El gasto se provisiona NETO (el IVA crédito nace con la factura); boletas, honorarios y exentos
+     van por su total. La cuenta de gasto NO está en la ODP: sale del mapeo paramétrico por categoría
+     (ctb_gasto_categorias). Sin mapeo no se inventa cuenta: la fila queda pendiente y se ve en el
+     cuadro y en el Cierre de Mes. Se libera cuando aparece el documento en el auxiliar o al anular. */
+  OTROS: { nombre: 'Otros gastos (ODP y pagos recurrentes sin documento)', regla: 'PROV_OTROS', reglaLib: 'PROV_OTROS_LIB', cuentaProv: '2106016', cuentaGasto: 'por categoría', paramDesde: 'prov_otros_desde' },
 };
 
 require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
@@ -53,8 +63,24 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
     creado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
     UNIQUE KEY uq_origen (concepto, origen_tipo, origen_id), INDEX idx_estado (concepto, estado), INDEX idx_mes (mes))`);
   await pool.query('CREATE TABLE IF NOT EXISTS ctb_config (clave VARCHAR(60) PRIMARY KEY, valor VARCHAR(200) NOT NULL)');
-  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09'), ('prov_sueldos_desde','2026-09')");
-  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1), ('2106015','PROVISION REMUNERACIONES (DEVENGO)','PASIVO',1)");
+  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09'), ('prov_sueldos_desde','2026-09'), ('prov_otros_desde','2026-09')");
+  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1), ('2106015','PROVISION REMUNERACIONES (DEVENGO)','PASIVO',1), ('2106016','PROVISION OTROS GASTOS (DEVENGO)','PASIVO',1)");
+  /* Mapeo paramétrico categoría de la ODP / tipo de pago recurrente → cuenta de gasto.
+     Es lo que permite provisionar un gasto que en la ODP solo tiene categoría y centro de costo.
+     Se siembran las categorías que hoy existen; la cuenta la completa el Administrador en
+     Contabilidad → Provisiones por Devengo → Cuentas por categoría. Sin cuenta NO se provisiona
+     (nunca inventar una cuenta: la fila queda pendiente y se ve en el cuadro del mes). */
+  await pool.query(`CREATE TABLE IF NOT EXISTS ctb_gasto_categorias (
+    categoria VARCHAR(60) PRIMARY KEY,
+    cuenta    VARCHAR(20) NULL,
+    activo    TINYINT(1) NOT NULL DEFAULT 1,
+    updated_at DATETIME NULL, actualizado_por VARCHAR(160) NULL)`);
+  // ARRIENDOS es la única inequívoca del plan de cuentas (4002100 ARRIENDOS); el resto nace sin cuenta.
+  await pool.query("INSERT IGNORE INTO ctb_gasto_categorias (categoria, cuenta) VALUES ('ARRIENDOS','4002100'), ('ARRIENDO','4002100')");
+  await pool.query(`INSERT IGNORE INTO ctb_gasto_categorias (categoria, cuenta)
+    SELECT DISTINCT UPPER(TRIM(categoria)), NULL FROM ordenes_pago WHERE categoria IS NOT NULL AND TRIM(categoria) <> ''`).catch(() => {});
+  await pool.query(`INSERT IGNORE INTO ctb_gasto_categorias (categoria, cuenta)
+    SELECT DISTINCT UPPER(TRIM(tipo_pago)), NULL FROM tesoreria_pagos_recurrentes WHERE tipo_pago IS NOT NULL AND TRIM(tipo_pago) <> ''`).catch(() => {});
   // Desglose por campo de la regla (parque: arriendo + comision); monto = total
   await pool.query('ALTER TABLE ctb_provisiones ADD COLUMN IF NOT EXISTS montos_json VARCHAR(400) NULL');
   // origen_id pasa a texto para los conceptos mensuales por tercero (EJECUTIVO|AAAA-MM); los ids numéricos siguen iguales
@@ -113,6 +139,14 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
       ['4001093', 'HABER', 'sis',     'Abono SIS provisionado'],
       ['4001091', 'HABER', 'afc',     'Abono seguro de cesantía empleador provisionado'],
       ['4001092', 'HABER', 'mutual',  'Abono mutual + SANNA provisionado'],
+    ]],
+    ['PROV_OTROS', 'Provisión otros gastos (ODP y pagos recurrentes sin documento)', 'Se dispara al cierre del mes (motor provisiones) por cada orden de pago emitida o pagada cuyo gasto todavía no tiene factura/boleta en el auxiliar de compras, y por cada pago recurrente del mes que aún no generó su ODP: reconoce el gasto NETO (boletas, honorarios y exentos por su total) y deja la provisión. La cuenta de gasto 4002180 se reemplaza por la que tenga la categoría en el mapeo Cuentas por categoría. Se libera cuando el documento aparece en el auxiliar o al anular la orden. Campos: monto (neto provisionado).', 'TRASPASO', 1, [
+      ['4002180', 'DEBE',  'monto', 'Provisión otros gastos (sin documento)'],
+      ['2106016', 'HABER', 'monto', 'Provisión otros gastos'],
+    ]],
+    ['PROV_OTROS_LIB', 'Liberación provisión otros gastos', 'Se dispara cuando la factura/boleta entra al auxiliar de compras (ahí nace el devengo real con su IVA) o cuando se anula la orden de pago: reversa íntegra la provisión constituida. La cuenta de gasto 4002180 se reemplaza por la misma con que se constituyó. Campos: monto (lo provisionado).', 'TRASPASO', 1, [
+      ['2106016', 'DEBE',  'monto', 'Liberación provisión otros gastos'],
+      ['4002180', 'HABER', 'monto', 'Abono otros gastos provisionados'],
     ]],
   ];
   for (const [evento, nombre, desc, tipo, activa, lineas] of R) {
@@ -262,6 +296,7 @@ async function liberarFilaPorId(idFila, motivo, fechaISO, usuario, contra = null
   if (p.concepto === 'PARQUE') return liberarParque(p.origen_id, motivo, fechaISO, usuario, contra);
   if (p.concepto === 'EJECUTIVO') return _liberarFilaEjecutivo(p, motivo, fechaISO, usuario, contra);
   if (p.concepto === 'SUELDOS') return liberarSueldos(p.mes, motivo, fechaISO, usuario, contra);
+  if (p.concepto === 'OTROS') return _liberarFilaOtros(p, motivo, fechaISO, usuario, contra);
   return _liberarFilaDealer(p, motivo, fechaISO, usuario, contra);
 }
 
@@ -715,6 +750,235 @@ async function sincronizarSueldos(usuario = 'Motor provisiones') {
   return out;
 }
 
+/* ═══ OTROS GASTOS: ODP sin documento y pagos recurrentes del mes ═══════════════════════════
+   Decisión de Pato (25-09-2026). Lo que se provisiona es el gasto que YA se debe y todavía no
+   tiene factura/boleta en el auxiliar de compras. El motor del match ODP ↔ auxiliar es único y
+   vive en shared/odp-documento (el mismo que usa el pago para dar con la CxP real). */
+const odpDoc = require('../../../shared/odp-documento');
+const CUENTA_GASTO_REGLA = '4002180';   // la de la regla PROV_OTROS; siempre se reemplaza por la de la categoría
+
+/* Conceptos que NO entran acá porque ya tienen su propio devengo o no son gasto:
+   comisiones (dealer/parque/ejecutivo, con sus propias provisiones), remuneraciones y finiquitos
+   (PROV_SUELDOS y FINIQUITO_EMITIDO), y anticipos y préstamos al personal, que nacen como cuenta
+   por cobrar cuando se desembolsan. */
+const EXCLUIR_OTROS = /anticipo|pr[ée]stamo|finiquito|remuneraci|sueldo|comisi[óo]n|comision/i;
+
+/* Los pagos a un PARQUE (su comisión y su arriendo) ya se devengan crédito a crédito por
+   PROV_PARQUE, en las mismas cuentas 4001100/4002100. Provisionar además su orden de pago
+   duplicaría el gasto, así que se excluye por el RUT de la ficha del parque. */
+async function esProveedorParque(rut) {
+  const r = odpDoc.limpiarRut(rut);
+  if (!r) return false;
+  const [[p]] = await pool.query("SELECT id FROM parques_ficha WHERE REPLACE(UPPER(rut),'.','')=? LIMIT 1", [r]).catch(() => [[null]]);
+  return !!p;
+}
+
+/* Cuenta de gasto de una categoría (mapeo paramétrico). null = sin configurar → no se provisiona. */
+async function cuentaGastoDe(categoria) {
+  const cat = String(categoria || '').trim().toUpperCase();
+  if (!cat) return null;
+  const [[r]] = await pool.query('SELECT cuenta FROM ctb_gasto_categorias WHERE categoria=? AND activo=1', [cat]);
+  return r && r.cuenta ? String(r.cuenta) : null;
+}
+
+/* Base del gasto de una ODP: NETO en facturas afectas (el IVA crédito nace con el documento) y
+   TOTAL en boletas, honorarios y exentos, donde no hay IVA que separar (auditoría 24-09, M2). */
+async function baseNetaODP(op) {
+  const bruto = Math.round(Number(op.monto_bruto) || Number(op.monto) || 0);
+  const td = String(op.tipo_documento || '');
+  const afecta = /factura/i.test(td) && !/exent/i.test(td);
+  if (!afecta) return bruto;
+  const neto = Math.round(Number(op.monto_neto) || 0);
+  return neto > 0 ? neto : Math.round(bruto / await ivaFactor());
+}
+
+/* Constituye la provisión de UNA orden de pago sin documento. Idempotente por ODP. */
+async function constituirOdp(idOdp, usuario = 'Motor provisiones') {
+  const C = CONCEPTOS.OTROS;
+  try {
+    const [[op]] = await pool.query(
+      `SELECT id, numero, concepto, categoria, estado, tipo_documento, numero_documento, monto, monto_bruto, monto_neto,
+              proveedor_nombre, proveedor_rut, DATE_FORMAT(fecha_emision,'%Y-%m-%d') fe FROM ordenes_pago WHERE id=?`, [idOdp]);
+    if (!op) return { skip: 'sin orden de pago' };
+    if (String(op.estado).toUpperCase() === 'ANULADA') return { skip: 'anulada' };
+    if (EXCLUIR_OTROS.test(`${op.concepto || ''} ${op.categoria || ''}`)) return { skip: 'tiene su propio devengo' };
+    if (await esProveedorParque(op.proveedor_rut)) return { skip: 'pago a parque: ya devengado por PROV_PARQUE' };
+    const mes = (op.fe || '').slice(0, 7);
+    const desde = await param(C.paramDesde, '2026-09');
+    if (!mes || mes < desde) return { skip: `anterior a ${desde}` };
+    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto='OTROS' AND origen_tipo='ODP' AND origen_id=?", [String(idOdp)]);
+    if (ya) return { skip: `ya ${ya.estado.toLowerCase()}`, id: ya.id };
+    if (await odpDoc.buscar(op)) return { skip: 'ya tiene documento (devengo real)' };
+    const cuenta = await cuentaGastoDe(op.categoria);
+    if (!cuenta) return { skip: `sin cuenta de gasto para la categoría "${op.categoria || '(sin categoría)'}"`, pendiente: true };
+    const monto = await baseNetaODP(op);
+    if (monto <= 0) return { skip: 'sin monto' };
+    const fecha = await fechaContable(op.fe);
+    const [ins] = await pool.query(
+      `INSERT IGNORE INTO ctb_provisiones (concepto, origen_tipo, origen_id, tercero, rut_tercero, mes, fecha_constitucion, monto, base_bruta, montos_json, creado_por)
+       VALUES ('OTROS','ODP',?,?,?,?,?,?,?,?,?)`,
+      [String(idOdp), op.proveedor_nombre || null, op.proveedor_rut || null, mes, fecha, monto,
+       Math.round(Number(op.monto_bruto) || Number(op.monto) || 0),
+       JSON.stringify({ montos: { monto }, cuenta, categoria: op.categoria || null, odp: op.numero || null, estado_odp: op.estado }), usuario]);
+    if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
+    const id = await contabilizar({
+      evento: C.regla, fecha, ref: `PROV-OTROS-ODP-${idOdp}`, montos: { monto },
+      reemplazos: { [CUENTA_GASTO_REGLA]: cuenta },
+      glosa: `Provisión ${op.concepto || 'gasto'} — ${op.proveedor_nombre || ''} (ODP ${op.numero || idOdp})`.slice(0, 300),
+      rut: op.proveedor_rut || null,
+      detalle: `ODP ${op.numero || idOdp} · ${op.categoria || 's/categoría'} · ${op.estado} sin documento · cuenta ${cuenta}`,
+    });
+    if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); return { error: 'sin asiento (ver log del motor en Reglas de Centralización)' }; }
+    await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
+    return { id: ins.insertId, monto, id_comprobante: id };
+  } catch (e) { console.error('[provisiones constituirOdp]', idOdp, e.message); return { error: e.message }; }
+}
+
+/* Constituye la provisión de un pago recurrente del mes que todavía no generó su ODP.
+   Al generarse la orden se libera (y la orden entra por constituirOdp): nunca los dos a la vez. */
+async function constituirRecurrente(idPago, mes, usuario = 'Motor provisiones') {
+  const C = CONCEPTOS.OTROS;
+  try {
+    const [[p]] = await pool.query(
+      `SELECT r.id, r.apodo, r.tipo_pago, r.tipo_documento, r.moneda, r.monto_origen, r.emisor_retiene,
+              DATE_FORMAT(r.fecha_proximo_pago,'%Y-%m-%d') venc, pr.nombre proveedor, pr.rut
+         FROM tesoreria_pagos_recurrentes r LEFT JOIN proveedores pr ON pr.id=r.id_proveedor
+        WHERE r.id=? AND r.activo=1`, [idPago]);
+    if (!p) return { skip: 'sin pago recurrente activo' };
+    const desde = await param(C.paramDesde, '2026-09');
+    if (!mes || mes < desde) return { skip: `anterior a ${desde}` };
+    const origenId = `REC${idPago}|${mes}`;
+    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto='OTROS' AND origen_tipo='RECURRENTE' AND origen_id=?", [origenId]);
+    if (ya) return { skip: `ya ${ya.estado.toLowerCase()}`, id: ya.id };
+    if (await odpDeRecurrente(idPago, mes)) return { skip: 'ya generó su ODP' };
+    if (await esProveedorParque(p.rut)) return { skip: 'pago a parque: ya devengado por PROV_PARQUE' };
+    const cuenta = await cuentaGastoDe(p.tipo_pago);
+    if (!cuenta) return { skip: `sin cuenta de gasto para la categoría "${p.tipo_pago || '(sin categoría)'}"`, pendiente: true };
+    // Mismo cálculo que usa la generación de la ODP (Máxima 1): tipo de cambio del día y motor calcularDoc.
+    const tc = await require('../../../shared/tipo-cambio').tipoCambio(p.moneda, hoyISO());
+    const brutoCLP = Math.round(Number(p.monto_origen) * tc);
+    const { calcularDoc } = require('../../ordenes-pago/src/controllers/ordenes-pago.controller');
+    const m = await calcularDoc(p.tipo_documento || 'Factura', 'BRUTO', brutoCLP);
+    const monto = m.clase === 'IVA' ? Math.round(Number(m.neto) || 0) : Math.round(Number(m.bruto) || brutoCLP);
+    if (monto <= 0) return { skip: 'sin monto' };
+    const fecha = await fechaContable(p.venc && p.venc.slice(0, 7) === mes ? p.venc : ultimoDiaMes(mes));
+    const [ins] = await pool.query(
+      `INSERT IGNORE INTO ctb_provisiones (concepto, origen_tipo, origen_id, tercero, rut_tercero, mes, fecha_constitucion, monto, base_bruta, montos_json, creado_por)
+       VALUES ('OTROS','RECURRENTE',?,?,?,?,?,?,?,?,?)`,
+      [origenId, `${p.apodo || 'Pago recurrente'} — ${p.proveedor || ''}`.trim(), p.rut || null, mes, fecha, monto, brutoCLP,
+       JSON.stringify({ montos: { monto }, cuenta, categoria: p.tipo_pago || null, recurrente: p.apodo || null, vencimiento: p.venc || null }), usuario]);
+    if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
+    const id = await contabilizar({
+      evento: C.regla, fecha, ref: `PROV-OTROS-REC-${idPago}-${mes}`, montos: { monto },
+      reemplazos: { [CUENTA_GASTO_REGLA]: cuenta },
+      glosa: `Provisión pago recurrente «${p.apodo || ''}» ${mes} — ${p.proveedor || ''}`.slice(0, 300),
+      rut: p.rut || null,
+      detalle: `Recurrente «${p.apodo || idPago}» · vence ${p.venc || mes} · sin ODP generada · cuenta ${cuenta}`,
+    });
+    if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); return { error: 'sin asiento (ver log del motor en Reglas de Centralización)' }; }
+    await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
+    return { id: ins.insertId, monto, id_comprobante: id };
+  } catch (e) { console.error('[provisiones constituirRecurrente]', idPago, mes, e.message); return { error: e.message }; }
+}
+
+/* ¿El recurrente ya generó la ODP de ese mes? (log de ocurrencias) */
+async function odpDeRecurrente(idPago, mes) {
+  const [[l]] = await pool.query(
+    "SELECT id_orden_pago, numero_odp FROM tesoreria_pagos_recurrentes_log WHERE id_pago=? AND DATE_FORMAT(fecha_vencimiento,'%Y-%m')=? ORDER BY id DESC LIMIT 1", [idPago, mes]);
+  return l || null;
+}
+
+/* Libera UNA fila de otros gastos. motivo: DOCUMENTO | ANULACION | ODP_GENERADA | MANUAL */
+async function _liberarFilaOtros(p, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
+  const C = CONCEPTOS.OTROS;
+  try {
+    const fecha = await fechaContable(fechaISO || hoyISO());
+    const cuenta = (() => { try { return JSON.parse(p.montos_json || '{}').cuenta || null; } catch (_) { return null; } })();
+    const [u] = await pool.query(
+      "UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, liberada_contra=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'",
+      [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
+    if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
+    const id = await contabilizar({
+      evento: C.reglaLib, fecha, ref: `PROV-OTROS-${p.origen_tipo}-${p.origen_id}-LIB`, montos: { monto: Number(p.monto) },
+      reemplazos: cuenta ? { [CUENTA_GASTO_REGLA]: cuenta } : null,
+      glosa: `Liberación provisión otros gastos — ${p.tercero || ''} (${motivo.toLowerCase()})`.slice(0, 300),
+      rut: p.rut_tercero || null, detalle: `${motivo} · por ${usuario}`,
+    });
+    if (!id) { await pool.query("UPDATE ctb_provisiones SET estado='CONSTITUIDA', motivo_liberacion=NULL, fecha_liberacion=NULL, liberada_contra=NULL WHERE id=?", [p.id]); return { error: 'sin asiento de liberación (ver log del motor)' }; }
+    await pool.query('UPDATE ctb_provisiones SET id_comprobante_liberacion=? WHERE id=?', [id, p.id]);
+    return { id: p.id, monto: Number(p.monto), id_comprobante: id };
+  } catch (e) { console.error('[provisiones liberarOtros]', p.id, e.message); return { error: e.message }; }
+}
+
+async function liberarOtros(idFila, motivo, fechaISO, usuario, contra = null) {
+  const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE id=? AND concepto='OTROS' AND estado='CONSTITUIDA'", [idFila]);
+  return p ? _liberarFilaOtros(p, motivo, fechaISO, usuario, contra) : { skip: 'sin provisión constituida' };
+}
+
+/* Red de seguridad cada 6 h: constituye lo que se debe sin documento y libera lo documentado o anulado. */
+async function sincronizarOtros(usuario = 'Motor provisiones') {
+  const C = CONCEPTOS.OTROS;
+  const desde = await param(C.paramDesde, '2026-09');
+  const out = { constituidas: 0, liberadas: 0, pendientes: [] };
+
+  // 1. Órdenes de pago (emitidas y pagadas) sin provisión
+  const [ordenes] = await pool.query(
+    `SELECT o.id FROM ordenes_pago o
+      WHERE UPPER(COALESCE(o.estado,'')) <> 'ANULADA' AND o.fecha_emision IS NOT NULL
+        AND DATE_FORMAT(o.fecha_emision,'%Y-%m') >= ?
+        AND NOT EXISTS (SELECT 1 FROM ctb_provisiones p
+                         WHERE p.concepto='OTROS' AND p.origen_tipo='ODP' AND p.origen_id = CAST(o.id AS CHAR))
+      ORDER BY o.id LIMIT 500`, [desde]);
+  for (const o of ordenes) {
+    const r = await constituirOdp(o.id, usuario);
+    if (r && r.id && r.id_comprobante) out.constituidas++;
+    else if (r && r.pendiente) out.pendientes.push({ odp: o.id, motivo: r.skip });
+  }
+
+  // 2. Pagos recurrentes del mes en curso sin ODP generada
+  const mesActual = hoyISO().slice(0, 7);
+  if (mesActual >= desde) {
+    const [recs] = await pool.query("SELECT id FROM tesoreria_pagos_recurrentes WHERE activo=1 AND DATE_FORMAT(fecha_proximo_pago,'%Y-%m') <= ?", [mesActual]);
+    for (const r0 of recs) {
+      const r = await constituirRecurrente(r0.id, mesActual, usuario);
+      if (r && r.id && r.id_comprobante) out.constituidas++;
+      else if (r && r.pendiente) out.pendientes.push({ recurrente: r0.id, motivo: r.skip });
+    }
+  }
+
+  // 3. Liberaciones: documento en el auxiliar, orden anulada, o el recurrente ya generó su ODP
+  const [abiertas] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto='OTROS' AND estado='CONSTITUIDA'");
+  for (const p of abiertas) {
+    if (p.origen_tipo === 'ODP') {
+      const [[op]] = await pool.query(
+        `SELECT numero, estado, tipo_documento, numero_documento, monto, proveedor_rut FROM ordenes_pago WHERE id=?`, [p.origen_id]);
+      if (!op) continue;
+      if (String(op.estado).toUpperCase() === 'ANULADA') {
+        const x = await _liberarFilaOtros(p, 'ANULACION', null, usuario, `ODP ${op.numero || p.origen_id} anulada`);
+        if (x && x.id) out.liberadas++;
+        continue;
+      }
+      const doc = await odpDoc.buscar(op);
+      if (doc) {
+        const f = doc.fecha_doc ? String(doc.fecha_doc).slice(0, 10) : null;
+        const fecha = f && f >= `${desde}-01` ? f : null;   // nunca antes del arranque del motor
+        const x = await _liberarFilaOtros(p, 'DOCUMENTO', fecha, usuario,
+          `${doc.tipo_doc || 'Doc'} N° ${doc.num_doc || 's/n'} del ${(f || '').split('-').reverse().join('-')} · neto $${Math.round(Number(doc.neto) || 0).toLocaleString('es-CL')}`);
+        if (x && x.id) out.liberadas++;
+      }
+    } else if (p.origen_tipo === 'RECURRENTE') {
+      const [, idPago, mes] = /^REC(\d+)\|(\d{4}-\d{2})$/.exec(String(p.origen_id)) || [];
+      if (!idPago) continue;
+      const odp = await odpDeRecurrente(Number(idPago), mes);
+      if (odp) {
+        const x = await _liberarFilaOtros(p, 'ODP_GENERADA', null, usuario, `ODP ${odp.numero_odp || odp.id_orden_pago} generada por el recurrente`);
+        if (x && x.id) out.liberadas++;
+      }
+    }
+  }
+  return out;
+}
+
 /* Detalle detrás de cada cuadro (pop-up y Excel). tipo: INICIAL | CONSTITUIDO | LIBERADO | VIGENTE | CUENTA */
 async function detalle(mes, concepto, tipo) {
   const cta = CONCEPTOS[concepto].cuentaProv;
@@ -736,8 +1000,8 @@ async function detalle(mes, concepto, tipo) {
   throw new Error('Tipo de detalle desconocido');
 }
 
-const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo, SUELDOS: sincronizarSueldos };
-const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, EJECUTIVO: liberarEjecutivo, SUELDOS: liberarSueldos };
+const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo, SUELDOS: sincronizarSueldos, OTROS: sincronizarOtros };
+const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, EJECUTIVO: liberarEjecutivo, SUELDOS: liberarSueldos, OTROS: liberarOtros };
 /* Al otorgar: todos los conceptos que nacen con el crédito (fire-and-forget, nunca lanza) */
 async function constituirAlOtorgar(idCredito, usuario) {
   const r = { DEALER: await constituirDealer(idCredito, usuario), PARQUE: await constituirParque(idCredito, usuario) };   // EJECUTIVO es mensual (al cierre), no al otorgar
@@ -754,4 +1018,5 @@ require('../../../shared/scheduler.js').programar('provisiones-devengo', tick, 6
 module.exports = { CONCEPTOS, SINCRONIZAR, LIBERAR, constituirAlOtorgar, constituirDealer, liberarDealer, liberarDealerPorNumOp, liberarFilaPorId, sincronizarDealer,
   constituirParque, liberarParque, liberarParquePorPago, sincronizarParque,
   constituirEjecutivoMes, liberarEjecutivo, liberarEjecutivoPorAprobacion, sincronizarEjecutivo, comisionesMotorMes,
-  constituirSueldos, liberarSueldos, sincronizarSueldos, proyeccionSueldos, cuadro, detalle };
+  constituirSueldos, liberarSueldos, sincronizarSueldos, proyeccionSueldos,
+  constituirOdp, constituirRecurrente, liberarOtros, sincronizarOtros, cuentaGastoDe, esProveedorParque, cuadro, detalle };

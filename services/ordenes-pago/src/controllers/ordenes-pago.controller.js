@@ -1440,20 +1440,12 @@ async function contabilizarPagoGeneral(oc, fechaPago, ctaBancaria) {
     const reemplazos = {};
     if (ctaBancaria && ctaBancaria.cuenta_contable) reemplazos['1101090'] = ctaBancaria.cuenta_contable;
     if (evento === 'ODP_PAGADA' && op.proveedor_rut) {
-      // La CxP real del devengo: la factura del proveedor en el auxiliar de compras
-      // (por folio si la orden lo trae; si no, por RUT + monto exacto, la más reciente).
+      // La CxP real del devengo: la factura del proveedor en el auxiliar de compras.
+      // El match vive en un solo lugar (shared/odp-documento), porque la provisión de
+      // otros gastos usa exactamente el mismo criterio para saber si falta el documento.
       try {
-        const rut = String(op.proveedor_rut).replace(/[.\s]/g, '');
-        let fila = null;
-        if (op.numero_documento)
-          [[fila]] = await pool.query(
-            "SELECT cuenta_cxp FROM ctb_compras_aux WHERE REPLACE(rut,'.','')=? AND num_doc=? AND cuenta_cxp IS NOT NULL ORDER BY id DESC LIMIT 1",
-            [rut, String(op.numero_documento)]);
-        if (!fila)
-          [[fila]] = await pool.query(
-            "SELECT cuenta_cxp FROM ctb_compras_aux WHERE REPLACE(rut,'.','')=? AND total=? AND cuenta_cxp IS NOT NULL ORDER BY fecha_doc DESC, id DESC LIMIT 1",
-            [rut, monto]);
-        if (fila && fila.cuenta_cxp) reemplazos['2102010'] = fila.cuenta_cxp;
+        const doc = await require('../../../../shared/odp-documento').buscar({ ...op, monto }, { conCxp: true });
+        if (doc && doc.cuenta_cxp) reemplazos['2102010'] = doc.cuenta_cxp;
       } catch (_) {}
     }
     await require('../../../contabilidad/src/motor-asientos').contabilizar({

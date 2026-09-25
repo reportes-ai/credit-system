@@ -110,6 +110,7 @@ require('../../../../shared/migrate').enFila('cierre-mes', async () => {
       ['PROVISION_PARQUE', 'Provisiones de parques cuadradas', 'Toda otorgada del mes con comisión o arriendo de parque tiene su provisión (o el pago del parque ya aprobado) y los asientos del motor calzan en la cuenta 2106013.', 9],
       ['PROVISION_EJECUTIVO', 'Provisiones de comisión ejecutivo cuadradas', 'Toda otorgada del mes con comisión de ejecutivo tiene su provisión (o la comisión del mes ya aprobada) y los asientos del motor calzan en la cuenta 2106014.', 10],
       ['PROVISION_SUELDOS', 'Remuneraciones del mes devengadas', 'El libro de remuneraciones del mes está contabilizado (RRHH o AVSOFT) o, si no, existe la provisión de sueldos del cierre en la cuenta 2106015.', 11],
+      ['PROVISION_OTROS', 'Otros gastos del mes devengados', 'Toda orden de pago del mes sin documento en el auxiliar de compras, y todo pago recurrente del mes sin su ODP, tienen su provisión en la cuenta 2106016; ninguna categoría quedó sin cuenta de gasto configurada.', 12],
     ]) {
       const [[hay]] = await pool.query('SELECT COUNT(*) n FROM cierre_checklist_items WHERE check_auto=?', [auto]);
       if (hay.n) continue;
@@ -199,6 +200,33 @@ const CHECKS_AUTO = {
     const [[p]] = await pool.query("SELECT monto, estado FROM ctb_provisiones WHERE concepto='SUELDOS' AND origen_tipo='MES' AND origen_id=?", [Number(mes.replace('-', ''))]);
     if (p) return { ok: true, detalle: `Sin libro: provisión de sueldos ${p.estado.toLowerCase()} por $${Math.round(Number(p.monto)).toLocaleString('es-CL')} (cuenta 2106015)` };
     return { ok: false, detalle: `El libro de remuneraciones ${mes} no está contabilizado y no hay provisión de sueldos: correr "Sincronizar" en Provisiones por Devengo (concepto Sueldos) o contabilizar el libro` };
+  },
+  /* Otros gastos: ninguna ODP del mes ni pago recurrente queda sin devengo, y ninguna
+     categoría sin cuenta configurada (sin cuenta el motor NO provisiona, a propósito). */
+  async PROVISION_OTROS(mes) {
+    const prov = require('../../../contabilidad/src/provisiones');
+    const c = await prov.cuadro(mes, 'OTROS');
+    if (mes < c.desde) return { ok: true, detalle: `Mes anterior a ${c.desde}: no se provisiona` };
+    const [odps] = await pool.query(
+      `SELECT o.id, o.numero, o.categoria, o.concepto, o.proveedor_nombre, o.proveedor_rut, o.monto, o.tipo_documento, o.numero_documento
+         FROM ordenes_pago o
+        WHERE UPPER(COALESCE(o.estado,'')) <> 'ANULADA' AND DATE_FORMAT(o.fecha_emision,'%Y-%m')=?
+          AND NOT EXISTS (SELECT 1 FROM ctb_provisiones p WHERE p.concepto='OTROS' AND p.origen_tipo='ODP' AND p.origen_id=CAST(o.id AS CHAR))
+        ORDER BY o.id LIMIT 200`, [mes]);
+    const odpDoc = require('../../../../shared/odp-documento');
+    const sinCuenta = new Set(), sinProvision = [];
+    for (const o of odps) {
+      if (/anticipo|pr[ée]stamo|finiquito|remuneraci|sueldo|comisi[óo]n|comision/i.test(`${o.concepto || ''} ${o.categoria || ''}`)) continue;
+      if (await prov.esProveedorParque(o.proveedor_rut)) continue;   // pago a parque: lo devenga PROV_PARQUE
+      if (await odpDoc.buscar(o)) continue;                       // tiene su documento: el devengo real ya entró
+      if (!(await prov.cuentaGastoDe(o.categoria))) { sinCuenta.add(String(o.categoria || '(sin categoría)').toUpperCase()); continue; }
+      sinProvision.push(o.numero || o.id);
+    }
+    const partes = [];
+    if (sinCuenta.size) partes.push(`${sinCuenta.size} categoría(s) sin cuenta de gasto configurada: ${[...sinCuenta].join(', ').slice(0, 160)} — completar en Provisiones por Devengo → Cuentas por categoría`);
+    if (sinProvision.length) partes.push(`${sinProvision.length} orden(es) de pago sin documento ni provisión: ${sinProvision.join(', ').slice(0, 160)} — correr Sincronizar (concepto Otros gastos)`);
+    if (partes.length) return { ok: false, detalle: partes.join(' · ') };
+    return { ok: true, detalle: `Cuenta ${c.cuenta_provision}: SF $${c.saldo_final.toLocaleString('es-CL')} — ${c.motor_n_vigente} provisión(es) vigente(s) por $${c.motor_vigente.toLocaleString('es-CL')}; toda ODP del mes tiene documento o provisión` };
   },
   async _provision(mes, concepto) {
     const prov = require('../../../contabilidad/src/provisiones');
