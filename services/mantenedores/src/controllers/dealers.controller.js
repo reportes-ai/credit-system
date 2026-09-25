@@ -1,6 +1,7 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
-const almacen = require('../../../../shared/almacen-docs');   // los documentos van al bucket, nunca a un LONGBLOB nuevo
+const almacen = require('../../../../shared/almacen-docs');
+const { etiqueta: etiquetaDealer } = require('../../../../shared/dealer-etiqueta');   // motor único del nombre del dealer en la auditoría   // los documentos van al bucket, nunca a un LONGBLOB nuevo
 const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico al guardar
 
 const ensureTable = () => pool.query(`CREATE TABLE IF NOT EXISTS dealers (
@@ -380,15 +381,16 @@ const updateDealer = async (req, res) => {
        r.activo ? 1 : 0, r.tiene_factura ? 1 : 0, r.observaciones || null,
        req.params.id]
     );
-    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.id, detalle: `Editó el dealer #${req.params.id} — ${r.nombre_razon || r.nombre_indexa || ''}`, rut: r.rut, meta: req.body });
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.id, detalle: `Editó el dealer ${await etiquetaDealer(req.params.id)}`, rut: r.rut, meta: req.body });
     res.json({ success: true, data: { id_dealer: req.params.id }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
 const deleteDealer = async (req, res) => {
   try {
+    const etiqueta = await etiquetaDealer(req.params.id);   // después del DELETE ya no hay de dónde sacar el nombre
     await pool.query('DELETE FROM dealers WHERE id_dealer=?', [req.params.id]);
-    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.id, detalle: `Eliminó el dealer #${req.params.id}` });
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.id, detalle: `Eliminó el dealer ${etiqueta}` });
     res.json({ success: true, data: { mensaje: 'Dealer eliminado' }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
@@ -645,7 +647,7 @@ const deleteLocal = async (req, res) => {
     if (!l) return res.status(404).json({ success: false, data: null, error: 'Local no encontrado' });
     await pool.query('UPDATE dealer_locales SET activo=0, es_principal=0 WHERE id=?', [idLocal]);
     await espejarDealerDesdeLocales(parseInt(id));
-    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: id, detalle: `Desactivó el local ${l.ubicacion} del dealer #${id}` });
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: id, detalle: `Desactivó el local ${l.ubicacion} del dealer ${await etiquetaDealer(id)}` });
     res.json({ success: true, data: { ubicacion: l.ubicacion }, error: null });
   } catch (e) { console.error('[deleteLocal]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -787,7 +789,7 @@ const verDocumento = async (req, res) => {
       [Number(req.params.idDoc), Number(req.params.id)]);
     if (!a || (!a.data && !a.doc_ruta)) return res.status(404).json({ success: false, data: null, error: 'Sin archivo' });
     auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'mantenedores', entidad: 'dealer', entidad_id: Number(req.params.id),
-      detalle: `Visualizó documento del dealer #${req.params.id}: ${a.nombre || ''}` });
+      detalle: `Visualizó documento del dealer ${await etiquetaDealer(req.params.id)}: ${a.nombre || ''}` });
     return almacen.servir(res, { ruta: a.doc_ruta, blob: a.data, nombre: a.nombre || 'archivo', mime: a.mime });
   } catch (e) { (console.error('[dealer documento ver]', e), res.status(500).json({ success:false, data:null, error:'Error interno del servidor' })); }
 };
@@ -802,7 +804,7 @@ const borrarDocumento = async (req, res) => {
     await pool.query('DELETE FROM dealer_documentos WHERE id=? AND id_dealer=?', [idDoc, idDealer]);
     if (doc.doc_ruta) await almacen.borrar(doc.doc_ruta);
     auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: idDealer,
-      detalle: `Eliminó documento del dealer #${idDealer}: ${doc.nombre || ''}` });
+      detalle: `Eliminó documento del dealer ${await etiquetaDealer(idDealer)}: ${doc.nombre || ''}` });
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { (console.error('[dealer documento eliminar]', e), res.status(500).json({ success:false, data:null, error:'Error interno del servidor' })); }
 };

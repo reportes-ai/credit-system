@@ -6,6 +6,7 @@
  */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const { etiqueta: etiquetaDealer } = require('../../../../shared/dealer-etiqueta');   // "N°262 DYD AUTOMOVILES (76474201-K)": el #id no sirve para buscar
 
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 
@@ -146,9 +147,10 @@ const asignar = async (req, res) => {
     // Nadie sin categoría: no se puede dejar un dealer sin categoría asignada.
     if (!cat) return res.status(400).json({ success: false, data: null, error: 'Todo dealer debe tener categoría (nacen como Socio); no se puede dejar sin categoría.' });
     { const [[ok]] = await pool.query('SELECT 1 v FROM dealer_categorias WHERE codigo=?', [cat]); if (!ok) return res.status(400).json({ success: false, data: null, error: 'Categoría inválida' }); }
-    await pool.query('UPDATE dealers SET categoria_asignada=? WHERE id_dealer=?', [cat, req.params.idDealer]);
+    const [u] = await pool.query('UPDATE dealers SET categoria_asignada=? WHERE id_dealer=?', [cat, req.params.idDealer]);
+    if (!u.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Dealer no encontrado' });
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.idDealer,
-      detalle: `Asignó categoría ${cat || '—'} al dealer #${req.params.idDealer}` });
+      detalle: `Asignó categoría ${cat || '—'} al dealer ${await etiquetaDealer(req.params.idDealer)}` });
     res.json({ success: true, data: { categoria_asignada: cat }, error: null });
   } catch (e) { console.error('[dealer-cat asignar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -234,9 +236,11 @@ const porInactivar = async (req, res) => {
 const setActivo = async (req, res) => {
   try {
     const activo = req.body.activo ? 1 : 0;
-    await pool.query('UPDATE dealers SET activo=? WHERE id_dealer=?', [activo, req.params.idDealer]);
+    const etiqueta = await etiquetaDealer(req.params.idDealer);   // antes del UPDATE da lo mismo: no cambian número ni nombre
+    const [u] = await pool.query('UPDATE dealers SET activo=? WHERE id_dealer=?', [activo, req.params.idDealer]);
+    if (!u.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Dealer no encontrado' });
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.idDealer,
-      detalle: `Marcó el dealer #${req.params.idDealer} como ${activo ? 'ACTIVO' : 'INACTIVO'}` });
+      detalle: `Marcó el dealer ${etiqueta} como ${activo ? 'ACTIVO' : 'INACTIVO'}` });
     res.json({ success: true, data: { activo }, error: null });
   } catch (e) { console.error('[dealer-cat setActivo]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
