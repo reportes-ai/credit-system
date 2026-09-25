@@ -1260,12 +1260,80 @@ function mesAnterior() {
   const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
-function recomendarPlan(consumo_uf, plan_uf) {
-  let rec = PLANES_UF.find(t => t >= consumo_uf);
-  if (rec == null) rec = PLANES_UF[PLANES_UF.length - 1];
-  if (consumo_uf <= 0) rec = PLANES_UF[0];
-  const accion = rec > plan_uf ? 'subir' : rec < plan_uf ? 'bajar' : 'mantener';
-  return { accion, plan_recomendado_uf: rec };
+/* ── Qué plan conviene (Pato, 25-09-2026) ────────────────────────────────────────
+   Reglas de DealerNet confirmadas por Pato: el plan es un MÍNIMO mensual que se paga igual
+   aunque no se consuma, lo no usado NO pasa al mes siguiente, y lo que se consume por sobre
+   el plan se cobra a la tarifa del MISMO tramo contratado. Por lo tanto cada plan cuesta:
+
+        costo(plan) = máx( plan , consumo del mes valorizado a la tarifa de ese plan )
+
+   y conviene el de menor costo. La versión anterior elegía "el plan más chico que alcance a
+   cubrir lo consumido", como si pasarse del plan estuviera prohibido: con 54 UF en el día 25
+   recomendaba subir a 80, que costaba ~15 UF más al mes que quedarse en 40 pagando la
+   diferencia. Además miraba el consumo a medio mes; ahora, en el mes en curso, se proyecta
+   al cierre con el ritmo de cada tipo de día observado en el mes (lunes a viernes, sábado y
+   domingo rinden muy distinto). Si dos planes cuestan igual, manda el contratado: no se
+   cambia de plan sin una razón en pesos. */
+async function recomendarPlan(mes, plan_uf, uf) {
+  const ini = mes + '-01';
+  const [y, m] = mes.split('-').map(Number);
+  const diasMes = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const fin = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-01`;
+  const [prods] = await pool.query(`SELECT codigo, ${Object.values(COLS_UF).join(', ')} FROM dealernet_productos`);
+  const pmap = {}; prods.forEach(p => pmap[String(p.codigo)] = p);
+  // Por día (fecha de Chile armada en SQL: nunca getDate() sobre un DATETIME de la base)
+  const [cnt] = await pool.query(
+    `SELECT DATE_FORMAT(created_at,'%Y-%m-%d') d, codigo_producto, COUNT(*) n FROM dealernet_informes
+      WHERE retcode='0' AND created_at >= ? AND created_at < ? GROUP BY 1,2`, [ini, fin]);
+  const porDia = {};   // d → { [plan]: uf }
+  for (const r of cnt) {
+    const pr = pmap[String(r.codigo_producto)]; if (!pr) continue;
+    const o = porDia[r.d] || (porDia[r.d] = {});
+    for (const t of PLANES_UF) o[t] = (o[t] || 0) + Number(r.n) * Number(pr[COLS_UF[t]] || 0);
+  }
+  const tipo = d => { const w = new Date(d + 'T12:00:00Z').getUTCDay(); return w === 0 ? 'DOM' : w === 6 ? 'SAB' : 'LV'; };
+  // ¿Mes en curso? → proyectar los días que faltan con el promedio de su tipo de día en el mes
+  const hoy = require('../../../../shared/fecha-chile').hoyISO();
+  const enCurso = hoy.slice(0, 7) === mes;
+  const restantes = [];
+  if (enCurso) for (let dd = Number(hoy.slice(8, 10)) + 1; dd <= diasMes; dd++) restantes.push(`${mes}-${String(dd).padStart(2, '0')}`);
+  // Días transcurridos del mes (con o sin consultas): un día sin consultas también cuenta como 0 en el promedio
+  const transcurridos = [];
+  const hasta = enCurso ? Number(hoy.slice(8, 10)) : diasMes;
+  for (let dd = 1; dd <= hasta; dd++) transcurridos.push(`${mes}-${String(dd).padStart(2, '0')}`);
+  const planes = PLANES_UF.map(t => {
+    const real = transcurridos.reduce((s, d) => s + ((porDia[d] || {})[t] || 0), 0);
+    let proy = 0;
+    if (restantes.length) {
+      const prom = {};
+      for (const k of ['LV', 'SAB', 'DOM']) {
+        const ds = transcurridos.filter(d => tipo(d) === k);
+        prom[k] = ds.length ? ds.reduce((s, d) => s + ((porDia[d] || {})[t] || 0), 0) / ds.length : 0;
+      }
+      proy = restantes.reduce((s, d) => s + prom[tipo(d)], 0);
+    }
+    const consumo = real + proy;
+    const costo = Math.max(t, consumo);
+    return { plan_uf: t, consumo_uf: +consumo.toFixed(4), costo_uf: +costo.toFixed(4), costo_clp: Math.round(costo * (uf || 0)),
+             sobre_minimo_uf: +Math.max(0, consumo - t).toFixed(4), minimo_sin_usar_uf: +Math.max(0, t - consumo).toFixed(4) };
+  });
+  const actual = planes.find(x => x.plan_uf === Number(plan_uf)) || planes.find(x => x.plan_uf === 40);
+  // Menor costo; empate → el contratado; después el plan más chico
+  const mejor = planes.slice().sort((a, b) => (a.costo_uf - b.costo_uf) || ((b.plan_uf === Number(plan_uf)) - (a.plan_uf === Number(plan_uf))) || (a.plan_uf - b.plan_uf))[0];
+  const ahorro = actual ? +(actual.costo_uf - mejor.costo_uf).toFixed(4) : 0;
+  const accion = mejor.plan_uf > Number(plan_uf) ? 'subir' : mejor.plan_uf < Number(plan_uf) ? 'bajar' : 'mantener';
+  // Consumo con que el plan de al lado empezaría a convenir, a la tarifa del plan contratado
+  const siguiente = PLANES_UF.find(t => t > Number(plan_uf));
+  let umbral_subir_uf = null;
+  if (siguiente && actual && actual.consumo_uf > 0) {
+    const ratio = (planes.find(x => x.plan_uf === siguiente).consumo_uf || 0) / actual.consumo_uf;   // tarifa relativa del tramo siguiente
+    // conviene cuando máx(siguiente, ratio·c) < c  →  c > siguiente (si ratio·c < siguiente)
+    umbral_subir_uf = ratio > 0 ? +Math.min(siguiente, siguiente / ratio).toFixed(2) : siguiente;
+  }
+  return { accion, plan_recomendado_uf: mejor.plan_uf, proyectado: restantes.length > 0, dias_restantes: restantes.length,
+           planes, ahorro_uf: ahorro, ahorro_clp: Math.round(ahorro * (uf || 0)),
+           consumo_proyectado_uf: actual ? actual.consumo_uf : null, costo_actual_uf: actual ? actual.costo_uf : null,
+           plan_siguiente_uf: siguiente || null, umbral_subir_uf };
 }
 async function calcularConsumoMes(mes) {
   const ini = mes + '-01';
@@ -1327,7 +1395,7 @@ const facturacion = async (req, res) => {
     const calc = await calcularConsumoMes(mes);
     const [[c]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='plan_uf'");
     const plan_uf = Number(c?.valor) || 40;
-    const rec = recomendarPlan(calc.consumo_uf, plan_uf);
+    const rec = await recomendarPlan(mes, plan_uf, calc.uf);
     const [[guardado]] = await pool.query('SELECT * FROM dealernet_facturacion WHERE mes=?', [mes]);
     res.json({ success: true, data: { ...calc, plan_uf, plan_clp: Math.round(plan_uf * calc.uf), ...rec, guardado: guardado || null }, error: null });
   } catch (e) { errSrv(res, e, 'facturacion'); }
@@ -1339,7 +1407,7 @@ const guardarFacturacion = async (req, res) => {
     const calc = await calcularConsumoMes(mes);
     const [[c]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='plan_uf'");
     const plan_uf = Number(c?.valor) || 40;
-    const rec = recomendarPlan(calc.consumo_uf, plan_uf);
+    const rec = await recomendarPlan(mes, plan_uf, calc.uf);
     let facturado = req.body?.facturado_real_clp;
     facturado = (facturado === '' || facturado == null) ? null : Number(facturado);
     await pool.query(

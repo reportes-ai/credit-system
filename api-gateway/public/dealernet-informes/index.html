@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v3.5 — Alertas de uso: clic en el encabezado de cualquier columna ordena de mayor a menor y viceversa (fechas y números por su valor real). v3.4 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
+  <!-- v3.6 — decimales en formato chileno en la facturacion. Facturacion prepago: la recomendacion compara lo que COSTARIA el mes con cada plan (max entre el minimo y el consumo a su tarifa; lo no usado no pasa al mes siguiente) y proyecta el mes en curso; antes elegia el plan mas chico que cubriera lo consumido y recomendaba subir a 80 cuando quedarse en 40 era mas barato. v3.5 — Alertas de uso: clic en el encabezado de cualquier columna ordena de mayor a menor y viceversa (fechas y números por su valor real). v3.4 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -769,19 +769,41 @@ async function cargarFacturacion(){
   } catch(_){ body.innerHTML='<div class="alertbox block">Error de conexión</div>'; }
 }
 function renderFacturacion(d){
+  // Decimales en formato chileno (63,94 — no 63.94)
+  const dec = (n, k) => Number(n||0).toLocaleString('es-CL',{minimumFractionDigits:k,maximumFractionDigits:k});
   const rec=d.accion, col = rec==='subir'?'#b91c1c':rec==='bajar'?'#92400e':'#15803d';
   const recTxt = rec==='subir' ? 'Subir el plan a '+d.plan_recomendado_uf+' UF'
     : rec==='bajar' ? 'Bajar el plan a '+d.plan_recomendado_uf+' UF' : 'Mantener el plan ('+d.plan_uf+' UF)';
+  /* La recomendación sale de comparar lo que COSTARÍA cada plan (máx entre su mínimo y el
+     consumo a su tarifa), no de "el plan que alcance a cubrir lo consumido". */
+  const recSub = rec==='mantener'
+    ? (d.umbral_subir_uf ? 'Conviene subir recién sobre '+fmtUF(d.umbral_subir_uf)+' al mes' : 'Es el plan más barato para este consumo')
+    : 'Ahorro '+fmtUF(d.ahorro_uf)+' ('+fmtCLP(d.ahorro_clp)+') al mes';
   const g = d.guardado;
   let h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px">'+
     facCard('Consumo del mes', fmtUF(d.consumo_uf)) +
     facCard('Consumo en pesos', fmtCLP(d.consumo_clp)+'<div class="muted" style="font-size:.7rem">UF '+esc(d.mes)+': $'+Number(d.uf).toLocaleString('es-CL')+'</div>') +
     facCard('Plan contratado', d.plan_uf+' UF<div class="muted" style="font-size:.7rem">'+fmtCLP(d.plan_clp)+'</div>') +
-    '<div style="background:'+col+';color:#fff;border-radius:10px;padding:12px 14px"><div style="font-size:.72rem;opacity:.85;text-transform:uppercase">Recomendación</div><div style="font-weight:800;font-size:1rem;margin-top:2px">'+recTxt+'</div></div></div>';
+    '<div style="background:'+col+';color:#fff;border-radius:10px;padding:12px 14px"><div style="font-size:.72rem;opacity:.85;text-transform:uppercase">Recomendación</div><div style="font-weight:800;font-size:1rem;margin-top:2px">'+recTxt+'</div><div style="font-size:.74rem;opacity:.9;margin-top:3px">'+recSub+'</div></div></div>';
+  // Cuánto costaría el mes con cada plan: el mínimo se paga igual, el exceso a la tarifa del tramo, lo no usado se pierde
+  if (Array.isArray(d.planes) && d.planes.length) {
+    h += '<div style="margin:-2px 0 14px;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;background:#f8fafc">'+
+      '<div style="font-weight:700;font-size:.8rem;color:#0f2a52;margin-bottom:6px"><i class="bi bi-calculator me-1"></i>¿Cuánto costaría este mes con cada plan?'+
+      (d.proyectado ? ' <span class="muted" style="font-weight:400">— proyectado al cierre: faltan '+d.dias_restantes+' día(s), con el ritmo de cada tipo de día del mes</span>' : '')+'</div>'+
+      '<table class="tb" style="margin:0"><thead><tr><th>Plan</th><th style="text-align:right">Consumo a su tarifa</th><th style="text-align:right">Mínimo sin usar</th><th style="text-align:right">Se paga</th><th style="text-align:right">En pesos</th></tr></thead><tbody>'+
+      d.planes.map(x => {
+        const es = x.plan_uf===d.plan_recomendado_uf, cont = x.plan_uf===Number(d.plan_uf);
+        return '<tr style="'+(es?'background:#ecfdf5;font-weight:700':'')+'"><td>'+x.plan_uf+' UF'+(cont?' <span class="muted" style="font-weight:400">(contratado)</span>':'')+(es?' <span style="color:#15803d">✓ más barato</span>':'')+'</td>'+
+          '<td style="text-align:right">'+dec(x.consumo_uf,2)+'</td>'+
+          '<td style="text-align:right;color:'+(x.minimo_sin_usar_uf>0?'#b91c1c':'#94a3b8')+'">'+(x.minimo_sin_usar_uf>0?dec(x.minimo_sin_usar_uf,2):'—')+'</td>'+
+          '<td style="text-align:right">'+dec(x.costo_uf,2)+' UF</td><td style="text-align:right">'+fmtCLP(x.costo_clp)+'</td></tr>';
+      }).join('')+'</tbody></table>'+
+      '<div class="muted" style="font-size:.72rem;margin-top:6px">Cada plan es un mínimo mensual que se paga aunque no se consuma; lo que no se usa <b>no</b> pasa al mes siguiente y el exceso se cobra a la tarifa del mismo tramo. Por eso un plan más grande solo conviene cuando el consumo supera su mínimo.</div></div>';
+  }
   h += '<div style="overflow:auto"><table class="tb"><thead><tr><th>Informe</th><th style="text-align:right">N°</th><th style="text-align:right">Precio UF</th><th style="text-align:right">Subtotal UF</th><th style="text-align:right">Subtotal $</th></tr></thead><tbody>';
   if(!d.items.length) h += '<tr><td colspan="5" class="muted">Sin consultas facturables en el mes.</td></tr>';
-  h += d.items.map(it=>'<tr><td>'+esc(it.nombre)+'</td><td style="text-align:right">'+it.n+'</td><td style="text-align:right">'+Number(it.precio_uf).toFixed(4)+'</td><td style="text-align:right">'+Number(it.subtotal_uf).toFixed(4)+'</td><td style="text-align:right">'+fmtCLP(it.subtotal_clp)+'</td></tr>').join('');
-  h += '<tr style="font-weight:800;border-top:2px solid #e2e8f0"><td>Total</td><td></td><td></td><td style="text-align:right">'+Number(d.consumo_uf).toFixed(4)+'</td><td style="text-align:right">'+fmtCLP(d.consumo_clp)+'</td></tr></tbody></table></div>';
+  h += d.items.map(it=>'<tr><td>'+esc(it.nombre)+'</td><td style="text-align:right">'+it.n+'</td><td style="text-align:right">'+dec(it.precio_uf,4)+'</td><td style="text-align:right">'+dec(it.subtotal_uf,4)+'</td><td style="text-align:right">'+fmtCLP(it.subtotal_clp)+'</td></tr>').join('');
+  h += '<tr style="font-weight:800;border-top:2px solid #e2e8f0"><td>Total</td><td></td><td></td><td style="text-align:right">'+dec(d.consumo_uf,4)+'</td><td style="text-align:right">'+fmtCLP(d.consumo_clp)+'</td></tr></tbody></table></div>';
   const real = (g && g.facturado_real_clp!=null) ? g.facturado_real_clp : '';
   h += '<div style="display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-top:14px;border-top:1px solid #f1f5f9;padding-top:12px">'+
     '<div><label class="muted" style="font-size:.74rem;display:block;margin-bottom:4px">Monto real facturado (CLP)</label>'+
