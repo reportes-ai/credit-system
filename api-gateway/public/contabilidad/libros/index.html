@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Diario y Mayor — AutoFácil</title>
-  <!-- v1.3 - comprobante mas ancho (980px) y N° OP / RUT en una sola linea · v1.2 - filtro por defecto: ultimos 3 dias | v1.1 — pestana Mayor Completo: TODAS las cuentas con saldo inicial, movimientos y saldo final, exportable -->
+  <!-- v1.4 - N°, Fecha y Cuenta en una línea, Detalle más chico, nombre de la cuenta al pasar el mouse · v1.3 - comprobante mas ancho (980px) y N° OP / RUT en una sola linea · v1.2 - filtro por defecto: ultimos 3 dias | v1.1 — pestana Mayor Completo: TODAS las cuentas con saldo inicial, movimientos y saldo final, exportable -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -22,6 +22,9 @@
     .tot td { font-weight:700; background:#f8fafc; }
     .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
     .fila-click { cursor:pointer; } .fila-click:hover td { background:#f0f9ff; }
+    td.nw { white-space:nowrap; }                     /* N°, Fecha y Cuenta en una sola línea (Pato 25-09-2026) */
+    td.det { font-size:.85rem; }                       /* Detalle más chico; el nombre de la cuenta va en el title del número */
+    td[title] { cursor:help; text-decoration:underline dotted #94a3b8; }
     .cta-head td { background:#eef4ff; border-top:2px solid #c7dbff; font-weight:800; color:var(--navy-dark); cursor:pointer; }
     .cta-head:hover td { background:#e2ecff; }
     .cta-fin td { background:#f8fafc; font-weight:700; }
@@ -111,8 +114,8 @@ async function buscar(){
   const rows = j.data||[];
   document.getElementById('thead').innerHTML = '<tr><th>N°</th><th>Fecha</th><th>Cuenta</th><th>Detalle</th><th>RUT</th><th>N° OP</th><th class="text-right">Debe</th><th class="text-right">Haber</th></tr>';
   document.getElementById('tbody').innerHTML = rows.map(x=>`
-    <tr class="fila-click" onclick="ver(${x.id})"><td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
-      <td class="num">${esc(x.cuenta)}</td><td>${esc(x.cuenta_nombre||'')} — ${esc(x.glosa||x.comp_glosa)}</td>
+    <tr class="fila-click" onclick="ver(${x.id})"><td class="num nw">${esc(x.num)}</td><td class="nw">${String(x.fecha).slice(0,10)}</td>
+      <td class="num nw" title="${esc(x.cuenta_nombre||'')}">${esc(x.cuenta)}</td><td class="det">${esc(x.glosa||x.comp_glosa)}</td>
       <td>${esc(x.rut||'')}</td><td>${esc(x.num_op||'')}</td>
       <td class="text-right">${x.debe>0?'$'+fmt(x.debe):''}</td><td class="text-right">${x.haber>0?'$'+fmt(x.haber):''}</td></tr>`).join('')
     || '<tr><td colspan="8" class="text-center text-muted py-4">Sin resultados</td></tr>';
@@ -154,8 +157,8 @@ async function diario(){
   const rows = j.data||[]; let d=0,h=0;
   document.getElementById('thead').innerHTML = '<tr><th>N°</th><th>Fecha</th><th>Cuenta</th><th>Detalle</th><th>N° OP</th><th class="text-right">Debe</th><th class="text-right">Haber</th></tr>';
   document.getElementById('tbody').innerHTML = rows.map(x=>{ d+=Number(x.debe); h+=Number(x.haber); return `
-    <tr class="fila-click" onclick="ver(${x.id})"><td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
-      <td class="num">${esc(x.cuenta)}</td><td>${esc(x.cuenta_nombre||'')} — ${esc(x.glosa||x.comp_glosa)}</td>
+    <tr class="fila-click" onclick="ver(${x.id})"><td class="num nw">${esc(x.num)}</td><td class="nw">${String(x.fecha).slice(0,10)}</td>
+      <td class="num nw" title="${esc(x.cuenta_nombre||'')}">${esc(x.cuenta)}</td><td class="det">${esc(x.glosa||x.comp_glosa)}</td>
       <td>${esc(x.num_op||'')}</td>
       <td class="text-right">${x.debe>0?'$'+fmt(x.debe):''}</td><td class="text-right">${x.haber>0?'$'+fmt(x.haber):''}</td></tr>`;
   }).join('') + (rows.length?`<tr class="tot"><td colspan="5">TOTALES</td><td class="text-right">$${fmt(d)}</td><td class="text-right">$${fmt(h)}</td></tr>`:'<tr><td colspan="7" class="text-center text-muted py-4">Sin movimientos en el período</td></tr>');
@@ -168,7 +171,7 @@ async function mayor(){
   document.getElementById('thead').innerHTML = '<tr><th>N°</th><th>Fecha</th><th>Detalle</th><th>N° OP</th><th class="text-right">Debe</th><th class="text-right">Haber</th><th class="text-right">Saldo</th></tr>';
   let html = `<tr class="tot"><td colspan="6">SALDO INICIAL al ${fDesde.value}</td><td class="text-right">$${fmt(saldo)}</td></tr>`;
   html += movimientos.map(x=>{ saldo += Number(x.debe)-Number(x.haber); return `
-    <tr class="fila-click" onclick="ver(${x.id})"><td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
+    <tr class="fila-click" onclick="ver(${x.id})"><td class="num nw">${esc(x.num)}</td><td class="nw">${String(x.fecha).slice(0,10)}</td>
       <td>${esc(x.glosa||x.comp_glosa)}</td><td>${esc(x.num_op||'')}</td>
       <td class="text-right">${x.debe>0?'$'+fmt(x.debe):''}</td><td class="text-right">${x.haber>0?'$'+fmt(x.haber):''}</td>
       <td class="text-right">$${fmt(saldo)}</td></tr>`;
@@ -205,7 +208,7 @@ async function mayorCompleto(){
     html += `<tr class="det d${i}" style="display:none"><td colspan="6" class="text-muted">Saldo inicial al ${esc(j.data.desde)}</td><td class="text-right">$${fmt(saldo)}</td></tr>`;
     html += c.movimientos.map(x=>{ saldo += Number(x.debe)-Number(x.haber); return `
       <tr class="det d${i} fila-click" style="display:none" onclick="ver(${x.id})">
-        <td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
+        <td class="num nw">${esc(x.num)}</td><td class="nw">${String(x.fecha).slice(0,10)}</td>
         <td>${esc(x.glosa||x.comp_glosa)}</td><td>${esc(x.num_op||'')}</td>
         <td class="text-right">${x.debe>0?'$'+fmt(x.debe):''}</td><td class="text-right">${x.haber>0?'$'+fmt(x.haber):''}</td>
         <td class="text-right">$${fmt(saldo)}</td></tr>`; }).join('');
