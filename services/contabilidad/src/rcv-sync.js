@@ -5,8 +5,8 @@
      - Auth: Basic base64("api:APIKEY")
      - multipart: campo "input" = JSON { RutUsuario, PasswordSII, RutEmpresa,
        Ambiente, RutCertificado?, Password? } + archivo "certificado" (.pfx) opcional.
-   Plan gratuito: 30 consultas/mes → se sincroniza DIARIO L-V a las 08:00 (Chile) el mes
-   en curso (≈22 consultas) y, hasta el día 8, también el mes anterior (≈6 más, para F29).
+   Plan gratuito: 30 consultas/mes → se sincroniza LUNES, MIÉRCOLES y VIERNES a las 08:00 (Chile) el
+   mes en curso (≈13 consultas) y, hasta el día 8, también el mes anterior (≈4 más, para F29).
 
    Env (Render):
      SIMPLEAPI_KEY     apikey de simpleapi.cl (obligatoria; sin ella no hace nada)
@@ -251,10 +251,10 @@ async function frenado() {
   return false;
 }
 
-/* Ritmo (Pato, 28-09-2026): DIARIO de lunes a viernes a las 08:00 hora de Chile.
-   ~22 corridas al mes (+ el mes anterior hasta el día 8) contra las 30 del plan
-   gratis: queda poco margen para los "Sincronizar" manuales. El tick revisa cada
-   15 min; corre si es día hábil, ya son las 08:00 y todavía no hay un OK de hoy
+/* Ritmo (Pato, 28-09-2026): LUNES, MIÉRCOLES y VIERNES a las 08:00 hora de Chile.
+   ~13 corridas al mes (+ ~4 del mes anterior hasta el día 8) contra las 30 del plan
+   gratis: queda margen para los "Sincronizar" manuales y el F29. El tick revisa cada
+   15 min; corre si es L/M/V, ya son las 08:00 y todavía no hay un OK de hoy
    (así un reinicio a las 09:00 no lo pierde, y uno a las 10:00 no lo repite). */
 async function tick() {
   try {
@@ -262,7 +262,7 @@ async function tick() {
     const ahora = new Date();
     const dia = ahora.toLocaleDateString('en-US', { timeZone: 'America/Santiago', weekday: 'short' });
     const hora = Number(ahora.toLocaleTimeString('en-GB', { timeZone: 'America/Santiago', hour: '2-digit', hour12: false }).slice(0, 2));
-    if (dia === 'Sat' || dia === 'Sun' || hora < 8) return;
+    if (!['Mon','Wed','Fri'].includes(dia) || hora < 8) return;
     const hoy = ahora.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
     // El pool fija time_zone de Chile: DATE(created_at) ya es fecha local
     const [[u]] = await pool.query("SELECT COUNT(*) n FROM ctb_rcv_sync_log WHERE resultado='OK' AND DATE(created_at)=?", [hoy]);
@@ -271,6 +271,6 @@ async function tick() {
     await sincronizar();
   } catch (e) { console.error('[rcv tick]', e.message); }
 }
-programar('rcv-sii', tick, 15 * 60 * 1000);        // cada 15 min; corre una vez L-V desde las 08:00 Chile
+programar('rcv-sii', tick, 15 * 60 * 1000);        // cada 15 min; corre una vez L-M-V desde las 08:00 Chile
 
 module.exports = { sincronizar, sincronizarMes, configurado, diagnosticoCert };

@@ -82,7 +82,7 @@ def construir():
            'Gratis y oficial. Si la API falla, los indicadores quedan en su último valor y el '
            'monitoreo avisa.')
     h2(doc, '3.2 SimpleAPI: el SII sin digitación')
-    p(doc, 'Trae el Registro de Compras y Ventas del SII de lunes a viernes a las 08:00: las facturas de proveedores '
+    p(doc, 'Trae el Registro de Compras y Ventas del SII lunes, miércoles y viernes a las 08:00: las facturas de proveedores '
            'entran solas al libro auxiliar con su asiento (capítulo 9 del Manual de Contabilidad). '
            'Requiere el certificado digital y la clave tributaria cargados en el servidor. El plan '
            'gratis da 30 consultas al mes — suficiente para el ritmo actual con su respaldo '
