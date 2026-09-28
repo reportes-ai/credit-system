@@ -25,6 +25,9 @@ require('../../../../shared/migrate').enFila('bono-jefe', async () => {
         valor      VARCHAR(40) NOT NULL,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )`);
+    // informe_para / informe_cc guardan varios correos separados por coma: 40 caracteres no
+    // alcanzaban ni para dos direcciones y el guardado caía en 500 (Pato, 28-09-2026).
+    await pool.query('ALTER TABLE bono_jefe_config MODIFY valor VARCHAR(500) NOT NULL').catch(() => {});
     const defaults = [
       ['creditos_min', '5'], ['creditos_esperado', '12'], ['pond_creditos', '45'],
       ['monto_por_op', '6800000'], ['pond_montos', '40'],
