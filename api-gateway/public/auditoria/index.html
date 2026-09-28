@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auditoría — AutoFácil</title>
-  <!-- v2.8 — full width en todas las pestañas · v2.7 — Correos Enviados: Destinatarios y CC muestran solo el primer correo (+N), lista completa en tooltip · v2.6 — navbar migrada al componente topnav · v2.4 — fix: al reabrir el MISMO correo el cuerpo salia en blanco (el iframe no recarga si el srcdoc no cambia) · v2.3 — pestaña Correos Enviados: log de todo correo del sistema por remitente, con vista del correo · v2.2 — breadcrumb con Mantenedores -->
+  <!-- v2.9 — Ingresos: sesiones numeradas por persona y día en orden de apertura, columna Solape (relevo de pestaña vs dos sesiones vivas) · v2.8 — full width en todas las pestañas · v2.7 — Correos Enviados: Destinatarios y CC muestran solo el primer correo (+N), lista completa en tooltip · v2.6 — navbar migrada al componente topnav · v2.4 — fix: al reabrir el MISMO correo el cuerpo salia en blanco (el iframe no recarga si el srcdoc no cambia) · v2.3 — pestaña Correos Enviados: log de todo correo del sistema por remitente, con vista del correo · v2.2 — breadcrumb con Mantenedores -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -287,20 +287,46 @@ function salidaHtml(r){
   const tip = r.logout_at ? '' : ' title="Estimada — última actividad (sesión sin cierre)"';
   return `<span style="color:#e2e8f0"${tip}>${fHora(sal)}${sub}</span>`;
 }
+/* Sesiones numeradas por persona y día, en orden de apertura, con el solape contra la anterior
+   (Pato, 28-09-2026): un solape de segundos es un relevo de pestaña o reinicio del navegador;
+   uno de minutos son dos sesiones vivas de verdad. La numeración es dentro de la página listada. */
 function renderLogins(rows){
   document.getElementById('thead').innerHTML =
-    '<tr><th>Usuario</th><th>Perfil</th><th>Fecha</th><th>Hora ingreso</th><th>Salida</th><th>Min</th><th>Estado</th></tr>';
+    '<tr><th>Usuario</th><th>Perfil</th><th>Fecha</th><th>N°</th><th>Hora ingreso</th><th>Salida</th><th>Min</th><th>Estado</th><th>Solape</th></tr>';
   const tb = document.getElementById('tbody');
-  if (!rows.length){ tb.innerHTML='<tr><td colspan="7" class="vacio">Sin ingresos en el rango seleccionado</td></tr>'; return; }
-  tb.innerHTML = rows.map(r => `<tr>
+  if (!rows.length){ tb.innerHTML='<tr><td colspan="9" class="vacio">Sin ingresos en el rango seleccionado</td></tr>'; return; }
+  const dia = d => new Date(d).toLocaleDateString('en-CA',{timeZone:'America/Santiago'});
+  const ms = d => { const t = Date.parse(d); return isNaN(t) ? 0 : t; };
+  const cierre = r => ms(r.logout_at || r.last_seen);
+  // Orden: día más reciente primero; dentro del día, por persona y de la sesión más antigua a la más nueva
+  const ord = rows.slice().sort((a,b) => dia(b.login_at).localeCompare(dia(a.login_at)) || String(a.nombre||'').localeCompare(String(b.nombre||'')) || ms(a.login_at) - ms(b.login_at));
+  let prev = null, n = 0;
+  const fmtDur = s => s < 60 ? `${s} s` : s < 3600 ? `${Math.round(s/60)} min` : `${(s/3600).toFixed(1)} h`;
+  tb.innerHTML = ord.map(r => {
+    const clave = (r.id_usuario||r.nombre) + '|' + dia(r.login_at);
+    if (!prev || prev.clave !== clave) { n = 1; prev = { clave, r }; }
+    else {
+      n++;
+      const sol = Math.round((cierre(prev.r) - ms(r.login_at)) / 1000);
+      r._solape = sol > 0 ? { con: prev.n, seg: sol, vivo: !prev.r.logout_at } : null;
+      prev = { clave, r };
+    }
+    prev.n = n;
+    const s = r._solape;
+    const solHtml = !s ? '' : s.seg >= 300 || s.vivo
+      ? `<span style="color:#f87171;font-weight:700" title="Dos sesiones vivas a la vez: la N°${s.con} seguía abierta ${fmtDur(s.seg)} después de abrir esta">⚠ con N°${s.con} · ${fmtDur(s.seg)}</span>`
+      : `<span style="color:#94a3b8" title="Relevo de pestaña o reinicio del navegador: la N°${s.con} se cerró ${fmtDur(s.seg)} después de abrir esta">relevo de N°${s.con} · ${fmtDur(s.seg)}</span>`;
+    return `<tr>
     <td class="c-user">${escH(r.nombre||'—')}</td>
     <td class="c-perfil">${escH(r.perfil||'')}</td>
     <td class="c-fecha">${fFecha(r.login_at)}</td>
+    <td style="color:#7dd3fc;font-weight:700">Sesión ${n}</td>
     <td>${fHora(r.login_at)}</td>
     <td class="c-fecha">${salidaHtml(r)}</td>
     <td>${r.minutos!=null?r.minutos:''}</td>
     <td>${r.logout_at?'<span class="estado-off">cerrada</span>':'<span class="estado-on">● activa</span>'}</td>
-  </tr>`).join('');
+    <td>${solHtml}</td>
+  </tr>`; }).join('');
 }
 
 function renderMov(rows){
