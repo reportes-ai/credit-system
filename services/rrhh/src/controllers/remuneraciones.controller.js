@@ -1308,7 +1308,7 @@ function calcLiquidacion(inp, ind) {
   // Ley SANNA (21.063): 0,03% de cargo del empleador sobre la renta imponible topada; se paga junto a la mutual
   const aporteSanna = R(baseCotiz * (ind.rem_sanna_pct || 0) / 100);
   return {
-    dias, sueldo_base: sueldo, comisiones, feriado_variable: feriadoVar, feriado_var_dias: inp.feriado_var_dias || 0, otros_imponibles: otrosImp, gratificacion,
+    dias, sueldo_base: sueldo, comisiones, comisiones_label: inp.comisiones_label || 'Comisiones', feriado_variable: feriadoVar, feriado_var_dias: inp.feriado_var_dias || 0, otros_imponibles: otrosImp, gratificacion,
     total_imponible: imponible, base_cotizacion: baseCotiz,
     tope_gratificacion: topeGrat, tope_imponible: topeImp, topes_prorrateados: prorrateo < 1,   // trazabilidad del prorrateo
     colacion, movilizacion, otros_no_imponibles: otrosNoImp,
@@ -1482,6 +1482,7 @@ const getComisionesMes = async (req, res) => {
   try {
     const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
     const comis = await comisionesDelMes(mes);
+    const bonosJefe = await bonoJefesDelMes(mesAnteriorDe(mes));   // quién lleva bono de jefe: cambia la etiqueta de la línea
     const sinAprobar = new Set(await comisionesSinAprobar(mes, comis));
     const [emps] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.cargo, f.tipo_contrato,
@@ -1519,6 +1520,7 @@ const getMes = async (req, res) => {
     const [guardadas] = await pool.query('SELECT * FROM rh_liquidaciones WHERE mes = ?', [mes]);
     const gMap = {}; guardadas.forEach(g => gMap[g.id_usuario] = g);
     const comis = await comisionesDelMes(mes);
+    const bonosJefe = await bonoJefesDelMes(mesAnteriorDe(mes));   // quién lleva bono de jefe: cambia la etiqueta de la línea
     const adics = await adicionalesDelMes(mes);
     const descs = await descuentosDelMes(mes);
     const lics = await licenciasDelMes(mes);
@@ -1541,6 +1543,7 @@ const getMes = async (req, res) => {
         dias: diasTrabajadosMes(mes, e.fecha_ingreso, lics[e.id_usuario], e.fecha_baja),
         colacion: e.colacion, movilizacion: e.movilizacion,
         comisiones: comis[String(e.nombre_corto).trim()] || 0,
+        comisiones_label: (String(e.nombre_corto).trim() in bonosJefe) ? 'Bono Jefe Comercial' : 'Comisiones',
         feriado_variable: ferVar[e.id_usuario]?.monto || 0,
         feriado_var_dias: ferVar[e.id_usuario]?.dias || 0,
         otros_imponibles: adics[e.id_usuario]?.imp || 0,
@@ -1576,6 +1579,7 @@ const guardar = async (req, res) => {
     const ind = await indicadores(mes);
     // Se recalcula SIEMPRE desde las fuentes (nada viene digitado del libro)
     const comis = await comisionesDelMes(mes);
+    const bonosJefe = await bonoJefesDelMes(mesAnteriorDe(mes));   // quién lleva bono de jefe: cambia la etiqueta de la línea
     const adics = await adicionalesDelMes(mes);
     const descs = await descuentosDelMes(mes);
     const lics = await licenciasDelMes(mes);
@@ -1597,6 +1601,7 @@ const guardar = async (req, res) => {
         dias: diasTrabajadosMes(mes, emp.fecha_ingreso, lics[emp.id_usuario], emp.fecha_baja),
         colacion: emp.colacion, movilizacion: emp.movilizacion,
         comisiones: comis[String(emp.nombre_corto).trim()] || 0,
+        comisiones_label: (String(emp.nombre_corto).trim() in bonosJefe) ? 'Bono Jefe Comercial' : 'Comisiones',
         feriado_variable: ferVar[emp.id_usuario]?.monto || 0,
         feriado_var_dias: ferVar[emp.id_usuario]?.dias || 0,
         otros_imponibles: adics[emp.id_usuario]?.imp || 0,
@@ -1933,7 +1938,7 @@ async function enviarLiquidacionesCorreo(mes) {
       <p>Hola ${String(l.nombre || '').split(' ')[0]}, tu liquidación de sueldo de <b>${mesPalabras(mes)}</b> fue emitida:</p>
       <table style="border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;width:100%;max-width:460px">
         <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">HABERES</td></tr>
-        ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila('Comisiones' + (d.comisiones_mes ? ' ' + String(d.comisiones_mes).split('-').reverse().join('-') : ''), d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación' + (d.dias != null && d.dias !== 30 && d.colacion ? ` (${d.dias}/30 días)` : ''), d.colacion)}${fila('Movilización' + (d.dias != null && d.dias !== 30 && d.movilizacion ? ` (${d.dias}/30 días)` : ''), d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
+        ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila((d.comisiones_label || 'Comisiones') + (d.comisiones_mes ? ' ' + String(d.comisiones_mes).split('-').reverse().join('-') : ''), d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación' + (d.dias != null && d.dias !== 30 && d.colacion ? ` (${d.dias}/30 días)` : ''), d.colacion)}${fila('Movilización' + (d.dias != null && d.dias !== 30 && d.movilizacion ? ` (${d.dias}/30 días)` : ''), d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
         <tr><td style="padding:3px 10px;font-weight:700">Total haberes</td><td style="padding:3px 10px;text-align:right;font-weight:700">${co(d.total_haberes)}</td></tr>
         <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">DESCUENTOS</td></tr>
         ${fila('AFP ' + (d.afp || ''), d.desc_afp, 1)}${fila('Salud 7%', d.desc_salud, 1)}${fila('Adicional Isapre', d.desc_salud_adicional, 1)}${fila('Seguro cesantía', d.desc_afc, 1)}${fila('Impuesto único', d.impuesto, 1)}${(d.descuentos_detalle || []).length ? d.descuentos_detalle.map(x => fila(x.glosa + (x.no_descontado ? ' (parcial)' : ''), x.monto, 1)).join('') : fila('Otros descuentos', d.otros_descuentos, 1)}${(d.descuentos_omitidos || []).length ? '<tr><td colspan="2" style="color:#b91c1c;font-size:11px;padding:4px 0">Prelación legal: ' + d.descuentos_omitidos.map(o => o.glosa + ' — $' + Math.round(o.no_descontado).toLocaleString('es-CL') + ' no descontado (' + o.motivo + ')').join('; ') + '</td></tr>' : ''}
@@ -2643,6 +2648,7 @@ async function haberesProyectados(idUsuario, mesPedido) {
   }
   const ind = await indicadores(mes);
   const comis = await comisionesDelMes(mes);
+    const bonosJefe = await bonoJefesDelMes(mesAnteriorDe(mes));   // quién lleva bono de jefe: cambia la etiqueta de la línea
   const adics = await adicionalesDelMes(mes);
   const descs = await descuentosDelMes(mes);
   const lics = await licenciasDelMes(mes);
@@ -2653,6 +2659,7 @@ async function haberesProyectados(idUsuario, mesPedido) {
     dias: diasTrabajadosMes(mes, emp.fecha_ingreso, lics[emp.id_usuario], emp.fecha_baja),
     colacion: emp.colacion, movilizacion: emp.movilizacion,
     comisiones: comis[String(emp.nombre_corto).trim()] || 0,
+        comisiones_label: (String(emp.nombre_corto).trim() in bonosJefe) ? 'Bono Jefe Comercial' : 'Comisiones',
     feriado_variable: ferVar[emp.id_usuario]?.monto || 0,
     feriado_var_dias: ferVar[emp.id_usuario]?.dias || 0,
     otros_imponibles: adics[emp.id_usuario]?.imp || 0,
