@@ -89,6 +89,7 @@ const PLACEMENT_ITEMS = {
   'alertas':                 { section:'mantenedores',  href:'/mantenedores/alertas/',            icon:'bi-bell-fill',              titulo:'Alertas' },
   'solo-dios':               { section:'mantenedores',  href:'/mantenedores/solo-dios/',          icon:'bi-lightning-charge-fill',  titulo:'SOLO DIOS' },
   'dealer-categorias':       { section:'mantenedores',  href:'/mantenedores/dealer-categorias/',  icon:'bi-award',                  titulo:'Categoría y Potencial Dealer' },
+  'seguros-autofacil':       { section:'mantenedores',  href:'/mantenedores/seguros-autofacil/',  icon:'bi-shield-check',           titulo:'Seguros AutoFácil (SURA)' },
   'impuestos':               { section:'mantenedores',  href:'/mantenedores/impuestos/',          icon:'bi-percent',                titulo:'Impuestos' },
   'definiciones':            { section:'mantenedores',  href:'/mantenedores/definiciones/',       icon:'bi-book',                   titulo:'Definiciones' },
   'feriados':                { section:'mantenedores',  href:'/mantenedores/feriados/',           icon:'bi-calendar-event',         titulo:'Feriados' },
@@ -145,6 +146,7 @@ const PLACEMENT_DESCS = {
   'respuestas-rapidas':'Respuestas predefinidas del chat de atención', 'alertas-saldos':'Alertas por saldos de precio pendientes',
   'dealernet':'Productos y costos de la integración DealerNet',
   'inteligencia-artificial':'Activa la IA (Anthropic) y prende cada análisis por separado',
+  'seguros-autofacil':'Desgravamen, cesantía y vehículo SURA de los créditos AutoFácil: pólizas, tramos de tasa, comisiones y markup',
   // Carga Masiva
   'cm-cargar':'Carga masiva de operaciones (Excel)', 'cm-trinidad':'Carga de archivos Trinidad', 'cm-eq-estados':'Equivalencias de estados Trinidad',
   'cm-eq-ejecs':'Equivalencia de ejecutivos', 'cm-historial':'Historial de cargas masivas',

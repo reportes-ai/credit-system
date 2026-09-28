@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seguros AutoFácil (SURA) — AutoFácil</title>
+  <!-- v1.0 — mantenedor de los seguros SURA de los créditos AutoFácil: desgravamen y cesantía (póliza, condiciones, tramos por opción, comisiones, markup, simulador de prima) y vehículo (portal SURA Dealers). Semilla cotizaciones 04-09-2026 (28-09-2026) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .main { max-width:1240px; margin:28px auto; padding:0 20px 60px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.6rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.88rem; }
+    .tabs { display:flex; gap:8px; border-bottom:2px solid #e2e8f0; margin-bottom:22px; }
+    .tab { background:none; border:none; border-bottom:3px solid transparent; margin-bottom:-2px; padding:11px 22px; font-size:.92rem; font-weight:700; color:#64748b; cursor:pointer; }
+    .tab.on { border-bottom-color:var(--navy); color:var(--navy); font-weight:800; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:18px; }
+    .card-af h3 { font-size:.95rem; font-weight:800; color:var(--navy-dark); margin:0 0 12px; display:flex; align-items:center; gap:8px; }
+    .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px 16px; }
+    .grid.g3 { grid-template-columns:repeat(3,1fr); }
+    @media(max-width:900px){ .grid, .grid.g3 { grid-template-columns:1fr 1fr; } }
+    .fld label { font-size:.72rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.4px; display:block; margin-bottom:3px; }
+    .fld input, .fld select, .fld textarea { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.86rem; box-sizing:border-box; }
+    .fld input:focus, .fld select:focus, .fld textarea:focus { outline:none; border-color:var(--navy); }
+    .fld.wide { grid-column:1 / -1; }
+    .chk { display:flex; align-items:center; gap:8px; font-size:.86rem; margin-top:22px; }
+    .btn-af { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:9px 18px; font-weight:700; font-size:.86rem; cursor:pointer; }
+    .btn-af.sec { background:#fff; color:var(--navy); border:1.5px solid var(--navy); }
+    .btn-af.sm { padding:5px 10px; font-size:.78rem; }
+    .btn-af:hover { filter:brightness(1.08); }
+    table.t { width:100%; border-collapse:collapse; font-size:.85rem; }
+    table.t th { background:#f8fafc; color:#374151; font-weight:700; padding:8px 10px; text-align:left; border-bottom:2px solid #e5e7eb; font-size:.76rem; text-transform:uppercase; }
+    table.t td { padding:6px 10px; border-bottom:1px solid #f0f2f5; vertical-align:middle; }
+    table.t input { width:100%; border:1.5px solid #d1d5db; border-radius:6px; padding:4px 8px; font-size:.84rem; }
+    table.t input.n { text-align:right; width:110px; }
+    .r { text-align:right; }
+    .opc { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    @media(max-width:900px){ .opc { grid-template-columns:1fr; } }
+    .opc-box { border:1.5px solid #e2e8f0; border-radius:12px; padding:14px 16px; }
+    .opc-box.vig { border-color:#16a34a; background:#f0fdf4; }
+    .opc-box h4 { font-size:.88rem; font-weight:800; margin:0 0 10px; color:var(--navy-dark); display:flex; justify-content:space-between; align-items:center; }
+    .pill { display:inline-block; border-radius:999px; padding:2px 10px; font-size:.7rem; font-weight:800; background:#dcfce7; color:#166534; }
+    .sim { background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:14px 16px; }
+    .sim .res { font-size:1.4rem; font-weight:800; color:var(--navy-dark); }
+    .muted { color:#64748b; font-size:.8rem; }
+    .footer-box { margin-top:26px; background:#f1f5f9; border-left:4px solid var(--navy); border-radius:10px; padding:16px 20px; }
+    .footer-box h4 { font-size:.85rem; font-weight:800; color:var(--navy-dark); display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+    .footer-box ul { margin:0; padding-left:18px; font-size:.84rem; color:#374151; line-height:1.7; }
+    .footer-box a { color:var(--navy); }
+    .toast-af { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; z-index:9999; display:none; }
+    .toast-af.err { background:#b91c1c; }
+    .links a { display:inline-block; margin:4px 8px 4px 0; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Seguros AutoFácil (SURA)',current:true}],actions:[{label:'Factores canal AutoFin',icon:'bi-percent',href:'/mantenedores/factores-seguro/'}]};</script>
+
+<div class="main">
+  <div class="page-banner">
+    <i class="bi bi-shield-check"></i>
+    <div>
+      <h2>Seguros AutoFácil (SURA)</h2>
+      <p>Desgravamen, cesantía y vehículo de los créditos con recursos propios: póliza, condiciones, tramos de tasa por opción, comisiones y markup. Los seguros del canal AutoFin viven en <b>Factores de Seguros Clientes</b>.</p>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="cuerpo"><div class="muted">Cargando…</div></div>
+
+  <div class="footer-box">
+    <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+    <ul>
+      <li><b>Opción vigente + tramos de tasa</b> → prima única de desgravamen y cesantía de los créditos AutoFácil por el motor <code>shared/seguros-autofacil.js</code> (<code>prima = tasa del tramo × MIC</code>). Lo consume el simulador de prima de esta página y quedará cableado al <a href="/simulador/">Simulador</a> y a las <a href="/aprobaciones/">Cartas</a> del producto AutoFácil cuando parta la colocación propia (pendiente 2.14 en PENDIENTES).</li>
+      <li><b>Markup</b> (solo opción 2, tasa técnica) → recargo de AutoFácil sobre la prima neta: <code>prima cliente = prima neta × (1 + markup)</code>. En la opción 1 la tasa ya es bruta y no aplica.</li>
+      <li><b>Comisiones por opción</b> → desglose informativo de cuánto de la prima neta va al corredor (FACILSEGUROS), recaudación y uso de canal; sirve para la conciliación con SURA y la contabilización de la prima.</li>
+      <li><b>Edades, tope de capital, carencia, cuotas máximas</b> → condiciones de asegurabilidad que la evaluación y la carta deben validar antes de incluir el seguro (edad máxima de ingreso 74 años en desgravamen; cesantía solo dependientes indefinidos).</li>
+      <li><b>Vehículo</b> → no tiene tarifa acá: se cotiza y emite en el portal SURA Dealers (links en la pestaña).</li>
+    </ul>
+  </div>
+</div>
+
+<div class="toast-af" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) location.href='/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const clp = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CL');
+function toast(m,err){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast-af'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
+
+let DATA = [], ACTUAL = sessionStorage.getItem('segaf_tab') || 'DESGRAVAMEN';
+const ICONO = { DESGRAVAMEN:'bi-heart-pulse', CESANTIA:'bi-briefcase', VEHICULO:'bi-car-front' };
+
+async function cargar(){
+  const r = await fetch('/api/seguros-autofacil', { headers:H }); const j = await r.json();
+  if (!j.success) { toast('Error al cargar', true); return; }
+  DATA = j.data;
+  document.getElementById('tabs').innerHTML = DATA.map(s => `<button class="tab ${s.seguro===ACTUAL?'on':''}" onclick="ver('${s.seguro}')"><i class="bi ${ICONO[s.seguro]||'bi-shield'} me-1"></i>${esc(s.nombre)}</button>`).join('');
+  render();
+}
+function ver(seg){ ACTUAL = seg; sessionStorage.setItem('segaf_tab', seg); if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(DATA.find(s=>s.seguro===seg)?.nombre||null); cargar(); }
+
+const fld = (s, k, label, type='text', extra='') => `<div class="fld"><label>${label}</label><input id="f_${k}" type="${type}" value="${esc(s[k]==null?'':s[k])}" ${extra}></div>`;
+
+function render(){
+  const s = DATA.find(x => x.seguro===ACTUAL); if (!s) return;
+  const esVeh = s.seguro==='VEHICULO';
+  let html = `<div class="card-af"><h3><i class="bi bi-file-earmark-text"></i> Póliza y condiciones · <span class="muted">actualizado ${esc(s.updated_at?String(s.updated_at).slice(0,10):'—')} por ${esc(s.updated_by||'—')}</span></h3>
+    <div class="grid">
+      ${fld(s,'nombre','Nombre')}${fld(s,'aseguradora','Aseguradora')}${fld(s,'aseguradora_rut','RUT aseguradora')}${fld(s,'poliza_cmf','Póliza CMF')}
+      ${fld(s,'intermediario','Intermediario / corredor')}${fld(s,'intermediario_rut','RUT intermediario')}${fld(s,'fecha_cotizacion','Fecha cotización','date')}${fld(s,'vigencia_desde','Vigencia desde','date')}
+      ${esVeh ? '' : `
+      <div class="fld"><label>Opción de tarifa vigente</label><select id="f_opcion_vigente"><option value="">— sin definir —</option><option value="1" ${s.opcion_vigente==1?'selected':''}>Opción 1 · tasa bruta (comisiones incluidas)</option><option value="2" ${s.opcion_vigente==2?'selected':''}>Opción 2 · tasa técnica neta (con markup)</option></select></div>
+      ${fld(s,'markup_pct','Markup AutoFácil % (solo opción 2)','number','step="0.01" min="0"')}
+      ${fld(s,'tope_capital_uf','Tope capital UF','number','step="0.01" min="0"')}
+      ${fld(s,'edad_min','Edad mínima','number','min="0"')}${fld(s,'edad_max_ingreso','Edad máx. ingreso','number','min="0"')}${fld(s,'edad_max_permanencia','Edad máx. permanencia','number','min="0"')}
+      ${fld(s,'carencia_dias','Carencia (días)','number','min="0"')}${fld(s,'antiguedad_dias','Antigüedad laboral (días)','number','min="0"')}${fld(s,'espera_dias','Período de espera (días)','number','min="0"')}
+      ${fld(s,'cuotas_max','Cuotas máx. cubiertas','number','min="0"')}${fld(s,'tope_cuota_uf','Tope por cuota UF','number','step="0.01" min="0"')}
+      <div class="chk"><input type="checkbox" id="f_obligatorio" ${s.obligatorio?'checked':''}> <label for="f_obligatorio" style="margin:0;text-transform:none;font-size:.86rem">Obligatorio en todo crédito</label></div>
+      <div class="chk"><input type="checkbox" id="f_exento_iva" ${s.exento_iva?'checked':''}> <label for="f_exento_iva" style="margin:0;text-transform:none;font-size:.86rem">Prima exenta de IVA</label></div>
+      <div class="fld wide"><label>Devolución por prepago</label><input id="f_devolucion_prepago" value="${esc(s.devolucion_prepago||'')}"></div>`}
+      <div class="chk"><input type="checkbox" id="f_activo" ${s.activo?'checked':''}> <label for="f_activo" style="margin:0;text-transform:none;font-size:.86rem">Activo</label></div>
+      <div class="fld wide"><label>Cobertura</label><textarea id="f_cobertura" rows="3">${esc(s.cobertura||'')}</textarea></div>
+      <div class="fld wide"><label>Notas</label><textarea id="f_notas" rows="3">${esc(s.notas||'')}</textarea></div>
+      ${esVeh ? `<div class="fld wide"><label>Links (uno por línea: Nombre | URL)</label><textarea id="f_links" rows="4">${esc((s.links||[]).map(l=>l[0]+' | '+l[1]).join('\n'))}</textarea>
+        <div class="links" style="margin-top:6px">${(s.links||[]).map(l=>`<a href="${esc(l[1])}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>${esc(l[0])}</a>`).join('')}</div></div>` : ''}
+    </div>
+    <div style="margin-top:14px"><button class="btn-af" onclick="guardarCab()"><i class="bi bi-save me-1"></i>Guardar condiciones</button></div>
+  </div>`;
+
+  if (!esVeh) {
+    html += `<div class="card-af"><h3><i class="bi bi-table"></i> Tramos de tasa por plazo (% sobre el monto inicial del crédito)</h3><div class="opc">` +
+      [1,2].map(op => `<div class="opc-box ${s.opcion_vigente==op?'vig':''}"><h4>Opción ${op} · ${op===1?'tasa bruta':'tasa técnica neta'} ${s.opcion_vigente==op?'<span class="pill">VIGENTE</span>':''}</h4>
+        <table class="t" id="tr_${op}"><thead><tr><th>Desde (mes)</th><th>Hasta (mes)</th><th class="r">Tasa %</th><th></th></tr></thead><tbody>
+        ${(s.tramos[op]||[]).map(t => filaTramo(t)).join('')}
+        </tbody></table>
+        <div style="margin-top:8px;display:flex;gap:8px"><button class="btn-af sec sm" onclick="addTramo(${op})"><i class="bi bi-plus"></i> Tramo</button><button class="btn-af sm" onclick="guardarTramos(${op})"><i class="bi bi-save me-1"></i>Guardar opción ${op}</button></div>
+        <h4 style="margin-top:14px">Comisiones sobre la prima neta</h4>
+        <table class="t" id="co_${op}"><thead><tr><th>Concepto</th><th class="r">%</th><th>IVA incl.</th><th></th></tr></thead><tbody>
+        ${(s.comisiones[op]||[]).map(c => filaCom(c)).join('')}
+        </tbody></table>
+        <div style="margin-top:8px;display:flex;gap:8px"><button class="btn-af sec sm" onclick="addCom(${op})"><i class="bi bi-plus"></i> Comisión</button><button class="btn-af sm" onclick="guardarCom(${op})"><i class="bi bi-save me-1"></i>Guardar comisiones ${op}</button></div>
+        <div class="muted" style="margin-top:6px">Total comisiones: ${((s.comisiones[op]||[]).reduce((a,c)=>a+c.pct,0)).toLocaleString('es-CL')}% de la prima neta</div>
+      </div>`).join('') + `</div></div>`;
+
+    html += `<div class="card-af sim"><h3><i class="bi bi-calculator"></i> Simulador de prima (motor único)</h3>
+      <div class="grid g3">
+        <div class="fld"><label>Monto inicial del crédito (MIC)</label><input id="sim_mic" type="number" min="0" step="1000" value="${sessionStorage.getItem('segaf_mic')||8000000}"></div>
+        <div class="fld"><label>Plazo (meses)</label><input id="sim_plazo" type="number" min="1" max="120" value="${sessionStorage.getItem('segaf_plazo')||36}"></div>
+        <div class="fld"><label>Opción</label><select id="sim_op"><option value="">Vigente</option><option value="1">Opción 1</option><option value="2">Opción 2</option></select></div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:10px;align-items:center"><button class="btn-af" onclick="simular()"><i class="bi bi-play-fill me-1"></i>Calcular</button><div id="sim_out" class="muted"></div></div>
+    </div>`;
+  }
+  document.getElementById('cuerpo').innerHTML = html;
+}
+const filaTramo = t => `<tr><td><input class="n" type="number" min="1" max="120" value="${t.plazo_desde}"></td><td><input class="n" type="number" min="1" max="120" value="${t.plazo_hasta}"></td><td class="r"><input class="n" type="number" step="0.0001" min="0" value="${t.tasa_pct}"></td><td><button class="btn-af sec sm" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td></tr>`;
+const filaCom = c => `<tr><td><input value="${esc(c.nombre)}"></td><td class="r"><input class="n" type="number" step="0.01" min="0" value="${c.pct}"></td><td><input type="checkbox" ${c.iva_incluido?'checked':''}></td><td><button class="btn-af sec sm" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td></tr>`;
+function addTramo(op){ const tb=document.querySelector('#tr_'+op+' tbody'); const last=tb.lastElementChild; const d=last?Number(last.children[1].querySelector('input').value)+1:1; tb.insertAdjacentHTML('beforeend', filaTramo({plazo_desde:d, plazo_hasta:d+11, tasa_pct:0})); }
+function addCom(op){ document.querySelector('#co_'+op+' tbody').insertAdjacentHTML('beforeend', filaCom({nombre:'', pct:0, iva_incluido:true})); }
+
+const v = id => { const e=document.getElementById(id); if(!e) return undefined; return e.type==='checkbox' ? e.checked : e.value; };
+async function guardarCab(){
+  const s = DATA.find(x=>x.seguro===ACTUAL);
+  const b = {}; ['nombre','aseguradora','aseguradora_rut','poliza_cmf','intermediario','intermediario_rut','fecha_cotizacion','vigencia_desde','opcion_vigente','markup_pct','tope_capital_uf','edad_min','edad_max_ingreso','edad_max_permanencia','carencia_dias','antiguedad_dias','espera_dias','cuotas_max','tope_cuota_uf','obligatorio','exento_iva','devolucion_prepago','cobertura','notas','activo'].forEach(k => { const x=v('f_'+k); b[k] = x===undefined ? s[k] : x; });
+  if (s.seguro==='VEHICULO') b.links = (v('f_links')||'').split('\n').map(l=>l.split('|').map(x=>x.trim())).filter(l=>l.length>=2 && l[1]);
+  else b.links = s.links;
+  try {
+    const r = await fetch('/api/seguros-autofacil/'+ACTUAL, { method:'PUT', headers:H, body:JSON.stringify(b) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
+    DATA = j.data; toast('Condiciones guardadas ✓'); render();
+  } catch(e){ toast(e.message, true); }
+}
+async function guardarTramos(op){
+  const tramos = [...document.querySelectorAll('#tr_'+op+' tbody tr')].map(tr => { const i=tr.querySelectorAll('input'); return { plazo_desde:i[0].value, plazo_hasta:i[1].value, tasa_pct:i[2].value }; });
+  try {
+    const r = await fetch(`/api/seguros-autofacil/${ACTUAL}/tramos`, { method:'PUT', headers:H, body:JSON.stringify({ opcion:op, tramos }) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
+    DATA = j.data; toast(`Tramos opción ${op} guardados ✓`); render();
+  } catch(e){ toast(e.message, true); }
+}
+async function guardarCom(op){
+  const comisiones = [...document.querySelectorAll('#co_'+op+' tbody tr')].map(tr => { const i=tr.querySelectorAll('input'); return { nombre:i[0].value, pct:i[1].value, iva_incluido:i[2].checked }; });
+  try {
+    const r = await fetch(`/api/seguros-autofacil/${ACTUAL}/comisiones`, { method:'PUT', headers:H, body:JSON.stringify({ opcion:op, comisiones }) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
+    DATA = j.data; toast(`Comisiones opción ${op} guardadas ✓`); render();
+  } catch(e){ toast(e.message, true); }
+}
+async function simular(){
+  const mic=v('sim_mic'), plazo=v('sim_plazo'), op=v('sim_op');
+  sessionStorage.setItem('segaf_mic', mic); sessionStorage.setItem('segaf_plazo', plazo);
+  const r = await fetch(`/api/seguros-autofacil/prima?seguro=${ACTUAL}&mic=${mic}&plazo=${plazo}${op?'&opcion='+op:''}`, { headers:H }); const j = await r.json();
+  const o = document.getElementById('sim_out');
+  if (!j.success) { o.innerHTML = '<span style="color:#b91c1c">'+esc(j.error)+'</span>'; return; }
+  const d = j.data;
+  if (d.error) { o.innerHTML = '<span style="color:#b91c1c">'+esc(d.error)+'</span>'; return; }
+  o.innerHTML = `<span class="res">${clp(d.prima_cliente)}</span> &nbsp; opción ${d.opcion} · tramo ${d.tramo} meses · tasa ${d.tasa_pct}% × MIC = prima neta ${clp(d.prima_neta)}${d.markup_pct?` · markup ${d.markup_pct}%`:''}${d.exento_iva?' · exenta de IVA':''}` +
+    (d.comisiones.length ? `<br><span class="muted">Comisiones: ${d.comisiones.map(c=>`${esc(c.nombre)} ${c.pct}% = ${clp(c.monto)}`).join(' · ')}</span>` : '');
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

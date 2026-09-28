@@ -321,6 +321,7 @@ app.use('/api/portal-cliente',       require('../../services/portal-cliente/src/
 app.use('/api/rrhh',                 require('../../services/rrhh/src/routes/rrhh.routes'));
 app.use('/api/contabilidad',         require('../../services/contabilidad/src/routes/contabilidad.routes'));
 app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/routes/dealer-categorias.routes'));
+app.use('/api/seguros-autofacil',    require('../../services/mantenedores/src/routes/seguros-autofacil.routes'));
 app.use('/api/dealer-campos',        require('../../services/mantenedores/src/routes/dealer-campos.routes'));
 app.use('/api/visitas',              require('../../services/mantenedores/src/routes/visitas.routes'));
 app.use('/api/terreno',              require('../../services/mantenedores/src/routes/visitas-terreno.routes'));
