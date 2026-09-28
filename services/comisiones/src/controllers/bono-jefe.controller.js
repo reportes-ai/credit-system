@@ -666,4 +666,6 @@ const getBitacoraDetalle = async (req, res) => {
   } catch (e) { console.error('[bono-jefe bitacora det]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getBSC, getVariables, setVariables, getCurva, enviarInforme, getBitacora, getBitacoraDetalle };
+module.exports = { getBSC, getVariables, setVariables, getCurva, enviarInforme, getBitacora, getBitacoraDetalle,
+  // motor único del bono: lo consume RRHH → Remuneraciones para llevar el total variable a la liquidación del jefe (mes vencido)
+  calcularBSC, jefesComerciales };

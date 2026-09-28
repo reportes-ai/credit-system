@@ -1421,7 +1421,33 @@ async function comisionesSinAprobar(mes, comis) {
   if (!conComision.length) return [];
   const [aps] = await pool.query("SELECT ejecutivo FROM comisiones_aprobaciones WHERE mes=? AND estado='aprobado'", [mesAnteriorDe(mes)]).catch(() => [[]]);
   const okSet = new Set(aps.map(a => String(a.ejecutivo).toUpperCase().trim()));
-  return conComision.filter(n => !okSet.has(n));
+  // El bono del Jefe Comercial no pasa por Revisión de Comisiones: no exige aprobación de Operaciones
+  const bonos = await bonoJefesDelMes(mesAnteriorDe(mes));
+  return conComision.filter(n => !okSet.has(n) && !(n in bonos));
+}
+
+/* ── Bono del Jefe Comercial → liquidación (Pato, 28-09-2026) ───────────────
+   El TOTAL VARIABLE del BSC (premio variable + semana corrida) del mes de producción
+   entra como "comisiones" en la liquidación del mes siguiente, igual que la comisión
+   de los ejecutivos (mes vencido). Motor único: bono-jefe.controller → calcularBSC.
+   Caché 60 s: el BSC recalcula tres pilares por jefe y el libro lo pide varias veces. */
+const _bonoCache = new Map();
+async function bonoJefesDelMes(mesProd) {
+  const c = _bonoCache.get(mesProd);
+  if (c && Date.now() - c.at < 60000) return c.data;
+  const out = {};
+  try {
+    const BJ = require('../../../comisiones/src/controllers/bono-jefe.controller');
+    const jefes = await BJ.jefesComerciales(mesProd);
+    for (const jf of jefes) {
+      const d = await BJ.calcularBSC(mesProd, null, jf.id_usuario);
+      const [[u]] = await pool.query("SELECT CONCAT(UPPER(COALESCE(nombre,'')),' ',UPPER(COALESCE(apellido,''))) k FROM usuarios WHERE id_usuario=?", [jf.id_usuario]);
+      const total = R(d?.premio?.total_variable || 0);
+      if (u && total > 0) out[String(u.k).trim()] = total;
+    }
+  } catch (e) { console.error('[remuneraciones bono jefe]', e.message); }
+  _bonoCache.set(mesProd, { at: Date.now(), data: out });
+  return out;
 }
 
 /* ── Comisiones del mes por colaborador (motor único de comisiones) ─────────── */
@@ -1433,7 +1459,11 @@ async function comisionesDelMes(mes) {
        regenera la nómina ex profeso. Sin nómina, se calcula en vivo como siempre. */
     const { montosNomina } = require('../../../comisiones/src/controllers/nomina.controller');
     const nom = await montosNomina(mesAnteriorDe(mes));
-    if (nom) return nom.montos;
+    // Bono del Jefe Comercial (total variable del BSC del mes de producción) entra por el mismo canal
+    const bonos = await bonoJefesDelMes(mesAnteriorDe(mes));
+    // Se SUMA: un jefe que además coloca créditos (Damaris) recibe su comisión de ejecutivo más el bono
+    const sumar = (base) => { const o = { ...base }; for (const [k, v] of Object.entries(bonos)) o[k] = R((o[k] || 0) + v); return o; };
+    if (nom) return sumar(nom.montos);
     const { calcularMes } = require('../../../comisiones/src/controllers/comisiones.controller');
     const filas = await calcularMes(mesAnteriorDe(mes));   // mes vencido
     const porNombre = {};
@@ -1441,7 +1471,7 @@ async function comisionesDelMes(mes) {
     // El detalle de que operaciones se revirtieron vive en Revision de Comisiones,
     // no en la liquidacion de sueldo.
     for (const f of filas) porNombre[String(f.ejecutivo || '').toUpperCase().trim()] = R(f.con_semana_corrida || f.incentivo_final);
-    return porNombre;
+    return sumar(porNombre);
   } catch (e) { console.error('[remuneraciones comisiones]', e.message); return {}; }
 }
 
