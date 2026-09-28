@@ -1550,6 +1550,8 @@ const pagarOrden = async (req, res) => {
       try {
         const rh = require('../../../rrhh/src/controllers/remuneraciones.controller');
         if (rh.onOdpPagadaJudicial) rh.onOdpPagadaJudicial(oc.origen_id).catch(e => console.error('[ordenes-pago aviso tribunal]', e.message));
+        // Hook Remuneraciones: la ODP de sueldos pagada manda a cada colaborador su liquidación (Pato, 28-09-2026)
+        if (rh.onOdpPagadaRemuneraciones) rh.onOdpPagadaRemuneraciones(oc.origen_id).catch(e => console.error('[ordenes-pago correo liquidaciones]', e.message));
       } catch (e) { console.error('[ordenes-pago hook judicial]', e.message); }
     } else if (oc.origen === 'SALDO') {
       const [[s]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes WHERE id=?', [oc.origen_id]);

@@ -1726,16 +1726,17 @@ const emitir = async (req, res) => {
       const fLibro = (() => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); })();
       return require('../../../contabilidad/src/provisiones').liberarSueldos(mes, 'LIBRO', fLibro, quien, `Liquidaciones ${mes} emitidas (REMUNERACIONES, haberes $${Math.round(Number(t.h)).toLocaleString('es-CL')})`);
     }).catch(e => console.error('[remuneraciones emitir→provisión]', e && e.message));
-    // Envío automático: cada colaborador recibe su liquidación al correo
-    // (no bloquea la respuesta; Modo Desarrollo redirige solo, vía shared/mailer)
-    enviarLiquidacionesCorreo(mes).catch(e => console.error('[remuneraciones correo]', e.message));
+    // El correo con la liquidación NO sale al emitir: sale cuando Tesorería PAGA la ODP de sueldos
+    // (Pato, 28-09-2026; hook onOdpPagadaRemuneraciones). Acá nace esa ODP con la Nómina Banco adjunta.
+    let odpSueldos = null;
+    try { odpSueldos = await ordenPagoSueldos(mes, req); } catch (e) { console.error('[remuneraciones ODP sueldos]', e.message); }
     // Máxima 4: lo retenido a la Caja es una obligación con la Caja → orden de pago con detalle
     let odpCaja = null;
     try { odpCaja = await ordenPagoCaja(mes, req); } catch (e) { console.error('[remuneraciones ODP Caja]', e.message); }
     // Retenciones judiciales: una orden por causa, al beneficiario que fijó el tribunal
     let odpJud = [];
     try { odpJud = await ordenesPagoJudiciales(mes, req); } catch (e) { console.error('[remuneraciones ODP judicial]', e.message); }
-    ok(res, { emitidas: r.affectedRows, odp_caja: odpCaja, odp_judiciales: odpJud });
+    ok(res, { emitidas: r.affectedRows, odp_sueldos: odpSueldos, odp_caja: odpCaja, odp_judiciales: odpJud });
   } catch (e) { console.error('[rrhh remuneraciones emitir]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -1923,16 +1924,17 @@ const mesPalabras = m => `${MESES_TXT[Number(String(m).slice(5, 7))] || ''} ${St
 
 async function enviarLiquidacionesCorreo(mes) {
   const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
+  // Solo las que aún no se enviaron (correo_enviado_at): el hook de la ODP puede correr más de una vez
   const [liqs] = await pool.query(
     `SELECT l.*, u.email FROM rh_liquidaciones l JOIN usuarios u ON u.id_usuario=l.id_usuario
-      WHERE l.mes=? AND l.estado='EMITIDA' AND u.email IS NOT NULL`, [mes]);
+      WHERE l.mes=? AND l.estado='EMITIDA' AND l.correo_enviado_at IS NULL AND u.email IS NOT NULL`, [mes]);
   const co = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
   let enviadas = 0;
   for (const l of liqs) {
     let d = {}; try { d = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) {}
     const fila = (lbl, v, neg) => (Number(v) || 0) ? `<tr><td style="padding:3px 10px">${lbl}</td><td style="padding:3px 10px;text-align:right;${neg ? 'color:#b91c1c' : ''}">${neg ? '−' : ''}${co(v)}</td></tr>` : '';
     const html = `
-      <p>Hola ${String(l.nombre || '').split(' ')[0]}, tu liquidación de sueldo de <b>${mesPalabras(mes)}</b> fue emitida:</p>
+      <p>Hola ${String(l.nombre || '').split(' ')[0]}, tu sueldo de <b>${mesPalabras(mes)}</b> ya fue pagado. Esta es tu liquidación:</p>
       <table style="border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;width:100%;max-width:460px">
         <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">HABERES</td></tr>
         ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila('Comisiones' + (d.comisiones_mes ? ' ' + String(d.comisiones_mes).split('-').reverse().join('-') : ''), d.comisiones)}${d.bono_jefe > 0 ? fila('Bono Jefe Comercial' + (d.comisiones_mes ? ' ' + String(d.comisiones_mes).split('-').reverse().join('-') : ''), d.bono_jefe) : ''}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación' + (d.dias != null && d.dias !== 30 && d.colacion ? ` (${d.dias}/30 días)` : ''), d.colacion)}${fila('Movilización' + (d.dias != null && d.dias !== 30 && d.movilizacion ? ` (${d.dias}/30 días)` : ''), d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
@@ -1945,6 +1947,7 @@ async function enviarLiquidacionesCorreo(mes) {
       <p style="font-size:12px;color:#64748b">El detalle completo e imprimible está en el Business Suite → Recursos Humanos → <a href="https://app.autofacilchile.cl/recursos-humanos/mi-ficha/">Mi Ficha</a>.</p>`;
     try {
       await enviarCorreo({ to: l.email, subject: `💰 Liquidación de sueldo ${mesPalabras(mes)} — AutoFácil`, html: envolverHTML ? envolverHTML(html) : html });
+      await pool.query('UPDATE rh_liquidaciones SET correo_enviado_at=NOW() WHERE id=?', [l.id]);
       enviadas++;
     } catch (e) { console.error('[remuneraciones correo]', l.email, e.message); }
   }
@@ -2595,13 +2598,22 @@ async function getNominaBanco(req, res) {
   try {
     const mes = String(req.query.mes || '').slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(mes)) return fail(res, 'Mes inválido', 400);
+    const d = await nominaBancoDatos(mes);
+    if (!d) return fail(res, `No hay liquidaciones EMITIDAS para ${mes}. Emite el mes primero.`, 404);
+    ok(res, d);
+  } catch (e) { fail(res, e.message); }
+}
+/* Datos puros de la Nómina Banco (motor único): los usa el botón Nómina Banco y la ODP de sueldos
+   que nace al emitir (adjunto CSV). null si el mes no tiene liquidaciones emitidas. */
+async function nominaBancoDatos(mes) {
+  {
     const [liqs] = await pool.query(
       `SELECT l.id_usuario, l.liquido, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut, u.email,
               f.banco_pago, f.tipo_cuenta_pago, f.num_cuenta_pago
          FROM rh_liquidaciones l JOIN usuarios u ON u.id_usuario=l.id_usuario
          LEFT JOIN rh_fichas f ON f.id_usuario=l.id_usuario
         WHERE l.mes=? AND l.estado='EMITIDA' ORDER BY u.apellido, u.nombre`, [mes]);
-    if (!liqs.length) return fail(res, `No hay liquidaciones EMITIDAS para ${mes}. Emite el mes primero.`, 404);
+    if (!liqs.length) return null;
     const avisos = [], filas = [];
     let total = 0;
     const catBanco = await catalogo('BANCO');   // código SBIF desde el catálogo único (fallback: mapa BANCOS_SBIF)
@@ -2622,8 +2634,65 @@ async function getNominaBanco(req, res) {
         cuenta, monto: liquido, email: l.email || '', glosa: `SUELDO ${mes}` });
       total += liquido;
     }
-    ok(res, { mes, filas, total, avisos });
-  } catch (e) { fail(res, e.message); }
+    return { mes, filas, total, avisos };
+  }
+}
+
+/* ── ORDEN DE PAGO DE SUELDOS (Pato, 28-09-2026) ──────────────────────────────────
+   Al EMITIR nace la ODP de los sueldos líquidos del mes ("DE ACUERDO A NÓMINA ADJUNTA", misma
+   figura que los anticipos) con la Nómina Banco adjunta en CSV y el detalle por persona. Las
+   liquidaciones NO se mandan por correo al emitir: se mandan cuando Tesorería PAGA esta ODP
+   (hook onOdpPagadaRemuneraciones) — la persona recibe su liquidación junto con el depósito.
+   Idempotente por concepto. */
+require('../../../../shared/migrate').enFila('rh-liq-correo-enviado', async () => {
+  await pool.query('ALTER TABLE rh_liquidaciones ADD COLUMN IF NOT EXISTS correo_enviado_at DATETIME NULL').catch(() => {});
+});
+const SUELDOS_CONCEPTO = mes => `Remuneraciones ${mes} — sueldos líquidos según Nómina Banco adjunta`;
+async function ordenPagoSueldos(mes, req) {
+  const d = await nominaBancoDatos(mes);
+  if (!d || !d.filas.length || !(d.total > 0)) return null;
+  const concepto = SUELDOS_CONCEPTO(mes);
+  const [[ya]] = await pool.query("SELECT numero FROM ordenes_pago WHERE concepto=? AND estado<>'ANULADA' LIMIT 1", [concepto]);
+  if (ya) return { numero: ya.numero, total: d.total, existente: true };
+  let [[prov]] = await pool.query("SELECT id, nombre FROM proveedores WHERE UPPER(nombre) LIKE 'DE ACUERDO A N%MINA ADJUNTA%' LIMIT 1");
+  if (!prov) {
+    const [np] = await pool.query('INSERT INTO proveedores (nombre, activo, comentario) VALUES (?,1,?)', ['DE ACUERDO A NÓMINA ADJUNTA', 'Beneficiario genérico para pagos masivos al personal (TEF con nómina adjunta).']);
+    prov = { id: np.insertId, nombre: 'DE ACUERDO A NÓMINA ADJUNTA' };
+  }
+  const { calcularDoc } = require('../../../ordenes-pago/src/controllers/ordenes-pago.controller');
+  const m = await calcularDoc('Otros', 'EXENTO', d.total);   // sueldos: sin impuesto
+  const u = (req && req.usuario) || {}, hoy = hoyChile();
+  const co = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
+  const obs = `Generada automáticamente al EMITIR las liquidaciones de ${mes}. Pagar por Nómina Banco (CSV adjunto). ` +
+    `AL MARCAR PAGADA se envía a cada colaborador su liquidación por correo.\nDetalle (${d.filas.length} personas):\n` +
+    d.filas.map(f => ` • ${f.nombre} (${f.rut || '—'}): ${f.banco || 'sin banco'} ${f.tipo_cuenta || ''} ${f.cuenta || ''} — ${co(f.monto)}`).join('\n') +
+    (d.avisos.length ? `\nAVISOS: ${d.avisos.join(' · ')}` : '') + `\nTOTAL líquidos: ${co(d.total)}`;
+  const [r] = await pool.query(
+    `INSERT INTO ordenes_pago (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento, tratamiento,
+        monto_bruto, monto_neto, impuesto_pct, impuesto_monto, monto, destino, fecha_emision, fecha_documento, metodo_pago, estado, observaciones, id_usuario, usuario_nombre)
+     VALUES (?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?,'Transferencia','EMITIDA',?,?,?)`,
+    [prov.id, prov.nombre, null, concepto, 'Remuneraciones', 'Otros', m.clase, m.bruto, m.neto, m.pct, m.imp, m.aPagar, 'Según Nómina Banco adjunta', hoy, hoy, obs, u.id_usuario || null, nombreDe(u) || 'Sistema']);
+  const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
+  const { numero } = await emitirCorrelativo({ origen: 'GENERAL', origen_id: r.insertId, concepto, monto: m.aPagar, id_usuario: u.id_usuario || null, usuario_nombre: nombreDe(u) || 'Sistema' });
+  await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
+  try {
+    const csv = '﻿' + ['RUT;Nombre;Banco;Codigo SBIF;Tipo cuenta;N cuenta;Monto;Email;Glosa']
+      .concat(d.filas.map(f => [f.rut, f.nombre, f.banco, f.banco_cod, f.tipo_cuenta, f.cuenta, f.monto, f.email, f.glosa].map(x => String(x == null ? '' : x).replace(/;/g, ',')).join(';'))).join('\r\n');
+    const pv = require('../../../postventa/src/controllers/postventa.controller');
+    await pv.guardarFacturaDoc({ origen: 'ODP', ref_id: r.insertId, nombre: `Nomina-Banco-${mes}.csv`, mime: 'text/csv', buffer: Buffer.from(csv, 'utf8'), usuario: nombreDe(u) || 'Sistema' });
+  } catch (e) { console.error('[remuneraciones ODP sueldos adjunto]', e.message); }
+  auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'orden_pago', entidad_id: String(r.insertId),
+    detalle: `ODP ${numero} de sueldos ${mes} por ${co(d.total)} (${d.filas.length} personas, Nómina Banco adjunta), generada al emitir las liquidaciones` });
+  return { numero, total: d.total, personas: d.filas.length };
+}
+/* Hook desde Órdenes de Pago → Pagar: la ODP de sueldos pagada dispara el correo de las liquidaciones. */
+async function onOdpPagadaRemuneraciones(idOrdenPago) {
+  const [[o]] = await pool.query('SELECT concepto FROM ordenes_pago WHERE id=?', [idOrdenPago]);
+  const m = o && String(o.concepto || '').match(/^Remuneraciones (\d{4}-\d{2}) — sueldos líquidos/);
+  if (!m) return null;
+  const n = await enviarLiquidacionesCorreo(m[1]);
+  console.log(`[remuneraciones] ODP de sueldos ${m[1]} pagada → ${n} liquidaciones enviadas por correo`);
+  return n;
 }
 
 /* Remuneración total PROYECTADA de la liquidación por emitir de UNA persona, con el motor único
@@ -2728,4 +2797,4 @@ const avisoPrelacion = async (req, res) => {
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic, editarAdicional, asignacionFicha,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion, haberesProyectados, prelacionDescuentos, avisoPrelacion,
-  getDescuentos, crearDescuento, editarDescuento, anularDescuento, ordenesPagoJudiciales, proveedorBeneficiario, onOdpPagadaJudicial, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
+  getDescuentos, crearDescuento, editarDescuento, anularDescuento, ordenesPagoJudiciales, proveedorBeneficiario, onOdpPagadaJudicial, onOdpPagadaRemuneraciones, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
