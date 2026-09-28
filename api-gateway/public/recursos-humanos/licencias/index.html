@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Licencias Médicas — AutoFácil</title>
-  <!-- v1.0 — registro de licencias por RRHH: días hábiles calculados, correo al supervisor, resumen por mes y persona -->
+  <!-- v1.1 — Excel real (.xlsx). v1.0 — registro de licencias por RRHH: días hábiles calculados, correo al supervisor, resumen por mes y persona -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -27,6 +27,7 @@
 <body>
 <div id="af-topnav"></div>
 <script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Recursos Humanos', href:'/recursos-humanos/' }, { label:'Licencias Médicas', icon:'bi-file-medical', current:true } ] };</script>
+<script src="/js/xlsx.full.min.js"></script>
 <script src="/js/topnav.js"></script>
 <div class="main-content">
   <div class="page-banner"><i class="bi bi-file-medical"></i><div><h2>Licencias Médicas</h2><p>Registro a nombre del colaborador: se calculan los días hábiles y al grabar el supervisor directo recibe un correo informativo. Solo Recursos Humanos ingresa licencias.</p></div></div>
@@ -148,9 +149,9 @@ function exportar(){
   if (!R?.detalle?.length) return;
   const filas = [['Colaborador','Desde','Hasta','Días hábiles','Comentario','Ingresada por'],
     ...R.detalle.map(x=>[x.nombre,fd(x.fecha_desde),fd(x.fecha_hasta),Number(x.dias_habiles),x.comentario||'',x.resuelto_nombre||''])];
-  const html = '<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c==null?'':c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
-  const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'],{type:'application/vnd.ms-excel'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='licencias-medicas.xls'; a.click(); URL.revokeObjectURL(a.href);
+  /* xlsx real (SheetJS): el HTML disfrazado de .xls hacía que Excel avisara "formato y extensión no coinciden" (Pato, 28-09-2026) */
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), 'Licencias');
+  XLSX.writeFile(wb, 'licencias-medicas.xlsx');
 }
 cargarColabs();
 </script>

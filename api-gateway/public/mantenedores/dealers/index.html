@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v2.15 — formato automatico de nombres: empresas en MAYUSCULAS y personas en Nombre Propio, con motor unico nombres-core.js compartido con el backend. v2.14 — Otros documentos en la ficha del dealer: boton para adjuntar respaldos libres (poderes, mandatos, correos) en creacion y en mantencion; van al bucket via shared/almacen-docs (tabla dealer_documentos) y quedan auditados. v2.13 — Datos bancarios editables completos: tipo de cuenta, titular de la cuenta y si es de EMPRESA o PERSONA (poder a un tercero); el TEF sale con RUT Pago + titular. v2.12 — Banco de la ficha con lista del mantenedor Bancos de la Plaza. v2.11 — ?ver=<id> abre la ficha directo (link desde Atención Remota → Solicitudes). v2.10 — Zona-Parque-Dealer: razones sociales largas abreviadas a EIRL en BD y columna Sucursal acotada · v2.9 — Potencial: columnas RUT y Zona; posiciones de dealers presentes en Zona-Parque-Dealer se leen de esa base (fuente unica, bloqueadas aqui) · v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
+  <!-- v2.16 — Excel real (.xlsx). v2.15 — formato automatico de nombres: empresas en MAYUSCULAS y personas en Nombre Propio, con motor unico nombres-core.js compartido con el backend. v2.14 — Otros documentos en la ficha del dealer: boton para adjuntar respaldos libres (poderes, mandatos, correos) en creacion y en mantencion; van al bucket via shared/almacen-docs (tabla dealer_documentos) y quedan auditados. v2.13 — Datos bancarios editables completos: tipo de cuenta, titular de la cuenta y si es de EMPRESA o PERSONA (poder a un tercero); el TEF sale con RUT Pago + titular. v2.12 — Banco de la ficha con lista del mantenedor Bancos de la Plaza. v2.11 — ?ver=<id> abre la ficha directo (link desde Atención Remota → Solicitudes). v2.10 — Zona-Parque-Dealer: razones sociales largas abreviadas a EIRL en BD y columna Sucursal acotada · v2.9 — Potencial: columnas RUT y Zona; posiciones de dealers presentes en Zona-Parque-Dealer se leen de esa base (fuente unica, bloqueadas aqui) · v2.8 — Zona-Parque-Dealer: la categoria de filas con RUT se lee de la categoria_asignada de la ficha (fuente unica) · v2.7 — 5ta card Zona - Parque - Dealer: base de posiciones del Excel comercial con RUT (match automatico + edicion manual) · v2.6 — rollout parametrico de la demo por categoria asignada (boton Demo portal, solo Admin) · v2.5 — celda ACTIVO centrada (badge + icono al medio de la columna) · v2.4 — las 4 cards de vista en una sola fila · v2.3 — icono demo centrado y alineado con el badge ACTIVO · v2.2 — icono 🏛 demo junto al SI (solo si el dealer NO tiene cuenta; desaparece al activarla) · v2.0 — locales por dealer: multi-parque + calle con comision pactada POR ubicacion (dealer_locales/dealer_comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -796,14 +796,9 @@ async function exportarExcel(btn) {
         d.contacto, d.telefono, d.correo, d.direccion, d.comuna, d.region,
         d.fecha_incorporacion ? String(d.fecha_incorporacion).slice(0, 10) : '']),
     ];
-    const html = '<table>' + filas.map((f, i) =>
-      '<tr>' + f.map(c => `<t${i ? 'd' : 'h'}>${escX(c)}</t${i ? 'd' : 'h'}>`).join('') + '</tr>').join('') + '</table>';
-    const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>' + html + '</body></html>'],
-      { type: 'application/vnd.ms-excel' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'dealers-' + (rows.length) + '-' + new Date().toISOString().slice(0, 10) + '.xls';
-    a.click(); URL.revokeObjectURL(a.href);
+    /* xlsx real (SheetJS): el HTML disfrazado de .xls hacía que Excel avisara "formato y extensión no coinciden" (Pato, 28-09-2026) */
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), 'Dealers');
+    XLSX.writeFile(wb, 'dealers-' + (rows.length) + '-' + new Date().toISOString().slice(0, 10) + '.xlsx');
   } catch (e) { alert('No se pudo exportar: ' + e.message); }
   finally { btn.disabled = false; btn.innerHTML = htmlBtn; }
 }

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Auxiliares — AutoFácil</title>
-  <!-- v1.14 — Traer del SII: casillero para emitir la Orden de Pago de cada factura (glosa y proveedor del SII, motor único de Órdenes de Pago); v1.13 — otros impuestos del RCV visibles y al gasto; "Sincronizar SII" refresca el mes que se está mirando; v1.12 — traer del SII: IVA no recuperable visible bajo el IVA (entra al gasto y al total, no al crédito fiscal); v1.11 — traer del SII: los documentos van al libro del período del RCV (no al de emisión) y las notas de crédito 61 también se importan; v1.10 — etiquetas EXENTO y sin cuenta sobrias (contorno gris); v1.9 — KPIs en una línea (FACTURAS: 687), la mitad de alto; v1.8 — botones de carga (AVSOFT/RCV) a la derecha de las pestañas: la barra de filtros queda en una fila y todo sube; v1.7 — resumen mensual como chips horizontales y detalle a ancho completo; v1.6 — columnas fusionadas (proveedor+RUT, emision+vcto, neto+exento con chip EXENTO) y 'sin cuenta' destacado en rojo; v1.5 — vista pulida: resumen mensual a 3 columnas con tooltip y mes filtrado destacado, tipo/folio separados, cebra + hover, encabezado pegado al scroll y suma al pie de lo listado; v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
+  <!-- v1.15 — Excel real (.xlsx). v1.14 — Traer del SII: casillero para emitir la Orden de Pago de cada factura (glosa y proveedor del SII, motor único de Órdenes de Pago); v1.13 — otros impuestos del RCV visibles y al gasto; "Sincronizar SII" refresca el mes que se está mirando; v1.12 — traer del SII: IVA no recuperable visible bajo el IVA (entra al gasto y al total, no al crédito fiscal); v1.11 — traer del SII: los documentos van al libro del período del RCV (no al de emisión) y las notas de crédito 61 también se importan; v1.10 — etiquetas EXENTO y sin cuenta sobrias (contorno gris); v1.9 — KPIs en una línea (FACTURAS: 687), la mitad de alto; v1.8 — botones de carga (AVSOFT/RCV) a la derecha de las pestañas: la barra de filtros queda en una fila y todo sube; v1.7 — resumen mensual como chips horizontales y detalle a ancho completo; v1.6 — columnas fusionadas (proveedor+RUT, emision+vcto, neto+exento con chip EXENTO) y 'sin cuenta' destacado en rojo; v1.5 — vista pulida: resumen mensual a 3 columnas con tooltip y mes filtrado destacado, tipo/folio separados, cebra + hover, encabezado pegado al scroll y suma al pie de lo listado; v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -52,6 +52,7 @@
 <body>
 <div id="af-topnav"></div>
 <script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Libros Auxiliares', icon:'bi-journals', current:true } ] };</script>
+<script src="/js/xlsx.full.min.js"></script>
 <script src="/js/topnav.js"></script>
 <div class="main-content">
   <div class="page-banner"><i class="bi bi-journals"></i><div><h2>Libros Auxiliares</h2><p>Detalle documento a documento de los auxiliares importados desde AVSOFT: compras (facturas de proveedores con IVA) y honorarios (boletas con retención). Filtra, revisa totales por mes y exporta a Excel.</p></div></div>
@@ -269,11 +270,9 @@ function exportar(){
        ...D.documentos.map(d=>[d.mes,d.rut,d.nombre,d.cargo,d.centro_costo,d.dias,d.sueldo_base,d.imponible,d.haberes,d.afp_nombre,d.afp_monto,d.salud_nombre,d.salud_monto,d.impuesto_unico,d.descuentos,d.liquido])]
     : [['Mes','N° Boleta','Emisión','RUT','Profesional','Glosa','Cta Gasto','Bruto','Tasa Ret.','Retención','Líquido'],
        ...D.documentos.map(d=>[d.mes,d.num_boleta,String(d.fecha_emision||'').slice(0,10),d.rut,d.nombre,d.glosa,d.cuenta_gasto,d.bruto,d.tasa_retencion,d.retencion,d.liquido])];
-  const html = '<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c==null?'':c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
-  const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'], { type:'application/vnd.ms-excel' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = (MODO==='C'?'auxiliar-compras':MODO==='V'?'auxiliar-ventas':MODO==='R'?'auxiliar-remuneraciones':'auxiliar-honorarios')+'-'+(fDesde.value||'')+'-'+(fHasta.value||'')+'.xls';
+  /* xlsx real (SheetJS): el HTML disfrazado de .xls hacía que Excel avisara "formato y extensión no coinciden" (Pato, 28-09-2026) */
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), 'Auxiliar');
+  XLSX.writeFile(wb, (MODO==='C'?'auxiliar-compras':MODO==='V'?'auxiliar-ventas':MODO==='R'?'auxiliar-remuneraciones':'auxiliar-honorarios')+'-'+(fDesde.value||'')+'-'+(fHasta.value||'')+'.xlsx');
   a.click(); URL.revokeObjectURL(a.href);
 }
 

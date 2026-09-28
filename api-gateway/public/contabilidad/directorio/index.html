@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Presentación Directorio — AutoFácil</title>
-  <!-- v1.8 — Lámina Gerencia Comercial (ops/montos por mes vs año anterior + bróker por financiera) -->
+  <!-- v1.9 — Excel real (.xlsx). v1.8 — Lámina Gerencia Comercial (ops/montos por mes vs año anterior + bróker por financiera) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js" defer></script>
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
@@ -175,11 +175,9 @@ async function copiarCuadro(btn){
 }
 function descargarCuadro(btn, titulo){
   const t = tablaDe(btn); if (!t) return;
-  const html = `<html><head><meta charset="utf-8"></head><body>${tablaInline(t).outerHTML}</body></html>`;
-  const blob = new Blob(['﻿'+html], {type:'application/vnd.ms-excel'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = titulo.toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi,'-').replace(/^-|-$/g,'') + '-' + fMes.value + '.xls';
+  /* xlsx real (SheetJS): el HTML disfrazado de .xls hacía que Excel avisara "formato y extensión no coinciden" (Pato, 28-09-2026) */
+  const wb = XLSX.utils.table_to_book(tablaInline(t), { sheet: titulo.replace(/[\\\/?*\[\]:]/g, ' ').slice(0, 31) });
+  XLSX.writeFile(wb, titulo.toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi,'-').replace(/^-|-$/g,'') + '-' + fMes.value + '.xlsx');
   a.click(); URL.revokeObjectURL(a.href);
 }
 
