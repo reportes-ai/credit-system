@@ -613,6 +613,7 @@ function renderConsulta(list) {
           ${sTh('N° OP','num_op')}
           ${sTh('RUT','rut_cliente')}
           ${sTh('Cliente','nombre_cliente')}
+          ${sTh('Ejecutivo','ejecutivo')}
           ${sTh('Financiera','financiera')}
           ${sTh('ID Financiera','id_financiera')}
           ${sTh('Fecha','fecha_otorgamiento')}
@@ -631,6 +632,7 @@ function renderConsulta(list) {
           <td class="num-cred">${c.num_op||c.numero_credito||'—'}</td>
           <td class="mono" style="white-space:nowrap">${c.rut_cliente||'—'}</td>
           <td>${c.nombre_cliente||'—'}</td>
+          <td style="font-size:.8rem;white-space:nowrap">${c.ejecutivo||'—'}</td>
           <td>${finTag(c.financiera)}</td>
           <td class="mono" style="font-size:.78rem;color:#6b7280">${c.id_financiera||'—'}</td>
           <td style="white-space:nowrap;font-size:.78rem;color:#6b7280">${fmtF(c.fecha_otorgamiento||c.created_at)}</td>

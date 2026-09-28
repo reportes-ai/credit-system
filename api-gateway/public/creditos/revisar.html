@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v3.3 — Desglose Seguros con los seguros REALES de la operación (RDH+E, cesantía, reparación menor); el cálculo teórico solo si no hay seguros informados. v3.2 — barra de acciones en UNA sola línea (sin wrap, botones más compactos, "Ver Carta") · v3.1 — boton "Ver Carta de Aprobación" junto a Editar Crédito: abre la carta que creó la operación con sus documentos adjuntos (/aprobaciones/?carta=ID) · v3.0 — boton Rechazar (con motivo obligatorio) en toda operacion propia en curso, junto al boton de la etapa · v2.9 — rotulos: Etapa del Crédito (antes "Estado") · v2.8 — navbar migrada al componente topnav (avatar, campanita y Salir) · v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
+<!-- v3.4 — ejecutivo en la cabecera de la ficha (Pato 28-09) · v3.3 — Desglose Seguros con los seguros REALES de la operación (RDH+E, cesantía, reparación menor); el cálculo teórico solo si no hay seguros informados. v3.2 — barra de acciones en UNA sola línea (sin wrap, botones más compactos, "Ver Carta") · v3.1 — boton "Ver Carta de Aprobación" junto a Editar Crédito: abre la carta que creó la operación con sus documentos adjuntos (/aprobaciones/?carta=ID) · v3.0 — boton Rechazar (con motivo obligatorio) en toda operacion propia en curso, junto al boton de la etapa · v2.9 — rotulos: Etapa del Crédito (antes "Estado") · v2.8 — navbar migrada al componente topnav (avatar, campanita y Salir) · v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -639,6 +639,7 @@ function renderPagina(c, ant, com) {
         ${c.financiera ? `<span class="ch-financiera">${c.financiera}</span>` : ''}
         <div class="ch-updated"><i class="bi bi-clock me-1"></i>Actualizado: ${fmtDT(c.updated_at||c.created_at)}</div>
         <div class="ch-updated"><i class="bi bi-calendar-plus me-1"></i>Ingresado: ${fmtDT(c.created_at)}</div>
+        <div class="ch-updated" style="font-weight:700"><i class="bi bi-person-badge me-1"></i>Ejecutivo: ${c.ejecutivo||'—'}</div>
       </div>
     </div>
 
