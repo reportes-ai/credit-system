@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <!-- v1.6 — conciliacion de precio unitario en el detalle del pedido: actualiza el catalogo y los demas pedidos pendientes · v1.5 — resumen por centro de costo en pendientes; detalle del pedido con "Mes pasado" por producto; orden con consolidado por codigo; ODP automatica al aprobarse la OC · v1.4 — workflow de aprobacion: firmas por nivel, hoja por sucursal con nro de pedido -->
+  <!-- v1.7 — pendientes: vista "Por producto" (agrupa los pedidos marcados o todos por codigo, para armar el pedido al proveedor antes de consolidar) · v1.6 — conciliacion de precio unitario en el detalle del pedido: actualiza el catalogo y los demas pedidos pendientes · v1.5 — resumen por centro de costo en pendientes; detalle del pedido con "Mes pasado" por producto; orden con consolidado por codigo; ODP automatica al aprobarse la OC · v1.4 — workflow de aprobacion: firmas por nivel, hoja por sucursal con nro de pedido -->
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -52,7 +52,12 @@
             </div>
           </div>
           <div id="resumenCC" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
-          <div class="table-responsive">
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <button class="btn btn-sm btn-outline-secondary active" id="btnVistaPed" onclick="vistaPed('pedidos')"><i class="bi bi-list-ul me-1"></i>Por pedido</button>
+            <button class="btn btn-sm btn-outline-secondary" id="btnVistaProd" onclick="vistaPed('productos')" title="Agrupa los pedidos marcados (o todos) por código de producto: lo que se le pide al proveedor"><i class="bi bi-upc-scan me-1"></i>Por producto</button>
+          </div>
+          <div id="pedPorProducto" style="display:none"></div>
+          <div class="table-responsive" id="pedPorPedido">
             <table class="table table-hover align-middle">
               <thead><tr>
                 <th style="width:34px"><input type="checkbox" id="chkAll" onchange="toggleAll(this.checked)"></th>
@@ -173,6 +178,38 @@
           <div style="font-size:.68rem;text-transform:uppercase;font-weight:800;color:#64748b">${esc(k)}</div>
           <div style="font-weight:800;color:#0141A2">${fmt(v.total)} <span class="muted" style="font-weight:400;font-size:.76rem">· ${v.n} pedido(s)</span></div>
         </div>`).join('');
+      tb.querySelectorAll('.chkPed').forEach(c => c.addEventListener('change', pintarPorProducto));
+      pintarPorProducto();
+    }
+    /* ── VISTA POR PRODUCTO (lo que se pide al proveedor, antes de consolidar) ── */
+    let VISTA_PED = 'pedidos';
+    function vistaPed(v){
+      VISTA_PED = v;
+      document.getElementById('btnVistaPed').classList.toggle('active', v==='pedidos');
+      document.getElementById('btnVistaProd').classList.toggle('active', v==='productos');
+      document.getElementById('pedPorPedido').style.display = v==='pedidos' ? '' : 'none';
+      document.getElementById('pedPorProducto').style.display = v==='productos' ? '' : 'none';
+      pintarPorProducto();
+    }
+    function pintarPorProducto(){
+      if (VISTA_PED !== 'productos') return;
+      const sel = seleccionados();
+      const base = sel.length ? peds.filter(p => sel.includes(p.id)) : peds;
+      const g = {};
+      base.forEach(p => (p.items||[]).forEach(i => {
+        const k = (i.sku||'') + '|' + (i.nombre||'');
+        g[k] = g[k] || { sku:i.sku, nombre:i.nombre, cantidad:0, subtotal:0, pedidos:new Set() };
+        g[k].cantidad += Number(i.cantidad)||0; g[k].subtotal += Number(i.subtotal)||0; g[k].pedidos.add(p.id);
+      }));
+      const filas = Object.values(g).sort((a,b)=>String(a.nombre).localeCompare(b.nombre));
+      const tot = filas.reduce((s,f)=>s+f.subtotal,0), uni = filas.reduce((s,f)=>s+f.cantidad,0);
+      document.getElementById('pedPorProducto').innerHTML = filas.length ? `
+        <p class="muted" style="font-size:.8rem;margin:0 0 6px">${sel.length ? `${sel.length} pedido(s) marcado(s)` : `Todos los ${peds.length} pendientes`} · ${filas.length} producto(s) · ${uni} unidad(es)</p>
+        <div class="table-responsive"><table class="table table-sm table-hover">
+          <thead><tr><th>Código</th><th>Producto</th><th class="text-end">Cantidad</th><th class="text-end">Subtotal</th><th class="text-end">Pedidos</th></tr></thead>
+          <tbody>${filas.map(f=>`<tr><td class="muted">${esc(f.sku||'—')}</td><td>${esc(f.nombre)}</td><td class="text-end"><b>${f.cantidad}</b></td><td class="text-end">${fmt(f.subtotal)}</td><td class="text-end muted" title="${[...f.pedidos].map(x=>'#'+x).join(', ')}">${f.pedidos.size}</td></tr>`).join('')}</tbody>
+          <tfoot><tr><th colspan="2" class="text-end">Total</th><th class="text-end">${uni}</th><th class="text-end">${fmt(tot)}</th><th></th></tr></tfoot>
+        </table></div>` : '<p class="muted">No hay pedidos pendientes.</p>';
     }
     /* ── DETALLE DE UN PEDIDO (corregir antes de consolidar) ── */
     let PED = null, MES_ANT = {};
@@ -250,7 +287,7 @@
       toast('Producto eliminado');
     }
 
-    function toggleAll(on){ document.querySelectorAll('.chkPed').forEach(c=>c.checked=on); }
+    function toggleAll(on){ document.querySelectorAll('.chkPed').forEach(c=>c.checked=on); pintarPorProducto(); }
     function seleccionados(){ return [...document.querySelectorAll('.chkPed:checked')].map(c=>+c.value); }
     async function consolidar(modo) {
       let ids = seleccionados();
