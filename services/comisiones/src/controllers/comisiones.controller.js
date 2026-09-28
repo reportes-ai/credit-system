@@ -754,6 +754,18 @@ async function calcularMes(mes, varsOverride) {
     const nombresU = new Set();
     for (const u of todosU) { nombresU.add(normN(u.nombre + ' ' + (u.apellido || ''))); nombresU.add(normN(String(u.nombre || '').split(/\s+/)[0] + ' ' + (u.apellido || ''))); }
 
+    /* Solo entran a la Revisión: (a) usuarios con perfil Ejecutivo Comercial, (b) quien tenga al menos
+       una operación OTORGADA en el mes (ejecutivos externos, jefes que colocan), (c) quien tenga
+       descuentos o ajustes que cobrar. Un gerente o tesorero que digitó una solicitud como ejecutivo
+       (queda DIGITADO) no comisiona ni debe aparecer (Leonardo y Cristina, Pato 28-09-2026). */
+    const [ejU] = await pool.query("SELECT u.nombre, u.apellido FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE p.nombre='Ejecutivo Comercial'").catch(() => [[]]);
+    const nombresEj = new Set();
+    for (const u of ejU) { nombresEj.add(normN(u.nombre + ' ' + (u.apellido || ''))); nombresEj.add(normN(String(u.nombre || '').split(/\s+/)[0] + ' ' + (u.apellido || ''))); }
+    for (const [ej, creds] of Object.entries(map)) {
+      const tieneOtorgada = creds.some(c => (c.estado_credito || '').toUpperCase() === 'OTORGADO');
+      if (!tieneOtorgada && !(dctos[ej] || []).length && !(ajustesPorEj[ej] || []).length && !nombresEj.has(normN(ej))) delete map[ej];
+    }
+
     const reglasProd = await require('../../../../shared/producto-reglas').mapaEjecutivoPct();   // AUTOFIN PREFERENTE → % ejecutivo propio (caché 60 s)
     const resultado = Object.entries(map).map(([ejecutivo, creds]) => {
       const calc = calcularComision(creds, vars, mes, { fecha_ingreso: ingresoDe[String(ejecutivo).toUpperCase().trim()] || null, reglas_producto: reglasProd });
