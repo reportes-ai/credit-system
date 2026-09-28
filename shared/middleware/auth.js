@@ -47,7 +47,8 @@ async function estadoSesion(id_usuario) {
   let cerradas = [];
   try {
     const [cs] = await pool.query(
-      'SELECT id FROM sesiones_usuario WHERE id_usuario = ? AND cerrada_limite = 1 AND login_at > NOW() - INTERVAL 2 DAY', [id_usuario]);
+      // También las cerradas por inactividad (motor sesiones-inactivas, 28-09-2026): mismo rechazo del sid
+      'SELECT id FROM sesiones_usuario WHERE id_usuario = ? AND (cerrada_limite = 1 OR cerrada_inactividad = 1) AND login_at > NOW() - INTERVAL 2 DAY', [id_usuario]);
     cerradas = cs.map(x => Number(x.id));
   } catch (_) {}
   const entry = {
@@ -63,6 +64,7 @@ async function estadoSesion(id_usuario) {
 /* Se llama al subir la versión: sin esto el usuario seguiría entrando hasta
    60 segundos después, que es justo lo que no se quiere en una desvinculación. */
 function olvidarSesion(id_usuario) { cacheSesion.delete(Number(id_usuario)); }
+function olvidarTodasLasSesiones() { cacheSesion.clear(); }   // tras cerrar sesiones por inactividad (motor sesiones-inactivas)
 
 /* Cierra TODAS las sesiones abiertas de un usuario, ya mismo. */
 async function cerrarSesiones(id_usuario) {
@@ -109,7 +111,7 @@ const verifyToken = async (req, res, next) => {
       }
       // Tope de sesiones simultáneas del perfil: esta sesión la cerró un ingreso más nuevo.
       if (payload.sid && Array.isArray(s.cerradas) && s.cerradas.includes(Number(payload.sid))) {
-        return res.status(401).json({ success: false, data: null, error: 'Esta sesión se cerró porque iniciaste sesión en otro dispositivo (tope de sesiones simultáneas de tu perfil). Ingresa de nuevo.' });
+        return res.status(401).json({ success: false, data: null, error: 'Esta sesión se cerró (por inactividad, o porque iniciaste sesión en otro dispositivo y tu perfil tiene un tope de sesiones simultáneas). Ingresa de nuevo.' });
       }
     } catch (e) {
       console.error('[auth] no se pudo verificar la sesión (se deja pasar):', e.message);
@@ -169,4 +171,4 @@ const requirePerfil = (...perfiles) => (req, res, next) => {
   next();
 };
 
-module.exports = { verifyToken, requirePerfil, cerrarSesiones, olvidarSesion, usuarioActual, JWT_SECRET, JWT_EXPIRES };
+module.exports = { verifyToken, requirePerfil, cerrarSesiones, olvidarSesion, olvidarTodasLasSesiones, usuarioActual, JWT_SECRET, JWT_EXPIRES };

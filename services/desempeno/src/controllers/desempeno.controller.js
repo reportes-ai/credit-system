@@ -391,4 +391,30 @@ const setComentarioAprob = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error' }); }
 };
 
-module.exports = { registrarLogin, ping, logout, logApertura, reporteDiario, reporteDia, reporteResumen, reporteCasos, setComentarioAprob };
+/* ── Motor sesiones-inactivas (Pato, 28-09-2026) ──────────────────────────────
+   Hasta ahora "Tiempo de inactividad" (Usuarios → Seguridad) no lo leía nadie: cerrar la pestaña no
+   hace logout y las sesiones quedaban "activas" días. Cada 5 min se cierran las sesiones cuyo último
+   latido (que solo llega con actividad real) es más viejo que ese tiempo: logout_at = last_seen,
+   cerrada_inactividad = 1; verifyToken rechaza ese sid y el usuario vuelve al login.
+   0 = nunca → se usa la vida del token (8 h) para que nada quede abierto eternamente. */
+require('../../../../shared/migrate').enFila('sesiones-inactivas-col', async () => {
+  await pool.query('ALTER TABLE sesiones_usuario ADD COLUMN IF NOT EXISTS cerrada_inactividad TINYINT NOT NULL DEFAULT 0').catch(() => {});
+});
+async function cerrarSesionesInactivas() {
+  try {
+    const [[c]] = await pool.query("SELECT valor FROM config_seguridad WHERE clave='timeout_inactividad'").catch(() => [[null]]);
+    let min = parseInt(c && c.valor, 10);
+    if (!Number.isFinite(min) || min <= 0) min = 480;
+    min = Math.max(min, 15);   // bajo 15 min se pisaría con la cadencia del latido
+    const [r] = await pool.query(
+      `UPDATE sesiones_usuario SET logout_at = last_seen, cerrada_inactividad = 1
+        WHERE logout_at IS NULL AND last_seen < NOW() - INTERVAL ? MINUTE`, [min]);
+    if (r.affectedRows) {
+      console.log(`[sesiones-inactivas] ${r.affectedRows} sesión(es) cerrada(s) por más de ${min} min sin actividad`);
+      try { require('../../../../shared/middleware/auth').olvidarTodasLasSesiones?.(); } catch (_) {}
+    }
+  } catch (e) { console.error('[sesiones-inactivas]', e.message); }
+}
+require('../../../../shared/scheduler').programar('sesiones-inactivas', cerrarSesionesInactivas, 5 * 60000);
+
+module.exports = { registrarLogin, ping, logout, logApertura, reporteDiario, reporteDia, reporteResumen, reporteCasos, setComentarioAprob, cerrarSesionesInactivas };

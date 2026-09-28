@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v278.0';
+const APP_VERSION = 'v278.1';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -938,7 +938,17 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', () => {
   const token = sessionStorage.getItem('token');
   if (!token) return;
-  const ping = () => fetch('/api/desempeno/ping', { method: 'POST', headers: { Authorization: 'Bearer ' + token } }).catch(() => {});
+  /* El latido solo va si hubo actividad REAL (mouse, teclado, toque, scroll o volver a la pestaña)
+     en los últimos 10 minutos: así last_seen refleja al usuario y no a una pestaña olvidada, y el
+     motor sesiones-inactivas puede cerrar la sesión según "Tiempo de inactividad" (Pato, 28-09-2026). */
+  let ultimaActividad = Date.now();
+  const marcar = () => { ultimaActividad = Date.now(); };
+  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'focus'].forEach(ev => window.addEventListener(ev, marcar, { passive: true }));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) marcar(); });
+  const ping = () => {
+    if (Date.now() - ultimaActividad > 10 * 60000) return;
+    fetch('/api/desempeno/ping', { method: 'POST', headers: { Authorization: 'Bearer ' + token } }).catch(() => {});
+  };
   ping();
   setInterval(ping, 60000);
 });

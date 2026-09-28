@@ -82,8 +82,9 @@ const getLogins = async (req, res) => {
     const { whereStr, vals } = whereLogins(req.query);
     const [[{ total }]] = await pool.query(`SELECT COUNT(*) total FROM sesiones_usuario ${whereStr}`, vals);
     const [rows] = await pool.query(
-      `SELECT id, id_usuario, nombre, perfil, login_at, last_seen, logout_at,
-              TIMESTAMPDIFF(MINUTE, login_at, COALESCE(logout_at, last_seen)) AS minutos
+      `SELECT id, id_usuario, nombre, perfil, login_at, last_seen, logout_at, cerrada_limite, cerrada_inactividad,
+              TIMESTAMPDIFF(MINUTE, login_at, COALESCE(logout_at, last_seen)) AS minutos,
+              TIMESTAMPDIFF(MINUTE, last_seen, NOW()) AS min_sin_actividad
        FROM sesiones_usuario ${whereStr} ORDER BY login_at DESC LIMIT ? OFFSET ?`,
       [...vals, limit, offset]);
     res.json({ success: true, data: { rows, total, page, limit, pages: Math.ceil(total / limit) }, error: null });
