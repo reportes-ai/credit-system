@@ -147,7 +147,7 @@ async function generarDevengos() {
     const [users] = await pool.query(
       `SELECT u.id_usuario, DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fi, COALESCE(f.anos_trabajados_previos,0) previos
          FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
-        WHERE u.estado='activo' AND COALESCE(f.no_mostrar,0)=0 AND u.fecha_ingreso IS NOT NULL`);
+        WHERE u.estado='activo' AND COALESCE(f.no_mostrar,0)=0 AND COALESCE(u.externo,0)=0 AND u.fecha_ingreso IS NOT NULL`);
     for (const u of users) {
       const [devs] = await pool.query(
         `SELECT tipo, DATE_FORMAT(periodo_desde,'%Y-%m-%d') pd FROM rh_vac_movimientos WHERE id_usuario=? AND tipo IN ('DEVENGO','PROGRESIVO')`, [u.id_usuario]);
@@ -351,7 +351,7 @@ async function calcularSaldosEquipo() {
       `SELECT u.id_usuario, u.id_supervisor, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut,
               DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso, COALESCE(f.anos_trabajados_previos,0) previos
          FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
-        WHERE u.estado='activo' AND COALESCE(f.no_mostrar,0)=0 ORDER BY u.apellido, u.nombre`);
+        WHERE u.estado='activo' AND COALESCE(f.no_mostrar,0)=0 AND COALESCE(u.externo,0)=0 ORDER BY u.apellido, u.nombre`);
     // Provisión de vacaciones (lo que habría que pagar si la persona se va):
     // motores únicos — base desde base-remuneracion.js y fórmula desde rrhh-core.js
     // (los mismos que usa el finiquito para el feriado proporcional).
