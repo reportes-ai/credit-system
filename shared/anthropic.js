@@ -32,6 +32,22 @@ function client() {
 /** ¿El motor puede operar? (la key está presente en el servidor) */
 function disponible() { return !!process.env.ANTHROPIC_API_KEY; }
 
+/* Caché de prompts (Pato, 28-09-2026): con cache=true el system prompt va como bloque con
+   cache_control ephemeral. Anthropic cachea todo lo que va ANTES del marcador (tools + system),
+   así que en los BI conversacionales el esquema, glosario y herramientas se cobran al 10% en las
+   iteraciones siguientes (TTL 5 min). Mínimo cacheable: 1.024 tokens (2.048 en Haiku); bajo eso
+   la API lo ignora sin error. El consumo se registra separando tokens leídos/escritos del caché. */
+const conCache = (system, cache) => (cache && system)
+  ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }]
+  : system;
+const usoDe = (resp, codigo, model, id_usuario) => ia.registrarUso({
+  codigo, modelo: model, id_usuario,
+  tokens_in:  resp.usage?.input_tokens  || 0,
+  tokens_out: resp.usage?.output_tokens || 0,
+  cache_w:    resp.usage?.cache_creation_input_tokens || 0,
+  cache_r:    resp.usage?.cache_read_input_tokens     || 0,
+});
+
 /**
  * Ejecuta un análisis con IA.
  * @param {object} o
@@ -46,7 +62,7 @@ function disponible() { return !!process.env.ANTHROPIC_API_KEY; }
  *  - modelo       override del modelo (def: el configurado para la funcionalidad)
  * @returns {Promise<{texto, datos, modelo, tokens_in, tokens_out, costo}>}
  */
-async function analizar({ codigo, system, prompt, documentos = [], max_tokens = 2048, thinking = false, json = false, id_usuario = null, modelo } = {}) {
+async function analizar({ codigo, system, prompt, documentos = [], max_tokens = 2048, thinking = false, json = false, id_usuario = null, modelo, cache = false } = {}) {
   if (codigo && !(await ia.iaActiva(codigo))) {
     const e = new Error('La IA para esta funcionalidad está desactivada.'); e.code = 'IA_OFF'; throw e;
   }
@@ -63,15 +79,15 @@ async function analizar({ codigo, system, prompt, documentos = [], max_tokens = 
   if (txt) content.push({ type: 'text', text: txt });
 
   const req = { model, max_tokens, messages: [{ role: 'user', content }] };
-  if (system) req.system = system;
+  if (system) req.system = conCache(system, cache);
   if (thinking) req.thinking = { type: 'adaptive' };
 
   const resp = await client().messages.create(req);
 
-  const tokens_in  = resp.usage?.input_tokens  || 0;
+  const tokens_in  = (resp.usage?.input_tokens || 0) + (resp.usage?.cache_creation_input_tokens || 0) + (resp.usage?.cache_read_input_tokens || 0);
   const tokens_out = resp.usage?.output_tokens || 0;
   let costo = 0;
-  try { costo = await ia.registrarUso({ codigo, modelo: model, tokens_in, tokens_out, id_usuario }); } catch (_) {}
+  try { costo = await usoDe(resp, codigo, model, id_usuario); } catch (_) {}
 
   const texto = (resp.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
   let datos = null;
@@ -99,7 +115,7 @@ async function analizar({ codigo, system, prompt, documentos = [], max_tokens = 
  * @param {object} o  { codigo, system, prompt, tools, ejecutarTool, max_tokens, id_usuario, modelo, max_iter }
  * @returns {Promise<{texto, iteraciones, tokens_in, tokens_out, costo}>}
  */
-async function analizarTools({ codigo, system, prompt, tools = [], ejecutarTool, max_tokens = 2048, id_usuario = null, modelo, max_iter = 6 } = {}) {
+async function analizarTools({ codigo, system, prompt, tools = [], ejecutarTool, max_tokens = 2048, id_usuario = null, modelo, max_iter = 6, cache = false } = {}) {
   if (codigo && !(await ia.iaActiva(codigo))) {
     const e = new Error('La IA para esta funcionalidad está desactivada.'); e.code = 'IA_OFF'; throw e;
   }
@@ -109,11 +125,11 @@ async function analizarTools({ codigo, system, prompt, tools = [], ejecutarTool,
 
   for (; it < max_iter; it++) {
     const req = { model, max_tokens, messages, tools };
-    if (system) req.system = system;
+    if (system) req.system = conCache(system, cache);
     const resp = await client().messages.create(req);
-    tokens_in  += resp.usage?.input_tokens  || 0;
+    tokens_in  += (resp.usage?.input_tokens || 0) + (resp.usage?.cache_creation_input_tokens || 0) + (resp.usage?.cache_read_input_tokens || 0);
     tokens_out += resp.usage?.output_tokens || 0;
-    try { costo += await ia.registrarUso({ codigo, modelo: model, tokens_in: resp.usage?.input_tokens || 0, tokens_out: resp.usage?.output_tokens || 0, id_usuario }); } catch (_) {}
+    try { costo += await usoDe(resp, codigo, model, id_usuario); } catch (_) {}
 
     const toolUses = (resp.content || []).filter(b => b.type === 'tool_use');
     texto = (resp.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();

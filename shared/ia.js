@@ -315,15 +315,19 @@ async function precioModelo(modelo) {
 }
 
 /** Registra una llamada a IA: calcula el costo con el precio vigente y lo guarda. */
-async function registrarUso({ codigo, modelo, tokens_in = 0, tokens_out = 0, id_usuario = null, meta = null } = {}) {
+async function registrarUso({ codigo, modelo, tokens_in = 0, tokens_out = 0, id_usuario = null, meta = null, cache_w = 0, cache_r = 0 } = {}) {
   try {
     const p = await precioModelo(modelo);
-    const ti = Number(tokens_in) || 0, to = Number(tokens_out) || 0;
-    const costo = (ti / 1e6) * p.in + (to / 1e6) * p.out;
+    const ti = Number(tokens_in) || 0, to = Number(tokens_out) || 0, cw = Number(cache_w) || 0, cr = Number(cache_r) || 0;
+    /* Caché de prompts: escribir al caché cuesta 1,25× el precio de entrada; leerlo 0,10×.
+       tokens_in guarda el total de entrada (normal + caché) para que las ventanas sigan comparables;
+       el desglose queda en meta. */
+    const costo = (ti / 1e6) * p.in + (cw / 1e6) * p.in * 1.25 + (cr / 1e6) * p.in * 0.10 + (to / 1e6) * p.out;
+    const m = (cw || cr) ? { ...(meta || {}), cache_w: cw, cache_r: cr } : meta;
     await pool.query(
       `INSERT INTO ia_uso (codigo, modelo, tokens_in, tokens_out, costo_usd, id_usuario, meta)
        VALUES (?,?,?,?,?,?,?)`,
-      [codigo || null, modelo || null, ti, to, costo, id_usuario, meta ? JSON.stringify(meta) : null]);
+      [codigo || null, modelo || null, ti + cw + cr, to, costo, id_usuario, m ? JSON.stringify(m) : null]);
     return costo;
   } catch (e) { console.error('[ia registrarUso]', e.message); return 0; }
 }

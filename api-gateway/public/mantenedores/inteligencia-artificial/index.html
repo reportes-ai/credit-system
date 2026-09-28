@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inteligencia Artificial — AutoFácil</title>
-  <!-- v1.7 — Uso IA: cards Mes en curso / Mes pasado y Saldo prepago Anthropic (anotado a mano, estimado). v1.6 -->
+  <!-- v1.8 — footer: caché de prompts. v1.7 — Uso IA: cards Mes en curso / Mes pasado y Saldo prepago Anthropic (anotado a mano, estimado). v1.6 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
@@ -159,6 +159,7 @@
         <li><b>Mostrar logo</b> → si el aviso y el sello incluyen el logo de Anthropic.</li>
         <li><b>Texto mientras analiza</b> → el aviso animado que aparece en la pantalla durante el análisis.</li>
         <li><b>Texto del sello</b> → la marca "Analizado con IA de Anthropic" que se estampa en el resultado o informe.</li>
+        <li><b>Caché de prompts</b> → los BI conversacionales (Pregúntale a AutoFácil y a Finanzas) mandan esquema, glosario y herramientas con caché de Anthropic: en las iteraciones siguientes esa entrada se cobra al 10%. El consumo registrado ya trae ese descuento (desglose en <code>meta.cache_r / cache_w</code>). Se activa por código en cada llamada (<code>cache: true</code>), no desde aquí.</li>
         <li><b>Saldo prepago Anthropic</b> (pestaña Uso IA) → se anota a mano el saldo de la consola de Anthropic y la fecha; el card muestra el saldo estimado restando el consumo registrado desde esa fecha. Es solo informativo: no frena la IA.</li>
       </ul>
     </div>

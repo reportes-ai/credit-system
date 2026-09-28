@@ -328,6 +328,7 @@ exports.preguntar = async (req, res) => {
     const { texto } = await analizarTools({
       codigo: CODIGO_IA, id_usuario: uid, system, prompt,
       tools: TOOLS, ejecutarTool: crearDispatcher(ultimo), max_tokens: 1500, max_iter: 10,
+      cache: true,   // esquema + glosario + herramientas se repiten en cada iteración: caché de prompts (28-09-2026)
     });
 
     // Extracción robusta del JSON final: el modelo a veces antepone prosa con llaves
