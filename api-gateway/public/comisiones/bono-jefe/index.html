@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.0 — equipo desde el primer mes completo del ejecutivo (ingreso antes del día 1). v1.9 — un Jefe Comercial ve solo su bono (sin botones de otros jefes). v1.8 — bitacora POR JEFE: la simulacion antes/despues se calcula para cada Jefe Comercial (los totales son la suma) y el detalle lo muestra por jefe. v1.7 — footer: variable Jefatura desde (ficha de Usuarios) y su efecto en meses historicos. v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
+<!-- v2.1 — leyenda "mes de producción · se paga en las liquidaciones de". v2.0 — equipo desde el primer mes completo del ejecutivo (ingreso antes del día 1). v1.9 — un Jefe Comercial ve solo su bono (sin botones de otros jefes). v1.8 — bitacora POR JEFE: la simulacion antes/despues se calcula para cada Jefe Comercial (los totales son la suma) y el detalle lo muestra por jefe. v1.7 — footer: variable Jefatura desde (ficha de Usuarios) y su efecto en meses historicos. v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bono Jefe Comercial — AutoFácil</title>
@@ -93,8 +93,9 @@
   <!-- ══ TAB BSC ══ -->
   <div id="vBsc">
     <div class="card filtros">
-      <label><i class="bi bi-calendar3 me-1"></i>Mes:</label>
+      <label><i class="bi bi-calendar3 me-1"></i>Mes de producción:</label>
       <input type="month" id="mes" onchange="cargarBSC()">
+      <span id="lblPago" style="font-size:.82rem;color:#64748b;margin-left:8px"></span>
       <!-- Cada Jefe Comercial se mide por SU gente a cargo (ficha de Usuarios) -->
       <span id="jefesBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-left:10px"></span>
       <span style="flex:1"></span>
@@ -324,6 +325,9 @@ let JEFE_SEL = null;   // id_usuario del Jefe Comercial en pantalla
 function elegirJefe(id){ JEFE_SEL = id; cargarBSC(); }
 async function cargarBSC(){
   const mes = document.getElementById('mes').value;
+  /* Mes de producción = colocaciones cursadas ese mes; el bono se paga en las liquidaciones del mes siguiente (misma leyenda que Nómina de Comisiones, Pato 28-09-2026) */
+  try { const [y,m] = mes.split('-').map(Number); const d = new Date(y, m, 1);
+    document.getElementById('lblPago').innerHTML = `se paga en las liquidaciones de <b>${d.toLocaleDateString('es-CL',{month:'long',year:'numeric'})}</b>`; } catch(_){}
   const tb = document.getElementById('tbody');
   tb.innerHTML = '<tr><td colspan="9" class="no-data"><i class="bi bi-hourglass-split"></i> Calculando…</td></tr>';
   let j; try { j = await (await fetch('/api/bono-jefe/bsc?mes='+mes+(JEFE_SEL?'&jefe='+JEFE_SEL:''), {headers:H()})).json(); }
