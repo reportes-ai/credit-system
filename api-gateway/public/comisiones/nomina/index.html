@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nómina de Comisiones — AutoFácil</title>
-  <!-- v1.1 — cuadros Aprobadas, Aceptadas y Sin respuesta del ejecutivo. v1.0 — nómina de comisiones por mes: monto a pagar, aprobación del supervisor y respuesta del ejecutivo con comentarios; Generar nómina = foto inmutable + correo a RRHH; regenerar ex profeso con motivo; historial de versiones (08-09-2026) -->
+  <!-- v1.2 — Excel real (.xlsx) en vez de HTML disfrazado. v1.1 — cuadros Aprobadas, Aceptadas y Sin respuesta del ejecutivo. v1.0 — nómina de comisiones por mes: monto a pagar, aprobación del supervisor y respuesta del ejecutivo con comentarios; Generar nómina = foto inmutable + correo a RRHH; regenerar ex profeso con motivo; historial de versiones (08-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -173,11 +173,12 @@ async function guardarDest(){ const r=await fetch('/api/comisiones/nomina/destin
 function exportar(){
   if(!D) return; const filas=[['Mes producción','Mes pago','Ejecutivo','RUT','Créditos','Financiado','Incentivo','Con semana corrida','Descuentos','Ajustes','A pagar','Aprobación','Notas aprobación','Respuesta ejecutivo','Comentario ejecutivo',D.vigente?'Nómina v'+D.vigente.version:'Cálculo vivo'],
     ...(D.filas||[]).map(f=>[D.mes,D.mes_pago,f.ejecutivo,f.rut||'',f.total_creditos,Math.round(f.total_financiado),Math.round(f.incentivo_final),Math.round(f.con_semana_corrida),Math.round(f.descuentos),Math.round(f.ajustes),Math.round(f.monto_pagar),f.estado_aprobacion,f.notas_aprobacion||'',f.ejec_estado,f.ejec_comentario||''])];
-  const html='<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
-  const blob=new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'],{type:'application/vnd.ms-excel'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='nomina-comisiones-'+D.mes+'.xls'; a.click(); URL.revokeObjectURL(a.href);
+  /* xlsx real (SheetJS): el HTML disfrazado de .xls hacía que Excel avisara "formato y extensión no coinciden" (Pato, 28-09-2026) */
+  const ws=XLSX.utils.aoa_to_sheet(filas); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Nómina '+D.mes);
+  XLSX.writeFile(wb,'nomina-comisiones-'+D.mes+'.xlsx');
 }
 </script>
+<script src="/js/xlsx.full.min.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
