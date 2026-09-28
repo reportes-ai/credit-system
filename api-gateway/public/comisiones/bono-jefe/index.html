@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.1 — leyenda "mes de producción · se paga en las liquidaciones de". v2.0 — equipo desde el primer mes completo del ejecutivo (ingreso antes del día 1). v1.9 — un Jefe Comercial ve solo su bono (sin botones de otros jefes). v1.8 — bitacora POR JEFE: la simulacion antes/despues se calcula para cada Jefe Comercial (los totales son la suma) y el detalle lo muestra por jefe. v1.7 — footer: variable Jefatura desde (ficha de Usuarios) y su efecto en meses historicos. v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
+<!-- v2.2 — informe paso a paso con detalle del cálculo por ejecutivo y tabla de nuevos dealers (OP, fecha, monto); el correo lleva lo mismo. v2.1 — leyenda "mes de producción · se paga en las liquidaciones de". v2.0 — equipo desde el primer mes completo del ejecutivo (ingreso antes del día 1). v1.9 — un Jefe Comercial ve solo su bono (sin botones de otros jefes). v1.8 — bitacora POR JEFE: la simulacion antes/despues se calcula para cada Jefe Comercial (los totales son la suma) y el detalle lo muestra por jefe. v1.7 — footer: variable Jefatura desde (ficha de Usuarios) y su efecto en meses historicos. v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bono Jefe Comercial — AutoFácil</title>
@@ -382,8 +382,17 @@ async function cargarBSC(){
   document.getElementById('pRenta').textContent = clp(pr.renta_total);
 
   document.getElementById('infMes').textContent = 'Mes evaluado: '+DATA.mes;
+  /* Nuevos dealers con negocios: tabla con las operaciones colocadas y la fecha de otorgamiento (Pato, 28-09-2026) */
+  const fmtF = f => f ? String(f).slice(0,10).split('-').reverse().join('-') : '—';
+  const dn = DATA.dealers_nuevos || [];
+  const dealersHtml = dn.length ? `
+    <div class="paso"><div class="num"><i class="bi bi-shop"></i></div><div style="flex:1"><h6>Nuevos dealers con negocios en ${esc(DATA.mes)}</h6>
+      <table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:6px">
+        <thead><tr style="background:#fdf2f8"><th style="padding:6px 8px;text-align:left">Dealer</th><th style="padding:6px 8px;text-align:left">Ejecutivo</th><th style="padding:6px 8px;text-align:right">N° OP</th><th style="padding:6px 8px;text-align:right">Fecha otorgamiento</th><th style="padding:6px 8px;text-align:right">Monto</th></tr></thead>
+        <tbody>${dn.flatMap(d => d.operaciones.map((o,i) => `<tr><td style="padding:5px 8px;border-bottom:1px solid #f1f5f9">${i===0?`<b>${esc(d.dealer)}</b>${d.rut?`<br><span style="color:#94a3b8">${esc(d.rut)}</span>`:''}`:''}</td><td style="padding:5px 8px;border-bottom:1px solid #f1f5f9">${esc(o.ejecutivo)}</td><td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right">${esc(o.num_op)}</td><td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right">${fmtF(o.fecha_otorgado)}</td><td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right">${clp(o.monto)}</td></tr>`)).join('')}</tbody>
+      </table></div></div>` : '';
   document.getElementById('pasos').innerHTML = DATA.pasos.map((s,i)=>`
-    <div class="paso"><div class="num">${i+1}</div><div><h6>${esc(s.titulo)}</h6><p>${esc(s.detalle)}</p></div></div>`).join('');
+    <div class="paso"><div class="num">${i+1}</div><div><h6>${esc(s.titulo)}</h6><p>${esc(s.detalle)}</p></div></div>`).join('') + dealersHtml;
 }
 async function enviarInforme(){
   const mes = document.getElementById('mes').value;

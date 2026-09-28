@@ -304,6 +304,23 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
           AND c.mes = t.pri AND c.estado_credito='OTORGADO'
         WHERE DATE_FORMAT(t.pri,'%Y-%m')=? AND c.ejecutivo IS NOT NULL AND c.ejecutivo<>''
         GROUP BY c.ejecutivo`, [mes]);   // pilar 3 sigue por `mes`: la "primera op" se ancla al mes contable histórico
+    // Detalle del pilar 3 para el informe: cada dealer nuevo con las operaciones que cursó en su
+    // primer mes, quién las colocó y la fecha de otorgamiento (Pato, 28-09-2026).
+    const [nvdDet] = await pool.query(
+      `SELECT t.d clave, COALESCE(NULLIF(dl.nombre_razon,''), NULLIF(dl.nombre_indexa,''), c.automotora) dealer, c.rut_dealer rut,
+              c.ejecutivo, c.num_op, DATE_FORMAT(c.fecha_otorgado,'%Y-%m-%d') fecha_otorgado, COALESCE(c.monto_financiado,0) monto
+         FROM (SELECT COALESCE(NULLIF(TRIM(rut_dealer),''), TRIM(automotora)) d, MIN(mes) pri
+                 FROM creditos
+                WHERE estado_credito='OTORGADO'
+                  AND COALESCE(NULLIF(TRIM(rut_dealer),''), TRIM(automotora)) IS NOT NULL
+                  AND COALESCE(NULLIF(TRIM(rut_dealer),''), TRIM(automotora))<>''
+                GROUP BY d) t
+         JOIN creditos c
+           ON COALESCE(NULLIF(TRIM(c.rut_dealer),''), TRIM(c.automotora)) = t.d
+          AND c.mes = t.pri AND c.estado_credito='OTORGADO'
+         LEFT JOIN dealers dl ON dl.id_dealer = c.id_dealer
+        WHERE DATE_FORMAT(t.pri,'%Y-%m')=? AND c.ejecutivo IS NOT NULL AND c.ejecutivo<>''
+        ORDER BY dealer, c.fecha_otorgado, c.num_op`, [mes]);
 
     const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
     const keyEj = s => norm(s).split(' ').filter(Boolean).sort().join(' ');
@@ -325,6 +342,16 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
       };
     }).map(f => ({ ...f, score: f.ptj_creditos + f.ptj_montos + f.ptj_dealers }));
 
+    // Dealers nuevos del EQUIPO evaluado (solo los atribuidos a ejecutivos de este jefe)
+    const kEquipo = new Set(ejs.map(e => keyEj(e.ejecutivo)));
+    const dealersNuevos = [];
+    for (const r of nvdDet) {
+      if (!kEquipo.has(keyEj(r.ejecutivo))) continue;
+      let d = dealersNuevos.find(x => x.clave === r.clave);
+      if (!d) { d = { clave: r.clave, dealer: r.dealer, rut: r.rut, ejecutivo: ejs.find(e => keyEj(e.ejecutivo) === keyEj(r.ejecutivo))?.ejecutivo || r.ejecutivo, operaciones: [] }; dealersNuevos.push(d); }
+      d.operaciones.push({ num_op: r.num_op, fecha_otorgado: r.fecha_otorgado, monto: Number(r.monto), ejecutivo: r.ejecutivo });
+    }
+
     // Fila PROMEDIO del equipo (como la fila 25 del Excel): promedio de las MÉTRICAS,
     // y sobre ese promedio se recalculan los puntajes
     const n = filas.length || 1;
@@ -342,6 +369,7 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
     // Informe paso a paso (mismo espíritu que el informe de comisiones de ejecutivos)
     const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
     const n2 = v => Number(v).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtFecha = f => (f ? String(f).slice(0, 10).split('-').reverse().join('-') : '—');
     let nombreJefe = null;
     if (idJefe) {
       const [[jj]] = await pool.query(
@@ -354,6 +382,10 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
       { titulo: `Pilar 1 — Créditos otorgados (pondera ${Math.round(cfg.pond_creditos * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.otorgados)} créditos otorgados en el mes. Regla: bajo el mínimo (${cfg.creditos_min}) el puntaje es 0; sobre lo esperado (${cfg.creditos_esperado}) se alcanza el máximo del pilar (${n2(cfg.pond_creditos * 100)} pts); entre medio es proporcional → (${n2(avg.otorgados)} ÷ ${cfg.creditos_esperado}) × ${Math.round(cfg.pond_creditos * 100)} = ${n2(avg.ptj_creditos)} pts.` },
       { titulo: `Pilar 2 — Montos Otorgados (pondera ${Math.round(cfg.pond_montos * 100)}%)`, detalle: `Promedio del equipo: ${clp(avg.monto_aprobado)} otorgados en el mes. Umbrales: mínimo ${clp(minM)} (${cfg.creditos_min} ops × ${clp(cfg.monto_por_op)}), esperado ${clp(espM)} (${cfg.creditos_esperado} ops × ${clp(cfg.monto_por_op)}). Puntaje: ${n2(avg.ptj_montos)} pts.` },
       { titulo: `Pilar 3 — Nuevos Dealers con Negocios (pondera ${Math.round(cfg.pond_dealers * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.dealers_nuevos)} dealers nuevos (dealers que cursaron su PRIMERA operación otorgada de la historia durante ${mes}, atribuidos al ejecutivo de esa operación). Regla: bajo el mínimo (${cfg.dealers_min}) es 0; si no, (valor ÷ ${cfg.dealers_esperado}) × ${Math.round(cfg.pond_dealers * 100)} = ${n2(avg.ptj_dealers)} pts, con tope en ${Math.round(cfg.pond_dealers * 100)} pts.` },
+      { titulo: 'Detalle de los nuevos dealers con negocios', detalle: dealersNuevos.length
+          ? dealersNuevos.map(dn => `${dn.dealer}${dn.rut ? ` (${dn.rut})` : ''} — ${dn.ejecutivo}: ${dn.operaciones.map(o => `OP ${o.num_op} otorgada el ${fmtFecha(o.fecha_otorgado)} por ${clp(o.monto)}`).join('; ')}.`).join(' ')
+          : `Ningún dealer cursó su primera operación con el equipo en ${mes}.` },
+      { titulo: 'Detalle del cálculo por ejecutivo', detalle: filas.map(f => `${f.ejecutivo}: ${f.otorgados} otorgados → ${n2(f.ptj_creditos)} pts · ${clp(f.monto_aprobado)} → ${n2(f.ptj_montos)} pts · ${f.dealers_nuevos} dealer(s) nuevo(s) → ${n2(f.ptj_dealers)} pts · score ${n2(f.score)}.`).join(' ') + ` Promedio del equipo: ${n2(avg.otorgados)} otorgados, ${clp(avg.monto_aprobado)}, ${n2(avg.dealers_nuevos)} dealers nuevos.` },
       { titulo: 'Score final del equipo', detalle: `${n2(avg.ptj_creditos)} + ${n2(avg.ptj_montos)} + ${n2(avg.ptj_dealers)} = ${n2(avg.score)} puntos.` },
       { titulo: 'Curva del premio', detalle: premio.pct_adicional === 0
           ? `El score (${n2(avg.score)}, se busca el entero ${premio.score_lookup}) no supera el mínimo de ${cfg.score_min} puntos → el premio del mes es $0. La curva parte a pagar sobre ${cfg.score_min} pts.`
@@ -361,7 +393,7 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
       { titulo: 'Premio del mes', detalle: `${clp(cfg.sueldo_fijo)} (fijo) × ${n2(premio.pct_adicional * 100)}% = ${clp(premio.variable)} de premio variable. Semana corrida: ${clp(premio.variable)} × ${n2(premio.factor_semana_aplicado * 100)}% = ${clp(premio.semana_corrida)} (art. 45 CT, factor del mes). Total variable: ${clp(premio.total_variable)} → Renta total del mes: ${clp(premio.renta_total)}.` },
     ];
 
-    return { mes, jefe: idJefe || null, jefe_nombre: nombreJefe, params: { ...cfg, min_montos: minM, esperado_montos: espM }, ejecutivos: filas, promedio: avg, premio, pasos };
+    return { mes, jefe: idJefe || null, jefe_nombre: nombreJefe, params: { ...cfg, min_montos: minM, esperado_montos: espM }, ejecutivos: filas, promedio: avg, premio, pasos, dealers_nuevos: dealersNuevos };
 }
 
 /* ── GET /api/bono-jefe/bsc?mes=YYYY-MM&jefe=<id_usuario> ──
@@ -420,30 +452,43 @@ const enviarInforme = async (req, res) => {
     const [yy, mm] = d.mes.split('-');
     const mesLargo = `${MESES[parseInt(mm,10)-1]} ${yy}`;
 
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const fmtF = f => (f ? String(f).slice(0, 10).split('-').reverse().join('-') : '—');
+    const td = (v, r) => `<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;${r ? 'text-align:right' : ''}">${v}</td>`;
     const bloqueDe = dd => { const filasHtml = dd.ejecutivos.map((f, i) => `
       <tr style="background:${i % 2 ? '#f8fafc' : '#fff'}">
-        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb">${f.ejecutivo}</td>
-        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${f.otorgados}</td>
-        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${clp(f.monto_aprobado)}</td>
+        ${td(esc(f.ejecutivo))}${td(f.otorgados, 1)}${td(n2v(f.ptj_creditos), 1)}${td(clp(f.monto_aprobado), 1)}${td(n2v(f.ptj_montos), 1)}${td(f.dealers_nuevos, 1)}${td(n2v(f.ptj_dealers), 1)}${td('<b>' + n2v(f.score) + '</b>', 1)}
       </tr>`).join('');
       const a = dd.promedio, pr = dd.premio;
+      const th = (t, r) => `<th style="padding:8px 10px;text-align:${r ? 'right' : 'left'};color:#0141A2;font-size:.78rem">${t}</th>`;
+      /* Detalle de los nuevos dealers: operaciones colocadas y fecha de otorgamiento (Pato, 28-09-2026) */
+      const dealersHtml = (dd.dealers_nuevos || []).length ? `
+        <div style="font-size:.9rem;font-weight:800;color:#012d70;margin:14px 0 6px">Nuevos dealers con negocios en ${mesLargo}</div>
+        <table style="width:100%;border-collapse:collapse;font-size:.84rem;margin-bottom:14px">
+          <thead><tr style="background:#fdf2f8">${th('Dealer')}${th('Ejecutivo')}${th('N° OP', 1)}${th('Fecha otorgamiento', 1)}${th('Monto', 1)}</tr></thead>
+          <tbody>${(dd.dealers_nuevos).flatMap(dn => dn.operaciones.map((o, i) => `<tr>${td(i === 0 ? `<b>${esc(dn.dealer)}</b>${dn.rut ? `<br><span style="color:#64748b">${esc(dn.rut)}</span>` : ''}` : '')}${td(esc(o.ejecutivo))}${td(esc(o.num_op), 1)}${td(fmtF(o.fecha_otorgado), 1)}${td(clp(o.monto), 1)}</tr>`)).join('')}</tbody>
+        </table>` : `<div style="font-size:.84rem;color:#64748b;margin:10px 0 14px">Ningún dealer cursó su primera operación con este equipo en ${mesLargo}.</div>`;
+      /* Detalle del cálculo: los mismos pasos del informe de la app */
+      const pasosHtml = `
+        <div style="font-size:.9rem;font-weight:800;color:#012d70;margin:14px 0 6px">Cómo se calculó, paso a paso</div>
+        <ol style="font-size:.82rem;color:#334155;line-height:1.5;padding-left:20px;margin:0 0 14px">
+          ${(dd.pasos || []).map(p => `<li style="margin-bottom:6px"><b>${esc(p.titulo)}.</b> ${esc(p.detalle)}</li>`).join('')}
+        </ol>`;
       return `
         <div style="font-size:1rem;font-weight:800;color:#012d70;margin:22px 0 8px;border-bottom:2px solid #dbeafe;padding-bottom:5px">
-          ${dd.jefe_nombre || 'Equipo comercial'} — su equipo (${dd.ejecutivos.length})</div>
-        <table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-bottom:16px">
+          ${esc(dd.jefe_nombre || 'Equipo comercial')} — su equipo (${dd.ejecutivos.length})</div>
+        <table style="width:100%;border-collapse:collapse;font-size:.84rem;margin-bottom:16px">
           <thead><tr style="background:#eff6ff">
-            <th style="padding:8px 12px;text-align:left;color:#0141A2">Ejecutivo Comercial</th>
-            <th style="padding:8px 12px;text-align:right;color:#0141A2">Créditos colocados</th>
-            <th style="padding:8px 12px;text-align:right;color:#0141A2">Monto otorgado</th>
+            ${th('Ejecutivo')}${th('Otorgados', 1)}${th('Pts', 1)}${th('Monto otorgado', 1)}${th('Pts', 1)}${th('Dealers nuevos', 1)}${th('Pts', 1)}${th('Score', 1)}
           </tr></thead>
           <tbody>${filasHtml}
             <tr style="background:#fffbeb;font-weight:800;border-top:2px solid #f59e0b">
-              <td style="padding:8px 12px">PROMEDIO DEL EQUIPO</td>
-              <td style="padding:8px 12px;text-align:right">${n2v(a.otorgados)}</td>
-              <td style="padding:8px 12px;text-align:right">${clp(a.monto_aprobado)}</td>
+              ${td('PROMEDIO DEL EQUIPO')}${td(n2v(a.otorgados), 1)}${td(n2v(a.ptj_creditos), 1)}${td(clp(a.monto_aprobado), 1)}${td(n2v(a.ptj_montos), 1)}${td(n2v(a.dealers_nuevos), 1)}${td(n2v(a.ptj_dealers), 1)}${td(n2v(a.score), 1)}
             </tr>
           </tbody>
         </table>
+        ${dealersHtml}
+        ${pasosHtml}
         <div style="background:#0f2d6b;color:#fff;border-radius:12px;padding:18px 22px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:18px">
           <div><div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;opacity:.75">Score del equipo</div>
             <div style="font-size:1.5rem;font-weight:900">${n2v(a.score)} pts</div></div>
@@ -460,7 +505,6 @@ const enviarInforme = async (req, res) => {
         </div>
         ${informes.map(bloqueDe).join('')}
         <div style="font-size:.78rem;color:#64748b;line-height:1.5;margin-top:14px">
-          Detalle del cálculo disponible en la app: Soporte → Bono Jefe Comercial (informe paso a paso).<br>
           Pilares: créditos otorgados ${Math.round(d.params.pond_creditos*100)}% · montos aprobados ${Math.round(d.params.pond_montos*100)}% · nuevos dealers ${Math.round(d.params.pond_dealers*100)}%.
         </div>
         <div style="margin-top:18px;padding-top:12px;border-top:1px dashed #cbd5e1;font-size:.78rem;color:#64748b">
