@@ -1415,7 +1415,9 @@ const upsert = async (req, res) => {
     } else { c.preferente = 0; c.producto = c.producto || null; c.parquePct = null; c.parqueMonto = null; }
     /* Comisión ejecutivo propuesta en la carta: normal = % del producto (PREFERENTE) o pct_ejecutivo_fin
        de Parámetros de Crédito. Menor o igual pasa; mayor solo con la excepción registrada. */
-    if (c.comEjecPct != null && c.comEjecPct !== '') {
+    // Solo el producto PREFERENTE lleva comisión ejecutivo en la carta (Pato, 28-09-2026): en el resto se
+    // calcula como siempre por las tablas de Revisión de Comisiones y acá se guarda NULL.
+    if (c.preferente && c.comEjecPct != null && c.comEjecPct !== '') {
       let normal = null;
       if (c.preferente) { const pr = await require('../../../../shared/producto-reglas').reglasDe(c.producto, c.acreedor); const e = pr ? require('../../../../shared/producto-reglas').ejecutivoPct(pr) : null; if (e != null) normal = e * 100; }
       if (normal == null) { const [[pp]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='pct_ejecutivo_fin'").catch(() => [[null]]); if (pp) normal = parseFloat(pp.valor); }
