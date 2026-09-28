@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inteligencia Artificial — AutoFácil</title>
-  <!-- v1.6 -->
+  <!-- v1.7 — Uso IA: cards Mes en curso / Mes pasado y Saldo prepago Anthropic (anotado a mano, estimado). v1.6 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
@@ -56,6 +56,12 @@
     .tab.active { color:var(--blue); box-shadow:0 -2px 0 var(--blue) inset; }
     /* Uso IA */
     .ucards { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:18px; }
+    .ucard.prepago { border-top-color:#0d9488; }
+    .ucard.prepago .est { font-weight:600; color:#0d9488; font-size:.7rem; margin-left:4px; }
+    .ucard-cost.bajo { color:#b91c1c; }
+    .prepago-form { display:flex; gap:6px; margin-top:8px; }
+    .prepago-form input { flex:1; min-width:0; font-size:.78rem; padding:3px 6px; border:1px solid #cbd5e1; border-radius:6px; }
+    @media (max-width:900px){ .ucards { grid-template-columns:repeat(2,1fr); } }
     .ucard { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:16px 18px; border-top:4px solid var(--blue); }
     .ucard-h { font-size:.78rem; color:#64748b; font-weight:700; }
     .ucard-cost { font-size:1.7rem; font-weight:800; color:var(--navy); margin:4px 0 2px; }
@@ -153,6 +159,7 @@
         <li><b>Mostrar logo</b> → si el aviso y el sello incluyen el logo de Anthropic.</li>
         <li><b>Texto mientras analiza</b> → el aviso animado que aparece en la pantalla durante el análisis.</li>
         <li><b>Texto del sello</b> → la marca "Analizado con IA de Anthropic" que se estampa en el resultado o informe.</li>
+        <li><b>Saldo prepago Anthropic</b> (pestaña Uso IA) → se anota a mano el saldo de la consola de Anthropic y la fecha; el card muestra el saldo estimado restando el consumo registrado desde esa fecha. Es solo informativo: no frena la IA.</li>
       </ul>
     </div>
     </div><!-- /tab-config -->
@@ -375,6 +382,15 @@
     const fmtTok = n => (Number(n)||0).toLocaleString('es-CL');
     const fmtUSD = n => { n = Number(n)||0; const dec = (Math.abs(n) < 1 && n !== 0) ? 4 : 2; return '$' + n.toLocaleString('en-US',{ minimumFractionDigits:dec, maximumFractionDigits:dec }); };
 
+    async function guardarPrepago(ev){
+      ev.preventDefault();
+      const saldo_usd = document.getElementById('ppSaldo').value, fecha = document.getElementById('ppFecha').value;
+      const r = await fetch('/api/ia-config', { method:'PUT', headers:{ ...H, 'Content-Type':'application/json' }, body: JSON.stringify({ prepago: { saldo_usd, fecha } }) });
+      const j = await r.json().catch(() => ({}));
+      if (!j.success) { alert(j.error || 'No se pudo guardar el saldo'); return false; }
+      renderUso();
+      return false;
+    }
     async function renderUso(){
       let j;
       try { const r = await fetch('/api/ia-config/uso?dias='+_usoDias, { headers:H }); j = await r.json(); }
@@ -382,10 +398,22 @@
       const cont = document.getElementById('usoBody');
       if (!j.success){ cont.innerHTML = '<div class="vacio">No se pudo cargar el uso.</div>'; return; }
       const d = j.data, hay = d.total.llamadas > 0;
-      const cards = [['30',d.ventanas.d30],['60',d.ventanas.d60],['90',d.ventanas.d90]].map(([dd,v]) => `
-        <div class="ucard"><div class="ucard-h">Últimos ${dd} días</div>
+      const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const hoy = new Date(), mPas = new Date(hoy.getFullYear(), hoy.getMonth()-1, 1);
+      const cards = [['Mes en curso · '+MESES[hoy.getMonth()], d.ventanas.mes_actual], ['Mes pasado · '+MESES[mPas.getMonth()], d.ventanas.mes_pasado],
+                     ['Últimos 30 días',d.ventanas.d30],['Últimos 60 días',d.ventanas.d60],['Últimos 90 días',d.ventanas.d90]].map(([t,v]) => `
+        <div class="ucard"><div class="ucard-h">${t}</div>
           <div class="ucard-cost">${fmtUSD(v.costo)}</div>
           <div class="ucard-sub">${fmtTok(v.tokens)} tokens · ${fmtTok(v.llamadas)} llamadas</div></div>`).join('');
+      /* Saldo del prepago Anthropic: la API no lo expone; se anota el saldo de la consola y la fecha, y se resta lo consumido desde ahí */
+      const p = d.prepago;
+      const saldoCard = `<div class="ucard prepago"><div class="ucard-h">Saldo prepago Anthropic ${p ? '<span class="est">estimado</span>' : ''}</div>
+          <div class="ucard-cost ${p && p.saldo_estimado < 5 ? 'bajo' : ''}">${p ? fmtUSD(p.saldo_estimado) : '—'}</div>
+          <div class="ucard-sub">${p ? `anotado ${fmtUSD(p.saldo_anotado)} el ${p.fecha.split('-').reverse().join('-')} · gastado desde entonces ${fmtUSD(p.gastado_desde)}` : 'Anota el saldo que muestra la consola de Anthropic'}</div>
+          <form class="prepago-form" onsubmit="return guardarPrepago(event)">
+            <input type="number" step="0.01" min="0" id="ppSaldo" placeholder="Saldo USD" value="${p ? p.saldo_anotado : ''}" required>
+            <input type="date" id="ppFecha" value="${p ? p.fecha : new Date().toISOString().slice(0,10)}" required>
+            <button type="submit" class="btn btn-sm btn-primary">Guardar</button></form></div>`;
       const rowsF = d.por_funcionalidad.length ? d.por_funcionalidad.map(f => `
         <tr><td>${esc(f.nombre)}</td><td class="r">${fmtTok(f.llamadas)}</td><td class="r">${fmtTok(f.tokens_in)}</td><td class="r">${fmtTok(f.tokens_out)}</td><td class="r">${fmtUSD(f.costo)}</td></tr>`).join('')
         : '<tr><td colspan="5" class="vacio2">Sin uso en el período</td></tr>';
@@ -396,7 +424,7 @@
       const precios = d.precios.map(p => `<tr><td>${esc(p.nombre)}</td><td class="r">${fmtUSD(p.precio_in)}</td><td class="r">${fmtUSD(p.precio_out)}</td></tr>`).join('');
       const venBtns = [30,60,90].map(x => `<button class="vbtn ${x===d.dias?'on':''}" data-d="${x}">${x} días</button>`).join('');
       cont.innerHTML = `
-        <div class="ucards">${cards}</div>
+        <div class="ucards">${cards}${saldoCard}</div>
         ${ !hay ? '<div class="card-af"><div class="vacio"><i class="bi bi-robot"></i>Aún no hay consumo registrado. Esta pestaña se llena sola cuando se use la IA.</div></div>' : '' }
         <div class="card-af">
           <div class="uso-head"><h3><i class="bi bi-grid-3x3-gap"></i>Por funcionalidad</h3>

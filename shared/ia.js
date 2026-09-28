@@ -184,6 +184,8 @@ async function getConfig(force = false) {
     texto_analizando: cfg.texto_analizando || DEFAULTS.texto_analizando,
     texto_analizado:  cfg.texto_analizado  || DEFAULTS.texto_analizado,
     mostrar_logo:     cfg.mostrar_logo !== '0',
+    prepago_saldo_usd: cfg.prepago_saldo_usd != null ? parseFloat(cfg.prepago_saldo_usd) : null,
+    prepago_fecha:    cfg.prepago_fecha || null,
     funcionalidades:  funcs,
     modelos:          modelos,
     afps:             afps,
@@ -231,11 +233,17 @@ async function registrarFuncionalidad({ codigo, nombre, descripcion, modelo }) {
 }
 
 /** Guardar config (master + textos + toggles + parámetros de cálculo). Devuelve la config nueva. */
-async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_logo, funcionalidades, params, afps, tramos } = {}) {
+async function setConfig({ activa, texto_analizando, texto_analizado, mostrar_logo, funcionalidades, params, afps, tramos, prepago } = {}) {
   const up = (k, v) => pool.query(
     'INSERT INTO ia_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)', [k, String(v)]);
   const pct = (v, def) => { let x = parseFloat(v); if (isNaN(x)) x = def; return Math.min(Math.max(x, 0), 100); };
   if (activa != null)           await up('activa', activa ? '1' : '0');
+  // Saldo del prepago Anthropic anotado a mano (USD) + fecha de la lectura; ver getUso
+  if (prepago && typeof prepago === 'object') {
+    const s = parseFloat(prepago.saldo_usd);
+    if (!isNaN(s) && s >= 0) await up('prepago_saldo_usd', s.toFixed(2));
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(prepago.fecha || ''))) await up('prepago_fecha', String(prepago.fecha));
+  }
   if (texto_analizando != null) await up('texto_analizando', String(texto_analizando).slice(0, 200));
   if (texto_analizado != null)  await up('texto_analizado',  String(texto_analizado).slice(0, 200));
   if (mostrar_logo != null)     await up('mostrar_logo', mostrar_logo ? '1' : '0');
@@ -335,8 +343,24 @@ async function getUso({ dias = 90 } = {}) {
       SUM(CASE WHEN fecha >= DATE_SUB(NOW(), INTERVAL 60 DAY) THEN 1 ELSE 0 END)                      AS n60,
       SUM(CASE WHEN fecha >= DATE_SUB(NOW(), INTERVAL 90 DAY) THEN costo_usd ELSE 0 END)              AS c90,
       SUM(CASE WHEN fecha >= DATE_SUB(NOW(), INTERVAL 90 DAY) THEN tokens_in+tokens_out ELSE 0 END)   AS t90,
-      SUM(CASE WHEN fecha >= DATE_SUB(NOW(), INTERVAL 90 DAY) THEN 1 ELSE 0 END)                      AS n90
+      SUM(CASE WHEN fecha >= DATE_SUB(NOW(), INTERVAL 90 DAY) THEN 1 ELSE 0 END)                      AS n90,
+      SUM(CASE WHEN fecha >= DATE_FORMAT(NOW(), '%Y-%m-01') THEN costo_usd ELSE 0 END)                AS cMa,
+      SUM(CASE WHEN fecha >= DATE_FORMAT(NOW(), '%Y-%m-01') THEN tokens_in+tokens_out ELSE 0 END)     AS tMa,
+      SUM(CASE WHEN fecha >= DATE_FORMAT(NOW(), '%Y-%m-01') THEN 1 ELSE 0 END)                        AS nMa,
+      SUM(CASE WHEN fecha >= DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m-01') AND fecha < DATE_FORMAT(NOW(), '%Y-%m-01') THEN costo_usd ELSE 0 END)            AS cMp,
+      SUM(CASE WHEN fecha >= DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m-01') AND fecha < DATE_FORMAT(NOW(), '%Y-%m-01') THEN tokens_in+tokens_out ELSE 0 END) AS tMp,
+      SUM(CASE WHEN fecha >= DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m-01') AND fecha < DATE_FORMAT(NOW(), '%Y-%m-01') THEN 1 ELSE 0 END)                    AS nMp
     FROM ia_uso`);
+
+  /* Saldo del prepago de Anthropic: la API no expone el saldo, así que el Administrador anota el saldo
+     que ve en la consola de Anthropic y la fecha de esa lectura (Configuración › Prepago). El saldo
+     estimado = saldo anotado − costo registrado desde esa fecha (Pato, 28-09-2026). */
+  const cfg = await getConfig();
+  let prepago = null;
+  if (cfg.prepago_saldo_usd != null && cfg.prepago_fecha) {
+    const [[g]] = await pool.query('SELECT COALESCE(SUM(costo_usd),0) c FROM ia_uso WHERE fecha >= ?', [cfg.prepago_fecha]);
+    prepago = { saldo_anotado: num(cfg.prepago_saldo_usd), fecha: cfg.prepago_fecha, gastado_desde: num(g.c), saldo_estimado: num(cfg.prepago_saldo_usd) - num(g.c) };
+  }
 
   const [pf] = await pool.query(`
     SELECT u.codigo, COALESCE(f.nombre, u.codigo) AS nombre,
@@ -367,7 +391,10 @@ async function getUso({ dias = 90 } = {}) {
       d30: { costo: num(v.c30), tokens: num(v.t30), llamadas: num(v.n30) },
       d60: { costo: num(v.c60), tokens: num(v.t60), llamadas: num(v.n60) },
       d90: { costo: num(v.c90), tokens: num(v.t90), llamadas: num(v.n90) },
+      mes_actual: { costo: num(v.cMa), tokens: num(v.tMa), llamadas: num(v.nMa) },
+      mes_pasado: { costo: num(v.cMp), tokens: num(v.tMp), llamadas: num(v.nMp) },
     },
+    prepago,
     por_funcionalidad: pf.map(mapRow),
     por_modelo: pm.map(mapRow),
     total: { llamadas: num(tot.llamadas), tokens_in: num(tot.tokens_in), tokens_out: num(tot.tokens_out), costo: num(tot.costo) },
