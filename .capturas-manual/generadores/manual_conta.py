@@ -183,11 +183,11 @@ def construir():
            'auxiliar con su asiento. El F29 sale del sistema porque el libro de compras se construye '
            'solo.')
     ficha(doc,
-          'El Contador revisa y confirma · la sincronización la hace el sistema solo (cada 2 días)',
+          'El Contador revisa y confirma · la sincronización la hace el sistema solo (lunes a viernes 08:00)',
           'ctb_libros_aux',
           'Certificado digital y Clave Tributaria cargados · mes sin candado',
           'Contabilidad → Libros Auxiliares')
-    paso(doc, 1, 'Sincronizar', 'Botón "Sincronizar SII (RCV)" o automático cada 2 días (el plan '
+    paso(doc, 1, 'Sincronizar', 'Botón "Sincronizar SII (RCV)" o automático de lunes a viernes a las 08:00 (el plan '
          'gratuito da 30 consultas al mes). Deja un espejo de solo lectura del SII; reemplaza el mes '
          'completo, así que re-sincronizar siempre es seguro.')
     paso(doc, 2, 'Ver la brecha', 'El banner muestra documentos del SII vs documentos del auxiliar. '
