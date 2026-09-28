@@ -1422,7 +1422,13 @@ const upsert = async (req, res) => {
       const tieneExc = Array.isArray(c.excepciones) && c.excepciones.some(x => (typeof x === 'string' ? x : (x && x.cod)) === 'COMISION_EJECUTIVO_SOBRE_NORMAL');
       if (normal != null && Number(c.comEjecPct) > normal + 1e-9 && !tieneExc)
         return res.status(400).json({ success: false, data: null, error: `La comisión ejecutivo propuesta (${Number(c.comEjecPct).toFixed(2).replace('.', ',')}%) supera la normal (${normal.toFixed(2).replace('.', ',')}%): requiere la excepción "Comisión ejecutivo sobre la normal"` });
-      c.comEjecMonto = Math.round((Number(c.montoCreditoCLP) || 0) * Number(c.comEjecPct) / 100);
+      /* IGUAL a la normal = NO hay pacto: se guarda NULL. La "normal" de Parámetros de Crédito
+         (pct_ejecutivo_fin, 2,12%) es el costo de rentabilidad e incluye parte del sueldo fijo;
+         si se guardaba como pactada, Revisión de Comisiones pagaba 2,12% en vez del 0,75/1% del
+         tramo (29 ops de septiembre, detectado con Bárbara el 28-09-2026). Solo un % distinto
+         (menor pactado, o mayor con excepción) es una comisión pactada de verdad. */
+      if (normal != null && Math.abs(Number(c.comEjecPct) - normal) < 1e-6) { c.comEjecPct = null; c.comEjecMonto = null; }
+      else c.comEjecMonto = Math.round((Number(c.montoCreditoCLP) || 0) * Number(c.comEjecPct) / 100);
     } else { c.comEjecPct = null; c.comEjecMonto = null; }
 
     const vals = [
