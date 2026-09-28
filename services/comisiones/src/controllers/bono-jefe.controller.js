@@ -222,9 +222,11 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
     const cfg = cfgOverride || await getCfg(mes);
 
     // Equipo: Ejecutivos Comerciales VIGENTES en el mes evaluado (convención: primer
-    // nombre + apellido paterno). Vigencia por la ficha de Usuarios: ingresó a más
-    // tardar el último día del mes y no estaba de baja antes de que el mes empezara
-    // — así un mes histórico no se diluye con quienes aún no entraban (Pato 2026-08-11).
+    // nombre + apellido paterno). Vigencia por la ficha de Usuarios: cuenta desde su
+    // PRIMER MES COMPLETO (ingresó antes del día 1 del mes evaluado) y no estaba de baja
+    // antes de que el mes empezara — así un mes histórico no se diluye con quienes aún
+    // no entraban (Pato 2026-08-11) ni con quien entró a mitad de mes y arrastra el
+    // promedio con cero (Manuel Basoalto, ingreso 22-09-2026; Pato 28-09-2026).
     /* Jefatura con vigencia: la gente de un jefe que AÚN no asumía en el mes
        evaluado (jefatura_desde posterior) cuenta para el jefe TITULAR de ese mes
        (el de jefatura más antigua o sin fecha). Así julio-2026 queda completo en
@@ -261,7 +263,7 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
         WHERE p.nombre='Ejecutivo Comercial'
           AND (u.estado='activo' OR u.fecha_baja IS NOT NULL)
           AND u.fecha_ingreso IS NOT NULL
-          AND u.fecha_ingreso <= LAST_DAY(CONCAT(?,'-01'))
+          AND u.fecha_ingreso < CONCAT(?,'-01')
           AND (u.fecha_baja IS NULL OR u.fecha_baja >= CONCAT(?,'-01'))
           AND ${supSql}
         ORDER BY ejecutivo`, [mes, mes, ...(supervisores || [])]);
