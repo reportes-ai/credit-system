@@ -22,7 +22,42 @@
       : '/login.html';
   }
 
-  if (!token || !usuario) { redirigir(); return; }
+  /* ── Una pestaña nueva HEREDA la sesión de otra pestaña del mismo navegador (Pato, 28-09-2026) ──
+     El token vive en sessionStorage (por pestaña, muere al cerrar el navegador). Sin esto, cada pestaña
+     nueva pedía login, creaba una sesión más y el tope de 2 sesiones simultáneas cerraba una pestaña viva:
+     Carmen hizo 8 logins en una mañana en cascada. Mecanismo: la pestaña nueva pide por localStorage
+     ('af_pedir_sesion'); una pestaña con sesión responde escribiendo 'af_sesion' y borrándola en el mismo
+     tick (queda solo el evento storage, nada en disco); la nueva copia token y usuario y recarga.
+     Si nadie responde en 600 ms, va al login como siempre. */
+  if (!token || !usuario) {
+    let resuelto = false;
+    const onStorage = (ev) => {
+      if (ev.key !== 'af_sesion' || !ev.newValue || resuelto) return;
+      try {
+        const s = JSON.parse(ev.newValue);
+        if (!s || !s.token || !s.usuario) return;
+        resuelto = true;
+        sessionStorage.setItem('token', s.token);
+        sessionStorage.setItem('usuario', s.usuario);
+        window.removeEventListener('storage', onStorage);
+        location.reload();
+      } catch (_) {}
+    };
+    window.addEventListener('storage', onStorage);
+    try { localStorage.setItem('af_pedir_sesion', String(Date.now())); localStorage.removeItem('af_pedir_sesion'); } catch (_) {}
+    setTimeout(() => { if (!resuelto) { window.removeEventListener('storage', onStorage); redirigir(); } }, 600);
+    return;
+  }
+  // Esta pestaña tiene sesión: responde a las pestañas nuevas que la pidan
+  window.addEventListener('storage', (ev) => {
+    if (ev.key !== 'af_pedir_sesion' || !ev.newValue) return;
+    try {
+      const t = sessionStorage.getItem('token'), u = sessionStorage.getItem('usuario');
+      if (!t || !u) return;
+      localStorage.setItem('af_sesion', JSON.stringify({ token: t, usuario: u }));
+      localStorage.removeItem('af_sesion');
+    } catch (_) {}
+  });
 
   try {
     // Decodificar el payload (segunda parte del JWT, base64url)
