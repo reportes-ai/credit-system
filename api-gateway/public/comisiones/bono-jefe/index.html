@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.2 — informe paso a paso con detalle del cálculo por ejecutivo y tabla de nuevos dealers (OP, fecha, monto); el correo lleva lo mismo. v2.1 — leyenda "mes de producción · se paga en las liquidaciones de". v2.0 — equipo desde el primer mes completo del ejecutivo (ingreso antes del día 1). v1.9 — un Jefe Comercial ve solo su bono (sin botones de otros jefes). v1.8 — bitacora POR JEFE: la simulacion antes/despues se calcula para cada Jefe Comercial (los totales son la suma) y el detalle lo muestra por jefe. v1.7 — footer: variable Jefatura desde (ficha de Usuarios) y su efecto en meses historicos. v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
+<!-- v2.3 — pasos 5 y 6 como cuadros. v2.2 — informe paso a paso con detalle del cálculo por ejecutivo y tabla de nuevos dealers (OP, fecha, monto); el correo lleva lo mismo. v2.1 — leyenda "mes de producción · se paga en las liquidaciones de". v2.0 — equipo desde el primer mes completo del ejecutivo (ingreso antes del día 1). v1.9 — un Jefe Comercial ve solo su bono (sin botones de otros jefes). v1.8 — bitacora POR JEFE: la simulacion antes/despues se calcula para cada Jefe Comercial (los totales son la suma) y el detalle lo muestra por jefe. v1.7 — footer: variable Jefatura desde (ficha de Usuarios) y su efecto en meses historicos. v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bono Jefe Comercial — AutoFácil</title>
@@ -364,7 +364,7 @@ async function cargarBSC(){
     <td class="grp-m">${clp(f.monto_aprobado)}</td><td class="grp-m ptj">${n2(f.ptj_montos)}</td>
     <td class="grp-d">${f.dealers_nuevos}</td><td class="grp-d ptj">${n2(f.ptj_dealers)}</td>
     <td class="score">${n2(f.score)}</td></tr>`).join('');
-  const a = DATA.promedio;
+  const pav = DATA.promedio;
   tb.innerHTML = (filas || '<tr><td colspan="9" class="no-data">Sin ejecutivos comerciales activos</td></tr>') + `
     <tr class="prom"><td></td><td class="nom"><i class="bi bi-people-fill me-1"></i>PROMEDIO DEL EQUIPO</td>
     <td class="grp-c">${n2(a.otorgados)}</td><td class="grp-c ptj">${n2(a.ptj_creditos)}</td>
@@ -385,14 +385,21 @@ async function cargarBSC(){
   /* Nuevos dealers con negocios: tabla con las operaciones colocadas y la fecha de otorgamiento (Pato, 28-09-2026) */
   const fmtF = f => f ? String(f).slice(0,10).split('-').reverse().join('-') : '—';
   const dn = DATA.dealers_nuevos || [];
-  const dealersHtml = dn.length ? `
-    <div class="paso"><div class="num"><i class="bi bi-shop"></i></div><div style="flex:1"><h6>Nuevos dealers con negocios en ${esc(DATA.mes)}</h6>
-      <table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:6px">
-        <thead><tr style="background:#fdf2f8"><th style="padding:6px 8px;text-align:left">Dealer</th><th style="padding:6px 8px;text-align:left">Ejecutivo</th><th style="padding:6px 8px;text-align:right">N° OP</th><th style="padding:6px 8px;text-align:right">Fecha otorgamiento</th><th style="padding:6px 8px;text-align:right">Monto</th></tr></thead>
-        <tbody>${dn.flatMap(d => d.operaciones.map((o,i) => `<tr><td style="padding:5px 8px;border-bottom:1px solid #f1f5f9">${i===0?`<b>${esc(d.dealer)}</b>${d.rut?`<br><span style="color:#94a3b8">${esc(d.rut)}</span>`:''}`:''}</td><td style="padding:5px 8px;border-bottom:1px solid #f1f5f9">${esc(o.ejecutivo)}</td><td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right">${esc(o.num_op)}</td><td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right">${fmtF(o.fecha_otorgado)}</td><td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right">${clp(o.monto)}</td></tr>`)).join('')}</tbody>
-      </table></div></div>` : '';
+  const TD = 'padding:5px 8px;border-bottom:1px solid #f1f5f9', TDR = TD+';text-align:right';
+  const TH = 'padding:6px 8px;text-align:left', THR = 'padding:6px 8px;text-align:right';
+  const n2 = v => Number(v||0).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2});
+  /* Paso 5 (DEALERS) y paso 6 (EJECUTIVOS) se muestran como cuadro, no como texto (Pato, 28-09-2026) */
+  const tablaDealers = dn.length ? `<table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:6px">
+        <thead><tr style="background:#fdf2f8"><th style="${TH}">Dealer</th><th style="${TH}">Ejecutivo</th><th style="${THR}">N° OP</th><th style="${THR}">Fecha otorgamiento</th><th style="${THR}">Monto</th></tr></thead>
+        <tbody>${dn.flatMap(d => d.operaciones.map((o,i) => `<tr><td style="${TD}">${i===0?`<b>${esc(d.dealer)}</b>${d.rut?`<br><span style="color:#94a3b8">${esc(d.rut)}</span>`:''}`:''}</td><td style="${TD}">${esc(o.ejecutivo)}</td><td style="${TDR}">${esc(o.num_op)}</td><td style="${TDR}">${fmtF(o.fecha_otorgado)}</td><td style="${TDR}">${clp(o.monto)}</td></tr>`)).join('')}</tbody>
+      </table>` : `<p>Ningún dealer cursó su primera operación con el equipo en ${esc(DATA.mes)}.</p>`;
+  const tablaEjec = `<table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:6px">
+        <thead><tr style="background:#eff6ff"><th style="${TH}">Ejecutivo</th><th style="${THR}">Otorgados</th><th style="${THR}">Pts</th><th style="${THR}">Monto otorgado</th><th style="${THR}">Pts</th><th style="${THR}">Dealers nuevos</th><th style="${THR}">Pts</th><th style="${THR}">Score</th></tr></thead>
+        <tbody>${DATA.ejecutivos.map(f => `<tr><td style="${TD}">${esc(f.ejecutivo)}</td><td style="${TDR}">${f.otorgados}</td><td style="${TDR}">${n2(f.ptj_creditos)}</td><td style="${TDR}">${clp(f.monto_aprobado)}</td><td style="${TDR}">${n2(f.ptj_montos)}</td><td style="${TDR}">${f.dealers_nuevos}</td><td style="${TDR}">${n2(f.ptj_dealers)}</td><td style="${TDR}"><b>${n2(f.score)}</b></td></tr>`).join('')}
+        <tr style="background:#fffbeb;font-weight:800"><td style="${TD}">PROMEDIO DEL EQUIPO</td><td style="${TDR}">${n2(pav.otorgados)}</td><td style="${TDR}">${n2(pav.ptj_creditos)}</td><td style="${TDR}">${clp(pav.monto_aprobado)}</td><td style="${TDR}">${n2(pav.ptj_montos)}</td><td style="${TDR}">${n2(pav.dealers_nuevos)}</td><td style="${TDR}">${n2(pav.ptj_dealers)}</td><td style="${TDR}">${n2(pav.score)}</td></tr></tbody>
+      </table>`;
   document.getElementById('pasos').innerHTML = DATA.pasos.map((s,i)=>`
-    <div class="paso"><div class="num">${i+1}</div><div><h6>${esc(s.titulo)}</h6><p>${esc(s.detalle)}</p></div></div>`).join('') + dealersHtml;
+    <div class="paso"><div class="num">${i+1}</div><div style="flex:1;min-width:0"><h6>${esc(s.titulo)}</h6>${s.tipo==='DEALERS' ? tablaDealers : s.tipo==='EJECUTIVOS' ? tablaEjec : `<p>${esc(s.detalle)}</p>`}</div></div>`).join('');
 }
 async function enviarInforme(){
   const mes = document.getElementById('mes').value;

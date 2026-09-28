@@ -382,10 +382,10 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
       { titulo: `Pilar 1 — Créditos otorgados (pondera ${Math.round(cfg.pond_creditos * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.otorgados)} créditos otorgados en el mes. Regla: bajo el mínimo (${cfg.creditos_min}) el puntaje es 0; sobre lo esperado (${cfg.creditos_esperado}) se alcanza el máximo del pilar (${n2(cfg.pond_creditos * 100)} pts); entre medio es proporcional → (${n2(avg.otorgados)} ÷ ${cfg.creditos_esperado}) × ${Math.round(cfg.pond_creditos * 100)} = ${n2(avg.ptj_creditos)} pts.` },
       { titulo: `Pilar 2 — Montos Otorgados (pondera ${Math.round(cfg.pond_montos * 100)}%)`, detalle: `Promedio del equipo: ${clp(avg.monto_aprobado)} otorgados en el mes. Umbrales: mínimo ${clp(minM)} (${cfg.creditos_min} ops × ${clp(cfg.monto_por_op)}), esperado ${clp(espM)} (${cfg.creditos_esperado} ops × ${clp(cfg.monto_por_op)}). Puntaje: ${n2(avg.ptj_montos)} pts.` },
       { titulo: `Pilar 3 — Nuevos Dealers con Negocios (pondera ${Math.round(cfg.pond_dealers * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.dealers_nuevos)} dealers nuevos (dealers que cursaron su PRIMERA operación otorgada de la historia durante ${mes}, atribuidos al ejecutivo de esa operación). Regla: bajo el mínimo (${cfg.dealers_min}) es 0; si no, (valor ÷ ${cfg.dealers_esperado}) × ${Math.round(cfg.pond_dealers * 100)} = ${n2(avg.ptj_dealers)} pts, con tope en ${Math.round(cfg.pond_dealers * 100)} pts.` },
-      { titulo: 'Detalle de los nuevos dealers con negocios', detalle: dealersNuevos.length
+      { titulo: 'Detalle de los nuevos dealers con negocios', tipo: 'DEALERS', detalle: dealersNuevos.length
           ? dealersNuevos.map(dn => `${dn.dealer}${dn.rut ? ` (${dn.rut})` : ''} — ${dn.ejecutivo}: ${dn.operaciones.map(o => `OP ${o.num_op} otorgada el ${fmtFecha(o.fecha_otorgado)} por ${clp(o.monto)}`).join('; ')}.`).join(' ')
           : `Ningún dealer cursó su primera operación con el equipo en ${mes}.` },
-      { titulo: 'Detalle del cálculo por ejecutivo', detalle: filas.map(f => `${f.ejecutivo}: ${f.otorgados} otorgados → ${n2(f.ptj_creditos)} pts · ${clp(f.monto_aprobado)} → ${n2(f.ptj_montos)} pts · ${f.dealers_nuevos} dealer(s) nuevo(s) → ${n2(f.ptj_dealers)} pts · score ${n2(f.score)}.`).join(' ') + ` Promedio del equipo: ${n2(avg.otorgados)} otorgados, ${clp(avg.monto_aprobado)}, ${n2(avg.dealers_nuevos)} dealers nuevos.` },
+      { titulo: 'Detalle del cálculo por ejecutivo', tipo: 'EJECUTIVOS', detalle: filas.map(f => `${f.ejecutivo}: ${f.otorgados} otorgados → ${n2(f.ptj_creditos)} pts · ${clp(f.monto_aprobado)} → ${n2(f.ptj_montos)} pts · ${f.dealers_nuevos} dealer(s) nuevo(s) → ${n2(f.ptj_dealers)} pts · score ${n2(f.score)}.`).join(' ') + ` Promedio del equipo: ${n2(avg.otorgados)} otorgados, ${clp(avg.monto_aprobado)}, ${n2(avg.dealers_nuevos)} dealers nuevos.` },
       { titulo: 'Score final del equipo', detalle: `${n2(avg.ptj_creditos)} + ${n2(avg.ptj_montos)} + ${n2(avg.ptj_dealers)} = ${n2(avg.score)} puntos.` },
       { titulo: 'Curva del premio', detalle: premio.pct_adicional === 0
           ? `El score (${n2(avg.score)}, se busca el entero ${premio.score_lookup}) no supera el mínimo de ${cfg.score_min} puntos → el premio del mes es $0. La curva parte a pagar sobre ${cfg.score_min} pts.`
@@ -472,7 +472,7 @@ const enviarInforme = async (req, res) => {
       const pasosHtml = `
         <div style="font-size:.9rem;font-weight:800;color:#012d70;margin:14px 0 6px">Cómo se calculó, paso a paso</div>
         <ol style="font-size:.82rem;color:#334155;line-height:1.5;padding-left:20px;margin:0 0 14px">
-          ${(dd.pasos || []).map(p => `<li style="margin-bottom:6px"><b>${esc(p.titulo)}.</b> ${esc(p.detalle)}</li>`).join('')}
+          ${(dd.pasos || []).filter(p => !p.tipo).map(p => `<li style="margin-bottom:6px"><b>${esc(p.titulo)}.</b> ${esc(p.detalle)}</li>`).join('')}
         </ol>`;
       return `
         <div style="font-size:1rem;font-weight:800;color:#012d70;margin:22px 0 8px;border-bottom:2px solid #dbeafe;padding-bottom:5px">
