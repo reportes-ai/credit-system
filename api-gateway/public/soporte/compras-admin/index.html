@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <!-- v1.7 — pendientes: vista "Por producto" (agrupa los pedidos marcados o todos por codigo, para armar el pedido al proveedor antes de consolidar) · v1.6 — conciliacion de precio unitario en el detalle del pedido: actualiza el catalogo y los demas pedidos pendientes · v1.5 — resumen por centro de costo en pendientes; detalle del pedido con "Mes pasado" por producto; orden con consolidado por codigo; ODP automatica al aprobarse la OC · v1.4 — workflow de aprobacion: firmas por nivel, hoja por sucursal con nro de pedido -->
+  <!-- v1.8 — orden: hoja por sucursal agrupada POR PEDIDO con el nombre de quien lo pidio (para repartir), impresion con consolidado + casilla Recibido · v1.7 — pendientes: vista "Por producto" (agrupa los pedidos marcados o todos por codigo, para armar el pedido al proveedor antes de consolidar) · v1.6 — conciliacion de precio unitario en el detalle del pedido: actualiza el catalogo y los demas pedidos pendientes · v1.5 — resumen por centro de costo en pendientes; detalle del pedido con "Mes pasado" por producto; orden con consolidado por codigo; ODP automatica al aprobarse la OC · v1.4 — workflow de aprobacion: firmas por nivel, hoja por sucursal con nro de pedido -->
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -363,10 +363,14 @@
       // Ítems agrupados por sucursal, con el N° de pedido de origen
       const grupos = {};
       isuc.forEach(i => (grupos[i.sucursal] = grupos[i.sucursal] || []).push(i));
+      // Dentro de cada sucursal, un bloque POR PEDIDO (persona) para repartir lo que llega
+      const porPedido = its => { const m = {}; its.forEach(i => (m[i.id_pedido] = m[i.id_pedido] || { usuario:i.usuario_nombre, items:[] }).items.push(i)); return Object.entries(m); };
       const hojas = Object.entries(grupos).map(([suc, its]) => `
         <h6 style="font-weight:700;margin:10px 0 4px;color:#0141A2"><i class="bi bi-geo-alt me-1"></i>${esc(suc)} <span class="muted" style="font-weight:400">— ${fmt(its.reduce((a,i)=>a+Number(i.subtotal),0))}</span></h6>
-        <table class="table table-sm" style="margin-bottom:6px"><thead><tr><th style="width:76px">Pedido</th><th>Artículo</th><th class="text-end">Cant.</th><th class="text-end">Precio</th><th class="text-end">Subtotal</th></tr></thead>
-          <tbody>${its.map(it=>`<tr><td class="muted">#${it.id_pedido}</td><td>${esc(it.nombre)}</td><td class="text-end">${it.cantidad}</td><td class="text-end">${fmt(it.precio_unit)}</td><td class="text-end">${fmt(it.subtotal)}</td></tr>`).join('')}</tbody></table>`).join('');
+        ${porPedido(its).map(([pid, g]) => `
+        <div style="font-size:.82rem;font-weight:700;margin:6px 0 2px"><i class="bi bi-person me-1"></i>${esc(g.usuario||'')} <span class="muted" style="font-weight:400">· pedido #${pid} · ${g.items.length} ítem(s) · ${fmt(g.items.reduce((a,i)=>a+Number(i.subtotal),0))}</span></div>
+        <table class="table table-sm" style="margin-bottom:6px"><thead><tr><th>Artículo</th><th class="text-end">Cant.</th><th class="text-end">Precio</th><th class="text-end">Subtotal</th></tr></thead>
+          <tbody>${g.items.map(it=>`<tr><td>${esc(it.nombre)}</td><td class="text-end">${it.cantidad}</td><td class="text-end">${fmt(it.precio_unit)}</td><td class="text-end">${fmt(it.subtotal)}</td></tr>`).join('')}</tbody></table>`).join('')}`).join('');
       // Workflow: firmas hechas + nivel pendiente + botones si me toca firmar
       const firmasHTML = `
         <h6 style="font-weight:700;margin:12px 0 6px"><i class="bi bi-person-check me-1"></i>Workflow de aprobación</h6>
@@ -419,15 +423,23 @@
       if (!w) return;
       const grupos = {};
       isuc.forEach(i => (grupos[i.sucursal] = grupos[i.sucursal] || []).push(i));
-      const bloques = Object.entries(grupos).map(([suc, its]) => `
-        <h3>${esc(suc)}</h3>
-        <table><thead><tr><th>Pedido</th><th>Artículo</th><th>SKU</th><th class="r">Cant.</th><th class="r">Precio</th><th class="r">Subtotal</th></tr></thead>
-        <tbody>${its.map(it=>`<tr><td>#${it.id_pedido}</td><td>${esc(it.nombre)}</td><td>${esc(it.sku||'')}</td><td class="r">${it.cantidad}</td><td class="r">${fmt(it.precio_unit)}</td><td class="r">${fmt(it.subtotal)}</td></tr>`).join('')}
-        <tr><td colspan="5" class="r st">Subtotal ${esc(suc)}</td><td class="r st">${fmt(its.reduce((a,i)=>a+Number(i.subtotal),0))}</td></tr></tbody></table>`).join('');
+      const cons = ordenActual.items||[];
+      const consHTML = cons.length ? `<h3>Consolidado por producto (pedido al proveedor)</h3>
+        <table><thead><tr><th>Código</th><th>Producto</th><th class="r">Cantidad</th><th class="r">Subtotal</th></tr></thead>
+        <tbody>${cons.map(it=>`<tr><td>${esc(it.sku||'')}</td><td>${esc(it.nombre)}</td><td class="r"><b>${it.cantidad}</b></td><td class="r">${fmt(it.subtotal)}</td></tr>`).join('')}</tbody></table>` : '';
+      const bloques = Object.entries(grupos).map(([suc, its]) => {
+        const m = {}; its.forEach(i => (m[i.id_pedido] = m[i.id_pedido] || { usuario:i.usuario_nombre, items:[] }).items.push(i));
+        return `<h3>${esc(suc)}</h3>` + Object.entries(m).map(([pid, g]) => `
+        <div style="margin:8px 0 2px;font-weight:700">${esc(g.usuario||'')} <span style="font-weight:400;color:#475569">· pedido #${pid}</span></div>
+        <table><thead><tr><th>Artículo</th><th>SKU</th><th class="r">Cant.</th><th class="r">Precio</th><th class="r">Subtotal</th><th style="width:70px">Recibido</th></tr></thead>
+        <tbody>${g.items.map(it=>`<tr><td>${esc(it.nombre)}</td><td>${esc(it.sku||'')}</td><td class="r">${it.cantidad}</td><td class="r">${fmt(it.precio_unit)}</td><td class="r">${fmt(it.subtotal)}</td><td>☐</td></tr>`).join('')}
+        <tr><td colspan="4" class="r st">Subtotal ${esc(g.usuario||('#'+pid))}</td><td class="r st">${fmt(g.items.reduce((a,i)=>a+Number(i.subtotal),0))}</td><td></td></tr></tbody></table>`).join('')
+        + `<p class="r st" style="margin:4px 0 10px">Subtotal ${esc(suc)}: ${fmt(its.reduce((a,i)=>a+Number(i.subtotal),0))}</p>`; }).join('');
       const firmasTxt = firmas.filter(f=>f.accion==='APROBAR').map(f=>`${esc(f.usuario||'')} — ${esc(f.nivel_nombre||('nivel '+f.nivel))} (${new Date(f.fecha).toLocaleDateString('es-CL')})`).join('  ·  ');
       w.document.write(`<html><head><title>Orden #${o.id}</title><style>body{font:12.5px/1.45 system-ui,Arial;padding:22px;color:#111}h2{margin:0 0 2px}h3{margin:14px 0 4px;font-size:14px;color:#0141A2}table{width:100%;border-collapse:collapse;margin-top:4px}th,td{border:1px solid #ccc;padding:5px 7px;text-align:left}th{background:#f1f5f9}.r{text-align:right}.st{font-weight:700;background:#f8fafc}.tot{font-weight:800;font-size:14px}</style></head><body>
         <h2>Orden de Compra #${o.id} — AutoFácil</h2>
         <div>${o.modo==='SEPARADO'?'Por sucursal':'Consolidada a Casa Matriz'} — Destino: <b>${esc(o.destino||'')}</b> · Fecha: ${new Date(o.fecha).toLocaleString('es-CL')} · Estado: <b>${esc(o.estado)}</b></div>
+        ${consHTML}
         ${bloques}
         <table><tbody><tr><td class="r tot">TOTAL ORDEN</td><td class="r tot" style="width:130px">${fmt(o.total)}</td></tr></tbody></table>
         ${firmasTxt?`<p style="margin-top:12px;font-size:11.5px;color:#475569"><b>Aprobaciones:</b> ${firmasTxt}</p>`:''}
