@@ -231,7 +231,9 @@
     })();
     // Si ya hay sesión, redirigir al destino
     if (sessionStorage.getItem('token')) window.location.href = _next;
-    else {
+    else if (Date.now() - Number(localStorage.getItem('af_logout') || 0) < 5000) {
+      /* Se llegó por "Salir": NO heredar la sesión de otra pestaña (se loguearía solo). */
+    } else {
       /* Pestaña nueva del mismo navegador: hereda la sesión de otra pestaña abierta antes de pedir
          la clave (mismo canal que auth-guard.js: 'af_pedir_sesion' → 'af_sesion'). */
       let _heredada = false;

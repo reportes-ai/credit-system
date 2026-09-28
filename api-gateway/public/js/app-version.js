@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v278.9';
+const APP_VERSION = 'v279.0';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -81,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.style.paddingBottom = '46px';
     document.getElementById('afVerComoSalir').onclick = () => {
       sessionStorage.clear();
+      try { sessionStorage.setItem('af_solo_esta', '1'); } catch (_) {}   // cierra SOLO esta pestaña, no avisa af_logout
       window.close();
       setTimeout(() => location.href = '/login.html', 200); // si el navegador no deja cerrar la pestaña
     };

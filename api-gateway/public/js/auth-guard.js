@@ -50,6 +50,13 @@
   }
   // Esta pestaña tiene sesión: responde a las pestañas nuevas que la pidan
   window.addEventListener('storage', (ev) => {
+    if (ev.key === 'af_logout' && ev.newValue) {
+      /* Otra pestaña hizo "Salir": esta también sale (misma sesión). Sin esto, el login de la
+         pestaña que salió pedía sesión, esta se la devolvía y "se logueaba solo" (Pato, 28-09). */
+      try { sessionStorage.clear(); } catch (_) {}
+      location.href = '/login.html';
+      return;
+    }
     if (ev.key !== 'af_pedir_sesion' || !ev.newValue) return;
     try {
       const t = sessionStorage.getItem('token'), u = sessionStorage.getItem('usuario');
@@ -57,6 +64,12 @@
       localStorage.setItem('af_sesion', JSON.stringify({ token: t, usuario: u }));
       localStorage.removeItem('af_sesion');
     } catch (_) {}
+  });
+  /* "Salir" se detecta en UN solo lugar, sin tocar los 14 logout() de las páginas: si al
+     descargar la página el token que había ya no está, fue un logout → se avisa a todas las
+     pestañas (af_logout) y el login no hereda sesión durante los próximos segundos. */
+  window.addEventListener('pagehide', () => {
+    try { if (!sessionStorage.getItem('token') && !sessionStorage.getItem('af_solo_esta')) localStorage.setItem('af_logout', String(Date.now())); } catch (_) {}
   });
 
   try {
