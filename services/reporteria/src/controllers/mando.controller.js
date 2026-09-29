@@ -5,6 +5,33 @@
    tasas, presupuesto del dashboard, pagos y gestiones del día. */
 const pool = require('../../../../shared/config/database');
 const { conectadosIds } = require('../../../../shared/presencia');
+const FER = require('../../../../shared/feriados');
+
+/* Minutos de SERVICIO entre dos instantes (Pato, 29-09-2026): el tiempo de aprobación de una carta solo cuenta
+   las horas en que el área de Analistas de Crédito tiene servicio previsto (mantenedor Horarios Analistas:
+   día a día, con feriados fuera). Una carta ingresada a las 20:00 y aprobada a las 10:30 del día siguiente
+   cuenta 30 minutos, no 14 horas y media. Fechas como texto 'YYYY-MM-DD HH:MM:SS' en hora de Chile. */
+function minutosServicio(iniTxt, finTxt, dias) {
+  const parse = t => { const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(String(t || '')); return m ? { y: +m[1], mo: +m[2], d: +m[3], min: +m[4] * 60 + +m[5] } : null; };
+  const a = parse(iniTxt), b = parse(finTxt);
+  if (!a || !b) return null;
+  const hm = s => { const [h, m] = String(s || '00:00').split(':').map(Number); return h * 60 + (m || 0); };
+  const dayUTC = o => Date.UTC(o.y, o.mo - 1, o.d);
+  let total = 0;
+  for (let t = dayUTC(a); t <= dayUTC(b); t += 86400000) {
+    const d = new Date(t);
+    const dow = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
+    const cfg = (dias || {})[dow];
+    if (!cfg || !cfg.on) continue;
+    if (FER.esFeriado(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))) continue;
+    const wIni = hm(cfg.ini), wFin = hm(cfg.fin);
+    const from = t === dayUTC(a) ? a.min : 0, to = t === dayUTC(b) ? b.min : 1440;
+    const lo = Math.max(wIni, from), hi = Math.min(wFin, to);
+    if (hi > lo) total += hi - lo;
+  }
+  return total;
+}
+exports.minutosServicio = minutosServicio;
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg) => res.status(500).json({ success: false, data: null, error: msg });
@@ -171,13 +198,18 @@ exports.mando = async (req, res) => {
       GROUP BY 1`);
     const [[totAprob]] = await pool.query(`
       SELECT COUNT(*) n FROM cartas_aprobacion WHERE fecha_aprobacion >= DATE_FORMAT(CURDATE(),'%Y-%m-01')`);
+    const cfgMandoT = await getMandoCfg();
     const [durs] = await pool.query(`
-      SELECT TIMESTAMPDIFF(MINUTE, fecha_creacion, fecha_aprobacion) m
+      SELECT DATE_FORMAT(fecha_creacion,'%Y-%m-%d %H:%i:%s') ini, DATE_FORMAT(fecha_aprobacion,'%Y-%m-%d %H:%i:%s') fin,
+             TIMESTAMPDIFF(MINUTE, fecha_creacion, fecha_aprobacion) m
       FROM cartas_aprobacion
       WHERE fecha_aprobacion >= DATE_FORMAT(CURDATE(),'%Y-%m-01') AND fecha_creacion IS NOT NULL`);
-    // Corrección tz conocida: algunas fecha_creacion quedaron +4h (gotcha mysql2) → diffs negativos
-    const dursOk = durs.map(r => { let m = Number(r.m); if (m < 0) m += 240; return m; })
-      .filter(m => m >= 0 && m <= 43200); // descarta outliers > 30 días
+    // Solo horas de SERVICIO del área (mantenedor Horarios Analistas, feriados fuera). Corrección tz conocida:
+    // algunas fecha_creacion quedaron +4h (gotcha mysql2) → diff negativo: se corre la creación 4 h atrás.
+    const dursOk = durs.map(r => {
+      let ini = r.ini; if (Number(r.m) < 0) { const d = new Date(String(r.ini).replace(' ', 'T') + 'Z'); d.setUTCHours(d.getUTCHours() - 4); ini = d.toISOString().slice(0, 19).replace('T', ' '); }
+      return minutosServicio(ini, r.fin, cfgMandoT.dias);
+    }).filter(m => m != null && m >= 0 && m <= 43200); // descarta outliers > 30 días
     const tPromMin = dursOk.length ? Math.round(dursOk.reduce((s, m) => s + m, 0) / dursOk.length) : null;
 
     // Créditos digitados del mes por usuario creador
