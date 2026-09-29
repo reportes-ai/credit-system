@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fiscalizaciones — AutoFácil</title>
-  <!-- v1.2 — ancho completo (sin max-width). v1.1 — colores de la suite (azul) y la carpeta nace de los documentos: la IA pone nombre, organismo y fecha. v1.0 — carpetas de fiscalización con resumen IA; documentos inmutables (se suben, no se borran) -->
+  <!-- v1.3 — botón de subida compacto junto al aviso; filtros por mes-año y organismo. v1.2 — ancho completo (sin max-width). v1.1 — colores de la suite (azul) y la carpeta nace de los documentos: la IA pone nombre, organismo y fecha. v1.0 — carpetas de fiscalización con resumen IA; documentos inmutables (se suben, no se borran) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --bg:#f0f4f8; }
@@ -22,7 +22,7 @@
     .pill { border-radius:12px; padding:2px 9px; font-size:.7rem; font-weight:700; white-space:nowrap; }
     .OK { background:#dcfce7; color:#166534; } .GENERANDO { background:#e0f2fe; color:#075985; } .ERROR { background:#fee2e2; color:#991b1b; } .IA_OFF, .SIN_DOCS { background:#f1f5f9; color:#64748b; }
     .aviso { background:#eff6ff; border-left:4px solid var(--navy); border-radius:8px; padding:12px 16px; font-size:.84rem; margin-bottom:14px; }
-    .drop { border:2px dashed #93c5fd; border-radius:12px; background:#f8fbff; padding:20px; text-align:center; cursor:pointer; }
+    .drop { border:2px dashed #93c5fd; border-radius:10px; background:#f8fbff; padding:8px 14px; font-size:.84rem; font-weight:700; color:var(--navy); cursor:pointer; white-space:nowrap; }
     .drop:hover, .drop.sobre { background:#eff6ff; border-color:var(--navy); }
     .sec h6 { color:var(--navy); font-weight:800; font-size:.8rem; text-transform:uppercase; margin:16px 0 6px; }
     .sec p, .sec li { font-size:.88rem; }
@@ -38,17 +38,19 @@
   <div class="page-banner"><i class="bi bi-clipboard2-pulse"></i><div><h2>Fiscalizaciones</h2><p>Una carpeta por fiscalización. Sube el acta, la resolución y los descargos; la IA resume la fiscalización, las sanciones, el porqué y los compromisos.</p></div></div>
 
   <div id="vLista">
-    <div class="aviso"><b>Los documentos no se pueden borrar ni reemplazar.</b> Cada archivo que se sube queda como respaldo permanente de la fiscalización. Si algo se subió mal, sube el documento correcto y anota la aclaración en la nota.</div>
-    <div class="card-box">
-      <div class="drop" id="drop" onclick="document.getElementById('nArch').click()">
-        <i class="bi bi-cloud-upload" style="font-size:1.8rem;color:var(--navy)"></i>
-        <div style="font-weight:700;color:var(--navy);margin-top:4px">Nueva fiscalización: sube o arrastra aquí los documentos</div>
-        <small style="color:#64748b">Acta, resolución, citación, descargos · PDF, JPG/PNG o Word, máx. 7 MB c/u. La IA pone el nombre, el organismo y la fecha.</small>
-        <div id="nEstado" style="margin-top:8px;font-size:.84rem;color:var(--navy);font-weight:600"></div>
+    <div class="aviso" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1;min-width:260px"><b>Los documentos no se pueden borrar ni reemplazar.</b> Cada archivo que se sube queda como respaldo permanente de la fiscalización. Si algo se subió mal, sube el documento correcto y anota la aclaración en la nota.</div>
+      <div class="drop" id="drop" onclick="document.getElementById('nArch').click()" title="Acta, resolución, citación, descargos · PDF, JPG/PNG o Word, máx. 7 MB c/u. La IA pone el nombre, el organismo y la fecha.">
+        <i class="bi bi-cloud-upload me-1"></i>Nueva fiscalización: sube o arrastra los documentos
+        <span id="nEstado" style="margin-left:8px;font-weight:600"></span>
       </div>
       <input id="nArch" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.docx" style="display:none" onchange="crearConDocs(this.files)">
     </div>
     <div class="card-box scroll-x">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:end">
+        <div class="fld" style="margin:0;width:170px"><label>Mes-año</label><select id="fMes" onchange="pintar()"><option value="">Todos</option></select></div>
+        <div class="fld" style="margin:0;width:300px"><label>Organismo</label><select id="fOrg" onchange="pintar()"><option value="">Todos</option></select></div>
+      </div>
       <table><thead><tr><th>Fecha</th><th>Carpeta</th><th>Organismo</th><th>Docs</th><th>Sanciones</th><th>Compromisos</th><th>Resumen</th></tr></thead>
       <tbody id="tb"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table>
     </div>
@@ -79,14 +81,27 @@
   const api=async(url,opt={})=>{ const j=await (await fetch('/api/rrhh/fiscalizaciones'+url,{headers:HJ,...opt})).json().catch(()=>({})); if(!j.success) throw new Error(j.error||'Error'); return j.data; };
   let actual=null, poll=null;
 
+  let TODAS=[];
+  const ym=f=>String(f.fecha||f.created_at||'').slice(0,7);
+  const MESES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const fym=s=>s?MESES[+s.slice(5,7)-1]+'-'+s.slice(0,4):'';
+  function llenarSel(id,vals,fmt){ const sel=document.getElementById(id), act=sel.value;
+    sel.innerHTML='<option value="">Todos</option>'+vals.map(v=>`<option value="${esc(v)}">${esc(fmt?fmt(v):v)}</option>`).join(''); sel.value=vals.includes(act)?act:''; }
+  function pintar(){
+    const tb=document.getElementById('tb'), m=document.getElementById('fMes').value, o=document.getElementById('fOrg').value;
+    const L=TODAS.filter(f=>(!m||ym(f)===m)&&(!o||(f.organismo||'')===o));
+    tb.innerHTML=L.length?L.map(f=>`<tr class="fila" onclick="abrir(${f.id})">
+      <td>${fd(f.fecha||f.created_at)}</td><td><b>${esc(f.nombre)}</b>${f.materia?`<br><small style="color:#64748b">${esc(f.materia)}</small>`:''}</td>
+      <td>${esc(f.organismo||'—')}</td><td>${f.n_docs}</td><td>${f.n_sanciones||'—'}</td><td>${f.n_compromisos||'—'}</td><td>${PILL(f.ia_estado)}</td></tr>`).join('')
+      :`<tr><td colspan="7" class="empty">${TODAS.length?'Sin fiscalizaciones con ese filtro.':'Aún no hay fiscalizaciones registradas.'}</td></tr>`;
+  }
   async function cargar(){
     const tb=document.getElementById('tb');
     try{
-      const L=await api('');
-      tb.innerHTML=L.length?L.map(f=>`<tr class="fila" onclick="abrir(${f.id})">
-        <td>${fd(f.fecha||f.created_at)}</td><td><b>${esc(f.nombre)}</b>${f.materia?`<br><small style="color:#64748b">${esc(f.materia)}</small>`:''}</td>
-        <td>${esc(f.organismo||'—')}</td><td>${f.n_docs}</td><td>${f.n_sanciones||'—'}</td><td>${f.n_compromisos||'—'}</td><td>${PILL(f.ia_estado)}</td></tr>`).join('')
-        :'<tr><td colspan="7" class="empty">Aún no hay fiscalizaciones registradas.</td></tr>';
+      TODAS=await api('');
+      llenarSel('fMes',[...new Set(TODAS.map(ym).filter(Boolean))].sort().reverse(),fym);
+      llenarSel('fOrg',[...new Set(TODAS.map(f=>f.organismo).filter(Boolean))].sort());
+      pintar();
     }catch(e){ tb.innerHTML=`<tr><td colspan="7" class="empty">${esc(e.message)}</td></tr>`; }
   }
 
