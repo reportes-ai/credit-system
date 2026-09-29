@@ -273,3 +273,106 @@ exports.cobranzaMora = async (req, res) => {
     ok(res, { kpi: { ...kpi, rec30_n: rec30.n, rec30_monto: rec30.monto }, tramos, recuperacion, deudores });
   } catch (e) { fail(res, e.message); }
 };
+
+
+/* ══ Respaldos de excepción — Rentabilidad Créditos (Pato, 29-09-2026) ═══════════════════════
+   Cuando una operación se cursó por la financiera MENOS rentable, alguien la excepcionó: el
+   documento que lo respalda (correo, carta, pantallazo) se sube acá, queda ligado a la operación
+   y se ve EN PANTALLA sin descargarlo. Archivo al bucket por shared/almacen-docs (la fila guarda
+   doc_storage/doc_ruta/doc_bytes; `data` solo es el respaldo sin bucket). Permiso: aprob_rentabilidad. */
+const almacen = require('../../../../shared/almacen-docs');
+require('../../../../shared/migrate').enFila('rentabilidad-respaldos', async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS rentabilidad_respaldos (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      num_op VARCHAR(30) NOT NULL,
+      mes VARCHAR(7) NULL,
+      nombre VARCHAR(200) NOT NULL,
+      mime VARCHAR(100) NULL,
+      tamano INT NULL,
+      nota VARCHAR(300) NULL,
+      data LONGBLOB NULL,
+      subido_por VARCHAR(160) NULL,
+      id_subido_por INT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_op (num_op), INDEX idx_mes (mes)
+    )`);
+  for (const ddl of almacen.sqlColumnas('rentabilidad_respaldos')) {
+    try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[rentabilidad_respaldos almacen]', e.message); }
+  }
+});
+const _b64 = b64 => Buffer.from(String(b64 || '').replace(/^data:[^;]+;base64,/, ''), 'base64');
+
+/* POST /api/reporteria/rentabilidad/respaldo { num_op, mes, nombre, mime, data_base64, nota } */
+exports.respaldoSubir = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const numOp = String(b.num_op || '').trim();
+    if (!numOp) return fail(res, 'Falta el N° de operación', 400);
+    const buf = _b64(b.data_base64);
+    if (!buf.length) return fail(res, 'Archivo requerido', 400);
+    if (buf.length > 12 * 1024 * 1024) return fail(res, 'Máximo 12 MB por archivo', 413);
+    const mime = String(b.mime || 'application/pdf').slice(0, 100);
+    if (!/^(application\/pdf|image\/(png|jpe?g|webp|gif))$/i.test(mime)) return fail(res, 'Solo PDF o imagen (PNG, JPG, WEBP)', 400);
+    const nombre = String(b.nombre || 'respaldo.pdf').slice(0, 200);
+    const d = await almacen.colocar({ ambito: 'rentabilidad', clave: numOp, buffer: buf, mime, nombre });
+    const u = req.usuario || {};
+    const [r] = await pool.query(
+      `INSERT INTO rentabilidad_respaldos (num_op, mes, nombre, mime, tamano, nota, data, doc_storage, doc_ruta, doc_bytes, subido_por, id_subido_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [numOp, /^\d{4}-\d{2}$/.test(String(b.mes || '')) ? b.mes : null, nombre, mime, buf.length, String(b.nota || '').slice(0, 300) || null,
+       d.blob, d.storage, d.ruta, d.bytes, [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || null, u.id_usuario || null]);
+    try { require('../../../../shared/audit').auditar({ req, accion: 'CREAR', modulo: 'reporteria', entidad: 'rentabilidad_respaldo', entidad_id: r.insertId, detalle: `Respaldo de excepción de rentabilidad OP ${numOp}: ${nombre}` }); } catch (_) {}
+    ok(res, { id: r.insertId });
+  } catch (e) { console.error('[rentabilidad respaldoSubir]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* GET /api/reporteria/rentabilidad/respaldos?mes=AAAA-MM  (o ?num_op=) → lista sin archivo */
+exports.respaldosListar = async (req, res) => {
+  try {
+    const mes = String(req.query.mes || ''), numOp = String(req.query.num_op || '').trim();
+    let where = '1=1', vals = [];
+    if (numOp) { where = 'num_op=?'; vals = [numOp]; }
+    else if (/^\d{4}-\d{2}$/.test(mes)) {
+      // por mes de la operación (creditos.mes / fecha_otorgado), no por el mes en que se subió
+      where = `num_op IN (SELECT num_op FROM creditos WHERE DATE_FORMAT(COALESCE(mes, fecha_otorgado),'%Y-%m')=?)`; vals = [mes];
+    }
+    const [rows] = await pool.query(
+      `SELECT id, num_op, mes, nombre, mime, tamano, nota, subido_por, DATE_FORMAT(created_at,'%Y-%m-%d %H:%i') created_at
+         FROM rentabilidad_respaldos WHERE ${where} ORDER BY created_at DESC LIMIT 2000`, vals);
+    ok(res, rows);
+  } catch (e) { console.error('[rentabilidad respaldosListar]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* GET /api/reporteria/rentabilidad/respaldo/:id/ver → el archivo inline (la página lo pinta en un visor) */
+exports.respaldoVer = async (req, res) => {
+  try {
+    const [[d]] = await pool.query('SELECT nombre, mime, data, doc_ruta FROM rentabilidad_respaldos WHERE id=?', [parseInt(req.params.id, 10) || 0]);
+    if (!d) return fail(res, 'Respaldo no encontrado', 404);
+    const contenido = await almacen.obtener({ ruta: d.doc_ruta, blob: d.data });
+    if (!contenido) return fail(res, 'Respaldo no encontrado', 404);
+    const fname = String(d.nombre || 'respaldo.pdf'), safe = fname.replace(/"/g, '').replace(/[^\x20-\x7E]/g, '_');
+    res.setHeader('Content-Type', d.mime || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(fname)}`);
+    res.send(contenido);
+  } catch (e) {
+    console.error('[rentabilidad respaldoVer]', e.message);
+    if (e.code === 'SIN_ALMACEN') return fail(res, 'Este servidor no tiene acceso al almacén de documentos. Entra por el host oficial.', 503);
+    fail(res, 'Error interno del servidor');
+  }
+};
+
+/* DELETE /api/reporteria/rentabilidad/respaldo/:id → solo quien lo subió o el Administrador */
+exports.respaldoBorrar = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10) || 0;
+    const [[d]] = await pool.query('SELECT id, num_op, nombre, id_subido_por, doc_ruta FROM rentabilidad_respaldos WHERE id=?', [id]);
+    if (!d) return fail(res, 'Respaldo no encontrado', 404);
+    const u = req.usuario || {};
+    if (Number(d.id_subido_por) !== Number(u.id_usuario) && u.perfil_nombre !== 'Administrador') return fail(res, 'Solo quien lo subió (o el Administrador) puede eliminarlo', 403);
+    await pool.query('DELETE FROM rentabilidad_respaldos WHERE id=?', [id]);
+    if (d.doc_ruta) await almacen.borrar(d.doc_ruta).catch(() => {});
+    try { require('../../../../shared/audit').auditar({ req, accion: 'ELIMINAR', modulo: 'reporteria', entidad: 'rentabilidad_respaldo', entidad_id: id, detalle: `Eliminó respaldo de excepción OP ${d.num_op}: ${d.nombre}` }); } catch (_) {}
+    ok(res, { id });
+  } catch (e) { console.error('[rentabilidad respaldoBorrar]', e.message); fail(res, 'Error interno del servidor'); }
+};

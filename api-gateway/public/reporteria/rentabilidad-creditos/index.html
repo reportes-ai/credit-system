@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rentabilidad Créditos — AutoFácil</title>
-  <!-- v1.24 — el mes de la operación sale del texto AAAA-MM de la BD (septiembre se mostraba como agosto por el desfase UTC) · v1.23 — Rentabilidad estimada (descuenta com. ejecutivo) en detalle; Comisión Parque sin % fijo; Etapa -->
+  <!-- v1.25 — casos menos rentables: botón Subir respaldo (PDF/imagen al bucket) y Ver respaldo en pantalla · v1.24 — el mes de la operación sale del texto AAAA-MM de la BD (septiembre se mostraba como agosto por el desfase UTC) · v1.23 — Rentabilidad estimada (descuenta com. ejecutivo) en detalle; Comisión Parque sin % fijo; Etapa -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -84,6 +84,12 @@
     .rr.sub{font-size:.78rem;color:#64748b;padding-left:8px}
     .rr.tot{border-top:1px solid #e5e7eb;margin-top:3px;padding-top:5px;font-weight:700}
     .mini-link:hover { text-decoration:underline; }
+    .btn-resp{border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:2px 7px;font-size:.7rem;cursor:pointer;color:#334155;white-space:nowrap}
+    .btn-resp:hover{background:#f1f5f9}
+    .btn-resp.ok{border-color:#86efac;background:#f0fdf4;color:#166534}
+    #dlgResp{border:none;border-radius:14px;padding:0;width:min(1100px,96vw);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+    #dlgResp::backdrop{background:rgba(15,23,42,.55)}
+    #respVisor{width:100%;height:min(78vh,900px);border:0;background:#f8fafc}
   </style>
 </head>
 <body>
@@ -286,9 +292,10 @@ function pctUACOp(count, plazo, mes){
 }
 
 /* ── Recalcular para el mes seleccionado ──────────── */
-function recalcular(){
+async function recalcular(){
   const mes = document.getElementById('mesSel').value;
   if(!mes){ return; }
+  await cargarRespaldos(mes);   // respaldos de excepción del mes (botones en la columna Más rentable)
   const tier = tierDelMes(mes);
   document.getElementById('tierInfo').innerHTML =
     `<b>Tier UAC del mes:</b> ${tier.n} (${tier.pct.toFixed(0)}%) · ${tier.count} ops Unidad de Crédito`;
@@ -394,6 +401,8 @@ function render(){
       chip = `<span class="op-pct ${ok?'pos':'neg'}" title="${motivo}">${sign}${p.toFixed(1)}%</span>`;
     }
     const opCell = `<td><a class="op-link ${opCls}" onclick="verDetalle(${idx})">${numTxt}</a>${chip}</td>`;
+    const opKey = String(c.num_op || c.numero_credito || '');
+    const nResp = (RESPALDOS[opKey] || []).length;
     if(!f.R){
       return `<tr>
         ${opCell}
@@ -412,7 +421,11 @@ function render(){
     else if (f.esOptima || Math.abs(f.vsOtraPct) < UMBRAL_DIFF)
       prefCell = `<i class="bi bi-check-circle-fill" style="color:#16a34a;font-size:1.25rem" title="Colocada en la más rentable"></i>`;
     else
-      prefCell = `<i class="bi bi-exclamation-triangle-fill" style="color:#dc2626;font-size:1.25rem" title="Se cursó por ${finLbl}, la más rentable era ${masRent}"></i>`;
+      /* Caso menos rentable: el documento que lo excepcionó se sube aquí y se ve en pantalla (Pato, 29-09-2026) */
+      prefCell = `<i class="bi bi-exclamation-triangle-fill" style="color:#dc2626;font-size:1.25rem" title="Se cursó por ${finLbl}, la más rentable era ${masRent}"></i>`
+        + `<div style="margin-top:4px">${nResp
+            ? `<button class="btn-resp ok" onclick="verRespaldo('${opKey}',${idx})" title="Ver el respaldo de la excepción en pantalla"><i class="bi bi-file-earmark-check"></i> Respaldo (${nResp})</button>`
+            : `<button class="btn-resp" onclick="subirRespaldo('${opKey}',${idx})" title="Subir el documento que respalda la excepción (correo, carta, pantallazo)"><i class="bi bi-upload"></i> Subir respaldo</button>`}</div>`;
     let masRentCell, vsCell;
     if (f.colo==='AFAC'){
       masRentCell = `<span class="chip-na" title="referencial">${masRent}</span>`;
@@ -439,6 +452,65 @@ function render(){
       <td class="ctr">${prefCell}</td>
     </tr>`;
   }).join('');
+}
+
+/* ── Respaldos de excepción (documento que autorizó cursar por la menos rentable) ── */
+let RESPALDOS = {}, RESP_OP = null, RESP_IDX = null, RESP_ID = null, RESP_URL = null;
+async function cargarRespaldos(mes){
+  RESPALDOS = {};
+  try {
+    const r = await fetch('/api/reporteria/rentabilidad/respaldos?mes=' + encodeURIComponent(mes), { headers: hdr() });
+    const j = await r.json();
+    (j.data || []).forEach(x => { (RESPALDOS[String(x.num_op)] = RESPALDOS[String(x.num_op)] || []).push(x); });
+  } catch(e) { console.warn('[respaldos]', e.message); }
+}
+function subirRespaldo(opKey, idx){
+  const inp = document.getElementById('respFile');
+  inp.value = '';
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    if (f.size > 12 * 1024 * 1024) { alert('Máximo 12 MB'); return; }
+    const nota = prompt('Nota (quién autorizó la excepción y por qué). Opcional:', '') ;
+    if (nota === null) return;
+    const data_base64 = await new Promise((ok, ko) => { const rd = new FileReader(); rd.onload = () => ok(rd.result); rd.onerror = ko; rd.readAsDataURL(f); });
+    const r = await fetch('/api/reporteria/rentabilidad/respaldo', { method:'POST', headers: hdr(),
+      body: JSON.stringify({ num_op: opKey, mes: document.getElementById('mesSel').value, nombre: f.name, mime: f.type || 'application/pdf', data_base64, nota }) });
+    const j = await r.json();
+    if (!j.success) { alert(j.error || 'No se pudo subir'); return; }
+    await cargarRespaldos(document.getElementById('mesSel').value);
+    render();
+    if (document.getElementById('dlgResp').open) verRespaldo(opKey, idx);
+  };
+  inp.click();
+}
+async function verRespaldo(opKey, idx, id){
+  const lista = RESPALDOS[opKey] || []; if (!lista.length) return;
+  RESP_OP = opKey; RESP_IDX = idx;
+  const d = id ? lista.find(x => x.id === id) : lista[0];
+  RESP_ID = d.id;
+  document.getElementById('respTit').textContent = `Respaldo de excepción — OP ${opKey}`;
+  document.getElementById('respMeta').textContent = `${d.nombre} · subido por ${d.subido_por || '—'} el ${(d.created_at || '').split(' ')[0].split('-').reverse().join('-')}${d.nota ? ' · ' + d.nota : ''}`;
+  document.getElementById('respLista').innerHTML = lista.length > 1 ? lista.map(x => `<button class="btn-resp ${x.id===d.id?'ok':''}" onclick="verRespaldo('${opKey}',${idx},${x.id})">${escH(x.nombre)}</button>`).join('') : '';
+  const dlg = document.getElementById('dlgResp'); if (!dlg.open) dlg.showModal();
+  // El visor no puede mandar el token en un src: se baja con fetch y se muestra como blob
+  const v = document.getElementById('respVisor'); v.src = 'about:blank';
+  try {
+    const r = await fetch(`/api/reporteria/rentabilidad/respaldo/${d.id}/ver`, { headers: { Authorization: 'Bearer ' + getToken() } });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); alert(j.error || 'No se pudo abrir el respaldo'); return; }
+    const blob = await r.blob();
+    if (RESP_URL) URL.revokeObjectURL(RESP_URL);
+    RESP_URL = URL.createObjectURL(blob);
+    v.src = RESP_URL;
+  } catch(e) { alert('No se pudo abrir el respaldo: ' + e.message); }
+}
+async function borrarRespaldo(){
+  if (!RESP_ID || !confirm('¿Eliminar este respaldo?')) return;
+  const r = await fetch(`/api/reporteria/rentabilidad/respaldo/${RESP_ID}`, { method:'DELETE', headers: hdr() });
+  const j = await r.json(); if (!j.success) { alert(j.error || 'No se pudo eliminar'); return; }
+  await cargarRespaldos(document.getElementById('mesSel').value);
+  render();
+  const lista = RESPALDOS[RESP_OP] || [];
+  if (lista.length) verRespaldo(RESP_OP, RESP_IDX); else document.getElementById('dlgResp').close();
 }
 
 /* ── Detalle del crédito (condiciones + rentabilidad) ───────────── */
@@ -570,6 +642,19 @@ function exportarCSV(){
   URL.revokeObjectURL(url);
 }
 </script>
+<dialog id="dlgResp">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e2e8f0">
+    <div><b id="respTit">Respaldo de excepción</b><div id="respMeta" style="font-size:.78rem;color:#64748b"></div></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn-resp" onclick="subirRespaldo(RESP_OP, RESP_IDX)"><i class="bi bi-upload"></i> Subir otro</button>
+      <button class="btn-resp" id="respBorrar" onclick="borrarRespaldo()"><i class="bi bi-trash"></i> Eliminar</button>
+      <button class="btn-resp" onclick="document.getElementById('dlgResp').close()">✕</button>
+    </div>
+  </div>
+  <div id="respLista" style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px 0"></div>
+  <div style="padding:8px 16px 16px"><iframe id="respVisor" title="Respaldo"></iframe></div>
+</dialog>
+<input type="file" id="respFile" accept="application/pdf,image/png,image/jpeg,image/webp" style="display:none">
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
