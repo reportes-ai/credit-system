@@ -316,4 +316,14 @@ router.get('/vac-progresivas',               verifyToken, vpr.listar);
 router.post('/vac-progresivas/:id/resolver', verifyToken, vpr.resolver);
 router.get('/vac-progresivas/:id/certificado', verifyToken, vpr.verCertificado);
 
+// Fiscalizaciones — carpeta por fiscalización + resumen IA. Se sube, NUNCA se borra: sin DELETE ni PUT a propósito
+const fisc = require('../controllers/fiscalizaciones.controller');
+const fiscPerm = requireFunc('rh_fiscalizaciones');
+router.get('/fiscalizaciones',               verifyToken, fiscPerm, fisc.listar);
+router.post('/fiscalizaciones',              verifyToken, fiscPerm, fisc.crear);
+router.get('/fiscalizaciones/docs/:docId',   verifyToken, fiscPerm, fisc.verDoc);
+router.get('/fiscalizaciones/:id',           verifyToken, fiscPerm, fisc.detalle);
+router.post('/fiscalizaciones/:id/docs',     verifyToken, fiscPerm, fisc.subirDoc);
+router.post('/fiscalizaciones/:id/resumir',  verifyToken, fiscPerm, fisc.reResumir);
+
 module.exports = router;

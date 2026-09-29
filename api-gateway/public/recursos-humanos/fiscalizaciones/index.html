@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fiscalizaciones — AutoFácil</title>
+  <!-- v1.0 — carpetas de fiscalización con resumen IA; documentos inmutables (se suben, no se borran) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main { padding:28px 34px; max-width:1000px; margin:0 auto; }
+    @media (max-width:640px){ .main { padding:16px; } }
+    .page-banner { background:linear-gradient(135deg,#7c2d12,#c2410c 55%,#f97316); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; } .page-banner i { font-size:2.2rem; opacity:.9; } .page-banner h2 { margin:0; font-size:1.25rem; font-weight:700; } .page-banner p { margin:2px 0 0; opacity:.85; font-size:.84rem; }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:22px; margin-bottom:16px; }
+    .fld { margin-bottom:12px; } .fld label { display:block; font-size:.78rem; font-weight:600; color:#475569; margin-bottom:5px; } .fld input, .fld select { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 11px; font-size:.88rem; box-sizing:border-box; }
+    .btn-ora { background:#c2410c; color:#fff; border:none; border-radius:8px; padding:9px 16px; font-weight:700; font-size:.86rem; cursor:pointer; }
+    .btn-mini { border:1px solid #cbd5e1; background:#fff; border-radius:7px; padding:5px 10px; font-size:.78rem; cursor:pointer; font-weight:600; }
+    table { width:100%; border-collapse:collapse; font-size:.85rem; } th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.68rem; text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb; } td { padding:10px 12px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+    .fila { cursor:pointer; } .fila:hover { background:#fff7ed; }
+    .empty { text-align:center; color:#94a3b8; padding:30px 0; }
+    .pill { border-radius:12px; padding:2px 9px; font-size:.7rem; font-weight:700; white-space:nowrap; }
+    .OK { background:#dcfce7; color:#166534; } .GENERANDO { background:#e0f2fe; color:#075985; } .ERROR { background:#fee2e2; color:#991b1b; } .IA_OFF, .SIN_DOCS { background:#f1f5f9; color:#64748b; }
+    .aviso { background:#fff7ed; border-left:4px solid #c2410c; border-radius:8px; padding:12px 16px; font-size:.84rem; margin-bottom:14px; }
+    .sec h6 { color:#9a3412; font-weight:800; font-size:.8rem; text-transform:uppercase; margin:16px 0 6px; }
+    .sec p, .sec li { font-size:.88rem; }
+    .doc { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9; font-size:.85rem; }
+    .scroll-x { overflow-x:auto; }
+    .af-footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:14px 18px; font-size:.84rem; margin-top:24px; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Fiscalizaciones',icon:'bi-clipboard2-pulse',current:true}]};</script>
+<div class="main">
+  <div class="page-banner"><i class="bi bi-clipboard2-pulse"></i><div><h2>Fiscalizaciones</h2><p>Una carpeta por fiscalización. Sube el acta, la resolución y los descargos; la IA resume la fiscalización, las sanciones, el porqué y los compromisos.</p></div></div>
+
+  <div id="vLista">
+    <div class="aviso"><b>Los documentos no se pueden borrar ni reemplazar.</b> Cada archivo que se sube queda como respaldo permanente de la fiscalización. Si algo se subió mal, sube el documento correcto y anota la aclaración en la nota.</div>
+    <div class="card-box">
+      <div style="display:grid;grid-template-columns:2fr 1.3fr 1fr auto;gap:10px;align-items:end" class="nueva">
+        <div class="fld" style="margin:0"><label>Nueva carpeta *</label><input id="nNom" placeholder="Ej: Fiscalización DT jornada · sep-2026"></div>
+        <div class="fld" style="margin:0"><label>Organismo</label><input id="nOrg" list="orgs" placeholder="Dirección del Trabajo"></div>
+        <div class="fld" style="margin:0"><label>Fecha</label><input id="nFec" type="date"></div>
+        <button class="btn-ora" onclick="crear()"><i class="bi bi-folder-plus me-1"></i>Crear</button>
+      </div>
+      <datalist id="orgs"><option>Dirección del Trabajo</option><option>SUSESO</option><option>Mutual de Seguridad</option><option>SEREMI de Salud</option><option>Superintendencia de Pensiones</option></datalist>
+    </div>
+    <div class="card-box scroll-x">
+      <table><thead><tr><th>Fecha</th><th>Carpeta</th><th>Organismo</th><th>Docs</th><th>Sanciones</th><th>Compromisos</th><th>Resumen</th></tr></thead>
+      <tbody id="tb"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div id="vDet" style="display:none"></div>
+
+  <div class="af-footer-afecta">
+    <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este módulo</b>
+    <ul style="margin:8px 0 0">
+      <li><b>Documentos</b> → quedan en el almacén de documentos (bucket), sin opción de borrado; cada subida queda en <a href="/auditoria/">Auditoría</a>.</li>
+      <li><b>Resumen IA</b> → consume la funcionalidad "Resumen de fiscalizaciones" del <a href="/mantenedores/inteligencia-artificial/">mantenedor de IA</a> (se puede apagar o cambiar de modelo ahí) y su costo aparece en Uso IA.</li>
+      <li><b>Pago de multas</b> → no se paga aquí: se emite una Orden de Pago en <a href="/ordenes-pago/">Órdenes de Pago</a>, que genera el asiento contable.</li>
+      <li><b>Acceso</b> → funcionalidad <code>rh_fiscalizaciones</code> en <a href="/usuarios/">Perfiles y Permisos</a>.</li>
+    </ul>
+  </div>
+</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token=sessionStorage.getItem('token'), yo=JSON.parse(sessionStorage.getItem('usuario')||'null');
+  if(!token||!yo) location.href='/login.html';
+  const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  const fd=s=>s?String(s).slice(0,10).split('-').reverse().join('-'):'—';
+  const kb=n=>n==null?'':(n>=1048576?(n/1048576).toLocaleString('es-CL',{maximumFractionDigits:1})+' MB':Math.round(n/1024).toLocaleString('es-CL')+' KB');
+  const ESTADO={OK:'Listo',GENERANDO:'Generando…',ERROR:'Error',IA_OFF:'IA apagada',SIN_DOCS:'Sin documentos'};
+  const PILL=e=>`<span class="pill ${e}">${ESTADO[e]||e}</span>`;
+  const api=async(url,opt={})=>{ const j=await (await fetch('/api/rrhh/fiscalizaciones'+url,{headers:HJ,...opt})).json().catch(()=>({})); if(!j.success) throw new Error(j.error||'Error'); return j.data; };
+  let actual=null, poll=null;
+
+  async function cargar(){
+    const tb=document.getElementById('tb');
+    try{
+      const L=await api('');
+      tb.innerHTML=L.length?L.map(f=>`<tr class="fila" onclick="abrir(${f.id})">
+        <td>${fd(f.fecha||f.created_at)}</td><td><b>${esc(f.nombre)}</b>${f.materia?`<br><small style="color:#64748b">${esc(f.materia)}</small>`:''}</td>
+        <td>${esc(f.organismo||'—')}</td><td>${f.n_docs}</td><td>${f.n_sanciones||'—'}</td><td>${f.n_compromisos||'—'}</td><td>${PILL(f.ia_estado)}</td></tr>`).join('')
+        :'<tr><td colspan="7" class="empty">Aún no hay fiscalizaciones registradas.</td></tr>';
+    }catch(e){ tb.innerHTML=`<tr><td colspan="7" class="empty">${esc(e.message)}</td></tr>`; }
+  }
+
+  async function crear(){
+    const b={nombre:document.getElementById('nNom').value,organismo:document.getElementById('nOrg').value,fecha:document.getElementById('nFec').value||null};
+    try{ const r=await api('',{method:'POST',body:JSON.stringify(b)});
+      ['nNom','nOrg','nFec'].forEach(i=>document.getElementById(i).value=''); abrir(r.id); }
+    catch(e){ alert(e.message); }
+  }
+
+  function volver(){ clearTimeout(poll); actual=null; document.getElementById('vDet').style.display='none'; document.getElementById('vLista').style.display='';
+    if(window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(null); cargar(); }
+
+  const lista=(arr,fn)=>Array.isArray(arr)&&arr.length?'<ul style="margin:0;padding-left:20px">'+arr.map(fn).join('')+'</ul>':'<p style="color:#94a3b8">No se indican en los documentos.</p>';
+
+  function pintarResumen(f){
+    const s=f.ia_resumen;
+    if(f.ia_estado==='GENERANDO') return '<p style="color:#075985"><span class="spinner-border spinner-border-sm me-2"></span>La IA está leyendo los documentos…</p>';
+    if(f.ia_estado==='SIN_DOCS') return '<p style="color:#94a3b8">Sube el primer documento para generar el resumen.</p>';
+    let h=f.ia_error?`<p style="color:#991b1b"><i class="bi bi-exclamation-triangle me-1"></i>${esc(f.ia_error)}</p>`:'';
+    if(!s) return h;
+    h+=`<div class="sec">
+      <p style="font-size:.8rem;color:#64748b;margin:0">${[s.organismo,s.numero_expediente?'N° '+s.numero_expediente:null,s.fecha_fiscalizacion?fd(s.fecha_fiscalizacion):null,s.estado?'Estado: '+s.estado:null].filter(Boolean).map(esc).join(' · ')}</p>
+      ${s.materia?`<h6>Materia</h6><p>${esc(s.materia)}</p>`:''}
+      <h6>Resumen</h6><p style="white-space:pre-wrap">${esc(s.resumen||'—')}</p>
+      <h6>Sanciones</h6>${lista(s.sanciones,x=>`<li><b>${esc(x.descripcion)}</b>${x.monto?' — '+esc(x.monto):''}${x.norma_infringida?`<br><small style="color:#64748b">${esc(x.norma_infringida)}</small>`:''}</li>`)}
+      <h6>Por qué</h6><p style="white-space:pre-wrap">${esc(s.motivo||'No se indica en los documentos.')}</p>
+      <h6>Compromisos</h6>${lista(s.compromisos,x=>`<li>${esc(x.compromiso)}${x.plazo?` — <b>plazo: ${esc(x.plazo)}</b>`:''}${x.responsable?` <small style="color:#64748b">(${esc(x.responsable)})</small>`:''}</li>`)}
+      ${Array.isArray(s.plazos_legales)&&s.plazos_legales.length?`<h6>Plazos legales</h6>${lista(s.plazos_legales,x=>`<li>${esc(x)}</li>`)}`:''}
+      ${Array.isArray(s.documentos_no_leidos)&&s.documentos_no_leidos.length?`<p style="font-size:.78rem;color:#b45309;margin-top:10px">No se alcanzaron a leer: ${s.documentos_no_leidos.map(esc).join(', ')}</p>`:''}
+      <p style="font-size:.74rem;color:#94a3b8;margin-top:12px">Generado por IA el ${fd(f.ia_at)} a partir de los documentos de la carpeta. Verifica montos y plazos contra el documento original.</p></div>`;
+    return h;
+  }
+
+  async function abrir(id){
+    clearTimeout(poll); actual=id;
+    const box=document.getElementById('vDet');
+    document.getElementById('vLista').style.display='none'; box.style.display='';
+    let f; try{ f=await api('/'+id); }catch(e){ box.innerHTML=`<div class="card-box empty">${esc(e.message)}</div>`; return; }
+    if(actual!==id) return;
+    if(window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(f.nombre);
+    box.innerHTML=`<div class="card-box">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:start">
+        <div><h5 style="color:#9a3412;margin:0 0 4px"><i class="bi bi-folder2-open me-1"></i>${esc(f.nombre)}</h5>
+        <small style="color:#64748b">${esc(f.organismo||'Organismo por definir')} · ${fd(f.fecha)} · creada por ${esc(f.creado_por_nombre||'—')}</small></div>
+        <button class="btn-mini" onclick="volver()"><i class="bi bi-arrow-left me-1"></i>Volver</button></div></div>
+      <div class="card-box"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <b style="font-size:.95rem"><i class="bi bi-stars me-1" style="color:#c2410c"></i>Resumen de la fiscalización</b>
+        <div>${PILL(f.ia_estado)} ${f.docs.length&&f.ia_estado!=='GENERANDO'?`<button class="btn-mini ms-1" onclick="reResumir(${f.id})"><i class="bi bi-arrow-repeat me-1"></i>Rehacer</button>`:''}</div></div>
+        <div style="margin-top:10px">${pintarResumen(f)}</div></div>
+      <div class="card-box"><b style="font-size:.95rem"><i class="bi bi-paperclip me-1"></i>Documentos (${f.docs.length})</b>
+        <div style="margin-top:8px">${f.docs.map(d=>`<div class="doc"><div><i class="bi bi-file-earmark-text me-1"></i><b>${esc(d.nombre_archivo)}</b> <small style="color:#94a3b8">${kb(d.doc_bytes)}</small>
+          <br><small style="color:#64748b">${fd(d.created_at)} · ${esc(d.subido_por_nombre||'—')}${d.nota?' · '+esc(d.nota):''}</small></div>
+          <button class="btn-mini" onclick="verDoc(${d.id})"><i class="bi bi-eye me-1"></i>Ver</button></div>`).join('')||'<p style="color:#94a3b8;font-size:.85rem">Sin documentos.</p>'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-top:14px" class="nueva">
+          <div class="fld" style="margin:0"><label>Archivo(s) — PDF, JPG/PNG o Word, máx. 7 MB c/u</label><input id="fArch" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.docx"></div>
+          <div class="fld" style="margin:0"><label>Nota (opcional)</label><input id="fNota" maxlength="300" placeholder="Ej: resolución de multa"></div>
+          <button class="btn-ora" id="btnSub" onclick="subir(${f.id})"><i class="bi bi-cloud-upload me-1"></i>Subir</button></div>
+        <p style="font-size:.76rem;color:#9a3412;margin:8px 0 0"><i class="bi bi-lock me-1"></i>Lo que se sube queda en forma permanente: no se puede borrar ni reemplazar.</p></div>`;
+    if(f.ia_estado==='GENERANDO') poll=setTimeout(()=>{ if(actual===id) abrir(id); },5000);
+  }
+
+  const aB64=file=>new Promise((ok,ko)=>{ const r=new FileReader(); r.onload=()=>ok(String(r.result).split(',')[1]); r.onerror=ko; r.readAsDataURL(file); });
+  async function subir(id){
+    const files=[...document.getElementById('fArch').files]; if(!files.length) return alert('Elige al menos un archivo');
+    const grande=files.find(x=>x.size>7*1024*1024); if(grande) return alert(`"${grande.name}" supera 7 MB`);
+    if(!confirm(`¿Subir ${files.length} documento(s)? No se podrán borrar después.`)) return;
+    const btn=document.getElementById('btnSub'); btn.disabled=true; const nota=document.getElementById('fNota').value;
+    try{ for(let i=0;i<files.length;i++){ btn.textContent=`Subiendo ${i+1}/${files.length}…`;
+        await api('/'+id+'/docs',{method:'POST',body:JSON.stringify({archivo_nombre:files[i].name,mime_type:files[i].type,archivo_data:await aB64(files[i]),nota})}); } }
+    catch(e){ alert(e.message); }
+    abrir(id);
+  }
+  async function reResumir(id){ try{ await api('/'+id+'/resumir',{method:'POST'}); abrir(id); }catch(e){ alert(e.message); } }
+  async function verDoc(docId){
+    try{ const r=await fetch('/api/rrhh/fiscalizaciones/docs/'+docId,{headers:H}); if(!r.ok) throw new Error('No se pudo abrir el documento');
+      window.open(URL.createObjectURL(await r.blob()),'_blank'); }catch(e){ alert(e.message); }
+  }
+  cargar();
+</script>
+<style>@media (max-width:640px){ .nueva { grid-template-columns:1fr !important; } }</style>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

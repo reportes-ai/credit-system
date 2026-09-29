@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v4.0 — card Entrega de Equipos (rh_equipos: laptops, celulares, otros + acta PDF). v3.9 — se quita la card Ingreso de Colaboradores (basta el botón en Colaboradores). v3.8 — card Ingreso de Colaboradores (rh_ingresos, todos los perfiles: el supervisor aprueba desde aquí). v3.7 — card Mi Firma por permiso rh_mi_firma. v3.6 — card Mi Firma de Correo (para todos). v3.5 — Documentos Firmados renombrado a Carpetas Digitales. v3.4 — card Revision de Postulantes para el jefe directo (rh_postulaciones_jefe) -->
+  <!-- v4.1 — card Fiscalizaciones (rh_fiscalizaciones: carpeta + resumen IA, documentos no se borran). v4.0 — card Entrega de Equipos (rh_equipos: laptops, celulares, otros + acta PDF). v3.9 — se quita la card Ingreso de Colaboradores (basta el botón en Colaboradores). v3.8 — card Ingreso de Colaboradores (rh_ingresos, todos los perfiles: el supervisor aprueba desde aquí). v3.7 — card Mi Firma por permiso rh_mi_firma. v3.6 — card Mi Firma de Correo (para todos). v3.5 — Documentos Firmados renombrado a Carpetas Digitales. v3.4 — card Revision de Postulantes para el jefe directo (rh_postulaciones_jefe) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -122,6 +122,12 @@
       <p>Canal confidencial de denuncias — acoso, violencia (Ley Karin), fraude e irregularidades. Puedes denunciar en forma anónima con código de seguimiento.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/fiscalizaciones/" class="module-card" id="cardFisc" style="display:none">
+      <div class="card-icon"><i class="bi bi-clipboard2-pulse"></i></div>
+      <h5>Fiscalizaciones <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
+      <p>Una carpeta por fiscalización (DT, SUSESO, mutual…). Sube el acta y la resolución y la IA resume sanciones, el porqué y los compromisos. Los documentos no se borran.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/cursos/" class="module-card" id="cardCur" style="display:none">
       <div class="card-icon"><i class="bi bi-mortarboard"></i></div>
       <h5>Cursos y Capacitaciones <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
@@ -204,6 +210,7 @@
     if (tiene('rh_desempeno')) document.getElementById('cardDes').style.display='';
     if (tiene('rh_cursos','rh_colaboradores','rh_aprobar')) document.getElementById('cardCur').style.display='';
     if (tiene('compliance')) document.getElementById('cardCompl').style.display='';
+    if (tiene('rh_fiscalizaciones')) document.getElementById('cardFisc').style.display='';
     if (tiene('rh_encuestas')) document.getElementById('cardEnc').style.display='';
     if (tiene('rh_solicitudes')) document.getElementById('cardSol').style.display='';
     if (tiene('rh_docs_firmados')) document.getElementById('cardDocsF').style.display='';
