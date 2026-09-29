@@ -229,6 +229,8 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
         INDEX idx_ficha (id_ficha)
       )`);
     await pool.query('ALTER TABLE dealer_ficha_autorizaciones ADD COLUMN IF NOT EXISTS sin_revision TINYINT(1) NOT NULL DEFAULT 0');
+    // Quién ENVIÓ la ficha a autorización (29-09-2026): no puede autorizarla él mismo (caso Bryan, Vespucio Norte)
+    await pool.query('ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS enviado_por INT NULL');
   } catch (e) { if (e.errno !== 1050) console.error('[dealer_ficha_autorizaciones migration]', e.message); }
 
   // Registro del módulo en el menú (idempotente).
@@ -1010,7 +1012,7 @@ const enviar = async (req, res) => {
         href: '/dealers-incorporacion/mantencion.html?tab=mias' });
     } else {
       const n0 = niveles[0];
-      await pool.query(`UPDATE dealer_fichas SET estado='PEND_AUTORIZACION', nivel_actual=?, ${baseSet} WHERE id=?`, [n0.orden, ...baseVals, f.id]);
+      await pool.query(`UPDATE dealer_fichas SET estado='PEND_AUTORIZACION', nivel_actual=?, enviado_por=?, ${baseSet} WHERE id=?`, [n0.orden, req.usuario.id_usuario || null, ...baseVals, f.id]);
       const ids = await idsConPermiso(n0.permiso, req.usuario.id_usuario);
       await notificarEventoDealer('dealer_para_autorizar', { idsBase: ids, ejecutivo: f.id_ejecutivo,
         titulo: reenvio ? '🔁 Ficha de dealer corregida' : '🛎️ Ficha de dealer para autorizar',
@@ -1041,6 +1043,18 @@ const autorizar = async (req, res) => {
     const esAdmin = req.usuario.perfil_nombre === 'Administrador';
     if (!esAdmin && !(await tieneFunc(req.usuario.id_usuario, niv.permiso)))
       return res.status(403).json({ success: false, data: null, error: `No tienes el permiso para autorizar el nivel "${niv.nombre}"` });
+    /* Segregación de funciones (Pato, 29-09-2026: "¿por qué Bryan puede aprobarse a sí mismo?"). Tener el permiso
+       del nivel no basta: quien SOLICITÓ la ficha (ejecutivo), quien la ENVIÓ a autorización (el analista que la
+       revisó) y quien ya firmó OTRO nivel de la misma ficha no pueden autorizar. Por usuario, en el servidor,
+       sin excepción para el Administrador. */
+    const uid = Number(req.usuario.id_usuario);
+    if (uid && Number(f.id_ejecutivo) === uid)
+      return res.status(403).json({ success: false, data: null, error: 'Segregación de funciones: solicitaste esta ficha, no puedes autorizarla' });
+    if (uid && Number(f.enviado_por) === uid)
+      return res.status(403).json({ success: false, data: null, error: 'Segregación de funciones: enviaste esta ficha a autorización, otra persona debe autorizarla' });
+    const [[yaFirmo]] = await pool.query('SELECT orden FROM dealer_ficha_autorizaciones WHERE id_ficha=? AND usuario_id=? LIMIT 1', [f.id, uid]);
+    if (yaFirmo)
+      return res.status(403).json({ success: false, data: null, error: `Segregación de funciones: ya autorizaste el nivel ${yaFirmo.orden} de esta ficha, otro nivel lo firma otra persona` });
 
     const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
     // ¿Revisó la ficha (abrió "Revisar") antes de autorizar? Si no → "Aprobado sin revisión de ficha".
