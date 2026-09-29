@@ -5,7 +5,7 @@
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cuadro de Mando — AutoFácil Business Suite</title>
-<!-- v1.5 — Otorgado hoy con N° de ops; ejecutivos que no se han conectado hoy (punto rojo, leyenda y ticker) · v1.4 — T° prom. aprobación carta solo en horas de servicio (Pato 29-09) · v1.3 — sonido de alerta al encenderse el letrero rojo · v1.2 — OPERACIONES OTORGADAS (antes "CURSADAS") · v1.1 — reconexion automatica de la cuenta TV (token_tv en localStorage) -->
+<!-- v1.6 — Carrera del mes: título en dos líneas y badge del día en una sola fila · v1.5 — Otorgado hoy con N° de ops; ejecutivos que no se han conectado hoy (punto rojo, leyenda y ticker) · v1.4 — T° prom. aprobación carta solo en horas de servicio (Pato 29-09) · v1.3 — sonido de alerta al encenderse el letrero rojo · v1.2 — OPERACIONES OTORGADAS (antes "CURSADAS") · v1.1 — reconexion automatica de la cuenta TV (token_tv en localStorage) -->
 <style>
   :root {
     --bg:#020817; --panel:#050e22; --line:#0a2748; --cyan:#00e5ff; --cyan-dim:#0891b2;
@@ -186,8 +186,8 @@
   <div class="row r2">
     <div class="panel">
       <div class="p-head">
-        <div class="p-title">◤ Carrera del mes · otorgados a mismos días</div>
-        <div class="p-badge" id="mesBadge">—</div>
+        <div class="p-title">◤ Carrera del mes · otorgados<div style="font-size:.78em;letter-spacing:.2em;color:#3a577c;font-weight:600;margin-top:.3vh">Mismos días para el cierre</div></div>
+        <div class="p-badge" id="mesBadge" style="white-space:nowrap">—</div>
       </div>
       <div id="chCarrera" style="flex:1;display:flex;align-items:center;justify-content:center"></div>
     </div>
