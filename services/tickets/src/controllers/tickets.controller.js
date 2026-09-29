@@ -41,6 +41,11 @@ require('../../../../shared/migrate').enFila('tickets', async () => {
         correo_cierre TINYINT(1) NOT NULL DEFAULT 1
       )`);
     await pool.query('INSERT IGNORE INTO ti_config (id) VALUES (1)');
+    /* Equipo TI paramétrico (Pato, 29-09-2026): el primer ticket avisó a los dos perfiles Administrador
+       y a todo perfil con ti_atender (Director incluido: dos correos externos). Ahora la lista de quienes
+       atienden vive aquí; si está vacía cae a la regla antigua. */
+    await pool.query('ALTER TABLE ti_config ADD COLUMN atienden_ids VARCHAR(500) NULL').catch(() => {});
+    await pool.query("UPDATE ti_config SET atienden_ids='1,60004' WHERE id=1 AND atienden_ids IS NULL");
   } catch (e) { console.error('[ti_config migration]', e.message); }
 
   try {
@@ -124,6 +129,12 @@ async function esTI(id_usuario) {
   catch { return false; }
 }
 async function poolTI() {
+  const cfg = await getConfig();
+  const ids = String(cfg.atienden_ids || '').split(',').map(x => parseInt(x)).filter(x => x > 0);
+  if (ids.length) {
+    const [r] = await pool.query("SELECT id_usuario, email, CONCAT(COALESCE(nombre,''),' ',COALESCE(apellido,'')) nombre FROM usuarios WHERE id_usuario IN (?) AND estado='activo'", [ids]);
+    return r;
+  }
   const [rows] = await pool.query(
     `SELECT u.id_usuario, u.email, CONCAT(COALESCE(u.nombre,''),' ',COALESCE(u.apellido,'')) nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
        WHERE p.nombre='Administrador' AND u.estado='activo'
@@ -265,8 +276,9 @@ const eliminarMotivo = async (req, res) => { try { await pool.query('UPDATE ti_m
 const getConfigEp = async (req, res) => { try { res.json({ success: true, data: await getConfig(), error: null }); } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error' }); } };
 const setConfig = async (req, res) => {
   try { const b = req.body || {};
-    await pool.query('UPDATE ti_config SET escal_horas=?, correo_nuevo=?, correo_escal=?, correo_cierre=? WHERE id=1',
-      [parseInt(b.escal_horas) || 48, b.correo_nuevo ? 1 : 0, b.correo_escal ? 1 : 0, b.correo_cierre ? 1 : 0]);
+    const ids = Array.isArray(b.atienden_ids) ? b.atienden_ids.map(x => parseInt(x)).filter(x => x > 0) : null;
+    await pool.query('UPDATE ti_config SET escal_horas=?, correo_nuevo=?, correo_escal=?, correo_cierre=?, atienden_ids=? WHERE id=1',
+      [parseInt(b.escal_horas) || 48, b.correo_nuevo ? 1 : 0, b.correo_escal ? 1 : 0, b.correo_cierre ? 1 : 0, ids && ids.length ? ids.join(',') : null]);
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

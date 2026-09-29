@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedor Tickets TI — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 — Equipo TI paramétrico: lista de quienes atienden (Pato 29-09) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -49,6 +49,9 @@
     <label class="chk"><input type="checkbox" id="cNuevo"> Enviar <b>correo al crear</b> un ticket (al equipo TI)</label>
     <label class="chk"><input type="checkbox" id="cEscalM"> Enviar <b>correo al escalar</b> un ticket vencido</label>
     <label class="chk"><input type="checkbox" id="cCierre"> Enviar <b>correo al solicitante</b> cuando se resuelve/cierra</label>
+    <div class="fld" style="margin-top:14px"><label>Equipo TI: quiénes atienden los tickets (reciben la alerta y el correo)</label>
+      <div id="cAtienden" style="display:flex;flex-wrap:wrap;gap:6px 16px;max-height:220px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:.84rem">Cargando…</div>
+      <p style="font-size:.78rem;color:#64748b;margin:6px 0 0">Si no marcas a nadie, avisa a todo perfil Administrador y a los perfiles con el permiso "atender tickets TI".</p></div>
     <div style="text-align:right;margin-top:10px"><button class="btn-navy" onclick="guardarConfig()"><i class="bi bi-check-lg"></i> Guardar</button></div>
   </div>
 
@@ -57,6 +60,7 @@
     <ul>
       <li><b>Motivos</b> → la lista de motivos que el usuario elige al crear un ticket en <a href="/soporte/tickets-ti/">Soporte › Tickets TI</a>; el <b>SLA</b> de cada motivo define cuándo un ticket sin respuesta se escala.</li>
       <li><b>Escalamiento</b> → reescala y avisa al equipo TI los tickets que superan su SLA sin primera respuesta.</li>
+      <li><b>Equipo TI</b> → a quién llega la campanita y el correo de cada ticket nuevo, mensaje del solicitante y escalamiento (<a href="/soporte/tickets-ti/">Tickets TI</a>).</li>
       <li><b>Correos automáticos</b> → al crear (a TI), al escalar (a TI) y al cerrar (al solicitante). Respetan el <a href="/mantenedores/mantencion-sistema/">Modo Desarrollo</a> (redirige correos de prueba).</li>
     </ul>
   </div>
@@ -95,9 +99,12 @@
     const j=await(await fetch('/api/tickets/admin/config',{headers:H})).json(); const c=j.data||{};
     document.getElementById('cEscal').value=c.escal_horas??48;
     document.getElementById('cNuevo').checked=!!c.correo_nuevo; document.getElementById('cEscalM').checked=!!c.correo_escal; document.getElementById('cCierre').checked=!!c.correo_cierre;
+    const sel=new Set(String(c.atienden_ids||'').split(',').map(Number));
+    const ju=await(await fetch('/api/usuarios',{headers:H})).json(); const us=(ju.data||ju||[]).filter(u=>u.estado==='activo').sort((a,b)=>String(a.nombre+a.apellido).localeCompare(b.nombre+b.apellido));
+    document.getElementById('cAtienden').innerHTML=us.map(u=>`<label style="white-space:nowrap"><input type="checkbox" class="chkAt" value="${u.id_usuario}" ${sel.has(u.id_usuario)?'checked':''}> ${esc(u.nombre)} ${esc(u.apellido||'')}</label>`).join('')||'Sin usuarios';
   }
   async function guardarConfig(){
-    const body={escal_horas:document.getElementById('cEscal').value,correo_nuevo:document.getElementById('cNuevo').checked,correo_escal:document.getElementById('cEscalM').checked,correo_cierre:document.getElementById('cCierre').checked};
+    const body={escal_horas:document.getElementById('cEscal').value,correo_nuevo:document.getElementById('cNuevo').checked,correo_escal:document.getElementById('cEscalM').checked,correo_cierre:document.getElementById('cCierre').checked,atienden_ids:[...document.querySelectorAll('.chkAt:checked')].map(c=>+c.value)};
     const j=await(await fetch('/api/tickets/admin/config',{method:'PUT',headers:HJ,body:JSON.stringify(body)})).json();
     if(!j.success)return alert(j.error); alert('Configuración guardada');
   }
