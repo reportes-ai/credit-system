@@ -1309,10 +1309,15 @@ const upsert = async (req, res) => {
     // Una carta DESISTIDA/VENCIDA no bloquea: la operación se puede volver a digitar
     // (caso real: carta desistida por error de concesionario → se re-crea con el mismo ID).
     if (c.opOrigen) {
+      /* Una carta viva cuyo crédito ya está ANULADO/DESISTIDO/RECHAZADO no bloquea (red de seguridad,
+         29-09-2026: la anulación de la op 26091266 dejó su carta -R1 APROBADA y el ID quedó tomado). */
       const [[caDup]] = await pool.query(
-        `SELECT op_carta FROM cartas_aprobacion
-          WHERE id_financiera = ? AND status NOT IN ('ELIMINADA','ANULADA','RECHAZADA','DESISTIDA','VENCIDA','REEMPLAZADA')
-            AND id <> COALESCE(?, 0) LIMIT 1`, [c.opOrigen, c.id || null]);
+        `SELECT ca.op_carta FROM cartas_aprobacion ca
+          LEFT JOIN creditos cr ON cr.id = ca.id_credito_creado
+          WHERE ca.id_financiera = ? AND ca.status NOT IN ('ELIMINADA','ANULADA','RECHAZADA','DESISTIDA','VENCIDA','REEMPLAZADA')
+            AND ca.id <> COALESCE(?, 0)
+            AND NOT (cr.id IS NOT NULL AND (UPPER(COALESCE(cr.estado,'')) IN ('ANULADO','DESISTIDO','RECHAZADO') OR UPPER(COALESCE(cr.estado_credito,'')) IN ('ANULADO','DESISTIDO','RECHAZADO')))
+          LIMIT 1`, [c.opOrigen, c.id || null]);
       if (caDup) return res.status(409).json({ success: false, data: null,
         error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (carta ${caDup.op_carta}).` });
       const MUERTOS = "('DESISTIDO','ANULADO','RECHAZADO')";

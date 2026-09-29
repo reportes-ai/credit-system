@@ -248,6 +248,15 @@ const resolver = async (req, res) => {
               comentarios=CONCAT(COALESCE(comentarios,''),' | ANULADA ',DATE_FORMAT(NOW(),'%d-%m-%Y'),': ',?)
         WHERE id=?`, [...valoresEtapa('ANULADO'), a.motivo, a.id_credito]);
 
+    /* 2b) Sus cartas: una operación anulada no puede dejar cartas vivas (APROBADA/PENDIENTE) porque
+       retienen el ID de la financiera y el ejecutivo no puede volver a digitarla ("ya se encuentra
+       ingresado (carta ...-R1)", op 26091266, Pato 29-09-2026). Quedan ANULADAS con el motivo. */
+    await pool.query(
+      `UPDATE cartas_aprobacion SET status='ANULADA', anulado_por=?, fecha_anulacion=NOW(),
+              motivo_rechazo=CONCAT('Operación anulada: ', ?)
+        WHERE id_credito_creado=? AND status IN ('PENDIENTE','APROBADA')`,
+      [nombreUsuario(req), a.motivo, a.id_credito]).catch(err => console.error('[anulacion cartas]', err.message));
+
     /* Post Venta: una operación anulada no pide fundantes (SALDO) ni tiene
        comisión al dealer (COMISION) ni al parque (PARQUE) que pagar. Los TRES
        tracks se apagan con el mismo criterio conservador: solo si el track no
