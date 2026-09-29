@@ -1724,7 +1724,10 @@ const emitir = async (req, res) => {
       }
       const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || 'RRHH';
       const fLibro = (() => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); })();
-      return require('../../../contabilidad/src/provisiones').liberarSueldos(mes, 'LIBRO', fLibro, quien, `Liquidaciones ${mes} emitidas (REMUNERACIONES, haberes $${Math.round(Number(t.h)).toLocaleString('es-CL')})`);
+      const PROV = require('../../../contabilidad/src/provisiones');
+      // El bono del jefe del mes anterior se paga en estas liquidaciones: libera su provisión (concepto JEFE, 29-09-2026)
+      PROV.liberarJefePorLiquidacion(mes, fLibro, quien).catch(e => console.error('[remuneraciones emitir→provisión jefe]', e && e.message));
+      return PROV.liberarSueldos(mes, 'LIBRO', fLibro, quien, `Liquidaciones ${mes} emitidas (REMUNERACIONES, haberes $${Math.round(Number(t.h)).toLocaleString('es-CL')})`);
     }).catch(e => console.error('[remuneraciones emitir→provisión]', e && e.message));
     // El correo con la liquidación NO sale al emitir: sale cuando Tesorería PAGA la ODP de sueldos
     // (Pato, 28-09-2026; hook onOdpPagadaRemuneraciones). Acá nace esa ODP con la Nómina Banco adjunta.

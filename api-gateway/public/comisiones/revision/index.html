@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Revisión Comisiones — AutoFácil</title><!-- v5.40 — Ingresar descuento: monto editable hacia abajo (nunca sobre lo que da la regla); botón Guardar atenuado cuando no se puede. v5.39 —Ingresar descuento: mes a elegir + confirmación "se descontará $X a EJECUTIVO en MES"; el saldo que la comisión no cubre pasa solo al mes siguiente al aprobar (aviso). v5.38 —el botón Ingresar descuento también para el Administrador (saltaba el fetch de permisos). v5.37 —Ingresar descuento por N° de operación (anulación 100% · prepago 100%/50% según cuotas pagadas) con la comisión pagada por esa op y glosa; se puede anular con motivo. v5.36 —ejecutivos EXTERNOS (nombre de la carga que no es usuario) fuera de las tarjetas, en un aviso ámbar. v5.35 — aviso Renta fija (no comisiona) desde la ficha RRHH. v5.34 — sello Valores firmes: aprobada por Operaciones = foto congelada, no se recalcula. v5.33 — Aprobar/Rechazar por permiso comisiones_aprobar (Analista de Operaciones), no solo Administrador. v5.32 — aviso de nómina generada (montos congelados) y filtro ?mes&ej desde la Nómina. v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
+  <title>Revisión Comisiones — AutoFácil</title><!-- v5.41 — card Con semana corrida (cuadra con Provisiones por Devengo). v5.40 — Ingresar descuento: monto editable hacia abajo (nunca sobre lo que da la regla); botón Guardar atenuado cuando no se puede. v5.39 —Ingresar descuento: mes a elegir + confirmación "se descontará $X a EJECUTIVO en MES"; el saldo que la comisión no cubre pasa solo al mes siguiente al aprobar (aviso). v5.38 —el botón Ingresar descuento también para el Administrador (saltaba el fetch de permisos). v5.37 —Ingresar descuento por N° de operación (anulación 100% · prepago 100%/50% según cuotas pagadas) con la comisión pagada por esa op y glosa; se puede anular con motivo. v5.36 —ejecutivos EXTERNOS (nombre de la carga que no es usuario) fuera de las tarjetas, en un aviso ámbar. v5.35 — aviso Renta fija (no comisiona) desde la ficha RRHH. v5.34 — sello Valores firmes: aprobada por Operaciones = foto congelada, no se recalcula. v5.33 — Aprobar/Rechazar por permiso comisiones_aprobar (Analista de Operaciones), no solo Administrador. v5.32 — aviso de nómina generada (montos congelados) y filtro ?mes&ej desde la Nómina. v5.31 — tarjeta sin comisión sin 'undefined' en los cruces. v5.30 — el filtro de ejecutivos asignados cruza sin mayúsculas ni tildes (Hans no veía sus comisiones). v5.29 — factor de semana corrida con 2 decimales y 'aprox.'. v5.28 — ejecutivos con menos de N meses (minimo_meses_exencion) no están acogidos al mínimo mensual: aviso azul en la tarjeta y en el informe. v5.27 — peso de cada indicador junto al título. v5.26 — rótulos según las reglas del modelo del mes (≤24/>24, calidad proporcional, RDH solo con peso). v5.25 — badge CORFO en las ops (fuera del NCNU) + marca manual IND cliente independiente: sale de la base del cruce de cesantía, cesantia N/A en la fila -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -28,7 +28,7 @@
     .btn-buscar { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 20px; font-size:.85rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; }
     .btn-buscar:hover { background:var(--navy-light); }
     /* Stats 6 columnas */
-    .stats-row { display:grid; grid-template-columns:repeat(6,1fr); gap:14px; margin-bottom:24px; }
+    .stats-row { display:grid; grid-template-columns:repeat(7,1fr); gap:14px; margin-bottom:24px; }
     @media(max-width:1100px){ .stats-row { grid-template-columns:repeat(3,1fr); } }
     @media(max-width:700px){ .stats-row { grid-template-columns:repeat(2,1fr); } }
     .stat-card { background:#fff; border-radius:12px; padding:14px 18px; box-shadow:0 1px 4px rgba(0,0,0,.06); border-left:4px solid transparent; }
@@ -154,6 +154,11 @@
       <div class="label">Total Comisiones</div>
       <div class="value" id="statComisiones">—</div>
       <div class="sub" id="statComisionesSub">incentivo final bruto</div>
+    </div>
+    <div class="stat-card green">
+      <div class="label">Con semana corrida</div>
+      <div class="value" id="statComisSC">—</div>
+      <div class="sub" id="statComisSCSub">lo que paga la liquidación</div>
     </div>
     <div class="stat-card amber">
       <div class="label">Aprobados</div>
@@ -329,6 +334,7 @@ function renderizar(data, mes) {
   const totalMonto   = conComision.reduce((s,d) => s + (d.total_financiado||0), 0);
   const totalMontoAll= data.reduce((s,d) => s + (d.total_financiado||0), 0);
   const totalComis   = conComision.reduce((s,d) => s + (d.incentivo_final||0), 0);
+  const totalComisSC = conComision.reduce((s,d) => s + (Number(d.con_semana_corrida)||d.incentivo_final||0), 0);
   const pctComis     = totalMontoAll > 0 ? (totalComis / totalMontoAll * 100).toFixed(2) : '0.00';
   const aprobados    = data.filter(d => d.estado === 'aprobado').length;
 
@@ -340,6 +346,8 @@ function renderizar(data, mes) {
   document.getElementById('statMontoSub').textContent     = `con comisión: ${fmt(totalMonto)}`;
   document.getElementById('statComisiones').textContent   = fmt(totalComis);
   document.getElementById('statComisionesSub').textContent= `${pctComis}% del total colocado`;
+  document.getElementById('statComisSC').textContent      = fmt(totalComisSC);
+  document.getElementById('statComisSCSub').textContent   = 'lo que paga la liquidación · provisionado en Contabilidad';
   document.getElementById('statAprobados').textContent    = `${aprobados}/${data.length}`;
   document.getElementById('statAprobadosSub').textContent = aprobados === data.length ? '✓ todos aprobados' : `${data.length - aprobados} pendientes`;
   document.getElementById('statsRow').style.display = 'grid';
