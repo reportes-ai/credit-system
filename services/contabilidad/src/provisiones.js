@@ -1796,8 +1796,32 @@ const sincronizarArriendo = async (u) => { const a = await sincronizarParque(u),
 const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, ARRIENDO: sincronizarArriendo, EJECUTIVO: sincronizarEjecutivo, JEFE: sincronizarJefe, SUELDOS: sincronizarSueldos, OTROS: sincronizarOtros, IAS: sincronizarIas, INGRESOS: sincronizarIngresos, INTERES: sincronizarInteres };
 const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, ARRIENDO: liberarFilaPorId, EJECUTIVO: liberarEjecutivo, JEFE: liberarJefe, SUELDOS: liberarSueldos, OTROS: liberarOtros, IAS: liberarIas };
 /* Al otorgar: todos los conceptos que nacen con el crédito (fire-and-forget, nunca lanza) */
+/* Los conceptos MENSUALES (ejecutivo, bono jefe) y de STOCK (ingresos por facturar) no nacen por crédito, pero
+   un otorgamiento los mueve: en vez de esperar la vuelta de 6 h del motor, se sincronizan en segundo plano al
+   otorgar (Pato, 29-09-2026: "¿ya provisionaste su comisión?"). Una sola corrida a la vez y con 5 s de espera
+   para agrupar otorgamientos seguidos (carga masiva). Nunca frena ni lanza. */
+let _syncOtorgarTimer = null, _syncOtorgarCorriendo = false, _syncOtorgarPendiente = false;
+function sincronizarTrasOtorgar(usuario) {
+  _syncOtorgarPendiente = true;
+  if (_syncOtorgarTimer) return;
+  _syncOtorgarTimer = setTimeout(async () => {
+    _syncOtorgarTimer = null;
+    if (_syncOtorgarCorriendo) return;            // la corrida en curso vuelve a mirar _syncOtorgarPendiente al terminar
+    _syncOtorgarCorriendo = true;
+    try {
+      while (_syncOtorgarPendiente) {
+        _syncOtorgarPendiente = false;
+        for (const k of ['EJECUTIVO', 'JEFE', 'INGRESOS']) {
+          try { const r = await SINCRONIZAR[k](usuario || 'Motor provisiones (otorgamiento)'); if (r && (r.constituidas || r.liberadas || r.ajustadas)) console.log(`[provisiones-${k.toLowerCase()} tras otorgar]`, JSON.stringify(r)); }
+          catch (e) { console.error(`[provisiones-${k.toLowerCase()} tras otorgar]`, e.message); }
+        }
+      }
+    } finally { _syncOtorgarCorriendo = false; }
+  }, 5000);
+}
 async function constituirAlOtorgar(idCredito, usuario) {
-  const r = { DEALER: await constituirDealer(idCredito, usuario), PARQUE: await constituirParque(idCredito, usuario) };   // EJECUTIVO es mensual (al cierre), no al otorgar
+  const r = { DEALER: await constituirDealer(idCredito, usuario), PARQUE: await constituirParque(idCredito, usuario) };   // por crédito, al tiro
+  sincronizarTrasOtorgar(usuario);   // ejecutivo, bono jefe e ingresos por facturar: mensuales/stock, en segundo plano
   return r;
 }
 async function tick() {
