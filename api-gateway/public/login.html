@@ -231,22 +231,9 @@
     })();
     // Si ya hay sesión, redirigir al destino
     if (sessionStorage.getItem('token')) window.location.href = _next;
-    else if (Date.now() - Number(localStorage.getItem('af_logout') || 0) < 5000) {
-      /* Se llegó por "Salir": NO heredar la sesión de otra pestaña (se loguearía solo). */
-    } else {
-      /* Pestaña nueva del mismo navegador: hereda la sesión de otra pestaña abierta antes de pedir
-         la clave (mismo canal que auth-guard.js: 'af_pedir_sesion' → 'af_sesion'). */
-      let _heredada = false;
-      const _onSt = (ev) => {
-        if (ev.key !== 'af_sesion' || !ev.newValue || _heredada) return;
-        try { const s = JSON.parse(ev.newValue); if (!s || !s.token || !s.usuario) return;
-          _heredada = true; sessionStorage.setItem('token', s.token); sessionStorage.setItem('usuario', s.usuario);
-          window.removeEventListener('storage', _onSt); window.location.href = _next; } catch (_) {}
-      };
-      window.addEventListener('storage', _onSt);
-      try { localStorage.setItem('af_pedir_sesion', String(Date.now())); localStorage.removeItem('af_pedir_sesion'); } catch (_) {}
-      setTimeout(() => window.removeEventListener('storage', _onSt), 1500);
-    }
+    /* El login NO hereda la sesión de otras pestañas (29-09-2026): quien llega aquí quiere elegir
+       cuenta (Pato usa varias en el mismo navegador). Las pestañas nuevas sobre páginas de la Suite
+       sí heredan, en auth-guard.js. */
 
     // Clave usada al ingresar — sirve como "contraseña actual" en el cambio obligatorio.
     // La sesión NO se persiste hasta cambiar la clave (evita saltarse el paso recargando).
