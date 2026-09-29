@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rentabilidad Créditos — AutoFácil</title>
-  <!-- v1.23 — Rentabilidad estimada (descuenta com. ejecutivo) en detalle; Comisión Parque sin % fijo; Etapa -->
+  <!-- v1.24 — el mes de la operación sale del texto AAAA-MM de la BD (septiembre se mostraba como agosto por el desfase UTC) · v1.23 — Rentabilidad estimada (descuenta com. ejecutivo) en detalle; Comisión Parque sin % fijo; Etapa -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -176,7 +176,9 @@ const puede = c => ES_ADMIN || PERMISOS.has(c);
 const fmtCLP = v => { const n=Math.round(Number(v)||0); return '$'+n.toLocaleString('es-CL'); };
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtRUT = r => { const c=String(r||'').replace(/[^0-9kK]/g,''); if(c.length<2) return r||''; const dv=c.slice(-1), num=c.slice(0,-1); return parseInt(num).toLocaleString('es-CL')+'-'+dv.toUpperCase(); };
-const ym = d => { if(!d) return ''; const x=new Date(d); return isNaN(x)?String(d).slice(0,7):`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`; };
+/* AAAA-MM directo del texto de la BD: `new Date('2026-09-01')` es medianoche UTC y en Chile ya es 31 de
+   agosto, así septiembre entero se mostraba como agosto (Pato, 29-09-2026; gotcha isoDeBD). */
+const ym = d => { if(!d) return ''; const m=/^(\d{4}-\d{2})/.exec(String(d)); if(m) return m[1]; const x=new Date(d); return isNaN(x)?String(d).slice(0,7):`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`; };
 // Período de negocio: el campo MES manda (igual que el Dashboard); fecha_otorgado es fallback.
 const mesOp = c => c.mes ? ym(c.mes) : ym(c.fecha_otorgado);
 /* tascli_real viene con unidades mezcladas según el origen del crédito:
