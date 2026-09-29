@@ -28,7 +28,13 @@ const CONCEPTOS = {
      (arriendo_parque) del crédito, cada uno a su gasto (4001100 / 4002100) contra 2106013 (cuenta propia:
      la 2106012 es el "por pagar" que deja COMISION_PARQUES al aprobar el mes). Se libera al APROBAR el pago
      del parque del mes en Post Venta → Comisiones Parques (foto parques_pagos_ops) o al anular. */
-  PARQUE: { nombre: 'Comisión y arriendo parque', regla: 'PROV_PARQUE', reglaLib: 'PROV_PARQUE_LIB', cuentaProv: '2106013', cuentaGasto: '4001100 / 4002100', paramDesde: 'prov_parque_desde' },
+  PARQUE: { nombre: 'Comisión parque', regla: 'PROV_PARQUE', reglaLib: 'PROV_PARQUE_LIB', cuentaProv: '2106013', cuentaGasto: '4001100', paramDesde: 'prov_parque_desde' },
+  /* ARRIENDO (29-09-2026, Pato): la comisión y el arriendo del parque se pagan con ODP distintas, así que se
+     provisionan por separado. El arriendo prorrateado de cada crédito de parque (arriendo_parque) nace al otorgar
+     junto a la comisión pero en su propia fila y cuenta (2106018), y se libera con el mismo pago del parque. Acá
+     entra también el arriendo de la OFICINA central (y cualquier ODP o recurrente cuya categoría mapee a 4002100),
+     que antes caía en OTROS: una sola fila 'Arriendos' en el resumen. Mismo paramDesde que parques. */
+  ARRIENDO: { nombre: 'Arriendos (parques y oficina)', regla: 'PROV_ARRIENDO', reglaLib: 'PROV_ARRIENDO_LIB', cuentaProv: '2106018', cuentaGasto: '4002100', paramDesde: 'prov_parque_desde' },
   /* EJECUTIVO (24-09-2026): MENSUAL por ejecutivo al cierre, con el cálculo del motor de Revisión de Comisiones (lo mismo que cierra RRHH); ver bloque EJECUTIVO más abajo. */
   EJECUTIVO: { nombre: 'Comisión ejecutivo', regla: 'PROV_EJECUTIVO', reglaLib: 'PROV_EJECUTIVO_LIB', cuentaProv: '2106014', cuentaGasto: '4001100', paramDesde: 'prov_ejecutivo_desde' },
   /* JEFE (29-09-2026): Bono Jefe Comercial del BSC, mensual por jefe con el mes de producción; se paga en la liquidación del mes siguiente. Ver bloque JEFE. */
@@ -90,7 +96,7 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
     UNIQUE KEY uq_origen (concepto, origen_tipo, origen_id), INDEX idx_estado (concepto, estado), INDEX idx_mes (mes))`);
   await pool.query('CREATE TABLE IF NOT EXISTS ctb_config (clave VARCHAR(60) PRIMARY KEY, valor VARCHAR(200) NOT NULL)');
   await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09'), ('prov_sueldos_desde','2026-09'), ('prov_otros_desde','2026-09'), ('prov_ias_desde','2026-09'), ('prov_ias_pct','8.33'), ('prov_ingresos_desde','2026-09'), ('prov_interes_desde','2026-09')");
-  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1), ('2106015','PROVISION REMUNERACIONES (DEVENGO)','PASIVO',1), ('2106016','PROVISION OTROS GASTOS (DEVENGO)','PASIVO',1), ('2106017','PROVISION BONO JEFE COMERCIAL (DEVENGO)','PASIVO',1), ('2106031','PROVISION INDEMNIZACION POR ANOS DE SERVICIO','PASIVO',1), ('1106015','PRODUCCION COMISION DEVENGADA NO FACTURADA','ACTIVO',1), ('1104125','PROVISION INTERESES DEVENGADOS POR COBRAR','ACTIVO',1)");
+  await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES PARQUE (DEVENGO)','PASIVO',1), ('2106018','PROVISION ARRIENDOS (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1), ('2106015','PROVISION REMUNERACIONES (DEVENGO)','PASIVO',1), ('2106016','PROVISION OTROS GASTOS (DEVENGO)','PASIVO',1), ('2106017','PROVISION BONO JEFE COMERCIAL (DEVENGO)','PASIVO',1), ('2106031','PROVISION INDEMNIZACION POR ANOS DE SERVICIO','PASIVO',1), ('1106015','PRODUCCION COMISION DEVENGADA NO FACTURADA','ACTIVO',1), ('1104125','PROVISION INTERESES DEVENGADOS POR COBRAR','ACTIVO',1)");
   /* Mapeo paramétrico categoría de la ODP / tipo de pago recurrente → cuenta de gasto.
      Es lo que permite provisionar un gasto que en la ODP solo tiene categoría y centro de costo.
      Se siembran las categorías que hoy existen; la cuenta la completa el Administrador en
@@ -131,17 +137,27 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
       ['2106011', 'DEBE',  'monto', 'Liberación provisión comisión dealer'],
       ['4001127', 'HABER', 'monto', 'Abono comisión dealer provisionada'],
     ]],
-    ['PROV_PARQUE', 'Provisión comisión y arriendo parque (al otorgar)', 'Se dispara al OTORGAR un crédito de parque (motor provisiones): reconoce en el mes de curse la comisión parque y el arriendo prorrateado de la operación, cada uno a su gasto, y deja la provisión. Se libera al aprobar el pago del parque del mes en Post Venta → Comisiones Parques. Campos: comision, arriendo.', 'TRASPASO', 1, [
+    ['PROV_PARQUE', 'Provisión comisión parque (al otorgar)', 'Se dispara al OTORGAR un crédito de parque (motor provisiones): reconoce en el mes de curse la comisión parque de la operación y deja la provisión. El arriendo va aparte (PROV_ARRIENDO). Se libera al aprobar el pago del parque del mes en Post Venta → Comisiones Parques. Campos: comision.', 'TRASPASO', 1, [
       ['4001100', 'DEBE',  'comision', 'Provisión comisión por ventas parque'],
-      ['4002100', 'DEBE',  'arriendo', 'Provisión arriendo de parque'],
       ['2106013', 'HABER', 'comision', 'Provisión parque (comisión)'],
-      ['2106013', 'HABER', 'arriendo', 'Provisión parque (arriendo)'],
     ]],
-    ['PROV_PARQUE_LIB', 'Liberación provisión parque', 'Se dispara al APROBAR el pago del parque del mes en Post Venta → Comisiones Parques (entra el devengo real por COMISION_PARQUES) o al anular la operación: reversa íntegra la provisión de cada crédito de la foto del mes. Campos: comision, arriendo.', 'TRASPASO', 1, [
+    ['PROV_PARQUE_LIB', 'Liberación provisión comisión parque', 'Se dispara al APROBAR el pago del parque del mes en Post Venta → Comisiones Parques (entra el devengo real por COMISION_PARQUES) o al anular la operación: reversa íntegra la provisión de comisión de cada crédito de la foto del mes. Campos: comision.', 'TRASPASO', 1, [
       ['2106013', 'DEBE',  'comision', 'Liberación provisión parque (comisión)'],
-      ['2106013', 'DEBE',  'arriendo', 'Liberación provisión parque (arriendo)'],
       ['4001100', 'HABER', 'comision', 'Abono comisión parque provisionada'],
-      ['4002100', 'HABER', 'arriendo', 'Abono arriendo parque provisionado'],
+    ]],
+    ['PROV_ARRIENDO', 'Provisión arriendos (parque al otorgar; oficina y otros por ODP)', 'Arriendo prorrateado de cada crédito de parque al OTORGAR (arriendo_parque) y, al cierre, cada ODP o pago recurrente sin documento cuya categoría mapea a 4002100 (arriendo de oficina, estacionamientos). Se libera al aprobar el pago del parque del mes, o cuando la ODP recibe su documento en el auxiliar. Campos: monto.', 'TRASPASO', 1, [
+      ['4002100', 'DEBE',  'monto', 'Provisión arriendo'],
+      ['2106018', 'HABER', 'monto', 'Provisión arriendos'],
+    ]],
+    ['PROV_ARRIENDO_LIB', 'Liberación provisión arriendos', 'Reversa íntegra la provisión de arriendo: al aprobar el pago del parque (crédito), al llegar el documento de la ODP al auxiliar, o al anular. Campos: monto.', 'TRASPASO', 1, [
+      ['2106018', 'DEBE',  'monto', 'Liberación provisión arriendos'],
+      ['4002100', 'HABER', 'monto', 'Abono arriendo provisionado'],
+    ]],
+    ['PROV_ARRIENDO_RECLAS', 'Reclasificación de arriendos provisionados (29-09-2026)', 'Un solo uso: mueve a 2106018 el arriendo que ya estaba provisionado dentro de parques (2106013) y el arriendo de oficina que estaba en otros gastos (2106016), cuando el concepto Arriendos se separó. Campos: parque, otros.', 'TRASPASO', 1, [
+      ['2106013', 'DEBE',  'parque', 'Reclasificación arriendo parque a Arriendos'],
+      ['2106016', 'DEBE',  'otros',  'Reclasificación arriendo oficina a Arriendos'],
+      ['2106018', 'HABER', 'parque', 'Provisión arriendos (desde parques)'],
+      ['2106018', 'HABER', 'otros',  'Provisión arriendos (desde otros gastos)'],
     ]],
     ['PROV_EJECUTIVO', 'Provisión comisión ejecutivo (cierre de mes)', 'Se dispara al terminar el mes (motor provisiones): por cada ejecutivo con comisión calculada por el motor de Revisión de Comisiones (incentivo con semana corrida, descuentos y ajustes) y aún no aprobada, reconoce ese valor al último día del mes y deja la provisión. Es el mismo valor que cierra RRHH. Se libera al aprobar en Revisión. Campos: monto.', 'TRASPASO', 1, [
       ['4001100', 'DEBE',  'monto', 'Provisión comisión ejecutivo'],
@@ -252,6 +268,17 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
       if (nuevas) console.log(`[provisiones] ${ev}: ${nuevas} línea(s) agregada(s) — retención de honorarios separada`);
     } catch (e) { console.error('[provisiones parche otros]', e.message); }
   }
+  // Parche idempotente (29-09-2026): el arriendo salió de PROV_PARQUE/PROV_PARQUE_LIB hacia PROV_ARRIENDO. Se borran
+  // las líneas 'arriendo' de las reglas (los asientos emitidos no cambian; lo ya provisionado se reclasifica aparte).
+  for (const ev of ['PROV_PARQUE', 'PROV_PARQUE_LIB']) {
+    try {
+      const [d] = await pool.query("DELETE FROM ctb_reglas_lineas WHERE evento=? AND campo='arriendo'", [ev]);
+      const def = R.find(r => r[0] === ev);
+      await pool.query('UPDATE ctb_reglas SET nombre=?, descripcion=? WHERE evento=? AND descripcion<>?', [def[1], String(def[2]).slice(0, 400), ev, String(def[2]).slice(0, 400)]);
+      if (d.affectedRows) console.log(`[provisiones] ${ev}: ${d.affectedRows} línea(s) de arriendo movidas a PROV_ARRIENDO`);
+    } catch (e) { console.error('[provisiones parche parque/arriendo]', e.message); }
+  }
+  await pool.query("UPDATE ctb_cuentas SET nombre='PROVISION COMISIONES PARQUE (DEVENGO)' WHERE codigo='2106013' AND nombre='PROVISION COMISIONES Y ARRIENDO PARQUE (DEVENGO)'").catch(() => {});
   // Parche idempotente (24-09-2026): PROV_SUELDOS nació con un solo campo 'monto'; ahora separa haberes y leyes
   // sociales (sis, afc, mutual). Solo si la regla conserva 'monto' y nunca generó un asiento.
   for (const ev of ['PROV_SUELDOS', 'PROV_SUELDOS_LIB']) {
@@ -392,6 +419,7 @@ async function liberarFilaPorId(idFila, motivo, fechaISO, usuario, contra = null
   const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE id=? AND estado='CONSTITUIDA'", [idFila]);
   if (!p) return { skip: 'sin provisión constituida' };
   if (p.concepto === 'PARQUE') return liberarParque(p.origen_id, motivo, fechaISO, usuario, contra);
+  if (p.concepto === 'ARRIENDO') return p.origen_tipo === 'CREDITO' ? liberarParque(p.origen_id, motivo, fechaISO, usuario, contra) : _liberarFilaOtros(p, motivo, fechaISO, usuario, contra);
   if (p.concepto === 'EJECUTIVO') return _liberarFilaEjecutivo(p, motivo, fechaISO, usuario, contra);
   if (p.concepto === 'JEFE') return _liberarFilaJefe(p, motivo, fechaISO, usuario, contra);
   if (p.concepto === 'SUELDOS') return liberarSueldos(p.mes, motivo, fechaISO, usuario, contra);
@@ -448,9 +476,10 @@ async function pagoParqueAprobado(num_op) {
   return r || null;
 }
 
-/* Constituye la provisión de comisión + arriendo de parque de UN crédito otorgado. Idempotente. */
+/* Constituye las provisiones de UN crédito de parque otorgado: comisión (concepto PARQUE, 2106013) y arriendo
+   prorrateado (concepto ARRIENDO, 2106018), cada una en su fila y su asiento (29-09-2026: ODP distintas). Idempotente por concepto. */
 async function constituirParque(idCredito, usuario = 'Motor provisiones') {
-  const C = CONCEPTOS.PARQUE;
+  const C = CONCEPTOS.PARQUE, CA = CONCEPTOS.ARRIENDO;
   try {
     const [[c]] = await pool.query(
       `SELECT id, num_op, UPPER(COALESCE(estado_credito,'')) est, com_parque, arriendo_parque, parque, DATE_FORMAT(fecha_otorgado,'%Y-%m-%d') fo,
@@ -463,47 +492,65 @@ async function constituirParque(idCredito, usuario = 'Motor provisiones') {
     const desde = await param(C.paramDesde, '2026-09');
     const mes = c.mes || (c.fo || '').slice(0, 7);
     if (!mes || mes < desde) return { skip: `anterior a ${desde}` };
-    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto='PARQUE' AND origen_tipo='CREDITO' AND origen_id=?", [idCredito]);
-    if (ya) return { skip: `ya ${ya.estado.toLowerCase()}`, id: ya.id };
     if (await pagoParqueAprobado(c.num_op)) return { skip: 'pago del parque ya aprobado (devengo real)' };
     const fecha = await fechaContable(c.fo || `${mes}-01`);
-    const montos = { comision, arriendo };
-    const [ins] = await pool.query(
-      `INSERT IGNORE INTO ctb_provisiones (concepto, origen_tipo, origen_id, num_op, tercero, mes, fecha_constitucion, monto, montos_json, creado_por)
-       VALUES ('PARQUE','CREDITO',?,?,?,?,?,?,?,?)`,
-      [idCredito, c.num_op || null, c.parque || null, mes, fecha, monto, JSON.stringify(montos), usuario]);
-    if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
-    const id = await contabilizar({
-      evento: C.regla, fecha, ref: `PROV-PARQUE-${idCredito}`, montos,
-      glosa: `Provisión parque OP ${c.num_op || idCredito} — ${c.parque || ''}`.slice(0, 300), num_op: c.num_op || null,
-      detalle: `OP ${c.num_op || idCredito} · ${c.parque || 'parque'} · comisión $${comision.toLocaleString('es-CL')} · arriendo $${arriendo.toLocaleString('es-CL')}`,
-    });
-    if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); return { error: 'sin asiento (ver log del motor en Reglas de Centralización)' }; }
-    await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
-    return { id: ins.insertId, monto, id_comprobante: id };
+    const out = { id: null, monto: 0, id_comprobante: null, arriendo_id: null };
+    // Un solo lugar para las dos filas: concepto, campo de la regla y ref de idempotencia cambian; el resto es igual
+    const una = async (concepto, Cx, campo, valor, ref, glosa, detalle) => {
+      if (valor <= 0) return null;
+      const [[ya]] = await pool.query('SELECT id, estado FROM ctb_provisiones WHERE concepto=? AND origen_tipo=\'CREDITO\' AND origen_id=?', [concepto, idCredito]);
+      if (ya) return { skip: `ya ${ya.estado.toLowerCase()}`, id: ya.id };
+      const [ins] = await pool.query(
+        `INSERT IGNORE INTO ctb_provisiones (concepto, origen_tipo, origen_id, num_op, tercero, mes, fecha_constitucion, monto, montos_json, creado_por)
+         VALUES (?,'CREDITO',?,?,?,?,?,?,?,?)`,
+        [concepto, idCredito, c.num_op || null, c.parque || null, mes, fecha, valor, JSON.stringify({ [campo]: valor }), usuario]);
+      if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
+      const id = await contabilizar({ evento: Cx.regla, fecha, ref, montos: { [campo]: valor }, glosa: glosa.slice(0, 300), num_op: c.num_op || null, detalle });
+      if (!id) { await pool.query('DELETE FROM ctb_provisiones WHERE id=?', [ins.insertId]); return { error: 'sin asiento (ver log del motor en Reglas de Centralización)' }; }
+      await pool.query('UPDATE ctb_provisiones SET id_comprobante_constitucion=? WHERE id=?', [id, ins.insertId]);
+      return { id: ins.insertId, monto: valor, id_comprobante: id };
+    };
+    const rc = await una('PARQUE', C, 'comision', comision, `PROV-PARQUE-${idCredito}`, `Provisión comisión parque OP ${c.num_op || idCredito} — ${c.parque || ''}`,
+      `OP ${c.num_op || idCredito} · ${c.parque || 'parque'} · comisión $${comision.toLocaleString('es-CL')}`);
+    const ra = await una('ARRIENDO', CA, 'monto', arriendo, `PROV-ARRIENDO-${idCredito}`, `Provisión arriendo parque OP ${c.num_op || idCredito} — ${c.parque || ''}`,
+      `OP ${c.num_op || idCredito} · ${c.parque || 'parque'} · arriendo prorrateado $${arriendo.toLocaleString('es-CL')}`);
+    if (rc && rc.error) return rc;
+    if (ra && ra.error) return ra;
+    if ((!rc || rc.skip) && (!ra || ra.skip)) return { skip: (rc && rc.skip) || (ra && ra.skip), id: (rc && rc.id) || (ra && ra.id) };
+    if (rc && rc.id_comprobante) { out.id = rc.id; out.monto += rc.monto; out.id_comprobante = rc.id_comprobante; }
+    if (ra && ra.id_comprobante) { out.arriendo_id = ra.id; out.monto += ra.monto; if (!out.id) { out.id = ra.id; out.id_comprobante = ra.id_comprobante; } }
+    return out;
   } catch (e) { console.error('[provisiones constituirParque]', idCredito, e.message); return { error: e.message }; }
 }
 
-/* Libera (reversa íntegra) la provisión PARQUE de un crédito. motivo: APROBACION | ANULACION | MANUAL */
+/* Libera (reversa íntegra) las provisiones PARQUE (comisión) y ARRIENDO (arriendo) de un crédito, cada una con su
+   asiento. motivo: APROBACION | ANULACION | MANUAL. Devuelve la primera liberada (compatibilidad) y cuántas fueron. */
 async function liberarParque(idCredito, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
-  const C = CONCEPTOS.PARQUE;
   try {
-    const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto='PARQUE' AND origen_tipo='CREDITO' AND origen_id=? AND estado='CONSTITUIDA'", [idCredito]);
-    if (!p) return { skip: 'sin provisión constituida' };
+    const [filas] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto IN ('PARQUE','ARRIENDO') AND origen_tipo='CREDITO' AND origen_id=? AND estado='CONSTITUIDA' ORDER BY FIELD(concepto,'PARQUE','ARRIENDO')", [idCredito]);
+    if (!filas.length) return { skip: 'sin provisión constituida' };
     const fecha = await fechaContable(fechaISO || hoyISO());
-    const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, liberada_contra=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'",
-      [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
-    if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
-    let montos; try { montos = JSON.parse(p.montos_json || ''); } catch (_) { montos = null; }
-    if (!montos) montos = { comision: Number(p.monto), arriendo: 0 };
-    const id = await contabilizar({
-      evento: C.reglaLib, fecha, ref: `PROV-PARQUE-${idCredito}-LIB`, montos,
-      glosa: `Liberación provisión parque OP ${p.num_op || idCredito} — ${p.tercero || ''} (${motivo.toLowerCase()})`.slice(0, 300), num_op: p.num_op || null,
-      detalle: `OP ${p.num_op || idCredito} · ${p.tercero || 'parque'} · ${motivo} · por ${usuario}`,
-    });
-    if (!id) { await pool.query("UPDATE ctb_provisiones SET estado='CONSTITUIDA', motivo_liberacion=NULL, fecha_liberacion=NULL, liberada_contra=NULL WHERE id=?", [p.id]); return { error: 'sin asiento de liberación (ver log del motor)' }; }
-    await pool.query('UPDATE ctb_provisiones SET id_comprobante_liberacion=? WHERE id=?', [id, p.id]);
-    return { id: p.id, monto: Number(p.monto), id_comprobante: id };
+    let primero = null, n = 0;
+    for (const p of filas) {
+      const Cx = CONCEPTOS[p.concepto];
+      const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, liberada_contra=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'",
+        [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
+      if (!u.affectedRows) continue;
+      let montos; try { montos = JSON.parse(p.montos_json || ''); } catch (_) { montos = null; }
+      // Filas anteriores a la separación traían {comision, arriendo} en una sola; la regla PARQUE ya solo tiene 'comision'
+      if (p.concepto === 'PARQUE') montos = { comision: Math.round(Number((montos && montos.comision) != null ? montos.comision : p.monto) || 0) };
+      else montos = { monto: Math.round(Number((montos && montos.monto) != null ? montos.monto : p.monto) || 0) };
+      const id = await contabilizar({
+        evento: Cx.reglaLib, fecha, ref: `PROV-${p.concepto}-${idCredito}-LIB`, montos,
+        glosa: `Liberación provisión ${p.concepto === 'PARQUE' ? 'comisión parque' : 'arriendo parque'} OP ${p.num_op || idCredito} — ${p.tercero || ''} (${motivo.toLowerCase()})`.slice(0, 300), num_op: p.num_op || null,
+        detalle: `OP ${p.num_op || idCredito} · ${p.tercero || 'parque'} · ${motivo} · por ${usuario}`,
+      });
+      if (!id) { await pool.query("UPDATE ctb_provisiones SET estado='CONSTITUIDA', motivo_liberacion=NULL, fecha_liberacion=NULL, liberada_contra=NULL WHERE id=?", [p.id]); if (!primero) primero = { error: 'sin asiento de liberación (ver log del motor)' }; continue; }
+      await pool.query('UPDATE ctb_provisiones SET id_comprobante_liberacion=? WHERE id=?', [id, p.id]);
+      n++;
+      if (!primero || primero.error) primero = { id: p.id, monto: Number(p.monto), id_comprobante: id };
+    }
+    return { ...(primero || { skip: 'carrera: ya liberada' }), liberadas: n };
   } catch (e) { console.error('[provisiones liberarParque]', idCredito, e.message); return { error: e.message }; }
 }
 /* Al aprobar el pago del parque del mes: libera las provisiones de todas las OP de la foto */
@@ -524,12 +571,14 @@ async function sincronizarParque(usuario = 'Motor provisiones') {
   const [pend] = await pool.query(
     `SELECT c.id FROM creditos c
       LEFT JOIN ctb_provisiones p ON p.concepto='PARQUE' AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
-     WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND (COALESCE(c.com_parque,0)>0 OR COALESCE(c.arriendo_parque,0)>0)
-       AND DATE_FORMAT(COALESCE(c.mes, c.fecha_otorgado),'%Y-%m') >= ? AND p.id IS NULL`, [desde]);
+      LEFT JOIN ctb_provisiones a ON a.concepto='ARRIENDO' AND a.origen_tipo='CREDITO' AND a.origen_id=c.id
+     WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO'
+       AND DATE_FORMAT(COALESCE(c.mes, c.fecha_otorgado),'%Y-%m') >= ?
+       AND ((COALESCE(c.com_parque,0)>0 AND p.id IS NULL) OR (COALESCE(c.arriendo_parque,0)>0 AND a.id IS NULL))`, [desde]);
   for (const r of pend) { const x = await constituirParque(r.id, usuario); if (x && x.id && !x.skip) out.constituidas++; else out.omitidas++; }
   const [abiertas] = await pool.query(
-    `SELECT p.origen_id id, p.num_op, UPPER(COALESCE(c.estado_credito,'')) est FROM ctb_provisiones p
-      JOIN creditos c ON c.id=p.origen_id WHERE p.concepto='PARQUE' AND p.estado='CONSTITUIDA'`);
+    `SELECT DISTINCT p.origen_id id, p.num_op, UPPER(COALESCE(c.estado_credito,'')) est FROM ctb_provisiones p
+      JOIN creditos c ON c.id=p.origen_id WHERE p.concepto IN ('PARQUE','ARRIENDO') AND p.origen_tipo='CREDITO' AND p.estado='CONSTITUIDA'`);
   for (const p of abiertas) {
     if (p.est !== 'OTORGADO') { const x = await liberarParque(p.id, 'ANULACION', null, usuario, `Crédito en estado ${p.est}`); if (x && x.id) out.liberadas++; continue; }
     const a = await pagoParqueAprobado(p.num_op);
@@ -1015,6 +1064,8 @@ async function esProveedorParque(rut) {
   return !!p;
 }
 
+/* Concepto que le toca a una ODP/recurrente según su cuenta de gasto: arriendos (4002100) tienen fila propia. */
+const conceptoOtros = cuenta => String(cuenta || '') === CONCEPTOS.ARRIENDO.cuentaGasto ? 'ARRIENDO' : 'OTROS';
 /* Cuenta de gasto de una categoría (mapeo paramétrico). null = sin configurar → no se provisiona. */
 async function cuentaGastoDe(categoria) {
   const cat = String(categoria || '').trim().toUpperCase();
@@ -1086,7 +1137,7 @@ async function constituirOdp(idOdp, usuario = 'Motor provisiones') {
     const mes = (op.fe || '').slice(0, 7);
     const desde = await param(C.paramDesde, '2026-09');
     if (!mes || mes < desde) return { skip: `anterior a ${desde}` };
-    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto='OTROS' AND origen_tipo='ODP' AND origen_id=?", [String(idOdp)]);
+    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto IN ('OTROS','ARRIENDO') AND origen_tipo='ODP' AND origen_id=?", [String(idOdp)]);
     if (ya) return { skip: `ya ${ya.estado.toLowerCase()}`, id: ya.id };
     if (await odpDoc.buscar(op)) return { skip: 'ya tiene documento (devengo real)' };
     const cuenta = await cuentaGastoDe(op.categoria);
@@ -1094,15 +1145,17 @@ async function constituirOdp(idOdp, usuario = 'Motor provisiones') {
     const { gasto, monto, retencion } = await desgloseODP(op);
     if (monto <= 0) return { skip: 'sin monto' };
     const fecha = await fechaContable(op.fe);
+    // Arriendos (categoría → 4002100) van al concepto ARRIENDO, con los arriendos de parque (29-09-2026)
+    const concepto = conceptoOtros(cuenta), Cc = CONCEPTOS[concepto];
     const [ins] = await pool.query(
       `INSERT IGNORE INTO ctb_provisiones (concepto, origen_tipo, origen_id, tercero, rut_tercero, mes, fecha_constitucion, monto, base_bruta, montos_json, creado_por)
-       VALUES ('OTROS','ODP',?,?,?,?,?,?,?,?,?)`,
-      [String(idOdp), op.proveedor_nombre || null, op.proveedor_rut || null, mes, fecha, monto,
+       VALUES (?,'ODP',?,?,?,?,?,?,?,?,?)`,
+      [concepto, String(idOdp), op.proveedor_nombre || null, op.proveedor_rut || null, mes, fecha, monto,
        Math.round(Number(op.monto_bruto) || Number(op.monto) || 0),
        JSON.stringify({ montos: { monto, retencion }, gasto, cuenta, categoria: op.categoria || null, odp: op.numero || null, estado_odp: op.estado }), usuario]);
     if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
     const id = await contabilizar({
-      evento: C.regla, fecha, ref: `PROV-OTROS-ODP-${idOdp}`, montos: { monto, retencion },
+      evento: Cc.regla, fecha, ref: `PROV-${concepto}-ODP-${idOdp}`, montos: { monto, retencion },
       reemplazos: { [CUENTA_GASTO_REGLA]: cuenta },
       glosa: `Provisión ${op.concepto || 'gasto'} — ${op.proveedor_nombre || ''} (ODP ${op.numero || idOdp})`.slice(0, 300),
       rut: op.proveedor_rut || null,
@@ -1118,7 +1171,7 @@ async function constituirOdp(idOdp, usuario = 'Motor provisiones') {
 /* Constituye la provisión de un pago recurrente del mes que todavía no generó su ODP.
    Al generarse la orden se libera (y la orden entra por constituirOdp): nunca los dos a la vez. */
 async function constituirRecurrente(idPago, mes, usuario = 'Motor provisiones') {
-  const C = CONCEPTOS.OTROS;
+  let C = CONCEPTOS.OTROS;
   try {
     const [[p]] = await pool.query(
       `SELECT r.id, r.apodo, r.tipo_pago, r.tipo_documento, r.moneda, r.monto_origen, r.emisor_retiene,
@@ -1129,11 +1182,12 @@ async function constituirRecurrente(idPago, mes, usuario = 'Motor provisiones') 
     const desde = await param(C.paramDesde, '2026-09');
     if (!mes || mes < desde) return { skip: `anterior a ${desde}` };
     const origenId = `REC${idPago}|${mes}`;
-    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto='OTROS' AND origen_tipo='RECURRENTE' AND origen_id=?", [origenId]);
+    const [[ya]] = await pool.query("SELECT id, estado FROM ctb_provisiones WHERE concepto IN ('OTROS','ARRIENDO') AND origen_tipo='RECURRENTE' AND origen_id=?", [origenId]);
     if (ya) return { skip: `ya ${ya.estado.toLowerCase()}`, id: ya.id };
     if (await odpDeRecurrente(idPago, mes)) return { skip: 'ya generó su ODP' };
     if (await esProveedorParque(p.rut)) return { skip: 'pago a parque: ya devengado por PROV_PARQUE' };
     const cuenta = await cuentaGastoDe(p.tipo_pago);
+    const concepto = conceptoOtros(cuenta); C = CONCEPTOS[concepto];
     if (!cuenta) return { skip: `sin cuenta de gasto para la categoría "${p.tipo_pago || '(sin categoría)'}"`, pendiente: true };
     // Mismo cálculo que usa la generación de la ODP (Máxima 1): tipo de cambio del día y motor calcularDoc.
     const tc = await require('../../../shared/tipo-cambio').tipoCambio(p.moneda, hoyISO());
@@ -1146,12 +1200,12 @@ async function constituirRecurrente(idPago, mes, usuario = 'Motor provisiones') 
     const fecha = await fechaContable(p.venc && p.venc.slice(0, 7) === mes ? p.venc : ultimoDiaMes(mes));
     const [ins] = await pool.query(
       `INSERT IGNORE INTO ctb_provisiones (concepto, origen_tipo, origen_id, tercero, rut_tercero, mes, fecha_constitucion, monto, base_bruta, montos_json, creado_por)
-       VALUES ('OTROS','RECURRENTE',?,?,?,?,?,?,?,?,?)`,
-      [origenId, `${p.apodo || 'Pago recurrente'} — ${p.proveedor || ''}`.trim(), p.rut || null, mes, fecha, monto, brutoCLP,
+       VALUES (?,'RECURRENTE',?,?,?,?,?,?,?,?,?)`,
+      [concepto, origenId, `${p.apodo || 'Pago recurrente'} — ${p.proveedor || ''}`.trim(), p.rut || null, mes, fecha, monto, brutoCLP,
        JSON.stringify({ montos: { monto }, cuenta, categoria: p.tipo_pago || null, recurrente: p.apodo || null, vencimiento: p.venc || null }), usuario]);
     if (!ins.affectedRows) return { skip: 'carrera: ya existía' };
     const id = await contabilizar({
-      evento: C.regla, fecha, ref: `PROV-OTROS-REC-${idPago}-${mes}`, montos: { monto },
+      evento: C.regla, fecha, ref: `PROV-${concepto}-REC-${idPago}-${mes}`, montos: { monto },
       reemplazos: { [CUENTA_GASTO_REGLA]: cuenta },
       glosa: `Provisión pago recurrente «${p.apodo || ''}» ${mes} — ${p.proveedor || ''}`.slice(0, 300),
       rut: p.rut || null,
@@ -1172,7 +1226,7 @@ async function odpDeRecurrente(idPago, mes) {
 
 /* Libera UNA fila de otros gastos. motivo: DOCUMENTO | ANULACION | ODP_GENERADA | MANUAL */
 async function _liberarFilaOtros(p, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
-  const C = CONCEPTOS.OTROS;
+  const C = CONCEPTOS[p.concepto] || CONCEPTOS.OTROS;   // ARRIENDO por ODP/recurrente libera con su propia regla
   try {
     const fecha = await fechaContable(fechaISO || hoyISO());
     const cuenta = (() => { try { return JSON.parse(p.montos_json || '{}').cuenta || null; } catch (_) { return null; } })();
@@ -1181,10 +1235,10 @@ async function _liberarFilaOtros(p, motivo = 'MANUAL', fechaISO = null, usuario 
       [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
     if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
     const id = await contabilizar({
-      evento: C.reglaLib, fecha, ref: `PROV-OTROS-${p.origen_tipo}-${p.origen_id}-LIB`,
+      evento: C.reglaLib, fecha, ref: `PROV-${p.concepto}-${p.origen_tipo}-${p.origen_id}-LIB`,
       montos: (() => { const m = montosDe(p); return { monto: Math.round(Number(m.monto) || Number(p.monto) || 0), retencion: Math.round(Number(m.retencion) || 0) }; })(),
       reemplazos: cuenta ? { [CUENTA_GASTO_REGLA]: cuenta } : null,
-      glosa: `Liberación provisión otros gastos — ${p.tercero || ''} (${motivo.toLowerCase()})`.slice(0, 300),
+      glosa: `Liberación provisión ${p.concepto === 'ARRIENDO' ? 'arriendo' : 'otros gastos'} — ${p.tercero || ''} (${motivo.toLowerCase()})`.slice(0, 300),
       rut: p.rut_tercero || null, detalle: `${motivo} · por ${usuario}`,
     });
     if (!id) { await pool.query("UPDATE ctb_provisiones SET estado='CONSTITUIDA', motivo_liberacion=NULL, fecha_liberacion=NULL, liberada_contra=NULL WHERE id=?", [p.id]); return { error: 'sin asiento de liberación (ver log del motor)' }; }
@@ -1194,7 +1248,7 @@ async function _liberarFilaOtros(p, motivo = 'MANUAL', fechaISO = null, usuario 
 }
 
 async function liberarOtros(idFila, motivo, fechaISO, usuario, contra = null) {
-  const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE id=? AND concepto='OTROS' AND estado='CONSTITUIDA'", [idFila]);
+  const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE id=? AND concepto IN ('OTROS','ARRIENDO') AND origen_tipo IN ('ODP','RECURRENTE') AND estado='CONSTITUIDA'", [idFila]);
   return p ? _liberarFilaOtros(p, motivo, fechaISO, usuario, contra) : { skip: 'sin provisión constituida' };
 }
 
@@ -1210,7 +1264,7 @@ async function sincronizarOtros(usuario = 'Motor provisiones') {
       WHERE UPPER(COALESCE(o.estado,'')) <> 'ANULADA' AND o.fecha_emision IS NOT NULL
         AND DATE_FORMAT(o.fecha_emision,'%Y-%m') >= ?
         AND NOT EXISTS (SELECT 1 FROM ctb_provisiones p
-                         WHERE p.concepto='OTROS' AND p.origen_tipo='ODP' AND p.origen_id = CAST(o.id AS CHAR))
+                         WHERE p.concepto IN ('OTROS','ARRIENDO') AND p.origen_tipo='ODP' AND p.origen_id = CAST(o.id AS CHAR))
       ORDER BY o.id LIMIT 500`, [desde]);
   for (const o of ordenes) {
     const r = await constituirOdp(o.id, usuario);
@@ -1230,7 +1284,7 @@ async function sincronizarOtros(usuario = 'Motor provisiones') {
   }
 
   // 3. Liberaciones: documento en el auxiliar, orden anulada, o el recurrente ya generó su ODP
-  const [abiertas] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto='OTROS' AND estado='CONSTITUIDA'");
+  const [abiertas] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto IN ('OTROS','ARRIENDO') AND origen_tipo IN ('ODP','RECURRENTE') AND estado='CONSTITUIDA'");
   for (const p of abiertas) {
     if (p.origen_tipo === 'ODP') {
       const [[op]] = await pool.query(
@@ -1738,8 +1792,9 @@ async function otrasCuentas(mes) {
   return out.sort((a, b) => (a.grupo === b.grupo ? Math.abs(b.saldo_final) - Math.abs(a.saldo_final) : (a.grupo === 'PROVISION' ? -1 : 1)));
 }
 
-const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, EJECUTIVO: sincronizarEjecutivo, JEFE: sincronizarJefe, SUELDOS: sincronizarSueldos, OTROS: sincronizarOtros, IAS: sincronizarIas, INGRESOS: sincronizarIngresos, INTERES: sincronizarInteres };
-const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, EJECUTIVO: liberarEjecutivo, JEFE: liberarJefe, SUELDOS: liberarSueldos, OTROS: liberarOtros, IAS: liberarIas };
+const sincronizarArriendo = async (u) => { const a = await sincronizarParque(u), b = await sincronizarOtros(u); return { constituidas: (a.constituidas || 0) + (b.constituidas || 0), liberadas: (a.liberadas || 0) + (b.liberadas || 0), pendientes: b.pendientes || [] }; };
+const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, ARRIENDO: sincronizarArriendo, EJECUTIVO: sincronizarEjecutivo, JEFE: sincronizarJefe, SUELDOS: sincronizarSueldos, OTROS: sincronizarOtros, IAS: sincronizarIas, INGRESOS: sincronizarIngresos, INTERES: sincronizarInteres };
+const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, ARRIENDO: liberarFilaPorId, EJECUTIVO: liberarEjecutivo, JEFE: liberarJefe, SUELDOS: liberarSueldos, OTROS: liberarOtros, IAS: liberarIas };
 /* Al otorgar: todos los conceptos que nacen con el crédito (fire-and-forget, nunca lanza) */
 async function constituirAlOtorgar(idCredito, usuario) {
   const r = { DEALER: await constituirDealer(idCredito, usuario), PARQUE: await constituirParque(idCredito, usuario) };   // EJECUTIVO es mensual (al cierre), no al otorgar
