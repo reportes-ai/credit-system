@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v47.3 — cache-bust del motor dealernet-informe.js (?v=) · v47.2 — la ocupacion del cliente se recupera sola: ya estaba guardada en cada documento -->
+<!-- v47.4 — fechas DATE de la BD sin desfase UTC · v47.3 — cache-bust del motor dealernet-informe.js (?v=) · v47.2 — la ocupacion del cliente se recupera sola: ya estaba guardada en cada documento -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -291,7 +291,8 @@
 
   // ── Helpers ─────────────────────────────────────────────────────────────
   const fmtPeso  = n => (n || n === 0) && Number(n) ? '$' + Number(n).toLocaleString('es-CL') : '—';
-  const fmtFecha = d => { if (!d) return '—'; const x = new Date(d); return isNaN(x) ? '—' :
+  // Una fecha DATE de la BD ('2026-09-01', sin hora) se lee del texto: new Date() la toma como UTC y en Chile es el día anterior (gotcha isoDeBD, 29-09-2026)
+  const fmtFecha = d => { if (!d) return '—'; const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d)); if (m) return m[3]+'-'+m[2]+'-'+m[1]; const x = new Date(d); return isNaN(x) ? '—' :
     String(x.getDate()).padStart(2,'0')+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+x.getFullYear(); };
   const rutLimpio = () => document.getElementById('inRut').value.replace(/[^0-9kK]/g,'').toUpperCase();
   const rutConGuion = () => { const c = rutLimpio(); return c.slice(0,-1)+'-'+c.slice(-1); };
