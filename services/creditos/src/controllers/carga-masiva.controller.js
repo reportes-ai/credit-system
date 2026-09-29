@@ -416,6 +416,8 @@ const preview = async (req, res) => {
 
 /* ── POST /api/carga-masiva/importar ───────────────────────────────────── */
 const importar = async (req, res) => {
+  // Créditos nuevos de la carga → ficha del dealer por RUT al terminar, sin esperar el barrido de 6 h (29-09-2026)
+  res.on('finish', () => require('../../../../shared/enlazar-dealer').barrido());
   try {
     if (!req.file) return res.status(400).json({ success: false, data: null, error: 'No se recibió archivo' });
 

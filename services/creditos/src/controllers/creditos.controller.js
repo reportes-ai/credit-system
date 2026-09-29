@@ -321,6 +321,8 @@ const create = async (req, res) => {
 
     // Recalcular el mes del crédito nuevo (comisiones/ingresos) — automático. Fire-and-forget.
     recalcularPorOps(r.insertId).catch(e => console.error('[recalc credito nuevo]', e.message));
+    // Ficha del dealer por RUT al tiro (motor único enlazar-dealer), no en el barrido de 6 h (29-09-2026)
+    require('../../../../shared/enlazar-dealer').enlazar({ idCredito: r.insertId }).catch(e => console.error('[enlazar dealer credito nuevo]', e.message));
 
     res.status(201).json({ success: true, data: { id_credito: r.insertId, numero_credito }, error: null });
   } catch (e) {

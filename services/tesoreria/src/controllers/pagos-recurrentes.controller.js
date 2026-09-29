@@ -232,6 +232,10 @@ async function generarVencidos() {
   if (n) console.log(`[pagos-recurrentes] ${n} orden(es) de pago generada(s)`);
 }
 programar('pagos-recurrentes', generarVencidos, 6 * 60 * 60 * 1000, { arranqueMs: 90 * 1000 });
+/* Por evento (Pato, 29-09-2026): al inscribir, editar o activar un recurrente cuyo vencimiento ya llegó, la ODP
+   nace al tiro y no a las 6 h. Corre completo (es idempotente por fecha_ultima_generacion) medio segundo después
+   de responder, para no frenar al usuario. */
+function generarTrasEvento() { setTimeout(() => generarVencidos().catch(e => console.error('[pagos-recurrentes evento]', e.message)), 500); }
 
 /* Hook desde Órdenes de Pago al PAGAR una ODP general: si nació de un pago
    recurrente, registra la fecha de último pago y avisa al proveedor con la glosa. */
@@ -309,6 +313,7 @@ exports.crear = async (req, res) => {
     auditar({ req, accion: 'CREAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(r.insertId),
       detalle: `Inscribió pago recurrente «${norm(b.apodo)}» (${String(b.periodicidad).toUpperCase()}, ${b.monto_origen} ${b.moneda}, próximo ${b.fecha_proximo_pago})` });
     ok(res, { id: r.insertId });
+    generarTrasEvento();
   } catch (e) { fail(res, e.message); }
 };
 
@@ -322,6 +327,7 @@ exports.editar = async (req, res) => {
     if (!r.affectedRows) return fail(res, 'Pago recurrente no encontrado', 404);
     auditar({ req, accion: 'EDITAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(id), detalle: `Editó «${norm(b.apodo)}»` });
     ok(res, { id });
+    generarTrasEvento();
   } catch (e) { fail(res, e.message); }
 };
 
@@ -333,6 +339,7 @@ exports.activar = async (req, res) => {
     if (!r.affectedRows) return fail(res, 'Pago recurrente no encontrado', 404);
     auditar({ req, accion: activo ? 'ACTIVAR' : 'PAUSAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(id), detalle: activo ? 'Activó el pago recurrente (genera órdenes)' : 'Desactivó el pago recurrente (no genera órdenes)' });
     ok(res, { id, activo });
+    if (activo) generarTrasEvento();
   } catch (e) { fail(res, e.message); }
 };
 

@@ -640,6 +640,9 @@ exports.preview = async (req, res) => {
 
 /* ── POST /api/carga-trinidad/importar ─────────────────────────── */
 exports.importar = async (req, res) => {
+  // Al terminar la carga (con o sin error) enlaza a su ficha de dealer los créditos que nacieron sin id_dealer,
+  // en vez de esperar el barrido de 6 h (Pato, 29-09-2026). Fire-and-forget: nunca frena la respuesta.
+  res.on('finish', () => require('../../../../shared/enlazar-dealer').barrido());
   try {
     const corteMes = await mesCorte();
     const { solicitudes, canal } = archivosDe(req);
