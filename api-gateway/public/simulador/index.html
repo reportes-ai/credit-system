@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.6 — sale la nota sobre comisiones editables del panel de datos · v3.5 — barra negra con el total del monto financiado; el detalle (saldo, gastos, primas) abajo a la izquierda · v3.4 — las notas explicativas (tier UAC, reglas del producto) van al pie de cada panel · v3.3 — productos con seguros obligatorios (PREFERENTE): monto financiado, primas, ingreso por seguros y cuota propios, aunque se desmarquen los seguros · v3.2 — costo de fondo propio por producto (tasa − spread ≤/> 200 UF) y página full width para ver los paneles uno al lado del otro · v3.1 — un panel por producto con reglas propias del mantenedor Productos por Financiera (AUTOFIN PREFERENTE): tasa, dealer por tramo, parque y ejecutivo propios, comisiones editables · v3.0 — comisiones Dealer, Parque y Ejecutivo editables EN CADA PANEL (AutoFin y UAC por separado, ↺ vuelve a la tabla); sale el input global de comisión dealer · v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
+<!-- v3.7 — panel AUTOFACIL (recursos propios): primas de desgravamen y cesantía por el motor Seguros SURA (markup por tramo, sin RDH), ingreso por seguros = margen del desgravamen · v3.6 — sale la nota sobre comisiones editables del panel de datos · v3.5 — barra negra con el total del monto financiado; el detalle (saldo, gastos, primas) abajo a la izquierda · v3.4 — las notas explicativas (tier UAC, reglas del producto) van al pie de cada panel · v3.3 — productos con seguros obligatorios (PREFERENTE): monto financiado, primas, ingreso por seguros y cuota propios, aunque se desmarquen los seguros · v3.2 — costo de fondo propio por producto (tasa − spread ≤/> 200 UF) y página full width para ver los paneles uno al lado del otro · v3.1 — un panel por producto con reglas propias del mantenedor Productos por Financiera (AUTOFIN PREFERENTE): tasa, dealer por tramo, parque y ejecutivo propios, comisiones editables · v3.0 — comisiones Dealer, Parque y Ejecutivo editables EN CADA PANEL (AutoFin y UAC por separado, ↺ vuelve a la tabla); sale el input global de comisión dealer · v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -111,6 +111,7 @@
 <body>
 <script src="/js/auth-guard.js"></script>
 <script src="/js/rentabilidad-core.js"></script>
+<script src="/js/seguros-sura-core.js"></script>
 <script src="/js/comision-dealer.js"></script>
 <div id="af-topnav"></div>
 <script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Simulador Rentabilidad',current:true}]};</script>
@@ -273,6 +274,7 @@ let T = {};    // tasas vigentes (CF / spreads, módulo de tasas)
 let UF = 0;   // valor UF hoy
 let OPS_UAC = 0;   // ops UAC otorgadas/aprobadas del mes en curso (tier vigente)
 let PRODS = [];    // productos con reglas propias (mantenedor Productos por Financiera): tasa, dealer por tramo, parque, ejecutivo
+let SURA = null;   // seguros SURA de los créditos AUTOFACIL (mantenedor Seguros AutoFácil) → motor AF_SEG_SURA
 let MES_UAC = '';  // mes en curso 'YYYY-MM'
 
 /* ── Tier UAC vigente — espejo del motor autoritativo
@@ -392,13 +394,20 @@ async function cargarDatos() {
   try {
     const rr = await fetch('/api/productos-financiera?activo=1', { headers: hdr() });
     const jr = await rr.json();
-    PRODS = (jr.data || []).filter(x => Number(x.reglas_propias) === 1 && x.tasa_menor_pct != null && x.tasa_mayor_pct != null);
+    // AUTOFACIL (recursos propios) entra aunque no tenga tasa propia: usa la vigente de Tasas
+    PRODS = (jr.data || []).filter(x => Number(x.reglas_propias) === 1 && ((x.tasa_menor_pct != null && x.tasa_mayor_pct != null) || String(x.financiera || '').toUpperCase() === 'AUTOFACIL'));
     document.getElementById('panelesProd').innerHTML = PRODS.map(x => `
       <div class="res-panel card" id="panelP${x.id}">
-        <div class="card-hdr" id="hdrP${x.id}" style="background:#7c2d12"><i class="bi bi-star-fill"></i> ${x.producto}</div>
+        <div class="card-hdr" id="hdrP${x.id}" style="background:${String(x.financiera || '').toUpperCase() === 'AUTOFACIL' ? '#0141A2' : '#7c2d12'}"><i class="bi ${String(x.financiera || '').toUpperCase() === 'AUTOFACIL' ? 'bi-shield-check' : 'bi-star-fill'}"></i> ${x.producto}</div>
         <div class="card-bd" id="resP${x.id}"></div>
       </div>`).join('');
   } catch(e) { console.warn('[simulador] productos-financiera:', e.message); }
+  // ── Seguros SURA (créditos AUTOFACIL): tramos, markup por tramo y opción vigente del mantenedor ──
+  try {
+    const rs = await fetch('/api/seguros-autofacil', { headers: hdr() });
+    const js = await rs.json();
+    if (js.success) SURA = js.data;
+  } catch(e) { console.warn('[simulador] seguros-autofacil:', e.message); }
 
   // ── Tasas vigentes (CF y spreads) ──
   try {
@@ -646,8 +655,20 @@ function simular() {
        reparaciones menores, se marquen o no en el panel de datos → monto financiado, primas, ingreso por
        seguros y cuota propios del producto. */
     const oblig = Number(pr.seguros_obligatorios) === 1;
-    let monto_fin_p = monto_fin, ing_seg_p = ing_seg_af, primas_p = totalPrimas;
-    if (oblig) {
+    const esAFAC = String(pr.financiera || '').toUpperCase() === 'AUTOFACIL';
+    let monto_fin_p = monto_fin, ing_seg_p = ing_seg_af, primas_p = totalPrimas, notaSura = '';
+    if (esAFAC) {
+      /* Crédito con recursos propios: seguros SURA por el motor único (Seguros AutoFácil), no los factores
+         del canal AutoFin. Desgravamen (opción vigente + markup del tramo) y cesantía, obligatorios; sin RDH.
+         El ingreso por seguros de AutoFácil es el margen del desgravamen (prima cliente − prima neta); la
+         intermediación de cesantía (8% + IVA) la cobra el corredor FACILSEGUROS. */
+      const subP = saldo + gastos;
+      const Ssr = (window.AF_SEG_SURA && SURA) ? AF_SEG_SURA.capitalizar(SURA, subP, plazo) : { error: 'mantenedor Seguros AutoFácil no disponible' };
+      if (!Ssr.error) {
+        primas_p = Ssr.total; monto_fin_p = subP + Ssr.total; ing_seg_p = Ssr.margen_desg;
+        notaSura = `<b>Seguros SURA</b> (Seguros AutoFácil): desgravamen ${fN(Ssr.desg.prima_cliente)} (tasa ${Ssr.desg.tasa_pct}% + markup ${Ssr.desg.markup_pct}% → neta ${fN(Ssr.desg.prima_neta)}) · cesantía ${fN(Ssr.cesa.prima_cliente)} (${Ssr.cesa.tasa_pct}%) · sin RDH · MIC ${fN(Ssr.capital)}. Ingreso por seguros = margen del desgravamen${Ssr.comision_cesantia ? ` (la intermediación de cesantía ${fN(Ssr.comision_cesantia)} la cobra FACILSEGUROS)` : ''}.<br>`;
+      } else { primas_p = 0; monto_fin_p = subP; ing_seg_p = 0; notaSura = `<b>Seguros SURA</b>: ${Ssr.error}.<br>`; }
+    } else if (oblig) {
       const gastosP = gastos + (incRep ? 0 : (P.reparaciones_menores || 0));
       const subP = saldo + gastosP;
       const rateP = getSegRate('d', plazo) + getSegRate('r', plazo) + getSegRate('c', plazo);
@@ -657,7 +678,10 @@ function simular() {
       ing_seg_p = Math.round((primas_p + (P.reparaciones_menores || 0)) * pctTraspaso);
     }
     const esMayorP = limite200 ? monto_fin_p > limite200 : false;
-    const tasaP = (esMayorP ? Number(pr.tasa_mayor_pct) : Number(pr.tasa_menor_pct)) / 100;
+    // Sin tasa propia (AUTOFACIL): la tasa vigente del mantenedor Tasas, como AutoFin
+    const tMenorP = pr.tasa_menor_pct != null ? Number(pr.tasa_menor_pct) : (T.tasa_mensual_menor != null ? Number(T.tasa_mensual_menor) : NaN);
+    const tMayorP = pr.tasa_mayor_pct != null ? Number(pr.tasa_mayor_pct) : (T.tasa_mensual_mayor != null ? Number(T.tasa_mensual_mayor) : NaN);
+    const tasaP = (esMayorP ? tMayorP : tMenorP) / 100;
     // Costo de fondo del producto = tasa − spread propio (misma fórmula que AutoFin: CF = tasa − spread); sin spread propio usa el de AutoFin
     const spreadP = esMayorP ? pr.spread_mayor_pct : pr.spread_menor_pct;
     const costoFondoP = spreadP != null && !isNaN(spreadP) ? tasaP - Number(spreadP) / 100 : costoFondo;
@@ -676,7 +700,7 @@ function simular() {
       com_dealer: C_P.dealer, com_patio: C_P.parque, com_ej: C_P.ej,
       rentab: rentab_p, pct: monto_fin_p ? rentab_p / monto_fin_p * 100 : 0,
       cuota: cuota_p, esPatio, esCorfo: false,
-      tier_note: `${oblig ? '<b>Seguros obligatorios</b>: monto financiado propio ' + fN(monto_fin_p) + ' (primas ' + fN(primas_p) + ')<br>' : ''}Tasa cliente <b>${(tasaP * 100).toFixed(2).replace('.', ',')}%</b> (${esMayorP ? '> 200 UF' : '≤ 200 UF'}) · spread ${spreadP != null ? Number(spreadP).toFixed(2).replace('.', ',') + '%' : 'AutoFin'} → costo de fondo ${(costoFondoP * 100).toFixed(2).replace('.', ',')}% · dealer ${(pctTramo(pr.dealer_tramos, plazo) * 100).toFixed(1).replace('.', ',')}% del saldo a ${plazo} meses · parque ${Number(pr.parque_pct) || 0}% · ejecutivo ${Number(pr.ejecutivo_pct) || 0}% del monto financiado${pr.descripcion ? '<br>' + pr.descripcion : ''}`,
+      tier_note: `${notaSura}${oblig && !esAFAC ? '<b>Seguros obligatorios</b>: monto financiado propio ' + fN(monto_fin_p) + ' (primas ' + fN(primas_p) + ')<br>' : ''}${esAFAC ? 'Monto financiado ' + fN(monto_fin_p) + ' (primas ' + fN(primas_p) + ')<br>' : ''}Tasa cliente <b>${(tasaP * 100).toFixed(2).replace('.', ',')}%</b> (${esMayorP ? '> 200 UF' : '≤ 200 UF'}) · spread ${spreadP != null ? Number(spreadP).toFixed(2).replace('.', ',') + '%' : 'AutoFin'} → costo de fondo ${(costoFondoP * 100).toFixed(2).replace('.', ',')}% · dealer ${(pctTramo(pr.dealer_tramos, plazo) * 100).toFixed(1).replace('.', ',')}% del saldo a ${plazo} meses · parque ${Number(pr.parque_pct) || 0}% · ejecutivo ${Number(pr.ejecutivo_pct) || 0}% del monto financiado${pr.descripcion ? '<br>' + pr.descripcion : ''}`,
     });
     paneles.push({ hdr: 'hdrP' + pr.id, nombre: pr.producto, icono: 'bi-star-fill', rentab: rentab_p });
   }

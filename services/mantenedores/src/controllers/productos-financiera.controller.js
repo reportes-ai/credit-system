@@ -65,6 +65,13 @@ require('../../../../shared/migrate').enFila('productos-financiera', async () =>
     // PREFERENTE: seguros obligatorios (Pato, 11-09-2026) — se marca una sola vez; después manda el mantenedor
     await pool.query("UPDATE productos_financiera SET seguros_obligatorios=1 WHERE producto='AUTOFIN PREFERENTE' AND descripcion NOT LIKE '%seguros obligatorios%'").catch(() => {});
     await pool.query("UPDATE productos_financiera SET descripcion=CONCAT(descripcion, '; seguros obligatorios') WHERE producto='AUTOFIN PREFERENTE' AND descripcion NOT LIKE '%seguros obligatorios%'").catch(() => {});
+    /* AUTOFACIL (recursos propios, 29-09-2026): producto con reglas propias para que el Simulador lo muestre como panel.
+       Sus seguros NO salen de aquí sino del mantenedor Seguros AutoFácil (SURA) por el motor único; sin tasa propia usa
+       la vigente de Tasas. Dealer/parque/ejecutivo: los que Pato defina en el mantenedor (nacen en 0). */
+    await pool.query(
+      `INSERT IGNORE INTO productos_financiera (financiera, producto, activo, orden, reglas_propias, seguros_obligatorios, dealer_tramos, parque_pct, ejecutivo_pct, descripcion)
+       VALUES ('AUTOFACIL', 'AUTOFACIL - CREDITO PROPIO', 1, 1, 1, 1, ?, 0, 0, 'Crédito con recursos propios: desgravamen (opción vigente + markup por tramo) y cesantía por el motor Seguros AutoFácil (SURA), sin RDH; tasa vigente de Tasas mientras no se defina una propia')`,
+      [JSON.stringify([{ hasta: 999, pct: 0 }])]).catch(() => {});
   } catch (e) {
     console.error('[productos-financiera migration]', e.message);
   }

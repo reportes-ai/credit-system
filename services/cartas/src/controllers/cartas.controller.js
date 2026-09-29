@@ -28,10 +28,11 @@ function persistirPrimasCarta(idCarta, c) {
   const rdhT = (c.segRdh != null || c.segDesgravamen != null)
     ? (Number(c.segRdh || 0) + Number(c.segDesgravamen || 0)) : null;
   pool.query(`UPDATE cartas_aprobacion SET
+      seg_desg = COALESCE(?, seg_desg),
       seg_rdh = COALESCE(?, seg_rdh), seg_cesantia = COALESCE(?, seg_cesantia),
       seg_rep = COALESCE(?, seg_rep), gps_monto = COALESCE(?, gps_monto),
       gastos_monto = COALESCE(?, gastos_monto) WHERE id = ?`,
-    [rdhT, c.segCesantia != null ? Number(c.segCesantia) : null,
+    [c.segDesgravamen != null ? Number(c.segDesgravamen) : null, rdhT, c.segCesantia != null ? Number(c.segCesantia) : null,
      c.segRep != null ? Number(c.segRep) : null,
      c.gps != null ? Number(c.gps) : null,
      c.gastos != null ? Number(c.gastos) : null, idCarta]
@@ -72,10 +73,11 @@ function sincronizarCreditoDesdeCarta(c, idCred) {
     const rep  = c.segRep != null ? Number(c.segRep) : null;
     const tot  = (rdhT != null || ces != null || rep != null) ? (Number(rdhT || 0) + Number(ces || 0) + Number(rep || 0)) : null;
     pool.query(`UPDATE creditos SET
+        seguro_desgravamen = COALESCE(?, seguro_desgravamen),
         seguro_rdh = COALESCE(?, seguro_rdh), seguro_cesantia = COALESCE(?, seguro_cesantia),
         seguro_rep_menor = COALESCE(?, seguro_rep_menor), seguros = COALESCE(?, seguros),
         gps = COALESCE(?, gps), gastos = COALESCE(?, gastos), updated_at = NOW() WHERE id = ?`,
-      [rdhT, ces, rep, tot, (c.gps != null ? Number(c.gps) : null),
+      [(c.segDesgravamen != null ? Number(c.segDesgravamen) : null), rdhT, ces, rep, tot, (c.gps != null ? Number(c.gps) : null),
        (c.gastos != null ? Number(c.gastos) : null), idCred]
     ).catch(e => console.error('[carta→credito primas]', e.message));
   }
@@ -245,7 +247,7 @@ async function crearCreditoDesdeCartas(c) {
        id_cliente, rut_dealer, vendedor,
        fecha_otorgado, mes, valor_vehiculo, pie, saldo_precio, pct_financiado,
        monto_financiado, plazo, tascli_real,
-       seguro_rdh, seguro_cesantia, seguro_rep_menor, seguros, gps, gastos,
+       seguro_desgravamen, seguro_rdh, seguro_cesantia, seguro_rep_menor, seguros, gps, gastos,
        tipo_vehiculo, marca, modelo, anio, patente,
        automotora, ejecutivo, comdea_real, producto, com_ejec_pct,
        created_at, updated_at)
@@ -254,7 +256,7 @@ async function crearCreditoDesdeCartas(c) {
             ?,?,?,
             NULL, DATE_FORMAT(NOW(),'%Y-%m-01'), ?,?,?,?,
             ?,?,?,
-            ?,?,?,?,?,?,
+            ?,?,?,?,?,?,?,
             ?,?,?,?,?,
             ?,?,?,?,?,
             NOW(),NOW())
@@ -272,7 +274,7 @@ async function crearCreditoDesdeCartas(c) {
     (c.monto_credito_clp || c.montoCreditoCLP || null),
     (c.plazo || null),
     (c.tasa_credito || c.tasaCredito || null),
-    segRdhTot, segCes, segRep, segTotal, (c.gps != null ? Number(c.gps) : null),
+    (c.segDesgravamen != null ? Number(c.segDesgravamen) : null), segRdhTot, segCes, segRep, segTotal, (c.gps != null ? Number(c.gps) : null),
     (c.gastos != null ? Number(c.gastos) : null),
     (c.tipo_vehiculo || c.tipoVehiculo || null),
     (c.marca || null), (c.modelo || null), (c.anio || null), (c.patente || null),
@@ -493,6 +495,9 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
        masiva), las primas se PERDÍAN y la operación caía a "datos faltantes".
        La carta es el documento que las trae: ahora las persiste y las sincroniza. */
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS seg_rdh DECIMAL(12,2) DEFAULT NULL`);
+    // Desgravamen aparte (29-09-2026): en AUTOFACIL lo tarifica SURA y no existe RDH; seg_rdh sigue sumando desg+RDH (convención AutoFin 2026-07)
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS seg_desg DECIMAL(12,2) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE creditos ADD COLUMN IF NOT EXISTS seguro_desgravamen DECIMAL(12,2) DEFAULT NULL`).catch(() => {});
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS seg_cesantia DECIMAL(12,2) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS seg_rep DECIMAL(12,2) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS gps_monto DECIMAL(12,2) DEFAULT NULL`);
@@ -931,7 +936,7 @@ const fichaCompleta = async (req, res) => {
       precioVenta: num(r.precio_venta), pie: num(r.pie), saldo: num(r.saldo), plazo: num(r.plazo),
       tasaCredito: num(r.tasa_credito), montoCreditoCLP: num(r.monto_credito_clp), montoCreditoUF: num(r.monto_credito_uf),
       // Primas y accesorios (NO van en la carta al dealer)
-      segRdh: num(r.seg_rdh), segCesantia: num(r.seg_cesantia), segRep: num(r.seg_rep),
+      segDesgravamen: num(r.seg_desg), segRdh: num(r.seg_rdh), segCesantia: num(r.seg_cesantia), segRep: num(r.seg_rep),
       gps: num(r.gps_monto), gastos: num(r.gastos_monto),
       // Dealer y comisión
       parque: r.parque, nombreDealer: r.nombre_dealer, rutDealer: r.rut_dealer, vendedor: r.vendedor,
@@ -2368,7 +2373,7 @@ const CAMPOS_CORREGIBLES = [
   'precio_venta', 'pie',
   'parque', 'nombre_dealer', 'rut_dealer', 'vendedor',
   'part_neto', 'part_iva', 'part_bruto',
-  'seg_rdh', 'seg_cesantia', 'seg_rep', 'gps_monto', 'gastos_monto',
+  'seg_desg', 'seg_rdh', 'seg_cesantia', 'seg_rep', 'gps_monto', 'gastos_monto',
 ];
 // Los que definen la operación: si cambian, ya no es la misma y no puede colgar del mismo crédito.
 const CAMPOS_BLOQUEADOS = [

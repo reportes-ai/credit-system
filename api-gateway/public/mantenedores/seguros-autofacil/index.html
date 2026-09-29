@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguros AutoFácil (SURA) — AutoFácil</title>
-  <!-- v1.1 — markup por tramo en la opción 2 (calibrado contra el desgravamen AutoFin) · v1.0 — mantenedor de los seguros SURA de los créditos AutoFácil: desgravamen y cesantía (póliza, condiciones, tramos por opción, comisiones, markup, simulador de prima) y vehículo (portal SURA Dealers). Semilla cotizaciones 04-09-2026 (28-09-2026) -->
+  <!-- v1.2 — footer: cableado a Simulador y Cartas · v1.1 — markup por tramo en la opción 2 (calibrado contra el desgravamen AutoFin) · v1.0 — mantenedor de los seguros SURA de los créditos AutoFácil: desgravamen y cesantía (póliza, condiciones, tramos por opción, comisiones, markup, simulador de prima) y vehículo (portal SURA Dealers). Semilla cotizaciones 04-09-2026 (28-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -76,7 +76,7 @@
   <div class="footer-box">
     <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
     <ul>
-      <li><b>Opción vigente + tramos de tasa</b> → prima única de desgravamen y cesantía de los créditos AutoFácil por el motor <code>shared/seguros-autofacil.js</code> (<code>prima = tasa del tramo × MIC</code>). Lo consume el simulador de prima de esta página y quedará cableado al <a href="/simulador/">Simulador</a> y a las <a href="/aprobaciones/">Cartas</a> del producto AutoFácil cuando parta la colocación propia (pendiente 2.14 en PENDIENTES).</li>
+      <li><b>Opción vigente + tramos de tasa</b> → prima única de desgravamen y cesantía de los créditos AutoFácil por el motor <code>shared/seguros-autofacil.js</code> (<code>prima = tasa del tramo × MIC</code>). Lo consumen el simulador de prima de esta página, el panel AUTOFACIL del <a href="/simulador/">Simulador</a> y las <a href="/aprobaciones/">Cartas</a> con acreedor AUTOFACIL (primas automáticas de desgravamen y cesantía, capitalizadas: MIC = saldo + gastos + primas). Fórmula única en <code>/js/seguros-sura-core.js</code>.</li>
       <li><b>Markup</b> (solo opción 2, tasa técnica) → recargo de AutoFácil sobre la prima neta: <code>prima cliente = prima neta × (1 + markup)</code>. Es <b>por tramo</b> (columna Markup % de la opción 2; vacío = el general de la cabecera). Calibrado el 29-09-2026 para igualar tramo a tramo el desgravamen de AutoFin: 501 / 337 / 274 / 246 %. En la opción 1 la tasa ya es bruta y no aplica.</li>
       <li><b>Comisiones por opción</b> → desglose informativo de cuánto de la prima neta va al corredor (FACILSEGUROS), recaudación y uso de canal; sirve para la conciliación con SURA y la contabilización de la prima.</li>
       <li><b>Edades, tope de capital, carencia, cuotas máximas</b> → condiciones de asegurabilidad que la evaluación y la carta deben validar antes de incluir el seguro (edad máxima de ingreso 74 años en desgravamen; cesantía solo dependientes indefinidos).</li>

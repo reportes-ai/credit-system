@@ -13,6 +13,7 @@
  * Caché 60 s. NO es el motor de los seguros del canal AUTOFIN (shared/cotizador.js, seg_*).
  */
 const pool = require('./config/database');
+const CORE = require('../api-gateway/public/js/seguros-sura-core');   // fórmula única (isomorfa): la misma del Simulador y las Cartas
 
 let _cache = null, _at = 0;
 const TTL = 60000;
@@ -51,20 +52,11 @@ function invalidar() { _cache = null; }
  */
 async function prima(seguro, mic, plazo, o = {}) {
   const segs = await cargar();
-  const s = segs.find(x => x.seguro === String(seguro || '').toUpperCase());
+  const s = CORE.seguroDe(segs, seguro);
   if (!s) return { seguro, error: 'Seguro no configurado' };
-  if (!s.activo) return { seguro: s.seguro, error: 'Seguro inactivo en el mantenedor' };
-  const opcion = o.opcion || s.opcion_vigente;
-  if (!opcion) return { seguro: s.seguro, error: 'Sin opción de tarifa vigente' };
-  const tramos = s.tramos[opcion] || [];
-  const t = tramos.find(x => plazo >= x.plazo_desde && plazo <= x.plazo_hasta);
-  if (!t) return { seguro: s.seguro, opcion, plazo, error: `Plazo ${plazo} fuera de los tramos de la opción ${opcion}` };
-  const prima_neta = Math.round(Number(mic) * t.tasa_pct / 100);
-  const markup = opcion === 2 ? (t.markup_pct != null ? Number(t.markup_pct) : (s.markup_pct != null ? Number(s.markup_pct) : 0)) : 0;
-  const prima_cliente = Math.round(prima_neta * (1 + markup / 100));
-  const comisiones = (s.comisiones[opcion] || []).map(c => ({ nombre: c.nombre, pct: c.pct, iva_incluido: c.iva_incluido, monto: Math.round(prima_neta * c.pct / 100) }));
-  return { seguro: s.seguro, opcion, plazo, tramo: `${t.plazo_desde}-${t.plazo_hasta}`, tasa_pct: t.tasa_pct, prima_neta, markup_pct: markup, prima_cliente, comisiones,
-    tope_capital_uf: s.tope_capital_uf, exento_iva: s.exento_iva === 1 };
+  return CORE.primaDe(s, mic, plazo, o.opcion);
 }
+/** Primas capitalizadas (desgravamen + cesantía) de un crédito AutoFácil: MIC = (saldo + gastos) / (1 − tasas) */
+async function capitalizar(subSinSeg, plazo, o = {}) { return CORE.capitalizar(await cargar(), subSinSeg, plazo, o); }
 
-module.exports = { cargar, invalidar, prima };
+module.exports = { cargar, invalidar, prima, capitalizar, CORE };
