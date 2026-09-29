@@ -5,7 +5,7 @@
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cuadro de Mando — AutoFácil Business Suite</title>
-<!-- v1.4 — T° prom. aprobación carta solo en horas de servicio (Pato 29-09) · v1.3 — sonido de alerta al encenderse el letrero rojo · v1.2 — OPERACIONES OTORGADAS (antes "CURSADAS") · v1.1 — reconexion automatica de la cuenta TV (token_tv en localStorage) -->
+<!-- v1.5 — Otorgado hoy con N° de ops; ejecutivos que no se han conectado hoy (punto rojo, leyenda y ticker) · v1.4 — T° prom. aprobación carta solo en horas de servicio (Pato 29-09) · v1.3 — sonido de alerta al encenderse el letrero rojo · v1.2 — OPERACIONES OTORGADAS (antes "CURSADAS") · v1.1 — reconexion automatica de la cuenta TV (token_tv en localStorage) -->
 <style>
   :root {
     --bg:#020817; --panel:#050e22; --line:#0a2748; --cyan:#00e5ff; --cyan-dim:#0891b2;
@@ -88,6 +88,8 @@
   .ej .st.hi { color:var(--green); text-shadow:0 0 8px rgba(34,255,160,.4); }
   .dot { width:1.15vh; height:1.15vh; border-radius:50%; flex-shrink:0; background:#22304a; }
   .dot.on { background:var(--green); box-shadow:0 0 9px var(--green); animation:pulse 2s infinite; }
+  .dot.nohoy { background:#7f1d1d; box-shadow:0 0 6px rgba(239,68,68,.5); }   /* no se ha conectado hoy */
+  .ej.nohoy .nm::after { content:' · sin conexión hoy'; font-size:.75em; color:#ef4444; letter-spacing:.02em; }
   @keyframes pulse { 50% { box-shadow:0 0 3px var(--green); } }
   .ej.off { color:#3a577c; } .ej.off .st { color:#3a577c; }
 
@@ -387,8 +389,9 @@ async function cargar(){
     document.getElementById('ejBadge').textContent=`CONECTADOS ${ej.conectados}/${ej.total}`;
     const fila = e => {
       const conv = e.aprobados_mes ? Math.round(e.otorgados_mes/e.aprobados_mes*100) : null;
-      return `<div class="ej ${e.conectado?'':'off'}">
-        <span class="dot ${e.conectado?'on':''}"></span>
+      const noHoy = !e.conectado && e.conecto_hoy === false;
+      return `<div class="ej ${e.conectado?'':'off'}${noHoy?' nohoy':''}" title="${e.conectado?'Conectado ahora':(e.conecto_hoy?'Hoy conectado de '+e.hoy_ini+' a '+e.hoy_fin+', ahora desconectado':'No se ha conectado hoy')}">
+        <span class="dot ${e.conectado?'on':(noHoy?'nohoy':'')}"></span>
         <span class="nm">${e.nombre}</span>
         <span class="st">${e.aprobados_mes||0}</span>
         <span class="st ${e.otorgados_mes?'hi':''}">${e.otorgados_mes||0}</span>
@@ -478,11 +481,11 @@ async function cargar(){
     // ticker
     const tk=[];
     tk.push(`COLOCACIÓN DEL MES <b>${MM(m.mtd_monto)}</b> (${NF(m.mtd_n)} ops)`);
-    tk.push(`OTORGADO HOY <b>${CLP(d.hoy.monto_otorgado)}</b>`);
+    tk.push(`OTORGADO HOY <b>${CLP(d.hoy.monto_otorgado)}</b> (${NF(d.hoy.otorgados)} ops)`);
     tk.push(`PAGOS RECIBIDOS HOY <b>${NF(d.hoy.pagos)}</b> por <b>${CLP(d.hoy.monto_pagos)}</b>`);
     tk.push(`GESTIONES DE COBRANZA HOY <b>${NF(d.hoy.gestiones_cobranza)}</b>`);
     if (d.hoy.mensajes_wsp!=null) tk.push(`MENSAJES FACILITO HOY <b>${NF(d.hoy.mensajes_wsp)}</b>`);
-    tk.push(`EJECUTIVOS EN LÍNEA <b>${ej.conectados}/${ej.total}</b>`);
+    tk.push(`EJECUTIVOS EN LÍNEA <b>${ej.conectados}/${ej.total}</b>${(ej.lista||[]).some(e=>e.conecto_hoy===false)?` · SIN CONEXIÓN HOY <b>${ej.lista.filter(e=>e.conecto_hoy===false).map(e=>e.nombre.split(' ')[0]).join(', ')}</b>`:''}`);
     if (d.indicadores.uf) tk.push(`UF <b>$${Number(d.indicadores.uf).toLocaleString('es-CL',{minimumFractionDigits:2})}</b>`);
     document.getElementById('ticker').innerHTML = tk.join('<span class="sep">◆</span>') + '<span class="sep">◆</span>';
   } catch(e){

@@ -236,9 +236,17 @@ exports.mando = async (req, res) => {
     }
 
     const vivos = conectadosIds();
+    // Quién se conectó HOY aunque ahora no esté (Pato, 29-09-2026): un ejecutivo sin ningún bloque de presencia en el día se marca aparte
+    const hoyIds = new Map();
+    if (ejecutivos.length) {
+      const [ph] = await pool.query(`SELECT id_usuario, DATE_FORMAT(MIN(bloque),'%H:%i') ini, DATE_FORMAT(MAX(bloque),'%H:%i') fin FROM presencia_bloques
+        WHERE id_usuario IN (?) AND DATE(bloque) = CURDATE() GROUP BY 1`, [ejecutivos.map(e => e.id_usuario)]).catch(() => [[]]);
+      ph.forEach(r => hoyIds.set(Number(r.id_usuario), { ini: r.ini, fin: r.fin }));
+    }
     const lista = ejecutivos.map(e => {
       const ot = sumOts(e.nombre);
-      return { nombre: e.nombre.trim(), conectado: vivos.has(Number(e.id_usuario)),
+      const h = hoyIds.get(Number(e.id_usuario)) || null;
+      return { nombre: e.nombre.trim(), conectado: vivos.has(Number(e.id_usuario)), conecto_hoy: !!h, hoy_ini: h ? h.ini : null, hoy_fin: h ? h.fin : null,
                aprobados_mes: sumCartas(e.nombre), otorgados_mes: ot.n, monto_mes: ot.monto };
     });
 
