@@ -189,7 +189,7 @@ async function aplicarFecha1aCuotaDesdeCarta(idCarta, iso) {
     if (!ca) return 0;
     const cond = [], args = [];
     if (ca.id_credito_creado) { cond.push('id = ?'); args.push(ca.id_credito_creado); }
-    if (ca.id_financiera)     { cond.push('num_op = ?'); args.push(ca.id_financiera); }
+    if (ca.id_financiera && /^\d+$/.test(String(ca.id_financiera).trim()))     { cond.push('num_op = ?'); args.push(String(ca.id_financiera).trim()); }   // num_op es INT: un ID con letra reventaba la consulta
     if (!cond.length) return 0;
     const [r] = await pool.query(
       `UPDATE creditos SET fecha_primera_cuota = ?, updated_at = NOW()
@@ -836,7 +836,7 @@ async function vigenciaDias() {
 async function _ligarCreditoEstado(carta, nuevoEstado, estadosOrigen) {
   const cond = [], args = [];
   if (carta.id_credito_creado) { cond.push('id = ?'); args.push(carta.id_credito_creado); }
-  if (carta.id_financiera)     { cond.push('num_op = ?'); args.push(carta.id_financiera); }
+  if (carta.id_financiera && /^\d+$/.test(String(carta.id_financiera).trim()))     { cond.push('num_op = ?'); args.push(String(carta.id_financiera).trim()); }   // num_op es INT: un ID con letra reventaba la consulta
   if (!cond.length) return 0;
   const ins = estadosOrigen.map(() => '?').join(',');
   try {
@@ -980,7 +980,9 @@ const otorgar = async (req, res) => {
     {
       const cond = [], args = [];
       if (ca.id_credito_creado) { cond.push('id = ?'); args.push(ca.id_credito_creado); }
-      if (ca.id_financiera)     { cond.push('num_op = ?'); args.push(ca.id_financiera); }
+      /* num_op es INT: un ID con letra ('6498106a', 29-09-2026) hacía reventar el UPDATE entero
+         ("Truncated incorrect INTEGER value") y el crédito quedaba atrás en silencio. Solo se compara si es numérico. */
+      if (ca.id_financiera && /^\d+$/.test(String(ca.id_financiera).trim())) { cond.push('num_op = ?'); args.push(String(ca.id_financiera).trim()); }
       // Participación PACTADA de la carta: al otorgar manda SOLO HACIA ABAJO (08-09-2026):
       // se escribe part_bruto si el crédito no tiene comisión o si la carta es MENOR que
       // la calculada (primer corte en pesos). El recalcularPorOps de más abajo resuelve la
@@ -1041,7 +1043,17 @@ const otorgar = async (req, res) => {
                  detalle, '/creditos/', `otorgar-sin-efecto:${ca.op_carta}`]);
             } catch (_) {}
           }
-        }).catch(e => console.error('[carta otorgar→credito]', e.message));
+        }).catch(async e => {
+          /* Nunca más mudo (29-09-2026): si el UPDATE revienta, el que otorgó recibe la misma alerta que cuando no calza ninguna fila. */
+          console.error('[carta otorgar→credito]', e.message);
+          try {
+            await pool.query(
+              `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar) VALUES (?,?,?,?,?,?,'alta',1)`,
+              [req.usuario?.id_usuario || 1, 'alerta', 'Carta otorgada sin crédito OTORGADO',
+               `La carta ${ca.op_carta} quedó OTORGADA pero el crédito NO pasó a OTORGADO: la base rechazó la actualización (${String(e.message).slice(0, 160)}). Revisar en Créditos.`,
+               '/creditos/', `otorgar-sin-efecto:${ca.op_carta}`]);
+          } catch (_) {}
+        });
         // El crédito de la carta nace sin num_op → correlativo AutoFácil (motor único).
         try {
           const [[sinOp]] = await pool.query(
