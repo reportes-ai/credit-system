@@ -245,12 +245,15 @@ async function revisar(carta, p) {
   let tasaRebajada = false;
   if (piz != null && tasaCarta != null) {
     const minPermitida = Math.floor(piz * (1 - (p.exc_tasa_rebaja_max_pct || 5) / 100) * 100) / 100;
-    tasaRebajada = tasaCarta < piz - 0.005;
+    /* La pizarra viene con 4 decimales (TMC/12: 2,838%) y la financiera cursa con 2 (2,83%). Cursar a la
+       pizarra truncada a centésimas NO es rebaja (Pato, 29-09-2026: 8 cartas de Unidad derivadas por 0,008 pts). */
+    const pizCentesimas = Math.floor(piz * 100 + 1e-9) / 100;
+    tasaRebajada = tasaCarta < pizCentesimas - 0.005;
     const dentroMax = tasaCarta >= minPermitida - 0.005;
     // ✅ solo si no hay rebaja, o si la rebaja está dentro del máximo Y viene con código
     add('Tasa pizarra / cursada', piz + '% pizarra', tasaCarta + '% cursada',
         !tasaRebajada || (dentroMax && !!carta.codigo_excepcion),
-        !tasaRebajada ? 'sin rebaja'
+        !tasaRebajada ? (tasaCarta < piz - 0.005 ? 'pizarra ' + piz + '% cursada a centésimas: sin rebaja' : 'sin rebaja')
         : !dentroMax ? `rebaja EXCEDE el máximo ${p.exc_tasa_rebaja_max_pct || 5}% (mínimo permitido ${minPermitida}%)`
         : carta.codigo_excepcion ? `rebaja dentro del máximo ${p.exc_tasa_rebaja_max_pct || 5}%, respaldada por código`
         : `rebaja dentro del máximo ${p.exc_tasa_rebaja_max_pct || 5}% pero SIN código de excepción`);
