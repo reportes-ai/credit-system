@@ -861,15 +861,15 @@ async function notificarReversaPagoDealer(track, idSeguimiento, motivo) {
    `porPeriodo`: el aviso es uno por día (no por operación) y el nuevo reemplaza a
    los anteriores del mismo evento. */
 const EVENTOS_SALDO = [
-  { evento: 'fondos_recibidos', titulo: 'Fondos recibidos — emitir Orden de Pago',
-    mensaje: 'La operación {op} tiene FONDOS RECIBIDOS. Emite la Orden de Pago.', href: '/postventa/orden-pago/' },
-  { evento: 'orden_emitida', titulo: 'Orden de Pago emitida — cargar montos disponibles',
-    mensaje: 'Se emitió la Orden de Pago de {op}. Carga los montos disponibles para pago.', href: '/postventa/saldos-a-pagar/',
+  { evento: 'fondos_recibidos', titulo: 'Fondos recibidos — emitir Orden de Pago de Saldo Precio',
+    mensaje: 'La operación {op} tiene FONDOS RECIBIDOS. Emite la Orden de Pago de Saldo Precio.', href: '/postventa/orden-pago/' },
+  { evento: 'orden_emitida', titulo: 'Orden de Pago de Saldo Precio emitida — cargar montos disponibles',
+    mensaje: 'Se emitió la Orden de Pago de Saldo Precio de {op}. Carga los montos disponibles para pago.', href: '/postventa/saldos-a-pagar/',
     sucede: 'fondos_recibidos' },
-  { evento: 'fondos_cargados', titulo: 'Montos disponibles cargados',
+  { evento: 'fondos_cargados', titulo: 'Montos disponibles cargados (Saldo Precio)',
     mensaje: 'Tesorería cargó los fondos disponibles para pago de saldos precio. Define qué pagar.', href: '/postventa/saldos-a-pagar/',
     porPeriodo: true },
-  { evento: 'enviado_pago', titulo: 'Operaciones enviadas a pago — confirmar pago',
+  { evento: 'enviado_pago', titulo: 'Saldos Precio enviados a pago — confirmar pago',
     mensaje: 'Se enviaron operaciones a pago. Confirma el pago en Saldos Precios a Pagar.', href: '/postventa/saldos-a-pagar/',
     sucede: 'orden_emitida' },
   { evento: 'pago_realizado', titulo: 'Saldo precio pagado',
@@ -881,18 +881,18 @@ const EVENTOS_SALDO = [
    se recibe la factura del concesionario, se emite la orden de pago, se
    selecciona qué se paga (Enviar a Pago) y se paga. */
 const EVENTOS_COMISION = [
-  { evento: 'com_factura_recibida', titulo: 'Factura recibida — emitir Orden de Pago de Comisión',
+  { evento: 'com_factura_recibida', titulo: 'Factura recibida — emitir Orden de Pago de Comisión Dealer',
     mensaje: 'La operación {op} tiene FACTURA RECIBIDA. Emite la Orden de Pago de comisión.', href: '/postventa/orden-pago-comision/' },
-  { evento: 'com_orden_emitida', titulo: 'Orden de Pago de Comisión emitida — cargar montos disponibles',
-    mensaje: 'Se emitió la Orden de Pago de comisión de {op}. Carga los montos disponibles para pago.', href: '/postventa/comisiones-a-pagar/',
+  { evento: 'com_orden_emitida', titulo: 'Orden de Pago de Comisión Dealer emitida — cargar montos disponibles',
+    mensaje: 'Se emitió la Orden de Pago de Comisión Dealer de {op}. Carga los montos disponibles para pago.', href: '/postventa/comisiones-a-pagar/',
     sucede: 'com_factura_recibida' },
-  { evento: 'com_fondos_cargados', titulo: 'Montos disponibles cargados (Comisión)',
+  { evento: 'com_fondos_cargados', titulo: 'Montos disponibles cargados (Comisión Dealer)',
     mensaje: 'Tesorería cargó los fondos disponibles para pago de comisiones. Define qué pagar.', href: '/postventa/comisiones-a-pagar/',
     porPeriodo: true },
-  { evento: 'com_enviado_pago', titulo: 'Comisiones enviadas a pago — confirmar pago',
+  { evento: 'com_enviado_pago', titulo: 'Comisiones Dealer enviadas a pago — confirmar pago',
     mensaje: 'Se enviaron comisiones a pago. Confirma el pago en Comisiones a Pagar.', href: '/postventa/comisiones-a-pagar/',
     sucede: 'com_orden_emitida' },
-  { evento: 'com_pago_realizado', titulo: 'Comisión pagada',
+  { evento: 'com_pago_realizado', titulo: 'Comisión Dealer pagada',
     mensaje: 'Se registró el pago de la comisión de {op}.', href: '/postventa/seguimiento/',
     sucede: 'com_enviado_pago' },
 ];
@@ -901,7 +901,7 @@ const EVENTOS_COMISION = [
    a quien paga (default Tesorero), y al pagar se avisa además SIEMPRE a los
    ejecutivos del parque (eso es del flujo, no configurable). */
 const EVENTOS_PARQUE = [
-  { evento: 'parque_orden_emitida', titulo: 'Orden de Pago de Parque emitida — por pagar',
+  { evento: 'parque_orden_emitida', titulo: 'Orden de Pago de Comisión / Arriendo de Parque emitida — por pagar',
     mensaje: 'Se emitió la Orden de Pago de comisión de parque. Queda por pagar en Órdenes de Pago.', href: '/ordenes-pago/' },
   { evento: 'parque_pago_realizado', titulo: 'Comisión de parque pagada',
     mensaje: 'Se registró el pago de la comisión de un parque.', href: '/postventa/comisiones-parques/',
