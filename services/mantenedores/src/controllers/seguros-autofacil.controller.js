@@ -81,6 +81,8 @@ require('../../../../shared/migrate').enFila('seguros-autofacil', async () => {
       id INT AUTO_INCREMENT PRIMARY KEY, seguro VARCHAR(20) NOT NULL, opcion TINYINT NOT NULL,
       plazo_desde INT NOT NULL, plazo_hasta INT NOT NULL, tasa_pct DECIMAL(8,4) NOT NULL,
       INDEX idx_seg (seguro, opcion, plazo_desde))`);
+    // Markup POR TRAMO (29-09-2026): igualar tramo a tramo el precio del desgravamen AutoFin (501 / 337 / 274 / 246 %). NULL = usa el de la cabecera.
+    await pool.query('ALTER TABLE seguros_autofacil_tramos ADD COLUMN IF NOT EXISTS markup_pct DECIMAL(7,2) NULL');
     await pool.query(`CREATE TABLE IF NOT EXISTS seguros_autofacil_comisiones (
       id INT AUTO_INCREMENT PRIMARY KEY, seguro VARCHAR(20) NOT NULL, opcion TINYINT NOT NULL,
       nombre VARCHAR(120) NOT NULL, pct DECIMAL(6,2) NOT NULL, iva_incluido TINYINT NOT NULL DEFAULT 1, orden INT NOT NULL DEFAULT 0,
@@ -175,15 +177,15 @@ const setTramos = async (req, res) => {
     const opcion = int(req.body?.opcion, 1, 2);
     if (!SEGUROS.includes(seguro) || !opcion) return res.status(400).json({ success: false, data: null, error: 'Seguro u opción inválidos' });
     const tramos = (Array.isArray(req.body?.tramos) ? req.body.tramos : [])
-      .map(t => ({ d: int(t.plazo_desde, 1, 120), h: int(t.plazo_hasta, 1, 120), t: num(t.tasa_pct, 0, 100) }))
+      .map(t => ({ d: int(t.plazo_desde, 1, 120), h: int(t.plazo_hasta, 1, 120), t: num(t.tasa_pct, 0, 100), m: (t.markup_pct === '' || t.markup_pct == null) ? null : num(t.markup_pct, 0, 5000) }))
       .filter(t => t.d && t.h && t.t != null && t.h >= t.d).sort((a, b) => a.d - b.d);
     for (let i = 1; i < tramos.length; i++) if (tramos[i].d <= tramos[i - 1].h)
       return res.status(400).json({ success: false, data: null, error: `Los tramos se pisan: ${tramos[i - 1].d}-${tramos[i - 1].h} y ${tramos[i].d}-${tramos[i].h}` });
     await pool.query('DELETE FROM seguros_autofacil_tramos WHERE seguro=? AND opcion=?', [seguro, opcion]);
-    for (const t of tramos) await pool.query('INSERT INTO seguros_autofacil_tramos (seguro, opcion, plazo_desde, plazo_hasta, tasa_pct) VALUES (?,?,?,?,?)', [seguro, opcion, t.d, t.h, t.t]);
+    for (const t of tramos) await pool.query('INSERT INTO seguros_autofacil_tramos (seguro, opcion, plazo_desde, plazo_hasta, tasa_pct, markup_pct) VALUES (?,?,?,?,?,?)', [seguro, opcion, t.d, t.h, t.t, opcion === 2 ? t.m : null]);
     await pool.query('UPDATE seguros_autofacil SET updated_by=?, updated_at=NOW() WHERE seguro=?', [quien(req), seguro]);
     motor.invalidar();
-    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'seguros_autofacil', entidad_id: seguro, detalle: `Tramos opción ${opcion} de ${seguro}: ${tramos.map(t => `${t.d}-${t.h} ${t.t}%`).join(' · ')}` });
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'seguros_autofacil', entidad_id: seguro, detalle: `Tramos opción ${opcion} de ${seguro}: ${tramos.map(t => `${t.d}-${t.h} ${t.t}%${t.m != null && opcion === 2 ? ' +' + t.m + '%' : ''}`).join(' · ')}` });
     res.json({ success: true, data: await motor.cargar(true), error: null });
   } catch (e) { err500(res, 'tramos', e); }
 };
