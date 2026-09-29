@@ -56,6 +56,9 @@ migrate.enFila('rrhh-fiscalizaciones', async () => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_fisc (id_fiscalizacion)
   )`);
+  // v282.1: la carpeta nace de los documentos y la IA le pone el nombre (Pato: "llena tú los campos")
+  await pool.query(`ALTER TABLE rh_fiscalizaciones ADD COLUMN nombre_auto TINYINT(1) NOT NULL DEFAULT 0`)
+    .catch(e => { if (e.code !== 'ER_DUP_FIELDNAME') throw e; });
   // Card en RRHH: solo Administrador de entrada; el resto se asigna en la matriz de Perfiles
   const [[modRRHH]] = await pool.query(`SELECT id_modulo FROM modulos WHERE ruta='/recursos-humanos/' LIMIT 1`);
   if (modRRHH) {
@@ -100,19 +103,21 @@ exports.listar = async (req, res) => {
   } catch (e) { console.error('[fiscalizaciones listar]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
-/* POST /api/rrhh/fiscalizaciones { nombre, organismo?, fecha? } — crea la carpeta */
+/* POST /api/rrhh/fiscalizaciones { nombre?, organismo?, fecha? } — crea la carpeta.
+   Sin nombre (lo normal) nace con uno provisorio y la IA lo reemplaza al leer los documentos. */
 exports.crear = async (req, res) => {
   try {
     const b = req.body || {};
-    const nombre = String(b.nombre || '').trim().slice(0, 200);
-    if (nombre.length < 3) return fail(res, 'Ponle un nombre a la carpeta (mínimo 3 caracteres)', 400);
+    const manual = String(b.nombre || '').trim().slice(0, 200);
+    if (manual && manual.length < 3) return fail(res, 'El nombre debe tener al menos 3 caracteres', 400);
+    const nombre = manual || 'Nueva fiscalización';
     const organismo = String(b.organismo || '').trim().slice(0, 120) || null;
     const fecha = b.fecha ? fechaOk(b.fecha) : null;
     if (b.fecha && !fecha) return fail(res, 'Fecha inválida', 400);
     const u = req.usuario || {};
     const [r] = await pool.query(
-      `INSERT INTO rh_fiscalizaciones (nombre, organismo, fecha, creado_por, creado_por_nombre) VALUES (?,?,?,?,?)`,
-      [nombre, organismo, fecha, u.id_usuario || null, nombreDe(u)]);
+      `INSERT INTO rh_fiscalizaciones (nombre, nombre_auto, organismo, fecha, creado_por, creado_por_nombre) VALUES (?,?,?,?,?,?)`,
+      [nombre, manual ? 0 : 1, organismo, fecha, u.id_usuario || null, nombreDe(u)]);
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'fiscalizacion', entidad_id: r.insertId,
       detalle: `Creó la carpeta de fiscalización "${nombre}"` });
     ok(res, { id: r.insertId });
@@ -223,6 +228,7 @@ async function resumir(id, id_usuario) {
       system: 'Eres asesor laboral de AutoFácil (empresa de crédito automotriz en Chile). Lees los documentos de una fiscalización (Dirección del Trabajo, SUSESO, mutual de seguridad, SEREMI de Salud u otro organismo) y haces un resumen ejecutivo fiel. Jamás inventes: lo que el documento no dice va como null o lista vacía. Montos tal como aparecen (UTM, UF o pesos). Fechas YYYY-MM-DD. Español de Chile, formal y breve. No incluyas RUT ni datos personales de trabajadores: refiérete a ellos por cargo o como "un trabajador".',
       prompt: `Resume la fiscalización con este JSON exacto:
 {
+ "titulo": string  (nombre corto para la carpeta, máx. 70 caracteres: organismo abreviado · materia · mes-año; ej. "DT · Jornada y descansos · sep-2026"),
  "organismo": string|null,
  "fecha_fiscalizacion": string|null,
  "numero_expediente": string|null  (N° de fiscalización, acta o resolución),
@@ -239,11 +245,13 @@ async function resumir(id, id_usuario) {
     if (!datos) return marcar('ERROR', stop_reason === 'max_tokens' ? 'La respuesta de la IA vino cortada' : 'La IA no devolvió un resumen legible');
     if (omitidos.length) datos.documentos_no_leidos = omitidos;
     const fechaIA = fechaOk(datos.fecha_fiscalizacion);
-    // organismo/fecha que puso RRHH a mano mandan; la IA solo completa los vacíos
+    const titulo = String(datos.titulo || '').trim().slice(0, 200) || null;
+    // Lo puesto a mano manda; la IA completa lo vacío y renombra solo las carpetas con nombre automático
     await pool.query(
       `UPDATE rh_fiscalizaciones SET ia_estado='OK', ia_error=NULL, ia_resumen=?, ia_at=NOW(),
+         nombre=IF(nombre_auto=1 AND ? IS NOT NULL, ?, nombre),
          organismo=COALESCE(organismo, ?), fecha=COALESCE(fecha, ?) WHERE id=?`,
-      [JSON.stringify(datos), datos.organismo ? String(datos.organismo).slice(0, 120) : null, fechaIA, id]);
+      [JSON.stringify(datos), titulo, titulo, datos.organismo ? String(datos.organismo).slice(0, 120) : null, fechaIA, id]);
   } catch (e) {
     console.error('[fiscalizaciones resumir]', e.message);
     marcar(e.code === 'IA_OFF' ? 'IA_OFF' : 'ERROR', e.message);
