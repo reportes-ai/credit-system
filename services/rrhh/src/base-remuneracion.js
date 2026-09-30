@@ -41,7 +41,7 @@ async function remuneracionBaseDetalle(idUsuario, hastaMes) {
   if (liqs.length) {
     const det = l => { try { return typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) { return {}; } };
     const detalle = liqs.map(l => { const d = det(l); return { mes: l.mes, imponible: N(l.total_imponible), sueldo: N(d.sueldo_base), comisiones: N(d.comisiones),
-      semana_corrida: 0, gratificacion: N(d.gratificacion), otros: N(d.otros_imponibles), con_apertura: true }; });
+      semana_corrida: 0, gratificacion: N(d.gratificacion), otros: N(d.otros_imponibles) + N(d.bono_jefe), con_apertura: true }; });   // bono_jefe: haber propio desde el 28-09-2026, va en "otros (bonos)"
     return { base: prom(detalle.map(x => x.imponible)), base_feriado: prom(detalle.map(x => x.imponible - x.gratificacion)),
       fuente: 'MOTOR', meses: detalle.map(x => x.mes), detalle };
   }

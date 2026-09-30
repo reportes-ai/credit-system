@@ -2270,7 +2270,9 @@ exports.getLRE = async (req, res) => {
           '1108': 0, '1109': 0, '1141': afpCod(d.afp || l.fafp), '1142': 0, '1143': salCod(d.salud || l.fsalud),
           '1151': 1, '1110': 1, '1152': 2,
           '1115': d.dias ?? 30, '1116': licDias[rut] || '', '1118': 0, '1155': 0, '1157': 0, '1131': 0,
-          '2101': d.sueldo_base || 0, '2103': d.comisiones || '', '2106': d.gratificacion || '', '2113': d.otros_imponibles || '',
+          // 2113 (bonos u otras remuneraciones variables) lleva también el Bono Jefe Comercial: desde el 28-09-2026 es
+          // un haber propio del snapshot (bono_jefe), ya no viene dentro de comisiones — sin esto 5210 no cuadraba con la fila
+          '2101': d.sueldo_base || 0, '2103': d.comisiones || '', '2106': d.gratificacion || '', '2113': ((Number(d.otros_imponibles) || 0) + (Number(d.bono_jefe) || 0)) || '',
           '2301': d.colacion || '', '2302': d.movilizacion || '', '2306': d.otros_no_imponibles || '',
           '3141': d.desc_afp || 0, '3143': d.desc_salud || 0, '3144': d.desc_salud_adicional || '',
           '3151': d.desc_afc || '', '3161': d.impuesto || 0, '3183': d.otros_descuentos || '',

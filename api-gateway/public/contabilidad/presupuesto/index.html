@@ -5,9 +5,10 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Presupuesto Anual — AutoFácil</title>
-  <!-- v1.1 — Excel real (.xlsx). v1.0 — grilla cuenta × 12 meses estilo Excel de finanzas: ver, editar, importar y continuar al año siguiente -->
+  <!-- v1.2 — Excel con los montos de verdad (motor único xlsx-es-cl: antes salían divididos por mil). v1.1 — Excel real (.xlsx). v1.0 — grilla cuenta × 12 meses estilo Excel de finanzas: ver, editar, importar y continuar al año siguiente -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js" defer></script>
+  <script src="/js/xlsx-es-cl.js" defer></script>
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
@@ -176,7 +177,8 @@ async function importarExcel(inp){
 
 function exportar(){
   /* xlsx real (SheetJS): el HTML disfrazado de .xls hacía que Excel avisara "formato y extensión no coinciden" (Pato, 28-09-2026) */
-  const wb = XLSX.utils.table_to_book(document.getElementById('tabla'), { sheet: 'Presupuesto ' + D.anio });
+  // Motor único es-CL (30-09-2026): table_to_book leía "850.000" como 850 y "1.234,50" como 1,2345
+  const wb = AF_XLSX.libroDeTabla(document.getElementById('tabla'), 'Presupuesto ' + D.anio);
   XLSX.writeFile(wb, `presupuesto-${D.anio}.xlsx`);
 }
 cargar(new Date().getFullYear());

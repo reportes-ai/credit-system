@@ -98,6 +98,68 @@ require('../../../../shared/migrate').enFila('anulaciones-operacion', async () =
   } catch (e) { console.error('[anulaciones migration]', e.message); }
 });
 
+/* ── Lo que una anulación deja apagado además del crédito (motor único, 30-09-2026) ──
+   2b) Sus cartas: una operación anulada no puede dejar cartas vivas (APROBADA/PENDIENTE) porque
+       retienen el ID de la financiera y el ejecutivo no puede volver a digitarla ("ya se encuentra
+       ingresado (carta ...-R1)", op 26091266, Pato 29-09-2026). Quedan ANULADAS con el motivo.
+   Post Venta: una operación anulada no pide fundantes (SALDO) ni tiene comisión al dealer (COMISION)
+       ni al parque (PARQUE) que pagar. Los TRES tracks se apagan con el mismo criterio conservador:
+       solo si el track no avanzó más allá de sus etapas iniciales — si ya se movió plata, la etapa
+       se respeta y queda para regularizar a mano. El sync() de Post Venta ya no resiembra las
+       iniciales de operaciones ANULADAS. */
+async function apagarRastroAnulacion(idCredito, motivo, quien) {
+  await pool.query(
+    `UPDATE cartas_aprobacion SET status='ANULADA', anulado_por=?, fecha_anulacion=NOW(),
+            motivo_rechazo=CONCAT('Operación anulada: ', ?)
+      WHERE id_credito_creado=? AND status IN ('PENDIENTE','APROBADA')`,
+    [quien, motivo, idCredito]).catch(err => console.error('[anulacion cartas]', err.message));
+  const INICIALES = {
+    SALDO:    ['FUNDANTES PENDIENTES'],
+    COMISION: ['COMISION PENDIENTE', 'COMISION A PAGAR'],
+    PARQUE:   ['COMISION A PAGAR'],
+  };
+  for (const [track, iniciales] of Object.entries(INICIALES)) {
+    await pool.query(`
+      DELETE e FROM postventa_etapas e
+      JOIN postventa_seguimiento s ON s.id = e.id_seguimiento
+      WHERE s.id_credito = ? AND e.track = ? AND e.etapa IN (?)
+        AND NOT EXISTS (SELECT 1 FROM (SELECT id_seguimiento, etapa, track FROM postventa_etapas) x
+          WHERE x.id_seguimiento = e.id_seguimiento AND x.track = ? AND x.etapa NOT IN (?))`,
+      [idCredito, track, iniciales, track, iniciales])
+      .catch(err => console.error('[anulacion track ' + track + ']', err.message));
+  }
+}
+
+/* ── Anulación pedida por una CARGA (Trinidad, 30-09-2026) ──────────────────
+   Autofin informa "Anulado" para una operación que acá está OTORGADA. La carga NO la anula sola:
+   anular retira la cartola, apaga Post Venta, anula la carta y deja bitácora, y exige segunda firma.
+   Se deja la solicitud PENDIENTE (sin solicitante: cualquiera con permiso de aprobar la resuelve) y
+   se avisa al pool de Operaciones; la operación sigue OTORGADA hasta que alguien la apruebe. Antes
+   (28 al 30-09) la carga escribía ANULADO directo y las cartas y la cartola quedaban vivas. */
+async function solicitarPorCarga({ id_credito, motivo, req, fuente = 'Carga Trinidad' }) {
+  const [[op]] = await pool.query('SELECT id, num_op, estado, estado_credito, estado_eval, financiera FROM creditos WHERE id=?', [id_credito]);
+  if (!op) return null;
+  if ([op.estado, op.estado_credito, op.estado_eval].some(v => String(v || '').toUpperCase() === 'ANULADO')) return { ya_anulada: true };
+  const mes = await getMesDeOp(id_credito);
+  if (mes && await isMesCerrado(mes)) return { mes_cerrado: mes };
+  const [[dup]] = await pool.query("SELECT id FROM anulaciones_operacion WHERE id_credito=? AND estado='PENDIENTE'", [id_credito]);
+  if (dup) return { id: dup.id, existente: true };
+  const quien = req && req.usuario ? nombreUsuario(req) : 'Sistema';
+  const [ins] = await pool.query(
+    `INSERT INTO anulaciones_operacion (id_credito, num_op, motivo, estado_anterior, solicitado_por, solicitado_nombre)
+     VALUES (?,?,?,?,NULL,?)`,
+    [id_credito, op.num_op, String(motivo).slice(0, 600), op.estado_credito || null, `${fuente} (subida por ${quien})`]);
+  auditar({ req, accion: 'SOLICITAR_ANULACION', modulo: 'creditos', entidad: 'credito', entidad_id: id_credito,
+    detalle: `${fuente}: solicitud de anulación de la OP ${op.num_op} (estaba en ${op.estado_credito}) — ${motivo}`, meta: { motivo, fuente } });
+  AVISOS.avisar('operacion_anulacion_pendiente', {
+    titulo: '🚫 Anulación por aprobar — OP ' + op.num_op,
+    mensaje: `${fuente}: ${motivo} La operación sigue OTORGADA hasta que alguien de Operaciones apruebe la anulación (retira cartola, anula la carta y apaga Post Venta).`,
+    href: '/creditos/anulaciones.html',
+    clave: 'anulacion:' + ins.insertId,
+  }).catch(() => {});
+  return { id: ins.insertId, existente: false };
+}
+
 /* ── GET /api/anulaciones/buscar?q= → operaciones OTORGADAS candidatas ─────── */
 const buscar = async (req, res) => {
   try {
@@ -248,36 +310,8 @@ const resolver = async (req, res) => {
               comentarios=CONCAT(COALESCE(comentarios,''),' | ANULADA ',DATE_FORMAT(NOW(),'%d-%m-%Y'),': ',?)
         WHERE id=?`, [...valoresEtapa('ANULADO'), a.motivo, a.id_credito]);
 
-    /* 2b) Sus cartas: una operación anulada no puede dejar cartas vivas (APROBADA/PENDIENTE) porque
-       retienen el ID de la financiera y el ejecutivo no puede volver a digitarla ("ya se encuentra
-       ingresado (carta ...-R1)", op 26091266, Pato 29-09-2026). Quedan ANULADAS con el motivo. */
-    await pool.query(
-      `UPDATE cartas_aprobacion SET status='ANULADA', anulado_por=?, fecha_anulacion=NOW(),
-              motivo_rechazo=CONCAT('Operación anulada: ', ?)
-        WHERE id_credito_creado=? AND status IN ('PENDIENTE','APROBADA')`,
-      [nombreUsuario(req), a.motivo, a.id_credito]).catch(err => console.error('[anulacion cartas]', err.message));
-
-    /* Post Venta: una operación anulada no pide fundantes (SALDO) ni tiene
-       comisión al dealer (COMISION) ni al parque (PARQUE) que pagar. Los TRES
-       tracks se apagan con el mismo criterio conservador: solo si el track no
-       avanzó más allá de sus etapas iniciales — si ya se movió plata, la etapa
-       se respeta y queda para regularizar a mano. El sync() de Post Venta ya
-       no resiembra las iniciales de operaciones ANULADAS. */
-    const INICIALES = {
-      SALDO:    ['FUNDANTES PENDIENTES'],
-      COMISION: ['COMISION PENDIENTE', 'COMISION A PAGAR'],
-      PARQUE:   ['COMISION A PAGAR'],
-    };
-    for (const [track, iniciales] of Object.entries(INICIALES)) {
-      await pool.query(`
-        DELETE e FROM postventa_etapas e
-        JOIN postventa_seguimiento s ON s.id = e.id_seguimiento
-        WHERE s.id_credito = ? AND e.track = ? AND e.etapa IN (?)
-          AND NOT EXISTS (SELECT 1 FROM (SELECT id_seguimiento, etapa, track FROM postventa_etapas) x
-            WHERE x.id_seguimiento = e.id_seguimiento AND x.track = ? AND x.etapa NOT IN (?))`,
-        [a.id_credito, track, iniciales, track, iniciales])
-        .catch(err => console.error('[anulacion track ' + track + ']', err.message));
-    }
+    // 2b) Cartas vivas y tracks de Post Venta: motor único apagarRastroAnulacion (también lo usa la regularización)
+    await apagarRastroAnulacion(a.id_credito, a.motivo, nombreUsuario(req));
 
     await pool.query(
       `UPDATE anulaciones_operacion SET estado='APROBADA', cartola_retirada=?, cartola_nota=?,
@@ -319,4 +353,4 @@ const resolver = async (req, res) => {
   } catch (e) { console.error('[anulaciones resolver]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { buscar, solicitar, listar, resolver };
+module.exports = { buscar, solicitar, listar, resolver, solicitarPorCarga, apagarRastroAnulacion };

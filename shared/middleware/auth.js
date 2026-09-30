@@ -95,8 +95,15 @@ const verifyToken = async (req, res, next) => {
     return res.status(403).json({ success: false, data: null, error: 'Token no válido para esta sección' });
   }
 
-  // Sesiones del staff: se comprueba que sigan vigentes. Los tokens sin
-  // id_usuario (portal del cliente) no pasan por acá y quedan como estaban.
+  /* Solo tokens del STAFF (con id_usuario) siguen adelante. Los del Portal del Cliente (tipo 'cliente',
+     sin id_usuario) van firmados con el mismo secreto y hasta el 30-09-2026 entraban a las ~600 rutas
+     internas que llevan solo verifyToken (cualquier cliente con cuenta en el portal podía leerlas).
+     Sus rutas usan verifyCliente; acá no tienen nada que hacer. */
+  if (!payload || payload.tipo === 'cliente' || !payload.id_usuario) {
+    return res.status(403).json({ success: false, data: null, error: 'Token no válido para esta sección' });
+  }
+
+  // Sesiones del staff: se comprueba que sigan vigentes.
   if (payload && payload.id_usuario) {
     try {
       const s = await estadoSesion(payload.id_usuario);

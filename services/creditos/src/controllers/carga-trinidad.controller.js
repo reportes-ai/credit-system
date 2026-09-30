@@ -250,6 +250,20 @@ function mapEstado(estadoTrinidad, mapaEstados) {
   return norm(mapaEstados[estadoTrinidad.trim().toLowerCase()]) || 'DIGITADO';
 }
 
+/* "Anulado" en el export para una operación OTORGADA acá: la carga no la anula sola, deja la solicitud
+   en Anular Operación por el motor único (anulaciones.controller.solicitarPorCarga) y lo anota en el log. */
+async function pedirAnulacion(idCredito, f, req, log, contador) {
+  try {
+    const motivo = `Autofin la informa "${f.estado_autofin || 'Anulado'}" en el export Trinidad del ${hoyChile().split('-').reverse().join('-')}.`;
+    const r = await require('./anulaciones.controller').solicitarPorCarga({ id_credito: idCredito, motivo, req, fuente: 'Carga Trinidad' });
+    if (!r) log.push(`⚠ ${f.num_op}: Autofin la informa ANULADA pero el crédito no se encontró`);
+    else if (r.ya_anulada) log.push(`↔ ${f.num_op}: ya estaba anulada acá`);
+    else if (r.mes_cerrado) log.push(`⚠ ${f.num_op}: Autofin la informa ANULADA y acá está OTORGADA en el mes cerrado ${r.mes_cerrado}: regularizar a mano`);
+    else if (r.existente) log.push(`⏳ ${f.num_op}: Autofin la informa ANULADA; ya había una solicitud de anulación pendiente (#${r.id})`);
+    else { contador.n++; log.push(`🚫 ${f.num_op}: Autofin la informa ANULADA y acá está OTORGADA → solicitud de anulación #${r.id} creada para aprobar en Créditos → Anular Operación (sigue OTORGADA hasta entonces)`); }
+  } catch (e) { console.error('[carga-trinidad pedirAnulacion]', f.num_op, e.message); log.push(`⚠ ${f.num_op}: no se pudo pedir la anulación (${e.message})`); }
+}
+
 function mapEjecutivo(nombreTrinidad, mapaEjecutivos) {
   if (!nombreTrinidad) return null;
   return mapaEjecutivos[nombreTrinidad.trim().toLowerCase()] || nombreTrinidad.trim();
@@ -710,6 +724,7 @@ exports.importar = async (req, res) => {
     let insertados   = 0;
     let actualizados = 0;
     let omitidosFuturo = 0;   // filas nuevas saltadas por fecha futura
+    const anulacionesPedidas = { n: 0 };   // OTORGADAS que Autofin informa anuladas → solicitud en Anular Operación
     let errores      = 0;
     const clienteCache = {};   // rut → id_cliente (resuelto/creado en tabla clientes)
     const log          = [];
@@ -778,8 +793,12 @@ exports.importar = async (req, res) => {
              local manda salvo que el archivo traiga un estado final (OTORGADO/ANULADO);
              estado_autofin sí se actualiza siempre (es informativo). */
           const actEq = existAfMap[String(f.num_op)];
-          const retrocedeEq = String(actEq?.estado_credito || '').toUpperCase() === 'OTORGADO'
-            && !['OTORGADO', 'ANULADO'].includes(String(f.estado_credito || '').toUpperCase());
+          /* "Anulado" del export sobre una OTORGADA local: la etapa NO se toca acá; se pide la anulación
+             por el motor (segunda firma, cartola, carta, Post Venta, bitácora). 30-09-2026. */
+          const anulaOtorgadaEq = String(actEq?.estado_credito || '').toUpperCase() === 'OTORGADO'
+            && String(f.estado_credito || '').toUpperCase() === 'ANULADO';
+          const retrocedeEq = anulaOtorgadaEq || (String(actEq?.estado_credito || '').toUpperCase() === 'OTORGADO'
+            && !['OTORGADO', 'ANULADO'].includes(String(f.estado_credito || '').toUpperCase()));
           await pool.query(
             `UPDATE creditos SET estado_autofin = ?, ejecutivo_tri = ?,
                ${retrocedeEq ? '' : `estado_credito = ?, estado_eval = ?, ${SET_ESTADO_SQL},`}
@@ -798,6 +817,7 @@ exports.importar = async (req, res) => {
              fechaEq, fechaEq, fechaEq ? fechaEq.slice(0, 7) + '-01' : null, String(f.num_op)]
           );
           actualizados++;
+          if (anulaOtorgadaEq && actEq?.id) await pedirAnulacion(actEq.id, f, req, log, anulacionesPedidas);
           // La última información manda: se pisan montos/vehículo/producto (no dealer ni
           // vendedor, no meses cerrados); lo que no se pisa queda en Diferencias para decidir.
           try {
@@ -827,8 +847,10 @@ exports.importar = async (req, res) => {
           const esCursado = (f.estado_credito || '').toLowerCase() === 'otorgado';
           // Mismo resguardo que arriba: un OTORGADO local no se retrocede con una
           // foto anterior del export; solo un estado final del archivo puede moverlo.
-          const retrocede = String(actual.estado_credito || '').toUpperCase() === 'OTORGADO'
-            && !['OTORGADO', 'ANULADO'].includes(String(f.estado_credito || '').toUpperCase());
+          const anulaOtorgada = String(actual.estado_credito || '').toUpperCase() === 'OTORGADO'
+            && String(f.estado_credito || '').toUpperCase() === 'ANULADO';   // ver pedirAnulacion (30-09-2026)
+          const retrocede = anulaOtorgada || (String(actual.estado_credito || '').toUpperCase() === 'OTORGADO'
+            && !['OTORGADO', 'ANULADO'].includes(String(f.estado_credito || '').toUpperCase()));
           await pool.query(
             `UPDATE creditos SET
                estado_autofin = ?, ejecutivo_tri = ?,
@@ -849,6 +871,7 @@ exports.importar = async (req, res) => {
              f.marca, f.modelo, f.vendedor, f.num_op]
           );
           actualizados++;
+          if (anulaOtorgada && actual.id) await pedirAnulacion(actual.id, f, req, log, anulacionesPedidas);
           try {
             if (actual.id && enVentana(actual, f) && !(await isMesCerrado(actual.mes_txt || ''))) {
               const pis = await pisarDesdeArchivo(actual.id, actual, f, nombreArchivo, cambiosLog);
@@ -992,7 +1015,7 @@ exports.importar = async (req, res) => {
 
     return res.json({
       success: true,
-      data: { total: filas.length, insertados, actualizados, omitidos_futuro: omitidosFuturo, errores, canal: resCanal, log, cursados, diferencias },
+      data: { total: filas.length, insertados, actualizados, omitidos_futuro: omitidosFuturo, anulaciones_pedidas: anulacionesPedidas.n, errores, canal: resCanal, log, cursados, diferencias },
     });
   } catch (e) {
     console.error('[carga-trinidad importar]', e);

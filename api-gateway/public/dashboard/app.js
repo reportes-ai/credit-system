@@ -5708,7 +5708,8 @@ function buildColocMensual(vista) {
 function exportColocMensual(vista) {
   const t = document.getElementById('t-coloc-' + vista);
   if (!t || !window.XLSX) return;
-  const wb = XLSX.utils.table_to_book(t, { sheet: vista === 'vdealers' ? 'dealers' : 'parques' });
+  // Motor único es-CL (30-09-2026): table_to_book leía "1.234" como 1,234
+  const wb = AF_XLSX.libroDeTabla(t, vista === 'vdealers' ? 'dealers' : 'parques');
   XLSX.writeFile(wb, `colocaciones_${vista === 'vdealers' ? 'dealers' : 'parques'}.xlsx`);
 }
 

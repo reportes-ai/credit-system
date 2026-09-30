@@ -217,7 +217,7 @@ async function filasRemuneraciones(mes) {
       // La semana corrida del motor viene dentro de comisiones (factor art. 45): se informa en la misma columna
       return { rut: nRut(l.rut || l.urut), nombre: l.nombre, cargo: l.cargo || '', tipo_contrato: d.tipo_contrato || l.tipo_contrato || '', fecha_ingreso: isoF(l.fecha_ingreso), dias: d.dias ?? 30,
         sueldo_base: R(d.sueldo_base), comisiones: R(d.comisiones), semana_corrida: 0, gratificacion: R(d.gratificacion),
-        otros_imponibles: R(d.otros_imponibles) + R(d.feriado_variable), total_imponible: R(d.total_imponible),
+        otros_imponibles: R(d.otros_imponibles) + R(d.feriado_variable) + R(d.bono_jefe), total_imponible: R(d.total_imponible),   // bono_jefe: haber propio desde el 28-09-2026
         colacion: R(d.colacion), movilizacion: R(d.movilizacion), otros_no_imponibles: R(d.otros_no_imponibles), total_haberes: R(d.total_haberes),
         afp: d.afp || l.fafp || '', desc_afp: R(d.desc_afp), salud: d.salud || l.fsalud || '', desc_salud: R(d.desc_salud), desc_salud_adicional: R(d.desc_salud_adicional),
         desc_afc: R(d.desc_afc), impuesto: R(d.impuesto), otros_descuentos: R(d.otros_descuentos), total_descuentos: R(d.total_descuentos), liquido: R(d.liquido),
