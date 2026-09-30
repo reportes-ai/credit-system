@@ -264,6 +264,7 @@ exports.setVencConfig = async (req, res) => {
 
 function fmtFecha(f) {
   if (!f) return '–';
-  const d = new Date(f);
-  return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  // isoDe (shared/fecha-chile) reconoce las DATE de la base: formatearlas en zona de Chile las corría un día con fechas del otro horario (barrido 30-09-2026)
+  const i = require('../../../../shared/fecha-chile').isoDe(f);
+  return i ? i.split('-').reverse().join('-') : '–';
 }

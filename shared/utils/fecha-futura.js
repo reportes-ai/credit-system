@@ -24,7 +24,7 @@ function esFechaFutura(v) {
   let s;
   if (v instanceof Date) {
     if (isNaN(v)) return false;
-    s = v.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+    s = require('../fecha-chile').isoDe(v);   // isoDe (shared/fecha-chile) reconoce las DATE de la base: formatearlas en zona de Chile las corría un día con fechas del otro horario (barrido 30-09-2026)
   } else {
     const m = String(v).trim().match(/(\d{4}-\d{2}-\d{2})/);
     if (!m) return false;

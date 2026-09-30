@@ -70,7 +70,7 @@ const FLUJO = ['FUNDANTES PENDIENTES', 'FUNDANTES RECIBIDOS', 'FUNDANTES ENVIADO
 /* SLA por categoría del dealer: motor único (mantenedor Categoría y Potencial
    Dealer + hora de corte). Salta fines de semana Y feriados chilenos. */
 const SLA = require('../../../../shared/sla-saldo');
-const ymd = d => d ? new Date(d).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : null;
+const ymd = d => d ? require('../../../../shared/fecha-chile').isoDe(d) : null;   // isoDe (shared/fecha-chile) reconoce las DATE de la base: formatearlas en zona de Chile las corría un día con fechas del otro horario (barrido 30-09-2026)
 
 /* GET /api/saldo-proceso-pago?estado=&q=&desde=&hasta=&todo=1
    Sin `todo`, muestra solo las que NO están pagadas (el "en proceso" del nombre). */

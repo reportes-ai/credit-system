@@ -32,8 +32,18 @@ function isoDe(d) {
   if (d == null || d === '') return null;
   const f = (d instanceof Date) ? d : new Date(d);
   if (isNaN(f)) return null;
+  // Una DATE de la base (medianoche exacta bajo el offset de mysql2) se lee deshaciendo ESE offset:
+  // formateada en zona de Chile caía en el día anterior si la fecha es del otro horario (30-09-2026).
+  if (d instanceof Date && _esDateBD(f)) return isoDeBD(f);
   return f.toLocaleDateString('en-CA', { timeZone: TZ });
 }
+function _msOffsetBD() {
+  let off = '-04:00';
+  try { off = require('./config/database').offsetBD() || off; } catch (_) {}
+  const m = /^([+-])(\d{2}):(\d{2})$/.exec(off);
+  return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : -4 * 3600000;
+}
+const _esDateBD = f => (f.getTime() + _msOffsetBD()) % 86400000 === 0;
 
 /* ── EL MES, VENGA COMO VENGA ────────────────────────────────────────────────
    'YYYY-MM' de un mes que puede llegar como Date (columna DATE leída por mysql2)
@@ -114,7 +124,7 @@ function isoDeBD(d) {
   try { off = require('./config/database').offsetBD() || off; } catch (_) {}
   const m = /^([+-])(\d{2}):(\d{2})$/.exec(off);
   const ms = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : -4 * 3600000;
-  return new Date(d.getTime() + ms).toISOString().slice(0, 10);
+  return new Date(d.getTime() + ms).toISOString().split("T")[0];   // UTC a propósito: ya se le sumó el offset
 }
 
 /* ── LECTOR MIXTO: para helpers que reciben tanto fechas de la base como fechas armadas en
@@ -131,7 +141,7 @@ function isoFlex(d) {
   try { off = require('./config/database').offsetBD() || off; } catch (_) {}
   const m = /^([+-])(\d{2}):(\d{2})$/.exec(off);
   const ms = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : -4 * 3600000;
-  if ((d.getTime() + ms) % 86400000 === 0) return new Date(d.getTime() + ms).toISOString().slice(0, 10);
+  if ((d.getTime() + ms) % 86400000 === 0) return isoDeBD(d);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
@@ -165,7 +175,7 @@ function jsonFechaBD(key, value) {
   const m = /^([+-])(\d{2}):(\d{2})$/.exec(off);
   const ms = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : -4 * 3600000;
   if ((o.getTime() + ms) % 86400000 !== 0) return value;      // trae hora: no es una DATE, va tal cual
-  return medianocheChileISO(new Date(o.getTime() + ms).toISOString().slice(0, 10));
+  return medianocheChileISO(isoDeBD(o));
 }
 
 module.exports = { TZ, isoDe, isoDeBD, isoFlex, jsonFechaBD, medianocheChileISO, mesDe, hoyISO, mesActualISO, desdeISO, sumarDias, sumarMeses, primerDiaMes, finDelDia };

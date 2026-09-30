@@ -100,7 +100,7 @@ const N = v => (v == null || v === '') ? 0 : Number(v);
    firma y QR verificable. Peor: al reimprimirlo desde el historial la consulta
    usa DATE_FORMAT y mostraba el día correcto, así que el mismo certificado decía
    dos fechas distintas. 'en-CA' entrega el formato YYYY-MM-DD. */
-const iso = d => d ? new Date(d).toLocaleDateString('en-CA', { timeZone: 'America/Santiago' }) : null;
+const iso = d => d ? require('../../../../shared/fecha-chile').isoDe(d) : null;   // isoDe (shared/fecha-chile) reconoce las DATE de la base: formatearlas en zona de Chile las corría un día con fechas del otro horario (barrido 30-09-2026)
 
 const TIPOS = {
   CERT_CREDITO_VIGENTE: 'Certificado de Crédito Vigente',

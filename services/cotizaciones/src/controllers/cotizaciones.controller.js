@@ -168,7 +168,9 @@ function _tratamiento(nombre) {
 
 function _fechaLarga(s) {
   if (!s) return new Date().toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
-  return new Date(s).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
+  // isoDe (shared/fecha-chile) reconoce las DATE de la base: formatearlas en zona de Chile las corría un día con fechas del otro horario (barrido 30-09-2026)
+  const i = (typeof s === 'string' && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) ? s : require('../../../../shared/fecha-chile').isoDe(s);
+  return new Date((i || s) + (i ? 'T12:00:00' : '')).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 // Extrae inputs/resultados y arma los bloques (una sola vez, reutilizable)

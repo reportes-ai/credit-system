@@ -660,7 +660,7 @@ const DOC_VERSION = 8;   // v8: comisión narrada desde el NETO (factura +IVA / 
 // (NO usar String(Date).slice, que da "Tue Jun 23"). Si ya viene string ISO, recortar.
 const soloFecha = v => {
   if (!v) return null;
-  if (v instanceof Date) return v.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+  if (v instanceof Date) return require('../../../../shared/fecha-chile').isoDe(v);   // isoDe (shared/fecha-chile) reconoce las DATE de la base: formatearlas en zona de Chile las corría un día con fechas del otro horario (barrido 30-09-2026)
   return String(v).slice(0, 10);
 };
 
