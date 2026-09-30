@@ -13,6 +13,8 @@ require('../../shared/entorno').anunciar();
 require('../../shared/env-check').verificarEntorno();
 
 const app = express();
+// Las DATE de la base salen al navegador como la medianoche real de Chile de ESE día (ver shared/fecha-chile.jsonFechaBD)
+app.set('json replacer', require('../../shared/fecha-chile').jsonFechaBD);
 app.set('trust proxy', 1); // Render está detrás de proxy: req.ip = IP real del cliente
 
 app.use(cors({

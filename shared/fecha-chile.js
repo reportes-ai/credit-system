@@ -135,4 +135,37 @@ function isoFlex(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-module.exports = { TZ, isoDe, isoDeBD, isoFlex, mesDe, hoyISO, mesActualISO, desdeISO, sumarDias, sumarMeses, primerDiaMes, finDelDia };
+/* ── DATE DE LA BASE HACIA EL NAVEGADOR (json replacer del gateway) ─────────────────────────
+   Una DATE sale de mysql2 como medianoche con el offset de HOY ('1989-10-01T03:00Z' en verano).
+   El navegador la vuelve a leer en hora de Chile DE ESA FECHA (-04:00 en octubre de 1989) y le
+   da las 23:00 del día anterior: todo `new Date(x).toLocaleDateString()` o `.getDate()` del
+   frontend (≈580 usos en más de 100 páginas) mostraba un día menos para fechas del otro horario.
+   En vez de tocar cada página, la respuesta JSON manda la medianoche REAL de Chile de ese día
+   ('1989-10-01T04:00Z'): mismo formato, mismo día con slice(0,10), y el navegador cae en el día
+   correcto. Solo cambia la hora de las DATE cuyo horario difiere del actual. (30-09-2026) */
+const _fmtCL = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+const _medianocheCL = new Map();
+function medianocheChileISO(iso) {
+  let v = _medianocheCL.get(iso);
+  if (v) return v;
+  v = iso + 'T04:00:00.000Z';
+  for (const h of ['03', '04', '05']) {                       // la primera hora UTC que ya es ese día en Chile
+    const c = iso + 'T' + h + ':00:00.000Z';
+    if (_fmtCL.format(new Date(c)) === iso) { v = c; break; }
+  }
+  if (_medianocheCL.size > 5000) _medianocheCL.clear();
+  _medianocheCL.set(iso, v);
+  return v;
+}
+function jsonFechaBD(key, value) {
+  const o = this && this[key];
+  if (!(o instanceof Date) || isNaN(o)) return value;
+  let off = '-04:00';
+  try { off = require('./config/database').offsetBD() || off; } catch (_) {}
+  const m = /^([+-])(\d{2}):(\d{2})$/.exec(off);
+  const ms = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : -4 * 3600000;
+  if ((o.getTime() + ms) % 86400000 !== 0) return value;      // trae hora: no es una DATE, va tal cual
+  return medianocheChileISO(new Date(o.getTime() + ms).toISOString().slice(0, 10));
+}
+
+module.exports = { TZ, isoDe, isoDeBD, isoFlex, jsonFechaBD, medianocheChileISO, mesDe, hoyISO, mesActualISO, desdeISO, sumarDias, sumarMeses, primerDiaMes, finDelDia };
