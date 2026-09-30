@@ -296,7 +296,11 @@ exports.mando = async (req, res) => {
     ok(res, {
       ahora: new Date().toISOString(),
       alertas: {
-        sin_servicio: enHorario && conectadosAna === 0,
+        /* "Conectado" vive en la memoria del proceso (shared/presencia.js): tras un deploy o reinicio
+           el mapa parte vacío y durante ~1 minuto NADIE figura conectado, así que la TV daba por
+           cerrada el área y hacía sonar la sirena (30-09-2026, 15:46, tres deploys seguidos). Los
+           primeros 3 minutos de vida del proceso no se juzga: la presencia aún se está llenando. */
+        sin_servicio: enHorario && conectadosAna === 0 && process.uptime() > 180,
         horario_hoy: horarioHoy,
         en_horario: enHorario,
         carta_espera: cartaEspera,          // { op_carta, segundos } o null
