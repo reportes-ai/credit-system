@@ -1182,7 +1182,7 @@ async function indicadores(mes) {
   // UF del ÚLTIMO día del mes (norma Previred/DT); si el mes aún no termina, getUF entrega la última cargada.
   const [y, m] = mes.split('-').map(Number);
   const finMes = mes + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0');
-  const uf = (await getUF(finMes)) || (await getUF(new Date().toISOString().slice(0, 10))) || 0;
+  const uf = (await getUF(finMes)) || (await getUF(hoyChile())) || 0;
   const [[utmRow]] = await pool.query('SELECT valor FROM utm WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [finMes + ' 23:59:59']);
   const utm = parseFloat(utmRow?.valor) || 0;
   const [afps] = await pool.query('SELECT afp, tasa_pct, codigo_previred FROM rh_afp_tasas ORDER BY afp');
@@ -1712,7 +1712,7 @@ const emitir = async (req, res) => {
     if (!libro.cuadra) console.error(`[remuneraciones emitir] el libro ${mes} no cuadra: debe $${libro.debe} ≠ haber $${libro.haber} — el motor de asientos lo va a rechazar como DESCUADRE (ver ctb_eventos_log)`);
     require('../../../contabilidad/src/motor-asientos').contabilizar({
       evento: 'REMUNERACIONES', glosa: `Libro de remuneraciones ${mes} (${libro.personas} colaboradores)`, ref: `REM-${mes}`,
-      fecha: (() => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); })(),   // último día del mes del libro (auditoría 24-09-2026, A4)
+      fecha: (() => { const [y, m] = mes.split('-').map(Number); return `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; })(),   // último día del mes del libro (auditoría 24-09-2026, A4)
       montos: libro.montos,
     }).then(async (idAsiento) => {
       // Entró el devengo real → se libera la provisión de sueldos del mes si el cierre la había constituido (motor único provisiones.js).
@@ -1723,7 +1723,7 @@ const emitir = async (req, res) => {
         if (!ya) { console.warn(`[remuneraciones emitir→provisión] sin asiento REMUNERACIONES para ${mes}: provisión de sueldos NO liberada (ver ctb_eventos_log)`); return; }
       }
       const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || 'RRHH';
-      const fLibro = (() => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); })();
+      const fLibro = (() => { const [y, m] = mes.split('-').map(Number); return `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; })();
       const PROV = require('../../../contabilidad/src/provisiones');
       // El bono del jefe del mes anterior se paga en estas liquidaciones: libera su provisión (concepto JEFE, 29-09-2026)
       PROV.liberarJefePorLiquidacion(mes, fLibro, quien).catch(e => console.error('[remuneraciones emitir→provisión jefe]', e && e.message));

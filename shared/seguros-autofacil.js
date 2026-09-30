@@ -26,7 +26,7 @@ async function cargar(force = false) {
   const out = segs.map(s => {
     let links = [];
     try { links = typeof s.links === 'string' ? JSON.parse(s.links) : (s.links || []); } catch (_) {}
-    const f = v => (v == null ? null : (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10)));
+    const f = v => (v == null ? null : require('./fecha-chile').isoFlex(v));
     return {
       ...s, links, fecha_cotizacion: f(s.fecha_cotizacion), vigencia_desde: f(s.vigencia_desde),
       markup_pct: s.markup_pct == null ? null : Number(s.markup_pct), tope_capital_uf: s.tope_capital_uf == null ? null : Number(s.tope_capital_uf),

@@ -45,7 +45,7 @@ const param = async (clave, def) => {
   const [[r]] = await pool.query('SELECT valor FROM ctb_config WHERE clave=?', [clave]);
   return r && r.valor != null && r.valor !== '' ? r.valor : def;
 };
-const ultimoDia = mes => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
+const ultimoDia = mes => { const [y, m] = mes.split('-').map(Number); return `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; };
 const dia = iso => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000;   // días enteros, sin TZ
 const mesAnterior = mes => { const [y, m] = mes.split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`; };
 

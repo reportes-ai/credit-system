@@ -449,7 +449,7 @@ async function sincronizarDealer(usuario = 'Motor provisiones') {
     // AVSOFT: solo documentos registrados desde que el motor manda (los anteriores ya los rebajó el contador o son parte de su diferencia)
     const d = await documentoDealer(p.num_op, p.origen_tipo === 'AVSOFT' ? `${desde}-01` : null);
     if (d) {
-      const fc0 = p.fecha_constitucion ? String(p.fecha_constitucion instanceof Date ? p.fecha_constitucion.toISOString().slice(0, 10) : p.fecha_constitucion).slice(0, 10) : null;
+      const fc0 = p.fecha_constitucion ? require('../../../shared/fecha-chile').isoFlex(p.fecha_constitucion) : null;
       const f = (p.origen_tipo === 'CREDITO' && fc0 && d.fecha < fc0) ? fc0 : d.fecha;   // nunca antes de la constitución (auditoría B2)
       const x = await _liberarFilaDealer(p, d.tipo, f, usuario, d.contra); if (x && x.id) out.liberadas++; continue;
     }
@@ -906,7 +906,7 @@ async function sincronizarJefe(usuario = 'Motor provisiones') {
 }
 
 /* ── SUELDOS (mensual) ──────────────────────────────────────────────────────── */
-const ultimoDiaMes = mes => { const [y, m] = mes.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
+const ultimoDiaMes = mes => { const [y, m] = mes.split('-').map(Number); return `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; };
 const mesAnteriorDe = mes => { const [y, m] = mes.split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`; };
 /* ¿El libro de remuneraciones del mes ya está en la contabilidad? (motor RRHH o traspaso AVSOFT en 4001060 fechado en el mes) */
 async function libroRemuneracionesContabilizado(mes) {
