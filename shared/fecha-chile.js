@@ -30,6 +30,9 @@ const TZ = 'America/Santiago';
    proceso ni el servidor. */
 function isoDe(d) {
   if (d == null || d === '') return null;
+  // Un texto que ya es un día ('AAAA-MM-DD') se devuelve tal cual: new Date() lo lee como UTC y en
+  // Chile caía en el día anterior (prueba de DATE como texto en staging, 30-09-2026).
+  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
   const f = (d instanceof Date) ? d : new Date(d);
   if (isNaN(f)) return null;
   // Una DATE de la base (medianoche exacta bajo el offset de mysql2) se lee deshaciendo ESE offset:

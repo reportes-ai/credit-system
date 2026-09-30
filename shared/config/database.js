@@ -15,6 +15,9 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME     || 'credit_system',
   timezone: MYSQL2_TZ,
+  /* PRUEBA (PENDIENTES 1.12 b): con DB_DATE_STRINGS=1 las columnas DATE llegan como texto
+     'AAAA-MM-DD' en vez de objeto Date. Apagado por defecto en todos los ambientes. */
+  ...(process.env.DB_DATE_STRINGS === '1' && { dateStrings: ['DATE'] }),
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
