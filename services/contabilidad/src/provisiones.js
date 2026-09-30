@@ -120,6 +120,11 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
     SELECT DISTINCT UPPER(TRIM(tipo_pago)), NULL FROM tesoreria_pagos_recurrentes WHERE tipo_pago IS NOT NULL AND TRIM(tipo_pago) <> ''`).catch(() => {});
   // Desglose por campo de la regla (parque: arriendo + comision); monto = total
   await pool.query('ALTER TABLE ctb_provisiones ADD COLUMN IF NOT EXISTS montos_json VARCHAR(400) NULL');
+  /* 30-09-2026: VARCHAR(400) se quedaba chico con el historial de ajustes y el JSON se guardaba
+     truncado (inválido); el contador de ajustes volvía a 1 y la fila quedaba congelada (ver
+     siguienteAjuste). Se agranda la columna y se reparan las filas que quedaron cortadas. */
+  await pool.query('ALTER TABLE ctb_provisiones MODIFY montos_json VARCHAR(4000) NULL').catch(e => console.error('[provisiones montos_json 4000]', e.message));
+  await repararMontosJson();
   // origen_id pasa a texto para los conceptos mensuales por tercero (EJECUTIVO|AAAA-MM); los ids numéricos siguen iguales
   await pool.query('ALTER TABLE ctb_provisiones MODIFY origen_id VARCHAR(80) NOT NULL');
   // La ref de idempotencia PROV-EJECUTIVO-<EJECUTIVO>|AAAA-MM supera los 40 caracteres del libro central
@@ -730,6 +735,43 @@ async function liberarEjecutivoPorAprobacion(ejecutivo, mes, fechaISO = null, us
   for (const p of filas) { const x = await _liberarFilaEjecutivo(p, 'APROBACION', fechaISO, usuario, contra); if (x && x.id) n++; }
   return { liberadas: n, filas: filas.length };
 }
+/* ── Ajustes (-AJn): numeración y JSON de la fila ─────────────────────────────
+   N° del próximo ajuste de una fila: el mayor entre lo que dice la fila (montos_json.ajustes) y lo
+   que ya existe en el libro (comprobantes CONTABILIZADOS con ref PREFIJO-AJn de la regla o de su
+   liberación), más uno. Nació el 30-09-2026: montos_json era VARCHAR(400) y el historial lo pasaba,
+   el JSON se guardaba truncado (inválido), el contador volvía a 1 y el motor chocaba con un ref ya
+   usado (DUPLICADO) en cada sincronización, para siempre: la provisión de Bárbara Schmidtchen
+   2026-09 quedó congelada 32 corridas seguidas. Con el libro como fuente, el número nunca retrocede. */
+async function siguienteAjuste(prefijo, eventos, mj) {
+  const [refs] = await pool.query(
+    "SELECT origen_ref FROM ctb_comprobantes WHERE origen IN (?) AND origen_ref LIKE ? AND estado='CONTABILIZADO'",
+    [eventos, String(prefijo).replace(/[\\%_]/g, m => '\\' + m) + '-AJ%']);
+  const enLibro = refs.reduce((m, r) => { const k = /-AJ(\d+)/.exec(String(r.origen_ref || '')); return k ? Math.max(m, Number(k[1])) : m; }, 0);
+  return Math.max(Number(mj && mj.ajustes) || 0, enLibro) + 1;
+}
+/* montos_json siempre válido: si no cabe en la columna se recorta el historial, nunca se trunca el texto. */
+const MAX_MONTOS_JSON = 4000;
+function jsonFila(mj) {
+  let s = JSON.stringify(mj);
+  while (s.length > MAX_MONTOS_JSON && Array.isArray(mj.historial) && mj.historial.length) { mj.historial = mj.historial.slice(1); s = JSON.stringify(mj); }
+  if (s.length > MAX_MONTOS_JSON) { delete mj.historial; s = JSON.stringify(mj); }
+  return s;
+}
+/* Repara (una vez, idempotente) las filas cuyo montos_json quedó truncado por el VARCHAR(400): rescata
+   los contadores del texto cortado y guarda un JSON válido; el historial perdido no se reconstruye. */
+async function repararMontosJson() {
+  try {
+    const [filas] = await pool.query('SELECT id, montos_json FROM ctb_provisiones WHERE montos_json IS NOT NULL AND LENGTH(montos_json) >= 400');
+    for (const f of filas) {
+      try { JSON.parse(f.montos_json); continue; } catch (_) {}
+      const s = String(f.montos_json), mj = {};
+      for (const k of ['ajustes', 'creditos', 'colaboradores', 'stock']) { const m = new RegExp('"' + k + '":(-?\\d+)').exec(s); if (m) mj[k] = Number(m[1]); }
+      await pool.query('UPDATE ctb_provisiones SET montos_json=? WHERE id=?', [JSON.stringify(mj), f.id]);
+      console.log(`[provisiones] montos_json de la fila ${f.id} venía truncado: reparado como ${JSON.stringify(mj)}`);
+    }
+  } catch (e) { console.error('[provisiones repararMontosJson]', e.message); }
+}
+
 /* Mientras no se apruebe, la provisión sigue al motor: si el cálculo cambió (más créditos, descuentos,
    ajustes), se contabiliza solo la DIFERENCIA (PROV_EJECUTIVO si sube, PROV_EJECUTIVO_LIB si baja) con
    ref propia por ajuste, y la fila queda en el valor vigente. Una sola fila por ejecutivo y mes. */
@@ -746,7 +788,7 @@ async function ajustarEjecutivoMes(mes, usuario = 'Motor provisiones') {
     const delta = nuevo - Math.round(Number(p.monto));
     if (!delta) continue;
     let mj = {}; try { mj = JSON.parse(p.montos_json || '{}'); } catch (_) {}
-    const n = (mj.ajustes || 0) + 1;
+    const n = await siguienteAjuste('PROV-EJECUTIVO-' + p.origen_id, [C.regla, C.reglaLib], mj);
     const id = await contabilizar({
       evento: delta > 0 ? C.regla : C.reglaLib, fecha, ref: 'PROV-EJECUTIVO-' + p.origen_id + '-AJ' + n, montos: { monto: Math.abs(delta) },
       glosa: ('Ajuste provisión comisión ejecutivo ' + p.tercero + ' — ' + mes + ' (' + (delta > 0 ? '+' : '−') + '$' + Math.abs(delta).toLocaleString('es-CL') + ', el motor pasó de $' + Math.round(Number(p.monto)).toLocaleString('es-CL') + ' a $' + nuevo.toLocaleString('es-CL') + ')').slice(0, 300),
@@ -754,7 +796,7 @@ async function ajustarEjecutivoMes(mes, usuario = 'Motor provisiones') {
     });
     if (!id) continue;   // sin asiento no se mueve la fila (queda en el log del motor)
     mj.ajustes = n; mj.creditos = f ? f.creditos : 0; mj.historial = [...(mj.historial || []), { n, fecha: hoyISO(), de: Math.round(Number(p.monto)), a: nuevo, comp: id }].slice(-8);
-    await pool.query('UPDATE ctb_provisiones SET monto=?, montos_json=?, updated_at=NOW() WHERE id=?', [nuevo, JSON.stringify(mj).slice(0, 400), p.id]);
+    await pool.query('UPDATE ctb_provisiones SET monto=?, montos_json=?, updated_at=NOW() WHERE id=?', [nuevo, jsonFila(mj), p.id]);
     out.ajustadas++; out.delta += delta;
   }
   return out;
@@ -845,7 +887,7 @@ async function ajustarJefeMes(mes, usuario = 'Motor provisiones') {
     const delta = nuevo - Math.round(Number(p.monto));
     if (!delta) continue;
     let mj = {}; try { mj = JSON.parse(p.montos_json || '{}'); } catch (_) {}
-    const n = (mj.ajustes || 0) + 1;
+    const n = await siguienteAjuste('PROV-JEFE-' + p.origen_id, [C.regla, C.reglaLib], mj);
     const id = await contabilizar({
       evento: delta > 0 ? C.regla : C.reglaLib, fecha, ref: 'PROV-JEFE-' + p.origen_id + '-AJ' + n, montos: { monto: Math.abs(delta) },
       glosa: ('Ajuste provisión Bono Jefe Comercial ' + p.tercero + ' — ' + mes + ' (' + (delta > 0 ? '+' : '−') + '$' + Math.abs(delta).toLocaleString('es-CL') + ', el motor pasó de $' + Math.round(Number(p.monto)).toLocaleString('es-CL') + ' a $' + nuevo.toLocaleString('es-CL') + ')').slice(0, 300),
@@ -853,7 +895,7 @@ async function ajustarJefeMes(mes, usuario = 'Motor provisiones') {
     });
     if (!id) continue;
     mj.ajustes = n; if (f) { mj.variable = f.variable; mj.semana = f.semana; } mj.historial = [...(mj.historial || []), { n, fecha: hoyISO(), de: Math.round(Number(p.monto)), a: nuevo, comp: id }].slice(-8);
-    await pool.query('UPDATE ctb_provisiones SET monto=?, montos_json=?, updated_at=NOW() WHERE id=?', [nuevo, JSON.stringify(mj).slice(0, 400), p.id]);
+    await pool.query('UPDATE ctb_provisiones SET monto=?, montos_json=?, updated_at=NOW() WHERE id=?', [nuevo, jsonFila(mj), p.id]);
     out.ajustadas++; out.delta += delta;
   }
   return out;
@@ -1003,7 +1045,7 @@ async function ajustarSueldos(mes, usuario = 'Motor provisiones') {
   const py = await proyeccionSueldos(mes);
   if (!(py.total > 0) || py.total === Math.round(Number(p.monto))) return { ajustada: false };
   let mj = {}; try { mj = JSON.parse(p.montos_json || '{}'); } catch (_) {}
-  const n = (mj.ajustes || 0) + 1, viejo = montosDe(p), fecha = await fechaContable(ultimoDiaMes(mes));
+  const n = await siguienteAjuste('PROV-SUELDOS-' + mes, [C.regla, C.reglaLib], mj), viejo = montosDe(p), fecha = await fechaContable(ultimoDiaMes(mes));
   // Solo la DIFERENCIA por concepto: lo que sube va por PROV_SUELDOS, lo que baja por PROV_SUELDOS_LIB (refs -AJn / -AJn-LIB)
   const sube = {}, baja = {};
   for (const k of ['haberes', 'sis', 'afc', 'mutual']) { const d = (py.montos[k] || 0) - (Number(viejo[k]) || 0); if (d > 0) sube[k] = d; else if (d < 0) baja[k] = -d; }
@@ -1015,7 +1057,7 @@ async function ajustarSueldos(mes, usuario = 'Motor provisiones') {
     glosa: ('Ajuste provisión remuneraciones ' + mes + ' (' + n + '): la proyección bajó a $' + py.total.toLocaleString('es-CL') + ' (' + py.filas.length + ' colaboradores)').slice(0, 300), detalle: ('baja: ' + txt(baja) + ' · por ' + usuario).slice(0, 300) });
   if (!idNew && !idLib) return { ajustada: false };
   mj = { ...mj, montos: py.montos, colaboradores: py.filas.length, ajustes: n, historial: [...(mj.historial || []), { n, fecha: hoyISO(), de: Math.round(Number(p.monto)), a: py.total, lib: idLib, comp: idNew }].slice(-6) };
-  await pool.query('UPDATE ctb_provisiones SET monto=?, montos_json=?, tercero=?, updated_at=NOW() WHERE id=?', [py.total, JSON.stringify(mj).slice(0, 400), 'Libro de remuneraciones ' + mes + ' (' + py.filas.length + ' colaboradores)', p.id]);
+  await pool.query('UPDATE ctb_provisiones SET monto=?, montos_json=?, tercero=?, updated_at=NOW() WHERE id=?', [py.total, jsonFila(mj), 'Libro de remuneraciones ' + mes + ' (' + py.filas.length + ' colaboradores)', p.id]);
   return { ajustada: true, de: Math.round(Number(p.monto)), a: py.total };
 }
 /* Red de seguridad: mes en curso y anterior; ajusta al motor; libera lo que ya tiene libro. */
@@ -1580,7 +1622,7 @@ async function aplicarStock(concepto, clave, mes, o, usuario = 'Motor provisione
     const delta = objetivo - Math.round(Number(ant.m)) - enMes;
     if (!delta) return { skip: 'sin cambios', stock: objetivo };
     let mj = {}; try { mj = JSON.parse((ya && ya.montos_json) || '{}'); } catch (_) {}
-    const n = ya ? (Number(mj.ajustes) || 0) + 1 : 0;
+    const n = ya ? await siguienteAjuste('PROV-' + concepto + '-' + origenId, [C.regla, C.reglaLib], mj) : 0;
     const fecha = await fechaContable(ultimoDiaMes(mes));
     const id = await contabilizar({
       evento: delta > 0 ? C.regla : C.reglaLib, fecha, ref: 'PROV-' + concepto + '-' + origenId + (n ? '-AJ' + n : ''),
@@ -1590,7 +1632,7 @@ async function aplicarStock(concepto, clave, mes, o, usuario = 'Motor provisione
     });
     if (!id) return { error: 'sin asiento (ver log del motor en Reglas de Centralización)' };
     mj = { ...mj, stock: objetivo, ajustes: n, ...(o.extra || {}) };
-    const json = JSON.stringify(mj).slice(0, 400);
+    const json = jsonFila(mj);
     if (ya) await pool.query('UPDATE ctb_provisiones SET monto=?, tercero=?, montos_json=?, updated_at=NOW() WHERE id=?', [enMes + delta, o.tercero, json, ya.id]);
     else await pool.query(
       "INSERT INTO ctb_provisiones (concepto, origen_tipo, origen_id, tercero, mes, fecha_constitucion, monto, montos_json, id_comprobante_constitucion, creado_por) VALUES (?,'MES',?,?,?,?,?,?,?,?)",

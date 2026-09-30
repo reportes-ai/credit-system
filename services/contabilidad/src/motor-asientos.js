@@ -148,6 +148,12 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['2106070', 'DEBE', 'monto', 'Rebaja finiquito por pagar'],
         ['1101090', 'HABER', 'monto', 'Salida de banco'],
       ]],
+      /* 30-09-2026: la ODP de sueldos (nace al EMITIR las liquidaciones) caía en ODP_PAGADA y rebajaba
+         Proveedores; el libro REMUNERACIONES dejó los líquidos en 2104010 y nadie los rebajaba. */
+      ['SUELDOS_PAGADOS', 'Sueldos líquidos pagados (ODP de Remuneraciones)', 'Se dispara al marcar PAGADA la ODP "Remuneraciones AAAA-MM — sueldos líquidos según Nómina Banco adjunta", que nace al EMITIR las liquidaciones en RRHH: rebaja Líquidos por Pagar (donde el libro REMUNERACIONES dejó los sueldos) contra banco. No pasa por Proveedores. Campos: monto (total de la orden).', 'EGRESO', 1, [
+        ['2104010', 'DEBE', 'monto', 'Pago de sueldos líquidos'],
+        ['1101090', 'HABER', 'monto', 'Salida de banco'],
+      ]],
       ['PROVISION_VAC_LIBERACION', 'Liberación provisión de vacaciones (cierre de mes)', 'Se dispara en el cierre de mes cuando la provisión de vacaciones BAJÓ (se tomaron o pagaron días): reversa el exceso. Campos: liberacion (variación).', 'TRASPASO', 1, [
         ['2106030', 'DEBE', 'liberacion', 'Rebaja provisión de vacaciones'],
         ['4002030', 'HABER', 'liberacion', 'Abono gasto provisión de vacaciones'],

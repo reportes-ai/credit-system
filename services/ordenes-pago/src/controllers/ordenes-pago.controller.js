@@ -1440,6 +1440,8 @@ async function estadoHorarioPago() {
    · Factura de proveedor → auxiliar de compras (HABER en su cuenta_cxp — AVSOFT/RCV
      usan cuentas POR AÑO tipo 2102024, no la 2102010 genérica de la regla)
    · Finiquito → FINIQUITO_EMITIDO deja el pasivo en 2106070 al guardarse
+   · Sueldos (ODP de Remuneraciones, nace al EMITIR) → el libro REMUNERACIONES dejó los
+     líquidos en 2104010; el pago los rebaja (SUELDOS_PAGADOS), nunca Proveedores (30-09-2026)
    · Anticipo / Préstamo al personal → NO hay devengo: el desembolso ES el hecho
      (nace la cuenta por cobrar al personal)
    El pago solo rebaja ese pasivo (o crea la CxC) contra banco. Los `reemplazos`
@@ -1456,6 +1458,7 @@ async function contabilizarPagoGeneral(oc, fechaPago, ctaBancaria) {
     if (/^anticipo de sueldo/i.test(cpto)) evento = 'ANTICIPO_PERSONAL';
     else if (/^pr[ée]stamo al personal/i.test(cpto)) evento = 'PRESTAMO_PERSONAL';
     else if (/^finiquito/i.test(cpto)) evento = 'FINIQUITO_PAGADO';
+    else if (require('../../../rrhh/src/controllers/remuneraciones.controller').RE_ODP_SUELDOS.test(cpto)) evento = 'SUELDOS_PAGADOS';
     const reemplazos = {};
     if (ctaBancaria && ctaBancaria.cuenta_contable) reemplazos['1101090'] = ctaBancaria.cuenta_contable;
     if (evento === 'ODP_PAGADA' && op.proveedor_rut) {
@@ -1476,7 +1479,7 @@ async function contabilizarPagoGeneral(oc, fechaPago, ctaBancaria) {
       detalle: oc.numero || op.numero || null,
       // Glosa por línea: a quién se paga (debe) y de qué cuenta sale (haber: banco + N° de cuenta)
       glosas: {
-        DEBE: op.proveedor_nombre ? `Pago a ${String(op.proveedor_nombre).trim()}` : null,
+        DEBE: evento === 'SUELDOS_PAGADOS' ? `Pago de sueldos líquidos (${cpto.slice(0, 60)})` : op.proveedor_nombre ? `Pago a ${String(op.proveedor_nombre).trim()}` : null,
         HABER: ctaBancaria ? ['Salida de banco', ctaBancaria.banco, ctaBancaria.numero_cuenta].filter(Boolean).join(' ') : null,
       },
     });

@@ -2653,6 +2653,8 @@ require('../../../../shared/migrate').enFila('rh-liq-correo-enviado', async () =
   await pool.query('ALTER TABLE rh_liquidaciones ADD COLUMN IF NOT EXISTS correo_enviado_at DATETIME NULL').catch(() => {});
 });
 const SUELDOS_CONCEPTO = mes => `Remuneraciones ${mes} — sueldos líquidos según Nómina Banco adjunta`;
+// Cómo se reconoce esa ODP (única fuente: la usan el correo de las liquidaciones y el asiento SUELDOS_PAGADOS al pagarla)
+const RE_ODP_SUELDOS = /^Remuneraciones (\d{4}-\d{2}) — sueldos líquidos/;
 async function ordenPagoSueldos(mes, req) {
   const d = await nominaBancoDatos(mes);
   if (!d || !d.filas.length || !(d.total > 0)) return null;
@@ -2693,7 +2695,7 @@ async function ordenPagoSueldos(mes, req) {
 /* Hook desde Órdenes de Pago → Pagar: la ODP de sueldos pagada dispara el correo de las liquidaciones. */
 async function onOdpPagadaRemuneraciones(idOrdenPago) {
   const [[o]] = await pool.query('SELECT concepto FROM ordenes_pago WHERE id=?', [idOrdenPago]);
-  const m = o && String(o.concepto || '').match(/^Remuneraciones (\d{4}-\d{2}) — sueldos líquidos/);
+  const m = o && String(o.concepto || '').match(RE_ODP_SUELDOS);
   if (!m) return null;
   const n = await enviarLiquidacionesCorreo(m[1]);
   console.log(`[remuneraciones] ODP de sueldos ${m[1]} pagada → ${n} liquidaciones enviadas por correo`);
@@ -2802,4 +2804,4 @@ const avisoPrelacion = async (req, res) => {
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic, editarAdicional, asignacionFicha,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion, haberesProyectados, prelacionDescuentos, avisoPrelacion,
-  getDescuentos, crearDescuento, editarDescuento, anularDescuento, ordenesPagoJudiciales, proveedorBeneficiario, onOdpPagadaJudicial, onOdpPagadaRemuneraciones, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
+  getDescuentos, crearDescuento, editarDescuento, anularDescuento, ordenesPagoJudiciales, proveedorBeneficiario, onOdpPagadaJudicial, onOdpPagadaRemuneraciones, RE_ODP_SUELDOS, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };

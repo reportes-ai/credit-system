@@ -109,6 +109,9 @@ require('../../../../shared/migrate').enFila('cierre-mes', async () => {
       ['PROVISION_DEALER', 'Provisiones de comisión dealer cuadradas', 'Toda otorgada del mes con comisión dealer tiene su provisión (o ya su factura) y los asientos del motor calzan con sus provisiones en la cuenta 2106011.', 8],
       ['PROVISION_PARQUE', 'Provisiones de parques cuadradas', 'Toda otorgada del mes con comisión o arriendo de parque tiene su provisión (o el pago del parque ya aprobado) y los asientos del motor calzan en la cuenta 2106013.', 9],
       ['PROVISION_EJECUTIVO', 'Provisiones de comisión ejecutivo cuadradas', 'Toda otorgada del mes con comisión de ejecutivo tiene su provisión (o la comisión del mes ya aprobada) y los asientos del motor calzan en la cuenta 2106014.', 10],
+      // 30-09-2026: arriendos (2106018) y Bono Jefe Comercial (2106017) salieron a su propio concepto
+      ['PROVISION_ARRIENDO', 'Provisiones de arriendos cuadradas', 'Toda otorgada del mes con arriendo de parque tiene su provisión (o el pago del parque ya aprobado) y los asientos del motor calzan en la cuenta 2106018 (arriendo de oficina y otros: por la ODP, junto a Otros gastos).', 9],
+      ['PROVISION_JEFE', 'Provisiones del Bono Jefe Comercial cuadradas', 'Cada Jefe Comercial con bono del BSC en el mes de producción tiene su provisión en la cuenta 2106017 (o ya devengó en las liquidaciones del mes siguiente) y los asientos del motor calzan con sus provisiones.', 10],
       ['PROVISION_SUELDOS', 'Remuneraciones del mes devengadas', 'El libro de remuneraciones del mes está contabilizado (RRHH o AVSOFT) o, si no, existe la provisión de sueldos del cierre en la cuenta 2106015.', 11],
       ['PROVISION_OTROS', 'Otros gastos del mes devengados', 'Toda orden de pago del mes sin documento en el auxiliar de compras, y todo pago recurrente del mes sin su ODP, tienen su provisión en la cuenta 2106016; ninguna categoría quedó sin cuenta de gasto configurada.', 12],
       ['PROVISION_IAS', 'Indemnización por años de servicio devengada', 'Todo trabajador con contrato indefinido tiene la cuota del mes (un doceavo de su base topada a 90 UF, hasta 11 años) provisionada en la cuenta 2106031.', 13],
@@ -122,6 +125,9 @@ require('../../../../shared/migrate').enFila('cierre-mes', async () => {
         `INSERT INTO cierre_checklist_items (nombre, descripcion, href, orden, obligatorio, dia_habil, resp_tipo, id_perfil, check_auto)
          VALUES (?,?,?,?,1,?,'PERFIL',?,?)`, [nombre, desc, '/contabilidad/provisiones/', orden, 3, pFin ? pFin.id_perfil : null, auto]);
     }
+    // 30-09-2026: el arriendo dejó de ir en la provisión de parques (concepto y chequeo propios)
+    await pool.query("UPDATE cierre_checklist_items SET descripcion=? WHERE check_auto='PROVISION_PARQUE' AND descripcion LIKE '%comisión o arriendo%'",
+      ['Toda otorgada del mes con comisión de parque tiene su provisión (o el pago del parque ya aprobado) y los asientos del motor calzan en la cuenta 2106013. El arriendo prorrateado va aparte (PROVISION_ARRIENDO).']);
 
     // Funcionalidades: página (todos los que operan cierre) + acción de cerrar + mantenedor
     const [[modT]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Tesorería' OR ruta LIKE '/tesoreria%' LIMIT 1");
@@ -173,6 +179,7 @@ const CHECKS_AUTO = {
      otorgada del mes con comisión sin provisión ni documento, y saldo del motor = cuenta 2106011. */
   async PROVISION_DEALER(mes) { return CHECKS_AUTO._provision(mes, 'DEALER'); },
   async PROVISION_PARQUE(mes) { return CHECKS_AUTO._provision(mes, 'PARQUE'); },
+  async PROVISION_ARRIENDO(mes) { return CHECKS_AUTO._provision(mes, 'ARRIENDO'); },
   /* Ejecutivos (mensual): cada ejecutivo con comisión del motor tiene su aprobación (devengo real) o su provisión al cierre */
   async PROVISION_EJECUTIVO(mes) {
     const prov = require('../../../contabilidad/src/provisiones');
@@ -189,6 +196,23 @@ const CHECKS_AUTO = {
     }
     if (!falta.length) return { ok: true, detalle: `${filas.length} ejecutivo(s) con comisión: todos aprobados o provisionados (cuenta ${c.cuenta_provision}: $${c.saldo_final.toLocaleString('es-CL')})` };
     return { ok: false, detalle: `${falta.length} ejecutivo(s) con comisión sin aprobar ni provisionar: ${falta.join(', ').slice(0, 250)} — correr Sincronizar (concepto Comisión ejecutivo)` };
+  },
+  /* Jefes comerciales (mensual, 30-09-2026): cada jefe con bono del BSC tiene su provisión JEFE al cierre,
+     salvo que ya haya devengado de verdad en las liquidaciones del mes siguiente (libro REMUNERACIONES). */
+  async PROVISION_JEFE(mes) {
+    const prov = require('../../../contabilidad/src/provisiones');
+    const c = await prov.cuadro(mes, 'JEFE');
+    if (mes < c.desde) return { ok: true, detalle: `Mes anterior a ${c.desde}: no se provisiona` };
+    if (mes >= require('../../../../shared/fecha-chile').hoyISO().slice(0, 7)) return { ok: true, detalle: 'El mes no ha terminado: la provisión se constituye al cierre' };
+    const [y, m] = mes.split('-').map(Number), mesSig = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+    if (await prov.libroRemuneracionesContabilizado(mesSig)) return { ok: true, detalle: `El bono ya devengó en las liquidaciones de ${mesSig} (libro REMUNERACIONES); cuenta ${c.cuenta_provision}: $${c.saldo_final.toLocaleString('es-CL')}` };
+    const jefes = await prov.bonosMotorMes(mes), falta = [];
+    for (const f of jefes) {
+      const [[p]] = await pool.query("SELECT 1 v FROM ctb_provisiones WHERE concepto='JEFE' AND origen_tipo='JEFE_MES' AND origen_id=?", [`JEFE${f.id_jefe}|${mes}`]);
+      if (!p) falta.push(`${f.jefe} ($${f.total.toLocaleString('es-CL')})`);
+    }
+    if (falta.length) return { ok: false, detalle: `${falta.length} jefe(s) con bono sin provisionar: ${falta.join(', ').slice(0, 250)} — correr Sincronizar (concepto Bono Jefe Comercial)` };
+    return { ok: true, detalle: `${jefes.length} jefe(s) con bono: todos provisionados (cuenta ${c.cuenta_provision}: $${c.saldo_final.toLocaleString('es-CL')}, motor $${c.motor_vigente.toLocaleString('es-CL')})` };
   },
   /* Sueldos: el mes tiene su libro contabilizado (RRHH o traspaso AVSOFT) o la provisión del cierre */
   async PROVISION_SUELDOS(mes) {
@@ -214,7 +238,7 @@ const CHECKS_AUTO = {
       `SELECT o.id, o.numero, o.categoria, o.concepto, o.proveedor_nombre, o.proveedor_rut, o.monto, o.tipo_documento, o.numero_documento
          FROM ordenes_pago o
         WHERE UPPER(COALESCE(o.estado,'')) <> 'ANULADA' AND DATE_FORMAT(o.fecha_emision,'%Y-%m')=?
-          AND NOT EXISTS (SELECT 1 FROM ctb_provisiones p WHERE p.concepto='OTROS' AND p.origen_tipo='ODP' AND p.origen_id=CAST(o.id AS CHAR))
+          AND NOT EXISTS (SELECT 1 FROM ctb_provisiones p WHERE p.concepto IN ('OTROS','ARRIENDO') AND p.origen_tipo='ODP' AND p.origen_id=CAST(o.id AS CHAR))   /* una ODP de arriendo se provisiona como ARRIENDO (29-09-2026) */
         ORDER BY o.id LIMIT 200`, [mes]);
     const odpDoc = require('../../../../shared/odp-documento');
     const sinCuenta = new Set(), sinProvision = [];
@@ -292,19 +316,24 @@ const CHECKS_AUTO = {
                     WHERE COALESCE(f.monto_liquido, t.monto_liquido) IS NOT NULL) fc ON fc.num_op=c.num_op   /* réplicas cuentan como documento (auditoría A2) */
        WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND COALESCE(c.comdea_real,0)>0
          AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND fc.num_op IS NULL`, [mes])
-    : concepto === 'PARQUE' ? await pool.query(
+    /* PARQUE mira la comisión y ARRIENDO el arriendo prorrateado: desde el 29-09-2026 son filas y cuentas
+       distintas (2106013 / 2106018), aunque el mismo pago del parque libera las dos. */
+    : (concepto === 'PARQUE' || concepto === 'ARRIENDO') ? await pool.query(
       `SELECT COUNT(*) n, GROUP_CONCAT(c.num_op ORDER BY c.num_op SEPARATOR ', ') ops FROM creditos c
-        LEFT JOIN ctb_provisiones p ON p.concepto='PARQUE' AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
+        LEFT JOIN ctb_provisiones p ON p.concepto=? AND p.origen_tipo='CREDITO' AND p.origen_id=c.id
         LEFT JOIN (SELECT po.num_op FROM parques_pagos_ops po JOIN parques_pagos_mes pm ON pm.parque=po.parque AND pm.mes=po.mes WHERE pm.etapa<>'EN_APROBACION') ap ON ap.num_op=c.num_op
-       WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND (COALESCE(c.com_parque,0)>0 OR COALESCE(c.arriendo_parque,0)>0)
-         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND ap.num_op IS NULL`, [mes])
-    : [[{ n: 0, ops: '' }]];   // EJECUTIVO y SUELDOS tienen su chequeo mensual propio (PROVISION_EJECUTIVO / PROVISION_SUELDOS)
-    // Los asientos del motor en la cuenta deben calzar con sus filas (constituido y liberado del mes)
+       WHERE UPPER(COALESCE(c.estado_credito,''))='OTORGADO' AND COALESCE(${concepto === 'PARQUE' ? 'c.com_parque' : 'c.arriendo_parque'},0)>0
+         AND DATE_FORMAT(COALESCE(c.mes,c.fecha_otorgado),'%Y-%m')=? AND p.id IS NULL AND ap.num_op IS NULL`, [concepto, mes])
+    : [[{ n: 0, ops: '' }]];   // EJECUTIVO, JEFE y SUELDOS tienen su chequeo mensual propio (PROVISION_EJECUTIVO / PROVISION_JEFE / PROVISION_SUELDOS)
+    /* Los asientos del motor en la cuenta deben calzar con sus filas (constituido y liberado del mes). La
+       reclasificación PROV_ARRIENDO_RECLAS (29-09-2026) movió el arriendo ya provisionado de 2106013 a
+       2106018 sin tocar filas: cuenta como parte de lo constituido (resta en parques, suma en arriendos). */
     const [[asi]] = await pool.query(
-      `SELECT COALESCE(SUM(CASE WHEN c.origen=? THEN m.haber END),0) h, COALESCE(SUM(CASE WHEN c.origen=? THEN m.debe END),0) d
+      `SELECT COALESCE(SUM(CASE WHEN c.origen=? THEN m.haber END),0) h, COALESCE(SUM(CASE WHEN c.origen=? THEN m.debe END),0) d,
+              COALESCE(SUM(CASE WHEN c.origen='PROV_ARRIENDO_RECLAS' THEN m.haber - m.debe END),0) reclas
          FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
-        WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m')=? AND c.origen IN (?,?)`, [K.regla, K.reglaLib, c.cuenta_provision, mes, K.regla, K.reglaLib]);
-    const dif = Math.round((c.motor_constituido - Number(asi.h)) + (c.motor_liberado - Number(asi.d)));
+        WHERE m.cuenta=? AND c.estado='CONTABILIZADO' AND DATE_FORMAT(c.fecha,'%Y-%m')=? AND c.origen IN (?,?,'PROV_ARRIENDO_RECLAS')`, [K.regla, K.reglaLib, c.cuenta_provision, mes, K.regla, K.reglaLib]);
+    const dif = Math.round((c.motor_constituido - Number(asi.h) - Number(asi.reclas)) + (c.motor_liberado - Number(asi.d)));
     if (sin.n === 0 && dif === 0) return { ok: true, detalle: `Cuenta ${c.cuenta_provision}: SF $${c.saldo_final.toLocaleString('es-CL')} (motor $${c.motor_vigente.toLocaleString('es-CL')} en ${c.motor_n_vigente} vigente(s) + histórico $${c.saldo_historico.toLocaleString('es-CL')}); asientos del motor calzan con sus provisiones` };
     const partes = [];
     if (sin.n) partes.push(`${sin.n} otorgada(s) sin provisión ni documento: ${String(sin.ops || '').slice(0, 200)}`);
