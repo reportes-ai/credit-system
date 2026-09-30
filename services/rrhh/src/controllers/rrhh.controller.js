@@ -180,6 +180,17 @@ const crearVacaciones = async (req, res) => {
     const fd = norm(b.fecha_desde), fh = norm(b.fecha_hasta);
     if (!fd || !fh) return res.status(400).json({ success: false, data: null, error: 'Indica las fechas desde y hasta' });
     if (fh < fd) return res.status(400).json({ success: false, data: null, error: 'La fecha hasta no puede ser anterior a desde' });
+    /* Año mal digitado (30-09-2026): una solicitud entró con 21-09-2016 en vez de 2026, se aprobó y nadie lo vio —
+       no descontó Edenred y cargó 3 días hábiles en vez de 4. Se acepta hasta 12 meses hacia atrás (regularizar
+       lo tomado fuera del sistema) y 18 hacia adelante; más allá es un error de tipeo. */
+    {
+      const okF = v => /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v + 'T12:00:00'));
+      if (!okF(fd) || !okF(fh)) return res.status(400).json({ success: false, data: null, error: 'Fechas inválidas' });
+      const FC = require('../../../../shared/fecha-chile'), hoy = FC.hoyISO();
+      const dmy = v => v.split('-').reverse().join('-');
+      if (fd < FC.sumarMeses(hoy, -12)) return res.status(400).json({ success: false, data: null, error: `La fecha desde (${dmy(fd)}) es de hace más de un año. Revisa el año.` });
+      if (fh > FC.sumarMeses(hoy, 18)) return res.status(400).json({ success: false, data: null, error: `La fecha hasta (${dmy(fh)}) está a más de 18 meses. Revisa el año.` });
+    }
     // La solicitud registra días CALENDARIO (ambas fechas inclusive) — definición del
     // negocio; la cuenta corriente descuenta solo los HÁBILES (motor shared/feriados)
     const dias = diasEntre(fd, fh);

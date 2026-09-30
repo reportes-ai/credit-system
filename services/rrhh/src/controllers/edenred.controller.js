@@ -72,6 +72,13 @@ require('../../../../shared/migrate').migrar('rrhh-edenred-sabado-ajustes', asyn
     UNIQUE KEY uq_mes_usuario (mes, id_usuario))`);
 });
 
+/* Personas AGREGADAS a mano (Pato, 30-09-2026): alguien que está en Business Suite pero no entra por la regla
+   (sin ficha, o sin sueldo base: honorarios, asesores). Queda en la nómina todos los meses hasta que se quite. */
+require('../../../../shared/migrate').migrar('rrhh-edenred-extra', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_edenred_extra (
+    id_usuario INT NOT NULL PRIMARY KEY, creado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+});
+
 /* Parámetro vigente para un mes: el de mayor mes_desde <= mes */
 async function paramDe(mes) {
   const [[p]] = await pool.query('SELECT * FROM rh_edenred_param WHERE mes_desde <= ? ORDER BY mes_desde DESC LIMIT 1', [mes]);
@@ -101,10 +108,13 @@ async function calcularMes(mes) {
   const ant = mesAnterior(mes);
   const ini = primerDia(mes), fin = ultimoDia(mes);
   const [gente] = await pool.query(
-    `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut, u.cargo, u.centro_costo area, u.fecha_ingreso, u.fecha_baja, f.edenred, f.jornada
-       FROM usuarios u JOIN rh_fichas f ON f.id_usuario=u.id_usuario
-      WHERE (u.estado='activo' OR (u.fecha_baja IS NOT NULL AND u.fecha_baja > ?)) AND COALESCE(f.sueldo_base,0) > 0
-        AND COALESCE(f.edenred,1)=1 AND (u.fecha_ingreso IS NULL OR u.fecha_ingreso <= ?)
+    `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut, u.cargo, u.centro_costo area, u.fecha_ingreso, u.fecha_baja, f.edenred, f.jornada,
+            (x.id_usuario IS NOT NULL AND NOT (COALESCE(f.sueldo_base,0) > 0 AND COALESCE(f.edenred,1)=1)) extra
+       FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
+       LEFT JOIN rh_edenred_extra x ON x.id_usuario=u.id_usuario
+      WHERE (u.estado='activo' OR (u.fecha_baja IS NOT NULL AND u.fecha_baja > ?))
+        AND ((COALESCE(f.sueldo_base,0) > 0 AND COALESCE(f.edenred,1)=1) OR x.id_usuario IS NOT NULL)
+        AND (u.fecha_ingreso IS NULL OR u.fecha_ingreso <= ?)
       ORDER BY nombre`, [ini, fin]);
   // Ausencias del mes ANTERIOR que descuentan (tipos paramétricos) + vacaciones si corresponde
   const tiposAus = p.tipos.filter(t => t !== 'VACACIONES');
@@ -145,7 +155,7 @@ async function calcularMes(mes) {
     const aj = ajuste[g.id_usuario];
     const diasAj = aj ? Number(aj.dias) : 0;
     const monto = Math.max(0, Math.round((habiles - descuento + diasAj) * p.monto_diario));
-    return { id_usuario: g.id_usuario, nombre: g.nombre, rut: g.rut, cargo: g.cargo, area: g.area, sabado: sab ? 1 : 0, baja: g.fecha_baja ? 1 : 0,
+    return { id_usuario: g.id_usuario, nombre: g.nombre, rut: g.rut, cargo: g.cargo, area: g.area, sabado: sab ? 1 : 0, baja: g.fecha_baja ? 1 : 0, extra: Number(g.extra) ? 1 : 0,
              dias_habiles: habiles, dias_descuento: descuento, dias_ajuste: diasAj, observacion: aj?.observacion || null,
              monto_diario: p.monto_diario, monto, detalle: f.det.join(' · ') || null,
              parcial: desde !== ini || hasta !== fin ? `${desde.slice(8)}/${desde.slice(5, 7)} → ${hasta.slice(8)}/${hasta.slice(5, 7)}` : null };
@@ -317,6 +327,44 @@ const putPersona = async (req, res) => {
   } catch (e) { console.error('[edenred persona]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
+/* GET /remuneraciones/edenred/candidatos?mes= — usuarios activos de Business Suite que NO están en la nómina */
+const candidatos = async (req, res) => {
+  try {
+    const mes = mesOk(req.query.mes) ? req.query.mes : require('../../../../shared/fecha-chile').mesActualISO();
+    const ya = new Set((await calcularMes(mes)).filas.map(f => f.id_usuario));
+    const [us] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut, u.cargo, COALESCE(f.edenred,1) edenred, COALESCE(f.sueldo_base,0) sueldo_base, f.id_usuario con_ficha
+         FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE u.estado='activo' ORDER BY nombre LIMIT 500`);
+    ok(res, us.filter(u => !ya.has(u.id_usuario)).map(u => ({ id_usuario: u.id_usuario, nombre: u.nombre, rut: u.rut, cargo: u.cargo,
+      motivo: !u.con_ficha ? 'sin ficha' : !Number(u.edenred) ? 'tarjeta desmarcada en la ficha' : !(Number(u.sueldo_base) > 0) ? 'sin sueldo base' : 'ingresa después de este mes' })));
+  } catch (e) { console.error('[edenred candidatos]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* POST /remuneraciones/edenred/extra {id_usuario} — agrega a la nómina a alguien que la regla no incluye */
+const postExtra = async (req, res) => {
+  try {
+    const idU = Number(req.body?.id_usuario);
+    if (!idU) return fail(res, 'Persona requerida', 400);
+    const [[u]] = await pool.query("SELECT id_usuario, TRIM(CONCAT_WS(' ', nombre, apellido)) nombre, rut FROM usuarios WHERE id_usuario=? AND estado='activo'", [idU]);
+    if (!u) return fail(res, 'Usuario no encontrado o inactivo', 404);
+    if (!String(u.rut || '').trim()) return fail(res, 'Esa persona no tiene RUT en Usuarios: Edenred lo exige para cargar la tarjeta', 400);
+    await pool.query('INSERT INTO rh_edenred_extra (id_usuario, creado_por) VALUES (?,?) ON DUPLICATE KEY UPDATE creado_por=VALUES(creado_por)', [idU, nombreDe(req.usuario)]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'edenred_extra', entidad_id: idU, detalle: `Agregó a ${u.nombre} a la nómina Edenred (persona fuera de la regla)` });
+    ok(res, { id_usuario: idU });
+  } catch (e) { console.error('[edenred extra]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* DELETE /remuneraciones/edenred/extra/:id — la quita (los meses ya generados no cambian) */
+const deleteExtra = async (req, res) => {
+  try {
+    const idU = Number(req.params.id);
+    const [r] = await pool.query('DELETE FROM rh_edenred_extra WHERE id_usuario=?', [idU]);
+    if (!r.affectedRows) return fail(res, 'Esa persona no estaba agregada a mano', 404);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'edenred_extra', entidad_id: idU, detalle: `Quitó al usuario ${idU} de las personas agregadas a la nómina Edenred` });
+    ok(res, { id_usuario: idU });
+  } catch (e) { console.error('[edenred extra delete]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 /* GET /remuneraciones/edenred/resumen — pagado por mes y por persona (últimos 12 meses) */
 const resumen = async (req, res) => {
   try {
@@ -378,4 +426,4 @@ async function avisarGeneracion() {
 }
 require('../../../../shared/scheduler').programar('edenred-aviso-generar', avisarGeneracion, 10 * 60 * 1000);
 
-module.exports = { avisarGeneracion, esUltimoHabilDelMes, getMes, putParam, putAjuste, generar, anular, archivoXlsx, nominaXlsx, putPersona, resumen, calcularMes };
+module.exports = { avisarGeneracion, esUltimoHabilDelMes, getMes, putParam, putAjuste, generar, anular, archivoXlsx, nominaXlsx, putPersona, resumen, calcularMes, candidatos, postExtra, deleteExtra };

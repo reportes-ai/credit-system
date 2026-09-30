@@ -219,6 +219,9 @@ router.get('/remuneraciones/edenred',            verifyToken, requireFunc('rh_re
 router.get('/remuneraciones/edenred/resumen',    verifyToken, requireFunc('rh_remuneraciones'), edenred.resumen);
 router.get('/remuneraciones/edenred/archivo.xlsx', verifyToken, requireFunc('rh_remuneraciones'), edenred.archivoXlsx);
 router.get('/remuneraciones/edenred/nomina.xlsx',  verifyToken, requireFunc('rh_remuneraciones'), edenred.nominaXlsx);
+router.get('/remuneraciones/edenred/candidatos', verifyToken, requireFunc('rh_remuneraciones'), edenred.candidatos);
+router.post('/remuneraciones/edenred/extra',     verifyToken, requireFunc('rh_remuneraciones'), edenred.postExtra);
+router.delete('/remuneraciones/edenred/extra/:id', verifyToken, requireFunc('rh_remuneraciones'), edenred.deleteExtra);
 router.put('/remuneraciones/edenred/ajuste',       verifyToken, requireFunc('rh_remuneraciones'), edenred.putAjuste);
 router.put('/remuneraciones/edenred/param',      verifyToken, requireFunc('rh_remuneraciones'), edenred.putParam);
 router.put('/remuneraciones/edenred/persona',    verifyToken, requireFunc('rh_remuneraciones'), edenred.putPersona);
