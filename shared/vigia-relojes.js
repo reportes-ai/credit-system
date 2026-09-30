@@ -73,6 +73,26 @@ async function revisar() {
     }
   }
 
+  // 3) Una fecha SIN hora de invierno y una de verano deben volver con su mismo día por cada
+  //    lector (30-09-2026: cumpleaños 01-10-1989 avisado el 30-09 — mysql2 entrega la DATE con el
+  //    offset de HOY y leerla en el horario de ESA fecha la corría un día). Si un cambio de
+  //    librería, de offset o de código rompe un lector, esto lo acusa al día siguiente.
+  try {
+    const F = require('./fecha-chile');
+    const PRUEBAS = ['2026-01-15', '2026-07-15', '1989-10-01', '2026-09-01', '2026-04-01'];
+    const [[r]] = await pool.query('SELECT ' + PRUEBAS.map((p, i) => `CAST('${p}' AS DATE) f${i}`).join(', '));
+    const fmtCL = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+    PRUEBAS.forEach((esperado, i) => {
+      const v = r['f' + i];
+      const lectores = {
+        isoDeBD: F.isoDeBD(v), isoDe: F.isoDe(v), isoFlex: F.isoFlex(v), mesDe: F.mesDe(v) + esperado.slice(7),
+        navegador: fmtCL.format(new Date(JSON.parse(JSON.stringify({ v }, F.jsonFechaBD)).v)),
+      };
+      const malos = Object.entries(lectores).filter(([, got]) => got !== esperado).map(([n, got]) => `${n}→${got}`);
+      if (malos.length) hallazgos.push(`La fecha ${esperado} leída de la BD vuelve corrida (${malos.join(', ')}). Un lector de shared/fecha-chile dejó de deshacer el offset de mysql2 (${pool.offsetBD ? pool.offsetBD() : '?'}).`);
+    });
+  } catch (e) { hallazgos.push(`No se pudo probar la lectura de fechas sin hora (${e.message})`); }
+
   if (!hallazgos.length) {
     console.log(`✓ [vigia-relojes] Relojes coherentes (BD=${bd.ahora}, Node=${nodeChile}, tz=${bd.tz})`);
     return hallazgos;
