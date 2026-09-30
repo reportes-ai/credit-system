@@ -35,7 +35,6 @@ const BASELINE = {
   'services/mantenedores/src/controllers/alertas.controller.js': 1,
   'services/mantenedores/src/controllers/bd-clientes.controller.js': 3,
   'services/mantenedores/src/controllers/bd-operaciones.controller.js': 1,
-  'services/mantenedores/src/controllers/db-maintenance-extra.js': 1,
   'services/mantenedores/src/controllers/dealers.controller.js': 1,
   'services/mantenedores/src/controllers/visitas.controller.js': 1,
   'services/mantenedores/src/tmc-sync.js': 1,

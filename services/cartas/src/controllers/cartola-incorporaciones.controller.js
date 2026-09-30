@@ -89,38 +89,42 @@ require('../../../../shared/migrate').enFila('cartola-incorporaciones', async ()
 });
 
 /* ── Comisión que CORRESPONDE, por el motor único ─────────────────────────── */
-async function comisionMotor({ rut_dealer, es_parque, saldo_precio, plazo, nombre_dealer, ubicacion }) {
+/* `memo` (Map, opcional): quien calcula MUCHAS filas en una misma petición lo pasa para no repetir las
+   mismas consultas por cada fila (sin-carta: 943 ops de 173 dealers = ~3.800 consultas, 30-09-2026).
+   Vive lo que dura la petición: no es caché entre usuarios ni entre llamadas. */
+const unaVez = (memo, clave, fn) => { if (!memo) return fn(); if (!memo.has(clave)) memo.set(clave, fn()); return memo.get(clave); };
+async function comisionMotor({ rut_dealer, es_parque, saldo_precio, plazo, nombre_dealer, ubicacion }, memo) {
   try {
     // parametros_credito es CLAVE/VALOR (no columnas): se arma el mapa igual que
     // calcular-operacion.js, si no la pizarra llega vacía y el % queda en 0.
-    const [prm] = await pool.query('SELECT clave, valor FROM parametros_credito').catch(() => [[]]);
+    const [prm] = await unaVez(memo, 'pizarra', () => pool.query('SELECT clave, valor FROM parametros_credito').catch(() => [[]]));
     const pizarra = {};
     (prm || []).forEach(r => { pizarra[r.clave] = parseFloat(r.valor); });
     // Tabla pactada del dealer: mismas columnas y misma normalización de RUT que el motor
     const rutNorm = String(rut_dealer || '').replace(/[.\-\s]/g, '').toUpperCase();
     let dealerTabla = null;
     if (rutNorm) {
-      const [dr] = await pool.query(
+      const [dr] = await unaVez(memo, 'tabla|' + rutNorm, () => pool.query(
         `SELECT com_6_12, com_13_24, com_25_36, com_37, com_parque_6_12, com_parque_13_24, com_parque_25_36, com_parque_37
            FROM dealers WHERE UPPER(REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','')) = ? LIMIT 1`, [rutNorm])
-        .catch(() => [[]]);
+        .catch(() => [[]]));
       dealerTabla = (dr && dr[0]) || null;
     }
     // Tablas POR UBICACIÓN (multi-parque + calle): la fila del local de la op manda.
     let dealerUbics = null;
     if (rutNorm) {
-      const [du] = await pool.query(
+      const [du] = await unaVez(memo, 'ubics|' + rutNorm, () => pool.query(
         `SELECT dc.ubicacion, dc.com_6_12, dc.com_13_24, dc.com_25_36, dc.com_37
            FROM dealer_comisiones dc JOIN dealers d ON d.id_dealer = dc.id_dealer
           WHERE UPPER(REPLACE(REPLACE(REPLACE(d.rut,'.',''),'-',''),' ','')) = ?`, [rutNorm])
-        .catch(() => [null]);
+        .catch(() => [null]));
       dealerUbics = du || null;
     }
     let parqData = null;
     if (es_parque && nombre_dealer) {
-      const [pr] = await pool.query(
+      const [pr] = await unaVez(memo, 'parque|' + String(nombre_dealer).trim().toUpperCase(), () => pool.query(
         'SELECT arriendo, comision_pct FROM parques_comisiones WHERE activo=1 AND UPPER(TRIM(nombre)) = UPPER(TRIM(?)) LIMIT 1',
-        [nombre_dealer]).catch(() => [[]]);
+        [nombre_dealer]).catch(() => [[]]));
       parqData = pr[0] || null;
     }
     const cd = COM.comisionDealer(
@@ -169,20 +173,49 @@ const sinCarta = async (req, res) => {
        sale de la FICHA DEL DEALER (dealers.ccs_parque), que es un registro mantenido.
        El crédito solo sirve de respaldo. Si ambos discrepan se marca para que el
        operador lo confirme a ojo — igual siempre es editable en pantalla. */
+    /* Las fichas de dealer, sus tablas por ubicación y los parques se leen UNA vez (3 consultas) y se
+       dejan en el memo con las mismas llaves que usa comisionMotor: antes eran ~4 consultas por
+       operación (943 ops = ~3.800 consultas cada vez que se abría Aprobaciones). */
+    const memo = new Map();
+    const normRut = v => String(v || '').replace(/[.\-\s]/g, '').toUpperCase();
+    try {
+      const [[dl], [ub], [pq]] = await Promise.all([
+        pool.query(`SELECT rut, ccs_parque, com_6_12, com_13_24, com_25_36, com_37, com_parque_6_12, com_parque_13_24, com_parque_25_36, com_parque_37
+                      FROM dealers ORDER BY id_dealer`),
+        pool.query(`SELECT d.rut, dc.ubicacion, dc.com_6_12, dc.com_13_24, dc.com_25_36, dc.com_37
+                      FROM dealer_comisiones dc JOIN dealers d ON d.id_dealer = dc.id_dealer`),
+        pool.query('SELECT nombre, arriendo, comision_pct FROM parques_comisiones WHERE activo=1'),
+      ]);
+      const ubics = new Map();
+      for (const u of ub) { const k = normRut(u.rut); if (!ubics.has(k)) ubics.set(k, []); const { rut, ...fila } = u; ubics.get(k).push(fila); }
+      for (const d of dl) {
+        const k = normRut(d.rut); if (!k || memo.has('ficha|' + k)) continue;          // LIMIT 1: la primera ficha de ese RUT
+        const { rut, ccs_parque, ...tabla } = d;
+        memo.set('ficha|' + k, [[{ ccs_parque }]]); memo.set('tabla|' + k, [[tabla]]);
+      }
+      for (const p of pq) { const k = 'parque|' + String(p.nombre || '').trim().toUpperCase(); if (!memo.has(k)) memo.set(k, [[{ arriendo: p.arriendo, comision_pct: p.comision_pct }]]); }
+      for (const r of rows) {                                                           // lo que no existe queda resuelto como "sin fila"
+        const k = normRut(r.rut_dealer);
+        if (k) { if (!memo.has('ficha|' + k)) memo.set('ficha|' + k, [[]]); if (!memo.has('tabla|' + k)) memo.set('tabla|' + k, [[]]); memo.set('ubics|' + k, [ubics.get(k) || []]); }
+        const kp = 'parque|' + String(r.nombre_dealer || '').trim().toUpperCase();
+        if (!memo.has(kp)) memo.set(kp, [[]]);
+      }
+      memo.set('pizarra', await pool.query('SELECT clave, valor FROM parametros_credito'));
+    } catch (e) { console.error('[cartolas sinCarta precarga]', e.message); memo.clear(); }   // sin precarga: comisionMotor consulta fila a fila, como antes
     for (const r of rows) {
       const credParque = /parque/i.test(String(r.tipo_ubicacion || '')) ? 1 : 0;
       let fichaParque = null;
       const rn = String(r.rut_dealer || '').replace(/[.\-\s]/g, '').toUpperCase();
       if (rn) {
-        const [d] = await pool.query(
-          "SELECT ccs_parque FROM dealers WHERE UPPER(REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','')) = ? LIMIT 1", [rn]).catch(() => [[]]);
+        const [d] = await unaVez(memo, 'ficha|' + rn, () => pool.query(
+          "SELECT ccs_parque FROM dealers WHERE UPPER(REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','')) = ? LIMIT 1", [rn]).catch(() => [[]]));
         if (d && d[0] && String(d[0].ccs_parque || '').trim())
           fichaParque = /parque/i.test(String(d[0].ccs_parque)) ? 1 : 0;
       }
       r.es_parque   = fichaParque != null ? fichaParque : credParque;
       r.origen_ubic = fichaParque != null ? 'ficha del dealer' : (r.tipo_ubicacion ? 'carga masiva' : 'sin dato');
       r.ubic_discrepa = (fichaParque != null && fichaParque !== credParque) ? 1 : 0;
-      r.comision_motor = await comisionMotor({ ...r, ubicacion: r.parque_op });
+      r.comision_motor = await comisionMotor({ ...r, ubicacion: r.parque_op }, memo);
     }
     res.json({ success: true, data: { mes, items: rows }, error: null });
   } catch (e) { console.error('[cartolas sinCarta]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }

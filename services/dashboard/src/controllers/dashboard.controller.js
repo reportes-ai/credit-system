@@ -437,14 +437,16 @@ async function climaRango(desde, hasta) {
   if (faltan.length) {
     try {
       const url = `https://archive-api.open-meteo.com/v1/archive?latitude=-33.45&longitude=-70.66&start_date=${faltan[0]}&end_date=${faltan[faltan.length - 1]}&daily=precipitation_sum,temperature_2m_max&timezone=America%2FSantiago`;
-      const j = await (await fetch(url)).json();
+      const j = await (await fetch(url, { signal: AbortSignal.timeout(8000) })).json();   // sin plazo, un Open-Meteo lento colgaba el dashboard
       const t = (j.daily && j.daily.time) || [];
+      const nuevas = [];
       for (let i = 0; i < t.length; i++) {
         const pp = j.daily.precipitation_sum[i], tm = j.daily.temperature_2m_max[i];
         if (pp == null && tm == null) continue;
         map.set(t[i], { pp: Number(pp) || 0, tmax: tm == null ? null : Number(tm) });
-        await pool.query('INSERT IGNORE INTO clima_diario (fecha, pp, tmax) VALUES (?,?,?)', [t[i], pp ?? null, tm ?? null]).catch(() => {});
+        nuevas.push([t[i], pp ?? null, tm ?? null]);
       }
+      if (nuevas.length) await pool.query('INSERT IGNORE INTO clima_diario (fecha, pp, tmax) VALUES ?', [nuevas]).catch(() => {});   // un INSERT, no uno por día
     } catch (e) { console.error('[clima open-meteo]', e.message); }
   }
   return map;
@@ -515,9 +517,11 @@ exports.getClimaCorrelacion = async (req, res) => {
     //    rendimiento histórico de su condición (feriado/víspera/post/lluvia/seco).
     let proyeccion = null;
     try {
-      const fc = await (await fetch('https://api.open-meteo.com/v1/forecast?latitude=-33.45&longitude=-70.66&daily=precipitation_sum,temperature_2m_max&timezone=America%2FSantiago&forecast_days=16')).json();
+      const fc = await (await fetch('https://api.open-meteo.com/v1/forecast?latitude=-33.45&longitude=-70.66&daily=precipitation_sum,temperature_2m_max&timezone=America%2FSantiago&forecast_days=16', { signal: AbortSignal.timeout(8000) })).json();
       const ppFc = new Map((fc.daily?.time || []).map((t, i) => [t, Number(fc.daily.precipitation_sum[i]) || 0]));
-      const finMesD = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+      // `hoy` no estaba definido acá: el bloque caía al catch y la proyección salía SIEMPRE vacía (30-09-2026)
+      const hoy = new Date(F.hoyISO() + 'T12:00:00');   // día de Chile
+      const finMesD = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59);
       const dias = []; let qRest = 0, mRest = 0;
       for (let d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 12); d <= finMesD; d.setDate(d.getDate() + 1)) {
         const dow = d.getDay();   // sáb/dom ENTRAN: sábado es el mejor día de venta

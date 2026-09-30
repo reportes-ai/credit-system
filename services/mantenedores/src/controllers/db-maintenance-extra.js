@@ -56,19 +56,16 @@ exports.getCrecimiento = async (req, res) => {
       ORDER BY (DATA_LENGTH+INDEX_LENGTH) DESC
     `);
 
-    const hoy = new Date().toISOString().slice(0, 10);
-    for (const t of actuales) {
+    /* La foto del día se reemplaza en DOS sentencias, no dos por tabla: con 454 tablas eran ~900
+       consultas en fila por cada apertura de la pantalla (30-09-2026). Día de Chile, no UTC. */
+    const hoy = require('../../../../shared/fecha-chile').hoyISO();
+    if (actuales.length) {
       try {
+        await conn.query('DELETE FROM db_size_history WHERE registrado_at = ?', [hoy]);
         await conn.query(
-          `DELETE FROM db_size_history WHERE tabla_nombre = ? AND registrado_at = ?`,
-          [t.tabla, hoy]
-        );
-        await conn.query(
-          `INSERT INTO db_size_history (tabla_nombre,filas,datos_mb,indices_mb,total_mb,registrado_at)
-           VALUES (?,?,?,?,?,?)`,
-          [t.tabla, t.filas, t.datos_mb, t.indices_mb, t.total_mb, hoy]
-        );
-      } catch (_) {}
+          'INSERT INTO db_size_history (tabla_nombre,filas,datos_mb,indices_mb,total_mb,registrado_at) VALUES ?',
+          [actuales.map(t => [t.tabla, t.filas, t.datos_mb, t.indices_mb, t.total_mb, hoy])]);
+      } catch (e) { console.error('[crecimiento foto del día]', e.message); }
     }
 
     const topTablas = actuales.slice(0, 10).map(t => t.tabla);
