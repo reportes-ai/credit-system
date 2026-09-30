@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fiscalizaciones — AutoFácil</title>
-  <!-- v1.3 — botón de subida compacto junto al aviso; filtros por mes-año y organismo. v1.2 — ancho completo (sin max-width). v1.1 — colores de la suite (azul) y la carpeta nace de los documentos: la IA pone nombre, organismo y fecha. v1.0 — carpetas de fiscalización con resumen IA; documentos inmutables (se suben, no se borran) -->
+  <!-- v1.4 — se puede eliminar una carpeta VACÍA; el tipo del archivo se reconoce por su contenido; un solo resumen por tanda de subidas. v1.3 — botón de subida compacto junto al aviso; filtros por mes-año y organismo. v1.2 — ancho completo (sin max-width). v1.1 — colores de la suite (azul) y la carpeta nace de los documentos: la IA pone nombre, organismo y fecha. v1.0 — carpetas de fiscalización con resumen IA; documentos inmutables (se suben, no se borran) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --bg:#f0f4f8; }
@@ -61,7 +61,7 @@
   <div class="af-footer-afecta">
     <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este módulo</b>
     <ul style="margin:8px 0 0">
-      <li><b>Documentos</b> → quedan en el almacén de documentos (bucket), sin opción de borrado; cada subida queda en <a href="/auditoria/">Auditoría</a>.</li>
+      <li><b>Documentos</b> → quedan en el almacén de documentos (bucket), sin opción de borrado (solo una carpeta vacía se elimina); el tipo se reconoce por el contenido del archivo, no por la extensión; cada subida queda en <a href="/auditoria/">Auditoría</a>.</li>
       <li><b>Resumen IA</b> → consume la funcionalidad "Resumen de fiscalizaciones" del <a href="/mantenedores/inteligencia-artificial/">mantenedor de IA</a> (se puede apagar o cambiar de modelo ahí) y su costo aparece en Uso IA.</li>
       <li><b>Pago de multas</b> → no se paga aquí: se emite una Orden de Pago en <a href="/ordenes-pago/">Órdenes de Pago</a>, que genera el asiento contable.</li>
       <li><b>Acceso</b> → funcionalidad <code>rh_fiscalizaciones</code> en <a href="/usuarios/">Perfiles y Permisos</a>.</li>
@@ -159,7 +159,7 @@
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:start">
         <div><h5 style="color:var(--navy);margin:0 0 4px"><i class="bi bi-folder2-open me-1"></i>${esc(f.nombre)}</h5>
         <small style="color:#64748b">${esc(f.organismo||'Organismo por definir')} · ${fd(f.fecha)} · creada por ${esc(f.creado_por_nombre||'—')}</small></div>
-        <button class="btn-mini" onclick="volver()"><i class="bi bi-arrow-left me-1"></i>Volver</button></div></div>
+        <div>${f.docs.length?'':`<button class="btn-mini me-1" style="color:#991b1b" onclick="eliminarVacia(${f.id})"><i class="bi bi-trash me-1"></i>Eliminar carpeta vacía</button>`}<button class="btn-mini" onclick="volver()"><i class="bi bi-arrow-left me-1"></i>Volver</button></div></div></div>
       <div class="card-box"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
         <b style="font-size:.95rem"><i class="bi bi-stars me-1" style="color:var(--navy)"></i>Resumen de la fiscalización</b>
         <div>${PILL(f.ia_estado)} ${f.docs.length&&f.ia_estado!=='GENERANDO'?`<button class="btn-mini ms-1" onclick="reResumir(${f.id})"><i class="bi bi-arrow-repeat me-1"></i>Rehacer</button>`:''}</div></div>
@@ -190,6 +190,7 @@
     for(let i=0;i<files.length;i++){ avance(`Subiendo ${i+1}/${files.length}…`);
       await api('/'+id+'/docs',{method:'POST',body:JSON.stringify({archivo_nombre:files[i].name,mime_type:files[i].type,archivo_data:await aB64(files[i]),nota})}); }
   }
+  async function eliminarVacia(id){ if(!confirm('¿Eliminar esta carpeta vacía?')) return; try{ await api('/'+id,{method:'DELETE'}); volver(); }catch(e){ alert(e.message); } }
   async function reResumir(id){ try{ await api('/'+id+'/resumir',{method:'POST'}); abrir(id); }catch(e){ alert(e.message); } }
   async function verDoc(docId){
     try{ const r=await fetch('/api/rrhh/fiscalizaciones/docs/'+docId,{headers:H}); if(!r.ok) throw new Error('No se pudo abrir el documento');

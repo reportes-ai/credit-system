@@ -24,18 +24,19 @@ const generarNumeroCreditoDesdeCartas = () => numeroCreditoCarta();
 function persistirPrimasCarta(idCarta, c) {
   if (!idCarta) return;
   if (c.segRdh === undefined && c.segDesgravamen === undefined && c.segCesantia === undefined
-      && c.segRep === undefined && c.gps === undefined && c.gastos === undefined) return;
+      && c.segRep === undefined && c.gps === undefined && c.gastos === undefined && c.segSinCesantia === undefined) return;
   const rdhT = (c.segRdh != null || c.segDesgravamen != null)
     ? (Number(c.segRdh || 0) + Number(c.segDesgravamen || 0)) : null;
   pool.query(`UPDATE cartas_aprobacion SET
       seg_desg = COALESCE(?, seg_desg),
       seg_rdh = COALESCE(?, seg_rdh), seg_cesantia = COALESCE(?, seg_cesantia),
       seg_rep = COALESCE(?, seg_rep), gps_monto = COALESCE(?, gps_monto),
-      gastos_monto = COALESCE(?, gastos_monto) WHERE id = ?`,
+      gastos_monto = COALESCE(?, gastos_monto), seg_sin_cesantia = COALESCE(?, seg_sin_cesantia) WHERE id = ?`,
     [c.segDesgravamen != null ? Number(c.segDesgravamen) : null, rdhT, c.segCesantia != null ? Number(c.segCesantia) : null,
      c.segRep != null ? Number(c.segRep) : null,
      c.gps != null ? Number(c.gps) : null,
-     c.gastos != null ? Number(c.gastos) : null, idCarta]
+     c.gastos != null ? Number(c.gastos) : null,
+     c.segSinCesantia === undefined ? null : (c.segSinCesantia ? 1 : 0), idCarta]
   ).catch(e => console.error('[carta primas persist]', e.message));
 }
 
@@ -539,6 +540,10 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
       try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[cartas docs almacen]', e.message); }
     }
   } catch(e) { /* columna ya existe */ }
+  // AUTOFACIL: la carta puede excluir la cesantía (cliente que no califica) si el mantenedor no la marca obligatoria (30-09-2026).
+  // En su propio try: el bloque de arriba se traga cualquier error y dejaba sin correr lo que viniera después.
+  try { await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS seg_sin_cesantia TINYINT NOT NULL DEFAULT 0`); }
+  catch (e) { console.error('[cartas migration seg_sin_cesantia]', e.message); }
   // Barrer vencidas al arrancar (por si el servicio estuvo caído al cumplirse el plazo).
   barrerVencidas().catch(e => console.error('[cartas barrerVencidas boot]', e.message));
 
@@ -936,6 +941,7 @@ const fichaCompleta = async (req, res) => {
       tasaCredito: num(r.tasa_credito), montoCreditoCLP: num(r.monto_credito_clp), montoCreditoUF: num(r.monto_credito_uf),
       // Primas y accesorios (NO van en la carta al dealer)
       segDesgravamen: num(r.seg_desg), segRdh: num(r.seg_rdh), segCesantia: num(r.seg_cesantia), segRep: num(r.seg_rep),
+      segSinCesantia: Number(r.seg_sin_cesantia) === 1,
       gps: num(r.gps_monto), gastos: num(r.gastos_monto),
       // Dealer y comisión
       parque: r.parque, nombreDealer: r.nombre_dealer, rutDealer: r.rut_dealer, vendedor: r.vendedor,
@@ -1474,6 +1480,47 @@ const upsert = async (req, res) => {
       if (normal != null && Math.abs(Number(c.comEjecPct) - normal) < 1e-6) { c.comEjecPct = null; c.comEjecMonto = null; }
       else c.comEjecMonto = Math.round((Number(c.montoCreditoCLP) || 0) * Number(c.comEjecPct) / 100);
     } else { c.comEjecPct = null; c.comEjecMonto = null; }
+
+    /* ACREEDOR AUTOFACIL: las primas SURA las fija el MOTOR ÚNICO en el servidor (shared/seguros-autofacil.js),
+       no el navegador — desgravamen y cesantía capitalizadas sobre saldo + GPS + gastos, RDH y rep. menores 0.
+       La cesantía se puede excluir (segSinCesantia: cliente que no califica) solo si el mantenedor no la marca
+       obligatoria; el tope de capital asegurado (UF) y la edad máxima de ingreso del mantenedor se hacen valer
+       aquí. Solo mientras la carta está PENDIENTE (digitación/corrección): aprobada u otorgada es una foto
+       (code-review 30-09-2026: el servidor no recalculaba ni validaba nada de esto). */
+    if (String(c.acreedor || '').toUpperCase().includes('AUTOFACIL') && (c.status || 'PENDIENTE') === 'PENDIENTE') {
+      const SEG = require('../../../../shared/seguros-autofacil');
+      const segs = await SEG.cargar();
+      const sd = SEG.CORE.seguroDe(segs, 'DESGRAVAMEN'), sc = SEG.CORE.seguroDe(segs, 'CESANTIA');
+      const sinCes = !!c.segSinCesantia;
+      if (sinCes && sc && Number(sc.obligatorio)) return res.status(400).json({ success: false, data: null, error: 'La cesantía está marcada como obligatoria en el mantenedor Seguros AutoFácil: no se puede excluir de la carta' });
+      const saldo = Number(c.saldo) || 0, plazo = parseInt(c.plazo, 10) || 0;
+      if (saldo > 0 && plazo > 0) {
+        const S = SEG.CORE.capitalizar(segs, saldo + (Number(c.gps) || 0) + (Number(c.gastos) || 0), plazo, { cesantia: !sinCes });
+        if (S.error) return res.status(400).json({ success: false, data: null, error: 'Seguros SURA: ' + S.error });
+        const uf = await require('../../../../shared/uf').getUF(c.fecha || new Date());
+        for (const [s, nm] of [[sd, 'desgravamen'], [sinCes ? null : sc, 'cesantía']]) {
+          if (!s || !(Number(s.tope_capital_uf) > 0) || !uf) continue;
+          const capUF = S.capital / uf;
+          if (capUF > Number(s.tope_capital_uf) + 1e-9)
+            return res.status(400).json({ success: false, data: null, error: `Seguro de ${nm}: el crédito (UF ${capUF.toLocaleString('es-CL', { maximumFractionDigits: 1 })}) supera el tope de capital asegurado de UF ${Number(s.tope_capital_uf).toLocaleString('es-CL')} del mantenedor Seguros AutoFácil` });
+        }
+        // Edad de ingreso: si el cliente tiene fecha de nacimiento en su ficha, se contrasta con el máximo del seguro
+        const rutCli = RUT.normalizar(c.rutCliente) || c.rutCliente;
+        const [[cli]] = rutCli ? await pool.query('SELECT fecha_nacimiento FROM clientes WHERE rut=? LIMIT 1', [rutCli]).catch(() => [[null]]) : [[null]];
+        if (cli && cli.fecha_nacimiento) {
+          const nac = require('../../../../shared/fecha-chile').isoFlex(cli.fecha_nacimiento), ref = String(c.fecha || require('../../../../shared/fecha-chile').hoyISO()).slice(0, 10);
+          if (nac) {
+            let edad = Number(ref.slice(0, 4)) - Number(nac.slice(0, 4)); if (ref.slice(5) < nac.slice(5)) edad--;
+            for (const [s, nm] of [[sd, 'desgravamen'], [sinCes ? null : sc, 'cesantía']])
+              if (s && Number(s.edad_max_ingreso) > 0 && edad > Number(s.edad_max_ingreso))
+                return res.status(400).json({ success: false, data: null, error: `Seguro de ${nm}: el cliente tiene ${edad} años y la edad máxima de ingreso es ${s.edad_max_ingreso} (mantenedor Seguros AutoFácil)` });
+          }
+        }
+        c.segDesgravamen = S.desg ? S.desg.prima_cliente : 0; c.segCesantia = S.cesa ? S.cesa.prima_cliente : 0; c.segRdh = 0; c.segRep = 0;
+        if (!(Number(c.montoCreditoCLP) > 0)) c.montoCreditoCLP = S.capital;
+        if (uf && c.montoCreditoCLP && !(Number(c.montoCreditoUF) > 0)) c.montoCreditoUF = Math.round(Number(c.montoCreditoCLP) / uf * 100) / 100;
+      }
+    }
 
     const vals = [
       c.opCarta, c.opOrigen, c.tipo,

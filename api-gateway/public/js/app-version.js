@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v282.24';
+const APP_VERSION = 'v282.25';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -52,9 +52,17 @@ const APP_VERSION = 'v282.24';
              (16-09-2026). "Contraseña actual incorrecta" también es 401 y NO cierra. */
           if (!j || /token|sesión (fue|se) cerr|cuenta fue desactivada/i.test(j.error || '')) {
             sessionStorage.setItem('sesion_expirada', /token/i.test((j && j.error) || '') || !j ? '1' : String(j.error));
+            /* Las pestañas hermanas comparten este token (lo heredaron): se les avisa que murió para que no lo
+               ofrezcan a una pestaña nueva, y se recuerda QUIÉN era para que, cuando esa persona vuelva a entrar
+               en cualquier pestaña, las demás sigan solas (login.html → af_login_ok). Antes cada pestaña pedía
+               login por su cuenta y cada login cerraba la anterior por el tope: cascada (code-review 30-09-2026). */
+            const tk = sessionStorage.getItem('token');
+            try { const u = JSON.parse(sessionStorage.getItem('usuario') || '{}'); if (u && u.id_usuario) sessionStorage.setItem('sesion_expirada_uid', String(u.id_usuario)); } catch (_) {}
+            try { localStorage.setItem('af_token_muerto', tk); localStorage.removeItem('af_token_muerto'); } catch (_) {}
             sessionStorage.removeItem('token');
             sessionStorage.removeItem('usuario');
-            location.href = '/login.html';
+            const next = location.pathname + location.search;
+            location.href = next && next !== '/' && !next.startsWith('/login') ? '/login.html?next=' + encodeURIComponent(next) : '/login.html';
           }
         }
       }

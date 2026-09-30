@@ -8,8 +8,12 @@
      fiscalizó, sanciones, por qué, y compromisos adquiridos con sus plazos.
      Se regenera solo cada vez que se sube un documento nuevo.
    · INMUTABLE: los documentos se suben pero NO se borran ni se reemplazan
-     (Pato, 29-09-2026). Por eso no existe ninguna ruta DELETE ni PUT, y el
-     objeto del bucket nunca se toca después de colocado.
+     (Pato, 29-09-2026). Por eso no existe DELETE ni PUT de documentos, y el
+     objeto del bucket nunca se toca después de colocado. Lo único que se borra
+     es una CARPETA VACÍA (quedaba imborrable si la subida fallaba tras crearla).
+   · El tipo del archivo se reconoce por su contenido (firma binaria), nunca por
+     el MIME que declara el navegador: un HTML disfrazado de PDF se serviría
+     inline y correría en el origen del Suite (code-review 30-09-2026).
    · Pagar una multa NO se hace aquí: se paga por Órdenes de Pago, que es
      quien contabiliza (Máxima 4). Esta carpeta es el respaldo documental.
    ───────────────────────────────────────────────────────────────────────────── */
@@ -23,7 +27,30 @@ const fail = (res, msg, code = 500) => res.status(code).json({ success: false, d
 const DOC_MAX = 7 * 1024 * 1024;          // body del gateway 10 MB; el base64 infla ~37%
 const IA_MAX_ADJ = 20 * 1024 * 1024;      // tope de PDFs/imágenes que se mandan juntos a la IA
 const IA_CODIGO = 'rrhh_fiscalizacion_resumen';
-const MIMES_OK = /pdf|image\/(jpe?g|png|webp)|wordprocessingml/i;
+const MIME_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const MIMES_OK = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp', MIME_DOCX]);
+/* Tipo real del archivo por su firma binaria (lo que se guarda y se sirve). null = no admitido. */
+function tipoReal(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf.slice(0, 5).toString('latin1') === '%PDF-') return 'application/pdf';
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return 'image/jpeg';
+  if (buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))) return 'image/png';
+  if (buf.slice(0, 4).toString('latin1') === 'RIFF' && buf.slice(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+  if (buf[0] === 0x50 && buf[1] === 0x4B && buf[2] === 0x03 && buf[3] === 0x04 && buf.indexOf('word/') !== -1) return MIME_DOCX;   // .docx = ZIP con carpeta word/
+  return null;
+}
+/* Un resumen por carpeta, no uno por archivo: las subidas seguidas se agrupan (2,5 s) y solo escribe la
+   corrida más nueva — antes N archivos lanzaban N resúmenes en paralelo y ganaba el que terminara último,
+   que podía ser el que leyó menos documentos. */
+const _resumen = new Map();   // id → { gen, timer }
+function pedirResumen(id, id_usuario) {
+  const r = _resumen.get(id) || { gen: 0, timer: null };
+  r.gen++; clearTimeout(r.timer);
+  const gen = r.gen;
+  r.timer = setTimeout(() => resumir(id, id_usuario, gen), 2500);
+  _resumen.set(id, r);
+}
+const resumenVigente = (id, gen) => (_resumen.get(id) || {}).gen === gen;
 
 const migrate = require('../../../../shared/migrate');
 migrate.enFila('rrhh-fiscalizaciones', async () => {
@@ -145,25 +172,26 @@ exports.subirDoc = async (req, res) => {
     if (!id) return fail(res, 'Id inválido', 400);
     const { archivo_nombre, mime_type, archivo_data, nota } = req.body || {};
     if (!archivo_data) return fail(res, 'Falta el archivo', 400);
-    if (!MIMES_OK.test(mime_type || '')) return fail(res, 'Formato no admitido: sube PDF, imagen (JPG/PNG) o Word (.docx)', 400);
     const [[f]] = await pool.query('SELECT id, nombre FROM rh_fiscalizaciones WHERE id=?', [id]);
     if (!f) return fail(res, 'Fiscalización no encontrada', 404);
     const buffer = Buffer.from(String(archivo_data).replace(/^data:[^;]+;base64,/, ''), 'base64');
     if (!buffer.length) return fail(res, 'El archivo llegó vacío', 400);
     if (buffer.length > DOC_MAX) return fail(res, 'El archivo supera el máximo de 7 MB', 400);
+    const mime = tipoReal(buffer);   // el MIME del navegador (mime_type) solo sirve para el mensaje
+    if (!mime) return fail(res, `Formato no admitido${mime_type ? ' (' + String(mime_type).slice(0, 60) + ')' : ''}: sube PDF, imagen (JPG/PNG/WEBP) o Word (.docx). El contenido del archivo no corresponde a esos formatos.`, 400);
     const nombre = String(archivo_nombre || 'documento').slice(0, 255);
-    const col = await ALMACEN.colocar({ ambito: 'rrhh-fiscalizaciones', clave: id, buffer, mime: mime_type, nombre });
+    const col = await ALMACEN.colocar({ ambito: 'rrhh-fiscalizaciones', clave: id, buffer, mime, nombre });
     const u = req.usuario || {};
     const [r] = await pool.query(
       `INSERT INTO rh_fiscalizacion_docs (id_fiscalizacion, nombre_archivo, mime, archivo, doc_storage, doc_ruta, doc_bytes, nota, subido_por, subido_por_nombre)
        VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      [id, nombre, mime_type || null, col.blob, col.storage, col.ruta, col.bytes,
+      [id, nombre, mime, col.blob, col.storage, col.ruta, col.bytes,
        String(nota || '').trim().slice(0, 300) || null, u.id_usuario || null, nombreDe(u)]);
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'fiscalizacion_doc', entidad_id: r.insertId,
       detalle: `Subió "${nombre}" a la fiscalización #${id} "${f.nombre}"` });
     // El resumen se rehace en segundo plano: la subida no espera a la IA
     await pool.query(`UPDATE rh_fiscalizaciones SET ia_estado='GENERANDO', ia_error=NULL WHERE id=?`, [id]);
-    resumir(id, u.id_usuario || null);
+    pedirResumen(id, u.id_usuario || null);
     ok(res, { id: r.insertId });
   } catch (e) { console.error('[fiscalizaciones subirDoc]', e.message); fail(res, 'Error interno del servidor'); }
 };
@@ -175,8 +203,25 @@ exports.verDoc = async (req, res) => {
     if (!docId) return fail(res, 'Id inválido', 400);
     const [[d]] = await pool.query('SELECT * FROM rh_fiscalizacion_docs WHERE id=?', [docId]);
     if (!d) return fail(res, 'Documento no encontrado', 404);
-    await ALMACEN.servir(res, { ruta: d.doc_ruta, blob: d.archivo, nombre: d.nombre_archivo, mime: d.mime });
+    // Solo tipos conocidos van inline; cualquier otro (filas viejas con MIME del navegador) se descarga como binario
+    const mime = MIMES_OK.has(String(d.mime || '').toLowerCase()) ? String(d.mime).toLowerCase() : 'application/octet-stream';
+    await ALMACEN.servir(res, { ruta: d.doc_ruta, blob: d.archivo, nombre: d.nombre_archivo, mime, adjunto: mime === MIME_DOCX || mime === 'application/octet-stream' });
   } catch (e) { console.error('[fiscalizaciones verDoc]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* DELETE /api/rrhh/fiscalizaciones/:id — solo una carpeta VACÍA (los documentos son inmutables) */
+exports.eliminar = async (req, res) => {
+  try {
+    const id = idNum(req.params.id);
+    if (!id) return fail(res, 'Id inválido', 400);
+    const [[f]] = await pool.query('SELECT id, nombre, (SELECT COUNT(*) FROM rh_fiscalizacion_docs d WHERE d.id_fiscalizacion=rh_fiscalizaciones.id) n FROM rh_fiscalizaciones WHERE id=?', [id]);
+    if (!f) return fail(res, 'Fiscalización no encontrada', 404);
+    if (f.n > 0) return fail(res, 'La carpeta tiene documentos y los documentos de una fiscalización no se borran', 409);
+    const [r] = await pool.query('DELETE FROM rh_fiscalizaciones WHERE id=? AND NOT EXISTS (SELECT 1 FROM rh_fiscalizacion_docs d WHERE d.id_fiscalizacion=?)', [id, id]);
+    if (!r.affectedRows) return fail(res, 'La carpeta ya no está vacía', 409);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'fiscalizacion', entidad_id: id, detalle: `Eliminó la carpeta vacía de fiscalización "${f.nombre}"` });
+    ok(res, { id });
+  } catch (e) { console.error('[fiscalizaciones eliminar]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
 /* POST /api/rrhh/fiscalizaciones/:id/resumir — rehacer el resumen a pedido */
@@ -186,16 +231,17 @@ exports.reResumir = async (req, res) => {
     if (!id) return fail(res, 'Id inválido', 400);
     const [r] = await pool.query(`UPDATE rh_fiscalizaciones SET ia_estado='GENERANDO', ia_error=NULL WHERE id=?`, [id]);
     if (!r.affectedRows) return fail(res, 'Fiscalización no encontrada', 404);
-    resumir(id, req.usuario?.id_usuario || null);
+    pedirResumen(id, req.usuario?.id_usuario || null);
     ok(res, { id, ia_estado: 'GENERANDO' });
   } catch (e) { console.error('[fiscalizaciones reResumir]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
 /* Motor del resumen: junta todos los documentos de la carpeta y le pide a la IA
-   el JSON. Nunca lanza: el resultado queda en ia_estado (OK / ERROR / IA_OFF). */
-async function resumir(id, id_usuario) {
-  const marcar = (estado, err) => pool.query(
-    'UPDATE rh_fiscalizaciones SET ia_estado=?, ia_error=? WHERE id=?', [estado, err ? String(err).slice(0, 300) : null, id]).catch(() => {});
+   el JSON. Nunca lanza: el resultado queda en ia_estado (OK / ERROR / IA_OFF).
+   `gen` es la corrida pedida: si mientras leía llegó otro documento (gen más nueva), este resultado se descarta. */
+async function resumir(id, id_usuario, gen) {
+  const marcar = (estado, err) => resumenVigente(id, gen) ? pool.query(
+    'UPDATE rh_fiscalizaciones SET ia_estado=?, ia_error=? WHERE id=?', [estado, err ? String(err).slice(0, 300) : null, id]).catch(() => {}) : null;
   try {
     const AI = require('../../../../shared/anthropic');
     if (!AI.disponible()) return marcar('IA_OFF', 'El servidor no tiene la IA configurada');
@@ -243,6 +289,7 @@ async function resumir(id, id_usuario) {
       documentos: adjuntos,
     });
     if (!datos) return marcar('ERROR', stop_reason === 'max_tokens' ? 'La respuesta de la IA vino cortada' : 'La IA no devolvió un resumen legible');
+    if (!resumenVigente(id, gen)) return;   // llegó otro documento mientras leía: la corrida nueva va a escribir
     if (omitidos.length) datos.documentos_no_leidos = omitidos;
     const fechaIA = fechaOk(datos.fecha_fiscalizacion);
     const titulo = String(datos.titulo || '').trim().slice(0, 200) || null;

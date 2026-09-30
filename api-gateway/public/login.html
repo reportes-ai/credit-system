@@ -292,6 +292,8 @@
 
           sessionStorage.setItem('token', data.data.token);
           sessionStorage.setItem('usuario', JSON.stringify(data.data.usuario));
+          // Las pestañas de ESTA misma persona que cayeron al login por el tope de sesiones siguen solas con esta sesión (una sola entrada, sin cascada)
+          try { localStorage.setItem('af_login_ok', JSON.stringify({ token: data.data.token, usuario: JSON.stringify(data.data.usuario), uid: data.data.usuario && data.data.usuario.id_usuario })); localStorage.removeItem('af_login_ok'); } catch (_) {}
           // Cuentas con página de inicio propia (ej. TV → Cuadro de Mando) entran directo
           const pi = data.data.usuario && data.data.usuario.pagina_inicio;
           if (_next === '/' && pi && pi.startsWith('/') && !pi.startsWith('//')) _next = pi;
@@ -382,6 +384,19 @@
       const a = document.getElementById('alerta');
       // '1' = token vencido; otro valor = el motivo que dio el servidor (otro dispositivo, cuenta desactivada…)
       if (a) { a.textContent = motivo === '1' ? 'Tu sesión expiró por inactividad. Vuelve a ingresar.' : motivo; a.style.display = 'block'; }
+      /* Esta pestaña cayó al login sin que el usuario lo pidiera: si LA MISMA persona vuelve a entrar en otra
+         pestaña, esta sigue sola a su destino con esa sesión. Otra cuenta no la mueve (Pato usa varias). */
+      const uidExp = sessionStorage.getItem('sesion_expirada_uid');
+      sessionStorage.removeItem('sesion_expirada_uid');
+      if (uidExp) window.addEventListener('storage', (ev) => {
+        if (ev.key !== 'af_login_ok' || !ev.newValue || sessionStorage.getItem('token')) return;
+        try {
+          const s = JSON.parse(ev.newValue);
+          if (!s || !s.token || !s.usuario || String(s.uid) !== String(uidExp)) return;
+          sessionStorage.setItem('token', s.token); sessionStorage.setItem('usuario', s.usuario);
+          window.location.href = _next;
+        } catch (_) {}
+      });
     }
   </script>
 <script src="/js/app-version.js"></script>

@@ -29,34 +29,53 @@
      ('af_pedir_sesion'); una pestaña con sesión responde escribiendo 'af_sesion' y borrándola en el mismo
      tick (queda solo el evento storage, nada en disco); la nueva copia token y usuario y recarga.
      Si nadie responde en 600 ms, va al login como siempre. */
+  /* Con varias cuentas abiertas responden varias pestañas: gana la que el usuario USÓ más recientemente
+     (foco), no la que escribió primero. Una pestaña "Ver como" nunca responde (su token es de solo lectura
+     y sin el banner la pestaña nueva parecería una sesión normal). Una pestaña cuyo token ya murió por el
+     tope de sesiones (af_token_muerto) tampoco ofrece ese token (code-review 30-09-2026). */
   if (!token || !usuario) {
-    let resuelto = false;
+    let resuelto = false, mejor = null, cierre = null;
+    const adoptar = () => {
+      if (resuelto || !mejor) return;
+      resuelto = true;
+      window.removeEventListener('storage', onStorage);
+      sessionStorage.setItem('token', mejor.token);
+      sessionStorage.setItem('usuario', mejor.usuario);
+      location.reload();
+    };
     const onStorage = (ev) => {
       if (ev.key !== 'af_sesion' || !ev.newValue || resuelto) return;
       try {
         const s = JSON.parse(ev.newValue);
         if (!s || !s.token || !s.usuario) return;
-        resuelto = true;
-        sessionStorage.setItem('token', s.token);
-        sessionStorage.setItem('usuario', s.usuario);
-        window.removeEventListener('storage', onStorage);
-        location.reload();
+        if (!mejor || Number(s.foco || 0) > Number(mejor.foco || 0)) mejor = s;
+        if (!cierre) cierre = setTimeout(adoptar, 250);   // ventana corta para que alcancen a responder las demás
       } catch (_) {}
     };
     window.addEventListener('storage', onStorage);
     try { localStorage.setItem('af_pedir_sesion', String(Date.now())); localStorage.removeItem('af_pedir_sesion'); } catch (_) {}
-    setTimeout(() => { if (!resuelto) { window.removeEventListener('storage', onStorage); redirigir(); } }, 600);
+    setTimeout(() => { if (!resuelto) { if (mejor) adoptar(); else { window.removeEventListener('storage', onStorage); redirigir(); } } }, 700);
     return;
   }
+  // Última vez que el usuario USÓ esta pestaña (decide quién responde cuando hay varias cuentas)
+  window.__afFoco = Date.now();
+  ['focus', 'pointerdown', 'keydown'].forEach(ev => window.addEventListener(ev, () => { window.__afFoco = Date.now(); }, true));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) window.__afFoco = Date.now(); });
   // Esta pestaña tiene sesión: responde a las pestañas nuevas que la pidan
   window.addEventListener('storage', (ev) => {
     if (ev.key !== 'af_pedir_sesion' || !ev.newValue) return;
     try {
+      if (sessionStorage.getItem('ver_como') === '1') return;
       const t = sessionStorage.getItem('token'), u = sessionStorage.getItem('usuario');
-      if (!t || !u) return;
-      localStorage.setItem('af_sesion', JSON.stringify({ token: t, usuario: u }));
+      if (!t || !u || sessionStorage.getItem('af_token_muerto') === t) return;
+      localStorage.setItem('af_sesion', JSON.stringify({ token: t, usuario: u, foco: window.__afFoco || 0 }));
       localStorage.removeItem('af_sesion');
     } catch (_) {}
+  });
+  // Otra pestaña supo que ESTE token murió (tope de sesiones, cierre desde Usuarios): no volver a ofrecerlo
+  window.addEventListener('storage', (ev) => {
+    if (ev.key !== 'af_token_muerto' || !ev.newValue) return;
+    try { if (ev.newValue === sessionStorage.getItem('token')) sessionStorage.setItem('af_token_muerto', ev.newValue); } catch (_) {}
   });
   /* "Salir" cierra SOLO esta pestaña (Pato, 29-09-2026: necesita varias cuentas en el mismo navegador).
      El login NUNCA hereda sesión: quien llega a login.html quiere elegir cuenta. Solo las pestañas

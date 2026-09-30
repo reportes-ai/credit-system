@@ -7,7 +7,7 @@
   <title>Productos por Financiera — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v2.4 — pestaña AUTOFÁCIL (recursos propios): sus seguros salen del mantenedor Seguros AutoFácil (SURA), no de aquí · v2.3 — pie: las reglas propias ya mandan en cartas (checkbox PREFERENTE), rentabilidad y comisiones. v2.2 — seguros obligatorios por producto. v2.1 — spreads propios (costo de fondo = tasa − spread). v2.0 — productos con REGLAS PROPIAS (tasa cliente, comisión dealer por tramo de plazo, parque y ejecutivo): nace AUTOFIN PREFERENTE; footer Qué afecta. v1.2 -->
+  <!-- v2.5 — el producto AUTOFACIL se puede editar sin tasa propia (usa la vigente de Tasas). v2.4 — pestaña AUTOFÁCIL (recursos propios): sus seguros salen del mantenedor Seguros AutoFácil (SURA), no de aquí · v2.3 — pie: las reglas propias ya mandan en cartas (checkbox PREFERENTE), rentabilidad y comisiones. v2.2 — seguros obligatorios por producto. v2.1 — spreads propios (costo de fondo = tasa − spread). v2.0 — productos con REGLAS PROPIAS (tasa cliente, comisión dealer por tramo de plazo, parque y ejecutivo): nace AUTOFIN PREFERENTE; footer Qué afecta. v1.2 -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -330,7 +330,9 @@
       dealer_tramos: leerTramos(),
     };
     if (!payload.producto) { alert('El nombre del producto es requerido'); return; }
-    if (payload.reglas_propias && (payload.tasa_menor_pct === '' || payload.tasa_mayor_pct === '' || !payload.dealer_tramos.length)) { alert('Con reglas propias se necesitan las dos tasas y al menos un tramo de comisión dealer'); return; }
+    // AUTOFACIL (recursos propios) puede no tener tasa propia: usa la vigente de Tasas (Pato, 29-09-2026); antes el formulario lo dejaba sin guardar
+    const sinTasaOk = payload.financiera === 'AUTOFACIL';
+    if (payload.reglas_propias && ((!sinTasaOk && (payload.tasa_menor_pct === '' || payload.tasa_mayor_pct === '')) || !payload.dealer_tramos.length)) { alert(sinTasaOk ? 'Con reglas propias se necesita al menos un tramo de comisión dealer (0% vale)' : 'Con reglas propias se necesitan las dos tasas y al menos un tramo de comisión dealer'); return; }
     try {
       const url    = id ? `/api/productos-financiera/${id}` : '/api/productos-financiera';
       const method = id ? 'PUT' : 'POST';

@@ -328,5 +328,6 @@ router.get('/fiscalizaciones/docs/:docId',   verifyToken, fiscPerm, fisc.verDoc)
 router.get('/fiscalizaciones/:id',           verifyToken, fiscPerm, fisc.detalle);
 router.post('/fiscalizaciones/:id/docs',     verifyToken, fiscPerm, fisc.subirDoc);
 router.post('/fiscalizaciones/:id/resumir',  verifyToken, fiscPerm, fisc.reResumir);
+router.delete('/fiscalizaciones/:id',        verifyToken, fiscPerm, fisc.eliminar);   // solo carpeta vacía
 
 module.exports = router;

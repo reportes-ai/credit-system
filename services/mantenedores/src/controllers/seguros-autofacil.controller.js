@@ -122,8 +122,13 @@ require('../../../../shared/migrate').enFila('seguros-autofacil', async () => {
 
 const quien = req => `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || String(req.usuario?.id_usuario || '');
 const err500 = (res, tag, e) => { console.error(`[seguros-autofacil ${tag}]`, e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
-const num = (v, min, max) => { if (v === '' || v == null) return null; const x = parseFloat(v); if (isNaN(x)) return null; return Math.min(Math.max(x, min), max); };
-const int = (v, min, max) => { if (v === '' || v == null) return null; const x = parseInt(v, 10); if (isNaN(x)) return null; return Math.min(Math.max(x, min), max); };
+/* Un valor fuera de rango o que no es número se RECHAZA (400 con el campo), no se recorta ni se descarta en
+   silencio: el markup de cabecera 501 se guardaba como 500 y un tramo mal digitado desaparecía sin aviso
+   (code-review 30-09-2026). Vacío = null (campo opcional). */
+class Invalido extends Error {}
+const num = (v, min, max, campo) => { if (v === '' || v == null) return null; const x = parseFloat(v); if (isNaN(x) || x < min || x > max) throw new Invalido(`${campo || 'Valor'}: debe ser un número entre ${min} y ${max} (llegó "${String(v).slice(0, 20)}")`); return x; };
+const int = (v, min, max, campo) => { if (v === '' || v == null) return null; const x = parseInt(v, 10); if (isNaN(x) || String(x) !== String(v).trim() || x < min || x > max) throw new Invalido(`${campo || 'Valor'}: debe ser un entero entre ${min} y ${max} (llegó "${String(v).slice(0, 20)}")`); return x; };
+const err400 = (res, e) => res.status(400).json({ success: false, data: null, error: e.message });
 const fecha = v => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : null);
 
 /* GET /api/seguros-autofacil → los 3 seguros con tramos y comisiones */
@@ -137,11 +142,11 @@ const prima = async (req, res) => {
   try {
     const seguro = String(req.query.seguro || '').toUpperCase();
     if (!SEGUROS.includes(seguro)) return res.status(400).json({ success: false, data: null, error: 'Seguro inválido' });
-    const mic = num(req.query.mic, 0, 1e10), plazo = int(req.query.plazo, 1, 120);
+    const mic = num(req.query.mic, 0, 1e10, 'MIC'), plazo = int(req.query.plazo, 1, 120, 'Plazo');
     if (!(mic > 0) || !plazo) return res.status(400).json({ success: false, data: null, error: 'Indica monto inicial del crédito y plazo' });
-    const opcion = int(req.query.opcion, 1, 2);
+    const opcion = int(req.query.opcion, 1, 2, 'Opción');
     res.json({ success: true, data: await motor.prima(seguro, mic, plazo, opcion ? { opcion } : {}), error: null });
-  } catch (e) { err500(res, 'prima', e); }
+  } catch (e) { if (e instanceof Invalido) return err400(res, e); err500(res, 'prima', e); }
 };
 
 /* PUT /api/seguros-autofacil/:seguro → cabecera (condiciones, opción vigente, markup) */
@@ -151,15 +156,15 @@ const actualizar = async (req, res) => {
     if (!SEGUROS.includes(seguro)) return res.status(400).json({ success: false, data: null, error: 'Seguro inválido' });
     const b = req.body || {};
     const s = (k, n) => (b[k] == null ? null : String(b[k]).trim().slice(0, n) || null);
-    const opcion_vigente = int(b.opcion_vigente, 1, 2);
+    const opcion_vigente = int(b.opcion_vigente, 1, 2, 'Opción vigente');
     const [r] = await pool.query(`UPDATE seguros_autofacil SET nombre=COALESCE(?, nombre), aseguradora=?, aseguradora_rut=?, poliza_cmf=?, intermediario=?, intermediario_rut=?,
         fecha_cotizacion=?, vigencia_desde=?, opcion_vigente=?, markup_pct=?, obligatorio=?, exento_iva=?, tope_capital_uf=?, edad_min=?, edad_max_ingreso=?, edad_max_permanencia=?,
         carencia_dias=?, antiguedad_dias=?, espera_dias=?, cuotas_max=?, tope_cuota_uf=?, devolucion_prepago=?, cobertura=?, notas=?, links=?, activo=?, updated_by=?, updated_at=NOW()
       WHERE seguro=?`,
       [s('nombre', 80), s('aseguradora', 120), s('aseguradora_rut', 20), s('poliza_cmf', 40), s('intermediario', 120), s('intermediario_rut', 20),
-       fecha(b.fecha_cotizacion), fecha(b.vigencia_desde), opcion_vigente, num(b.markup_pct, 0, 500), b.obligatorio ? 1 : 0, b.exento_iva ? 1 : 0,
-       num(b.tope_capital_uf, 0, 1e6), int(b.edad_min, 0, 120), int(b.edad_max_ingreso, 0, 120), int(b.edad_max_permanencia, 0, 120),
-       int(b.carencia_dias, 0, 3650), int(b.antiguedad_dias, 0, 3650), int(b.espera_dias, 0, 3650), int(b.cuotas_max, 0, 120), num(b.tope_cuota_uf, 0, 1e5),
+       fecha(b.fecha_cotizacion), fecha(b.vigencia_desde), opcion_vigente, num(b.markup_pct, 0, 5000, 'Markup'), b.obligatorio ? 1 : 0, b.exento_iva ? 1 : 0,
+       num(b.tope_capital_uf, 0, 1e6, 'Tope capital UF'), int(b.edad_min, 0, 120, 'Edad mínima'), int(b.edad_max_ingreso, 0, 120, 'Edad máxima de ingreso'), int(b.edad_max_permanencia, 0, 120, 'Edad máxima de permanencia'),
+       int(b.carencia_dias, 0, 3650, 'Carencia'), int(b.antiguedad_dias, 0, 3650, 'Antigüedad'), int(b.espera_dias, 0, 3650, 'Espera'), int(b.cuotas_max, 0, 120, 'Cuotas máx.'), num(b.tope_cuota_uf, 0, 1e5, 'Tope cuota UF'),
        s('devolucion_prepago', 400), b.cobertura == null ? null : String(b.cobertura).slice(0, 4000), b.notas == null ? null : String(b.notas).slice(0, 4000),
        Array.isArray(b.links) ? JSON.stringify(b.links.filter(l => Array.isArray(l) && l[1]).map(l => [String(l[0] || '').slice(0, 80), String(l[1]).slice(0, 300)])) : null,
        b.activo === false || b.activo === 0 ? 0 : 1, quien(req), seguro]);
@@ -167,44 +172,60 @@ const actualizar = async (req, res) => {
     motor.invalidar();
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'seguros_autofacil', entidad_id: seguro, detalle: `Seguro AutoFácil ${seguro} editado (opción vigente ${opcion_vigente || '—'}, markup ${b.markup_pct ?? '—'}%)` });
     res.json({ success: true, data: await motor.cargar(true), error: null });
-  } catch (e) { err500(res, 'actualizar', e); }
+  } catch (e) { if (e instanceof Invalido) return err400(res, e); err500(res, 'actualizar', e); }
 };
 
 /* PUT /api/seguros-autofacil/:seguro/tramos { opcion, tramos:[{plazo_desde,plazo_hasta,tasa_pct}] } → reemplaza la tabla de esa opción */
 const setTramos = async (req, res) => {
   try {
     const seguro = String(req.params.seguro || '').toUpperCase();
-    const opcion = int(req.body?.opcion, 1, 2);
+    const opcion = int(req.body?.opcion, 1, 2, 'Opción');
     if (!SEGUROS.includes(seguro) || !opcion) return res.status(400).json({ success: false, data: null, error: 'Seguro u opción inválidos' });
     const tramos = (Array.isArray(req.body?.tramos) ? req.body.tramos : [])
-      .map(t => ({ d: int(t.plazo_desde, 1, 120), h: int(t.plazo_hasta, 1, 120), t: num(t.tasa_pct, 0, 100), m: (t.markup_pct === '' || t.markup_pct == null) ? null : num(t.markup_pct, 0, 5000) }))
-      .filter(t => t.d && t.h && t.t != null && t.h >= t.d).sort((a, b) => a.d - b.d);
+      .map((t, i) => {
+        const f = `Tramo ${i + 1}`;
+        const x = { d: int(t.plazo_desde, 1, 120, f + ' plazo desde'), h: int(t.plazo_hasta, 1, 120, f + ' plazo hasta'), t: num(t.tasa_pct, 0, 100, f + ' tasa'), m: (t.markup_pct === '' || t.markup_pct == null) ? null : num(t.markup_pct, 0, 5000, f + ' markup') };
+        if (!x.d || !x.h || x.t == null) throw new Invalido(`${f}: plazo desde, plazo hasta y tasa son obligatorios`);
+        if (x.h < x.d) throw new Invalido(`${f}: el plazo hasta (${x.h}) es menor que el plazo desde (${x.d})`);
+        return x;
+      }).sort((a, b) => a.d - b.d);
     for (let i = 1; i < tramos.length; i++) if (tramos[i].d <= tramos[i - 1].h)
       return res.status(400).json({ success: false, data: null, error: `Los tramos se pisan: ${tramos[i - 1].d}-${tramos[i - 1].h} y ${tramos[i].d}-${tramos[i].h}` });
-    await pool.query('DELETE FROM seguros_autofacil_tramos WHERE seguro=? AND opcion=?', [seguro, opcion]);
-    for (const t of tramos) await pool.query('INSERT INTO seguros_autofacil_tramos (seguro, opcion, plazo_desde, plazo_hasta, tasa_pct, markup_pct) VALUES (?,?,?,?,?,?)', [seguro, opcion, t.d, t.h, t.t, opcion === 2 ? t.m : null]);
-    await pool.query('UPDATE seguros_autofacil SET updated_by=?, updated_at=NOW() WHERE seguro=?', [quien(req), seguro]);
+    // Reemplazo atómico: si un INSERT falla, la tabla de la opción no queda vacía
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query('DELETE FROM seguros_autofacil_tramos WHERE seguro=? AND opcion=?', [seguro, opcion]);
+      for (const t of tramos) await conn.query('INSERT INTO seguros_autofacil_tramos (seguro, opcion, plazo_desde, plazo_hasta, tasa_pct, markup_pct) VALUES (?,?,?,?,?,?)', [seguro, opcion, t.d, t.h, t.t, opcion === 2 ? t.m : null]);
+      await conn.query('UPDATE seguros_autofacil SET updated_by=?, updated_at=NOW() WHERE seguro=?', [quien(req), seguro]);
+      await conn.commit();
+    } catch (e) { await conn.rollback().catch(() => {}); throw e; } finally { conn.release(); }
     motor.invalidar();
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'seguros_autofacil', entidad_id: seguro, detalle: `Tramos opción ${opcion} de ${seguro}: ${tramos.map(t => `${t.d}-${t.h} ${t.t}%${t.m != null && opcion === 2 ? ' +' + t.m + '%' : ''}`).join(' · ')}` });
     res.json({ success: true, data: await motor.cargar(true), error: null });
-  } catch (e) { err500(res, 'tramos', e); }
+  } catch (e) { if (e instanceof Invalido) return err400(res, e); err500(res, 'tramos', e); }
 };
 
 /* PUT /api/seguros-autofacil/:seguro/comisiones { opcion, comisiones:[{nombre,pct,iva_incluido}] } */
 const setComisiones = async (req, res) => {
   try {
     const seguro = String(req.params.seguro || '').toUpperCase();
-    const opcion = int(req.body?.opcion, 1, 2);
+    const opcion = int(req.body?.opcion, 1, 2, 'Opción');
     if (!SEGUROS.includes(seguro) || !opcion) return res.status(400).json({ success: false, data: null, error: 'Seguro u opción inválidos' });
     const com = (Array.isArray(req.body?.comisiones) ? req.body.comisiones : [])
-      .map(c => ({ n: String(c.nombre || '').trim().slice(0, 120), p: num(c.pct, 0, 100), iva: c.iva_incluido ? 1 : 0 })).filter(c => c.n && c.p != null);
-    await pool.query('DELETE FROM seguros_autofacil_comisiones WHERE seguro=? AND opcion=?', [seguro, opcion]);
-    for (let i = 0; i < com.length; i++) await pool.query('INSERT INTO seguros_autofacil_comisiones (seguro, opcion, nombre, pct, iva_incluido, orden) VALUES (?,?,?,?,?,?)', [seguro, opcion, com[i].n, com[i].p, com[i].iva, i]);
-    await pool.query('UPDATE seguros_autofacil SET updated_by=?, updated_at=NOW() WHERE seguro=?', [quien(req), seguro]);
+      .map((c, i) => { const x = { n: String(c.nombre || '').trim().slice(0, 120), p: num(c.pct, 0, 100, `Comisión ${i + 1} %`), iva: c.iva_incluido ? 1 : 0 }; if (!x.n || x.p == null) throw new Invalido(`Comisión ${i + 1}: nombre y % son obligatorios`); return x; });
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query('DELETE FROM seguros_autofacil_comisiones WHERE seguro=? AND opcion=?', [seguro, opcion]);
+      for (let i = 0; i < com.length; i++) await conn.query('INSERT INTO seguros_autofacil_comisiones (seguro, opcion, nombre, pct, iva_incluido, orden) VALUES (?,?,?,?,?,?)', [seguro, opcion, com[i].n, com[i].p, com[i].iva, i]);
+      await conn.query('UPDATE seguros_autofacil SET updated_by=?, updated_at=NOW() WHERE seguro=?', [quien(req), seguro]);
+      await conn.commit();
+    } catch (e) { await conn.rollback().catch(() => {}); throw e; } finally { conn.release(); }
     motor.invalidar();
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'seguros_autofacil', entidad_id: seguro, detalle: `Comisiones opción ${opcion} de ${seguro}: ${com.map(c => `${c.n} ${c.p}%`).join(' · ') || 'ninguna'}` });
     res.json({ success: true, data: await motor.cargar(true), error: null });
-  } catch (e) { err500(res, 'comisiones', e); }
+  } catch (e) { if (e instanceof Invalido) return err400(res, e); err500(res, 'comisiones', e); }
 };
 
 module.exports = { listar, prima, actualizar, setTramos, setComisiones };
