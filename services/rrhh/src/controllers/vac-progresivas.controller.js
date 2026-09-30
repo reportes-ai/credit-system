@@ -20,8 +20,8 @@ const { notificar } = require('../../../notificaciones/src/controllers/notificac
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
 const nombreDe = u => [u?.nombre, u?.apellido].filter(Boolean).join(' ') || u?.usuario || 'Sistema';
-const isoF = f => f == null ? null
-  : (f instanceof Date ? new Date(f.getTime() - f.getTimezoneOffset() * 60000).toISOString() : String(f)).slice(0, 10);
+// isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
+const isoF = f => f == null ? null : require('../../../../shared/fecha-chile').isoFlex(f);
 const fLarga = v => v ? new Date(String(v).slice(0, 10) + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
 
 require('../../../../shared/migrate').enFila('rrhh-vac-progresivas', async () => {

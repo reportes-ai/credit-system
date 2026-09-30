@@ -415,7 +415,7 @@ async function _procesarCarta(idCarta) {
        vencida — el motor tampoco. El barrido la pasará a VENCIDA. */
     if (carta.fecha) {
       const dias = parseFloat(p.vigencia_carta_dias) > 0 ? parseFloat(p.vigencia_carta_dias) : 5;
-      const vence = new Date(carta.fecha); vence.setDate(vence.getDate() + dias); vence.setHours(23, 59, 59);
+      const vence = new Date(require('../../../shared/fecha-chile').isoFlex(carta.fecha) + 'T12:00:00'); vence.setDate(vence.getDate() + dias); vence.setHours(23, 59, 59);   // isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
       if (vence < new Date()) { console.log(`[revisor-unidad] carta ${carta.op_carta} vencida: no se aprueba`); return; }
     }
 

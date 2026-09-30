@@ -795,8 +795,8 @@ async function tierUAC(fechaRef) {
     const [pr] = await pool.query(
       "SELECT clave, valor FROM parametros_credito WHERE clave LIKE 'uac%'");
     const P = {}; pr.forEach(r => { P[r.clave] = parseFloat(r.valor); });
-    const ref = fechaRef ? new Date(fechaRef) : new Date();
-    const ym = isNaN(ref) ? null : `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`;
+    // isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
+    const ym = (require('../../../../shared/fecha-chile').isoFlex(fechaRef || new Date()).slice(0, 7)) || null;
     let count = 0;
     if (ym) {
       const [[c]] = await pool.query(
@@ -812,9 +812,8 @@ async function tierUAC(fechaRef) {
 // Recalcula el snapshot de tier para todas las cartas de un mes (dashboard más aproximado).
 async function recalcularTierMes(fechaRef) {
   const t = await tierUAC(fechaRef);
-  const ref = fechaRef ? new Date(fechaRef) : new Date();
-  if (isNaN(ref)) return t;
-  const ym = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`;
+  const ym = require('../../../../shared/fecha-chile').isoFlex(fechaRef || new Date()).slice(0, 7);
+  if (!/^[0-9]{4}-[0-9]{2}$/.test(ym)) return t;
   await pool.query("UPDATE cartas_aprobacion SET tier_uac_n=?, tier_uac_pct=? WHERE DATE_FORMAT(COALESCE(fecha, DATE(fecha_creacion)),'%Y-%m')=?", [t.n, t.pct, ym]).catch(() => {});
   return t;
 }
@@ -1815,8 +1814,10 @@ const cargaMasivaCartas = async (req, res) => {
 
         const fecha = r.mes ? new Date(r.mes) : null;
         const valida = fecha && !isNaN(fecha);
-        const yy = String(valida ? fecha.getFullYear() : new Date().getFullYear()).slice(-2);
-        const mm = String((valida ? fecha.getMonth() : new Date().getMonth()) + 1).padStart(2, '0');
+        // Mes leído del TEXTO cuando viene 'AAAA-MM…': new Date('2026-09-01') es UTC y en Chile caía en agosto (barrido 30-09-2026)
+        const mIso = /^([0-9]{4})-([0-9]{2})/.exec(String(r.mes || ''));
+        const yy = mIso ? mIso[1].slice(-2) : String(valida ? fecha.getFullYear() : new Date().getFullYear()).slice(-2);
+        const mm = mIso ? mIso[2] : String((valida ? fecha.getMonth() : new Date().getMonth()) + 1).padStart(2, '0');
         const fechaISO = valida ? fecha.toISOString().slice(0, 10) : null;
         const opCarta = `${yy}${nId}${_inicEjec(ejec)}`;
 
@@ -2345,7 +2346,7 @@ const verificable = async (req, res) => {
     const vig = new Date(base); vig.setDate(vig.getDate() + dias);
     const datos = {
       documento: 'Carta de Aprobación de Crédito',
-      operacion: c.op_carta, fecha: String(c.fecha || '').slice(0, 10),
+      operacion: c.op_carta, fecha: require('../../../../shared/fecha-chile').isoFlex(c.fecha),
       vigencia_dias: dias, valida_hasta: vig.toISOString().slice(0, 10),
       cliente: c.cliente, rut_cliente: c.rut_cliente,
       dealer: c.nombre_dealer, vehiculo: [c.marca, c.modelo, c.anio].filter(Boolean).join(' '),

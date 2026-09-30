@@ -660,7 +660,8 @@ exports.getDotacionEjecutivos = async (req, res) => {
            no se cuenta en NINGÚN mes. Contarlos solo en los históricos inflaba
            el promedio y hundía el factor (130→108 el 02-09-2026). */
         if (!baja && e.estado !== 'activo') continue;
-        const antig = ing ? (y - ing.getFullYear()) * 12 + (m - 1 - ing.getMonth()) : 12;
+        const ingI = ing ? require('../../../../shared/fecha-chile').isoFlex(e.fecha_ingreso) : '';   // isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
+        const antig = ing ? (y - Number(ingI.slice(0, 4))) * 12 + (m - Number(ingI.slice(5, 7))) : 12;
         peso += rampa(antig); n++;
       }
       return { peso: Math.round(peso * 100) / 100, n };

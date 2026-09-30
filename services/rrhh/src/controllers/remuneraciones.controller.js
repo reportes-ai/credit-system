@@ -1331,8 +1331,8 @@ function calcLiquidacion(inp, ind) {
 }
 
 /* ── Días trabajados del mes (convención 30avos): 30 − ingreso parcial − licencias ── */
-const isoF = f => f == null ? null
-  : (f instanceof Date ? new Date(f.getTime() - f.getTimezoneOffset() * 60000).toISOString() : String(f)).slice(0, 10);
+// isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
+const isoF = f => f == null ? null : require('../../../../shared/fecha-chile').isoFlex(f);
 
 function diasTrabajadosMes(mes, fechaIngreso, licencias, fechaBaja) {
   let dias = 30;

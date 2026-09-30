@@ -2105,7 +2105,8 @@ async function calcularDJ1887(anio) {
       const [cuerpo, dv] = String(g.rut).split('-');
       const u = usuarioDe.get(g.rut);
       const ultimo = g.con.lastIndexOf(true) + 1;
-      const baja = u && u.fecha_baja && new Date(u.fecha_baja).getFullYear() === anio ? new Date(u.fecha_baja).getMonth() + 1 : null;
+      const bajaI = u && u.fecha_baja ? require('../../../../shared/fecha-chile').isoFlex(u.fecha_baja) : '';   // isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
+      const baja = bajaI && Number(bajaI.slice(0, 4)) === anio ? Number(bajaI.slice(5, 7)) : null;
       /* "F" solo con evidencia (fecha de baja, indemnización, vacaciones proporcionales o mes de aviso
          pagados en el mes). Deducirlo del último mes con liquidación no calzó con la 1887 que presentó
          AVSOFT en AT2026 (14 diferencias): quien deja de aparecer sin finiquito en el libro va con "C". */
@@ -2212,8 +2213,8 @@ require('../../../../shared/migrate').enFila('contabilidad-lre', async () => {
 const LRE_AFP = { 'PROVIDA': 6, 'PLANVITAL': 11, 'PLAN VITAL': 11, 'CUPRUM': 13, 'HABITAT': 14, 'UNO': 19, 'CAPITAL': 31, 'MODELO': 103 };
 const LRE_SALUD = { 'FONASA': 102, 'CRUZ BLANCA': 1, 'ISAPRE CRUZ BLANCA S.A.': 1, 'BANMEDICA': 3, 'COLMENA': 4, 'CONSALUD': 9, 'VIDA TRES': 12, 'NUEVA MAS VIDA': 43, 'ESENCIAL': 44, 'ESCENCIAL': 44 };
 const lreFecha = f => { const s = isoF(f); return s ? s.split('-').reverse().join('/') : ''; };
-const isoF = f => f == null ? null
-  : (f instanceof Date ? new Date(f.getTime() - f.getTimezoneOffset() * 60000).toISOString() : String(f)).slice(0, 10);
+// isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
+const isoF = f => f == null ? null : require('../../../../shared/fecha-chile').isoFlex(f);
 
 // Orden de columnas del archivo (solo los conceptos que la empresa usa + obligatorios)
 const LRE_COLS = ['1101','1102','1103','1104','1105','1106','1170','1146','1107','1108','1109','1141','1142','1143','1151','1110','1152',

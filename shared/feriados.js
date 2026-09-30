@@ -101,8 +101,10 @@ function proximosDiasHabiles(fromISO, n) {
 // paramétrica). MOTOR ÚNICO de "días hábiles de un rango": vacaciones (cargo en
 // cuenta), ausencias y cualquier consumidor nuevo. Acepta Date o 'YYYY-MM-DD'.
 function diasHabilesEntre(desde, hasta) {
-  const d = typeof desde === 'string' ? new Date(desde.slice(0, 10) + 'T12:00:00') : new Date(desde);
-  const h = typeof hasta === 'string' ? new Date(hasta.slice(0, 10) + 'T12:00:00') : new Date(hasta);
+  // isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
+  const F = require('./fecha-chile');
+  const d = new Date(F.isoFlex(desde) + 'T12:00:00');
+  const h = new Date(F.isoFlex(hasta) + 'T12:00:00');
   let n = 0;
   for (; d <= h; d.setDate(d.getDate() + 1)) if (esHabil(d)) n++;
   return n;

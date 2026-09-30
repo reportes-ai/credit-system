@@ -19,9 +19,7 @@ const norm = s => String(s || '').trim();
 const nombreDe = u => `${u?.nombre || ''} ${u?.apellido || ''}`.trim() || u?.email || null;
 const esRRHH = id => tieneFunc(id, 'rh_aprobar').catch(() => false);
 // mysql2 devuelve DATE como objeto Date → normalizar a 'YYYY-MM-DD'
-const isoF = f => f instanceof Date
-  ? `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`
-  : String(f || '').slice(0, 10);
+const isoF = require('../../../../shared/fecha-chile').isoFlex; // isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
 
 /* ── Migración ─────────────────────────────────────────────────────────────── */
 require('../../../../shared/migrate').enFila('rrhh-ausencias', async () => {

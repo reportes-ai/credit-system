@@ -69,9 +69,7 @@ function normTexto(v) {
 
 function normFecha(v) {
   if (!v) return '';
-  if (v instanceof Date) {
-    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
-  }
+  if (v instanceof Date) return require('./fecha-chile').isoFlex(v);   // isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
   const m = String(v).match(/^(\d{4}-\d{2}-\d{2})/);
   return m ? m[1] : String(v).trim();
 }

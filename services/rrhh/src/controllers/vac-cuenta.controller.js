@@ -17,8 +17,8 @@ const { auditar } = require('../../../../shared/audit');
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
-const isoF = f => f == null ? null
-  : (f instanceof Date ? new Date(f.getTime() - f.getTimezoneOffset() * 60000).toISOString() : String(f)).slice(0, 10);
+// isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
+const isoF = f => f == null ? null : require('../../../../shared/fecha-chile').isoFlex(f);
 
 require('../../../../shared/migrate').enFila('rrhh-vac-cuenta', async () => {
   await pool.query(`CREATE TABLE IF NOT EXISTS rh_vac_movimientos (

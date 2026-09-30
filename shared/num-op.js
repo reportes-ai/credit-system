@@ -111,8 +111,8 @@ async function numeroCreditoCarta(mesISO, conn) {
     const m = String(mesISO).match(/^(\d{4})-(\d{2})/);
     if (m) prefix = m[1].slice(-2) + m[2];
     else {
-      const d = new Date(mesISO);
-      prefix = String(d.getFullYear()).slice(-2) + String(d.getMonth() + 1).padStart(2, '0');
+      const iso = require('./fecha-chile').isoFlex(new Date(mesISO));   // isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
+      prefix = iso ? iso.slice(2, 4) + iso.slice(5, 7) : prefijoMes();
     }
   } else prefix = prefijoMes();
 
