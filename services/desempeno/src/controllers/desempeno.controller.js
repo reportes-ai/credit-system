@@ -86,14 +86,23 @@ const ping = async (req, res) => {
   try {
     const id = req.usuario.id_usuario;
     // Con sid en el token late ESTA sesión (multi-dispositivo); tokens viejos, la última.
-    const [r] = req.usuario.sid
-      ? await pool.query('UPDATE sesiones_usuario SET last_seen = NOW() WHERE id = ? AND id_usuario = ? AND logout_at IS NULL', [req.usuario.sid, id])
-      : await pool.query(
-      `UPDATE sesiones_usuario SET last_seen = NOW()
-       WHERE id_usuario = ? AND logout_at IS NULL
-         AND last_seen > (NOW() - INTERVAL 15 MINUTE)
-       ORDER BY login_at DESC LIMIT 1`, [id]);
-    if (!r.affectedRows) {
+    let filas = 0;
+    if (req.usuario.sid) {
+      const [r] = await pool.query('UPDATE sesiones_usuario SET last_seen = NOW() WHERE id = ? AND id_usuario = ? AND logout_at IS NULL', [req.usuario.sid, id]);
+      filas = r.affectedRows;
+    }
+    /* Sin sid, o con la sesión del sid ya cerrada (inactividad) y el token todavía válido: late la sesión
+       abierta más reciente de la persona y, si no hay, nace UNA nueva. Antes, con el sid cerrado, cada
+       latido insertaba una sesión: la TV del Cuadro de Mando creó una por minuto el 30-09-2026. */
+    if (!filas) {
+      const [r] = await pool.query(
+        `UPDATE sesiones_usuario SET last_seen = NOW()
+         WHERE id_usuario = ? AND logout_at IS NULL
+           AND last_seen > (NOW() - INTERVAL 15 MINUTE)
+         ORDER BY login_at DESC LIMIT 1`, [id]);
+      filas = r.affectedRows;
+    }
+    if (!filas) {
       const nombre = ((req.usuario.nombre || '') + ' ' + (req.usuario.apellido || '')).trim() || req.usuario.email;
       await pool.query('INSERT INTO sesiones_usuario (id_usuario, nombre, perfil, login_at, last_seen) VALUES (?,?,?,NOW(),NOW())',
         [id, nombre, req.usuario.perfil_nombre || null]);
