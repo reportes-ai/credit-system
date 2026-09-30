@@ -862,11 +862,12 @@ exports.diagnostico = async (req, res) => {
 
     // 6. Sample de créditos AutoFácil VIGENTE con sus campos de mora
     const [sample] = await pool.query(
-      `SELECT id_credito, numero_credito, nombre_cliente, financiera,
-              fecha_primera_cuota, plazo, cuota, estado
-       FROM creditos
-       WHERE estado = 'VIGENTE'
-         AND (financiera IN ('AUTOFACIL','AFA') OR financiera IS NULL)
+      // creditos no tiene id_credito ni nombre_cliente: la PK es id y el nombre vive en clientes (una sola fuente)
+      `SELECT c.id AS id_credito, c.numero_credito, TRIM(CONCAT_WS(' ', cl.nombres, cl.apellido_paterno, cl.apellido_materno)) AS nombre_cliente, c.financiera,
+              c.fecha_primera_cuota, c.plazo, c.cuota, c.estado
+       FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+       WHERE c.estado = 'VIGENTE'
+         AND (c.financiera IN ('AUTOFACIL','AFA') OR c.financiera IS NULL)
        LIMIT 10`
     );
 
