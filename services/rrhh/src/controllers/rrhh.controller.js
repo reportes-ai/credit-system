@@ -528,6 +528,7 @@ async function getConfig() {
 const tpl = (t, vars) => String(t || '').replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? vars[k] : ''));
 
 // Fecha de HOY en Chile (el server corre en UTC en Render)
+const { isoDeBD } = require("../../../../shared/fecha-chile");
 function hoyChile() {
   const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   return p; // YYYY-MM-DD
@@ -709,7 +710,7 @@ async function cumplesEnVentana(tope, soloId) {
       WHERE u.fecha_nacimiento IS NOT NULL AND u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0${extra} LIMIT 600`, params);
   const out = [];
   for (const r of rows) {
-    const fn = isoFecha(r.fecha_nacimiento); // YYYY-MM-DD
+    const fn = isoDeBD(r.fecha_nacimiento) || ""; // isoDeBD: deshace el offset de mysql2; getDate() corría un día los nacidos en fechas con otro horario (01-10-1989 salía 30-09)
     const hit = fechas.find(f => f.iso.slice(5) === fn.slice(5)); // match mes-día
     if (hit) out.push({ ...r, fecha_cumple: hit.iso, dias: hit.dias });
   }
@@ -734,7 +735,7 @@ async function cumplesProximos(dias) {
       WHERE u.fecha_nacimiento IS NOT NULL AND u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0 LIMIT 600`);
   const out = [];
   for (const r of rows) {
-    const fn = isoFecha(r.fecha_nacimiento);
+    const fn = isoDeBD(r.fecha_nacimiento) || ""; // isoDeBD: deshace el offset de mysql2; getDate() corría un día los nacidos en fechas con otro horario (01-10-1989 salía 30-09)
     const hit = fechas.find(f => f.iso.slice(5) === fn.slice(5));   // match mes-día
     if (hit) out.push({
       id_usuario: r.id_usuario, nombre: r.nombre, nombre_pila: r.nombre_pila, sexo: r.sexo,
