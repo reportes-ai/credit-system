@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — Pagos Recurrentes (v1.1: "Quién retiene" en boletas de honorarios + A pagar en la vista previa): inscripción de pagos periódicos (arriendos, servicios) con proveedor de la base, moneda de origen (CLP/UF/UTM/USD), glosa con {MES} variable; el motor genera la ODP el día del vencimiento al tipo de cambio del día, avisa a Tesorería y al proveedor al pagarse -->
+<!-- v1.2 — la ODP de un vencido nace sola al inscribir/activar: la pantalla lo avisa y se refresca; el ⚡ solo emite el vencimiento confirmado (30-09-2026). v1.1 — Pagos Recurrentes (v1.1: "Quién retiene" en boletas de honorarios + A pagar en la vista previa): inscripción de pagos periódicos (arriendos, servicios) con proveedor de la base, moneda de origen (CLP/UF/UTM/USD), glosa con {MES} variable; el motor genera la ODP el día del vencimiento al tipo de cambio del día, avisa a Tesorería y al proveedor al pagarse -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -93,7 +93,7 @@
 
   <div class="panel">
     <h5><i class="bi bi-list-check"></i> Pagos inscritos
-      <span style="margin-left:auto;font-size:.72rem;color:#94a3b8;font-weight:600">El motor revisa cada 6 horas; lo que vence hoy se emite hoy.</span></h5>
+      <span style="margin-left:auto;font-size:.72rem;color:#94a3b8;font-weight:600">El motor revisa cada 6 horas y al inscribir, editar o activar; lo que ya venció se emite al tiro.</span></h5>
     <div style="overflow:auto"><table id="tabla">
       <thead><tr><th style="min-width:200px">Apodo</th><th style="min-width:180px">Proveedor</th><th class="c">Period.</th><th class="c">Día</th><th>Tipo</th><th class="num">Monto origen</th><th style="min-width:180px">Glosa</th><th class="c">Último pago</th><th class="c">Próximo pago</th><th class="c">Última ODP</th><th class="c">Estado</th><th></th></tr></thead>
       <tbody id="tbody"><tr><td colspan="12" class="vacio">Cargando…</td></tr></tbody>
@@ -352,9 +352,20 @@ async function guardar(){
   const j = editandoId ? await api('PUT','/api/pagos-recurrentes/'+editandoId, body) : await api('POST','/api/pagos-recurrentes', body);
   b.disabled = false;
   if (!j || !j.success) { toast('Error: '+(j&&j.error||'no se pudo guardar')); return; }
-  dlg.close(); toast(editandoId ? 'Pago actualizado' : 'Pago inscrito'); cargar();
+  dlg.close();
+  // Vencimiento ya cumplido: la ODP nace sola en segundos → se avisa y se vuelve a cargar cuando ya existe
+  if (j.data && j.data.genera) { toast((editandoId ? 'Pago actualizado' : 'Pago inscrito') + ' · el vencimiento ya llegó: la orden de pago se está generando'); setTimeout(cargar, 4000); }
+  else toast(editandoId ? 'Pago actualizado' : 'Pago inscrito');
+  cargar();
 }
-async function activar(id, activo){ const j = await api('PUT',`/api/pagos-recurrentes/${id}/activo`,{activo}); if(j&&j.success){ toast(activo?'Encendido: genera órdenes al vencimiento':'Apagado: no genera órdenes'); cargar(); } else { toast('Error: '+(j&&j.error)); cargar(); } }
+async function activar(id, activo){
+  const j = await api('PUT',`/api/pagos-recurrentes/${id}/activo`,{activo});
+  if(j&&j.success){
+    if (j.data && j.data.genera) { toast('Encendido · el vencimiento ya llegó: la orden de pago se está generando'); setTimeout(cargar, 4000); }
+    else toast(activo?'Encendido: genera órdenes al vencimiento':'Apagado: no genera órdenes');
+    cargar();
+  } else { toast('Error: '+(j&&j.error)); cargar(); }
+}
 async function eliminar(id){
   const p = DATA.find(x=>x.id===id); if(!p) return;
   if (!confirm(`¿Eliminar «${p.apodo}»?${p.generadas?'\n\nComo ya generó órdenes, quedará PAUSADO (la historia se conserva).':''}`)) return;
@@ -363,7 +374,9 @@ async function eliminar(id){
 async function generar(id){
   const p = DATA.find(x=>x.id===id); if(!p) return;
   if (!confirm(`¿Generar AHORA la Orden de Pago de «${p.apodo}» para el vencimiento ${fdate(p.fecha_proximo_pago)}?\n\nSe emitirá al tipo de cambio de hoy y se avisará a Tesorería.`)) return;
-  const j = await api('POST',`/api/pagos-recurrentes/${id}/generar`); if(j&&j.success){ toast('Emitida la ODP '+j.data.numero); cargar(); } else toast('Error: '+(j&&j.error));
+  // Se manda el vencimiento confirmado: si la lista estaba desactualizada el servidor avisa en vez de emitir el siguiente
+  const j = await api('POST',`/api/pagos-recurrentes/${id}/generar`, { vencimiento: String(p.fecha_proximo_pago||'').slice(0,10) });
+  if(j&&j.success){ toast('Emitida la ODP '+j.data.numero); cargar(); } else { toast('Error: '+(j&&j.error)); cargar(); }
 }
 async function verLog(id){
   const p = DATA.find(x=>x.id===id); if(!p) return;

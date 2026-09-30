@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Asistencia (Workera) — AutoFácil</title>
-  <!-- v1.5 — "enrolado" = tiene ficha ACTIVA en Workera (Personas), ya no "tiene marcas del mes" -->
+  <!-- v1.6 — latido de sesión (30-09-2026). v1.5 — "enrolado" = tiene ficha ACTIVA en Workera (Personas), ya no "tiene marcas del mes" -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -209,5 +209,6 @@ $('mes').value=new Date().toISOString().slice(0,7);
 $('mes').onchange=cargar;
 cargar();
 </script>
+<script src="/js/latido-sesion.js"></script>
 </body>
 </html>

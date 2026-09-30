@@ -5,7 +5,7 @@
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cuadro de Mando — AutoFácil Business Suite</title>
-<!-- v1.6 — Carrera del mes: título en dos líneas y badge del día en una sola fila · v1.5 — Otorgado hoy con N° de ops; ejecutivos que no se han conectado hoy (punto rojo, leyenda y ticker) · v1.4 — T° prom. aprobación carta solo en horas de servicio (Pato 29-09) · v1.3 — sonido de alerta al encenderse el letrero rojo · v1.2 — OPERACIONES OTORGADAS (antes "CURSADAS") · v1.1 — reconexion automatica de la cuenta TV (token_tv en localStorage) -->
+<!-- v1.7 — latido de sesión permanente: la TV ya no queda en SIN DATOS cuando el motor de inactividad la cierra a los 60 min (30-09-2026) · v1.6 — Carrera del mes: título en dos líneas y badge del día en una sola fila · v1.5 — Otorgado hoy con N° de ops; ejecutivos que no se han conectado hoy (punto rojo, leyenda y ticker) · v1.4 — T° prom. aprobación carta solo en horas de servicio (Pato 29-09) · v1.3 — sonido de alerta al encenderse el letrero rojo · v1.2 — OPERACIONES OTORGADAS (antes "CURSADAS") · v1.1 — reconexion automatica de la cuenta TV (token_tv en localStorage) -->
 <style>
   :root {
     --bg:#020817; --panel:#050e22; --line:#0a2748; --cyan:#00e5ff; --cyan-dim:#0891b2;
@@ -534,5 +534,7 @@ cargar();
 setInterval(cargar, 45000);          // refresco de datos cada 45 s
 setTimeout(()=>location.reload(), 6*60*60*1000);  // reload duro cada 6 h (TV siempre encendida)
 </script>
+<script>window.AF_LATIDO_SIEMPRE = true;</script>   <!-- pantalla sin operador: late aunque nadie la toque -->
+<script src="/js/latido-sesion.js"></script>
 </body>
 </html>

@@ -11,7 +11,7 @@
   <link rel="icon" href="/terreno/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="/terreno/apple-touch-icon.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <!-- v1.2 -->
+  <!-- v1.3 — latido de sesión (la PWA ya no se cierra a los 60 min en uso) · v1.2 -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --ok:#15803d; --bad:#dc2626; --warn:#b45309; }
     * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -513,5 +513,6 @@ async function guardarVisita(){
   finally { $('btnGuardar').disabled = false; }
 }
 </script>
+<script src="/js/latido-sesion.js"></script>
 </body>
 </html>

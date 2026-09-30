@@ -1124,7 +1124,19 @@ const otorgar = async (req, res) => {
          LEFT JOIN creditos crx ON crx.id = ca.id_credito_creado
         WHERE ca.id = ? AND ca.otorgado = 1 AND ca.status = 'APROBADA'
           AND NOT EXISTS (SELECT 1 FROM cartolas_movimientos m WHERE m.id_carta = ca.id AND m.movimiento = 'COMISION')`,
-      [id]).catch(e => console.error('[carta otorgar→cartola]', e.message));
+      [id]).catch(async e => {
+        /* Nunca más mudo (30-09-2026): si la base rechaza la fila de cartola (p. ej. un ID con letra en
+           num_op INT), la carta y el crédito quedan otorgados pero la comisión del dealer no entra a la
+           cartola. Se avisa a quien otorgó, igual que cuando el crédito no se mueve. */
+        console.error('[carta otorgar→cartola]', e.message);
+        try {
+          await pool.query(
+            `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar) VALUES (?,?,?,?,?,?,'alta',1)`,
+            [req.usuario?.id_usuario || 1, 'alerta', 'Carta otorgada sin comisión en cartola',
+             `La carta ${ca.op_carta} quedó OTORGADA pero la comisión NO entró a la cartola: la base rechazó el movimiento (${String(e.message).slice(0, 160)}). Revisar el ID Financiera y correr Sincronizar en Cartolas.`,
+             '/aprobaciones/', `otorgar-sin-cartola:${ca.op_carta}`]);
+        } catch (_) {}
+      });
     // Otorgar una UAC puede subir el tier del mes → refresca el snapshot de ese mes
     recalcularTierMes(ca.fecha).catch(() => {});
     auditar({ req, accion: 'OTORGAR', modulo: 'cartas', entidad: 'carta', entidad_id: id,
@@ -1273,6 +1285,15 @@ const upsert = async (req, res) => {
       if (!limpio)
         return res.status(400).json({ success: false, data: null, error: 'El nombre del cliente no puede ser un relleno (XXX...). Escribe el nombre real.' });
       c.cliente = limpio;
+    }
+    /* El ID de la financiera es NUMÉRICO: es lo que se compara con creditos.num_op (INT) y lo que se
+       escribe en cartolas_movimientos.num_op (INT). Con una letra ('6498106a', 29-09-2026) el crédito no
+       se actualizaba y la comisión no entraba a la cartola, todo en silencio. Se detiene acá. */
+    if (c.opOrigen != null && String(c.opOrigen).trim() !== '') {
+      const idTxt = String(c.opOrigen).trim();
+      if (!/^\d+$/.test(idTxt))
+        return res.status(400).json({ success: false, data: null, error: `El ID Financiera debe ser solo números (llegó "${idTxt.slice(0, 30)}"). Corrígelo antes de guardar.` });
+      c.opOrigen = idTxt;
     }
     // Estado previo (para detectar transiciones que generan notificación)
     let prevStatus = null;

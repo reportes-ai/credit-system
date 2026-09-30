@@ -19,7 +19,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
-const { programar } = require('../../../../shared/scheduler');
+const { programar, porEvento } = require('../../../../shared/scheduler');
 const fc = require('../../../../shared/fecha-chile');
 const { getUF } = require('../../../../shared/uf');
 
@@ -152,11 +152,27 @@ const fmtOrigen = (n, mon) => mon === 'CLP' ? fmtCLP(n) : `${Number(n).toLocaleS
 
 /* Genera la ODP de UN pago recurrente para su vencimiento vigente. Devuelve el
    número emitido. Idempotente por (pago, vencimiento): si ya se generó para esa
-   fecha, no hace nada. */
+   fecha, no hace nada.
+   La reserva del vencimiento es ATÓMICA (30-09-2026): antes se miraba la foto en memoria y el marcador
+   se escribía al final, así que dos corridas a la vez (evento + reloj de 6 h, dos eventos seguidos, el
+   botón ⚡ durante un barrido) leían el mismo pendiente y emitían dos ODP. Ahora gana el UPDATE: si no
+   afecta filas, otro ya lo tomó. Si la emisión falla antes de nacer la orden, se devuelve el marcador. */
 async function generarUno(p, hoyISO, req) {
   const venc = fc.isoDeBD(p.fecha_proximo_pago) || String(p.fecha_proximo_pago).slice(0, 10);
-  if (p.fecha_ultima_generacion && fc.isoDeBD(p.fecha_ultima_generacion) >= venc) return null;
-
+  const antes = p.fecha_ultima_generacion ? (fc.isoDeBD(p.fecha_ultima_generacion) || String(p.fecha_ultima_generacion).slice(0, 10)) : null;
+  const [cl] = await pool.query(
+    'UPDATE tesoreria_pagos_recurrentes SET fecha_ultima_generacion=? WHERE id=? AND activo=1 AND (fecha_ultima_generacion IS NULL OR fecha_ultima_generacion < ?)',
+    [venc, p.id, venc]);
+  if (!cl.affectedRows) return null;
+  let odpId = null;
+  try {
+    return await _emitirRecurrente(p, venc, hoyISO, req, id => { odpId = id; });
+  } catch (e) {
+    if (!odpId) await pool.query('UPDATE tesoreria_pagos_recurrentes SET fecha_ultima_generacion=? WHERE id=? AND fecha_ultima_generacion=?', [antes, p.id, venc]).catch(() => {});
+    throw e;
+  }
+}
+async function _emitirRecurrente(p, venc, hoyISO, req, marcarOdp) {
   const [[prov]] = await pool.query('SELECT id, nombre, rut, email, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE id=?', [p.id_proveedor]);
   if (!prov) throw new Error(`Proveedor ${p.id_proveedor} no existe`);
 
@@ -179,6 +195,7 @@ async function generarUno(p, hoyISO, req) {
     [prov.id, prov.nombre, prov.rut, concepto, p.tipo_pago, p.tipo_documento || 'Factura',
      m.clase, m.bruto, m.neto, m.pct, m.imp, m.aPagar, destino,
      hoyISO, obs, USUARIO_SISTEMA, p.id]);
+  marcarOdp(r.insertId);   // desde acá la orden existe: la reserva del vencimiento ya no se devuelve
   const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
   const { id: ocId, numero } = await emitirCorrelativo({
     origen: 'GENERAL', origen_id: r.insertId, concepto: `${concepto} — ${prov.nombre}`,
@@ -235,7 +252,20 @@ programar('pagos-recurrentes', generarVencidos, 6 * 60 * 60 * 1000, { arranqueMs
 /* Por evento (Pato, 29-09-2026): al inscribir, editar o activar un recurrente cuyo vencimiento ya llegó, la ODP
    nace al tiro y no a las 6 h. Corre completo (es idempotente por fecha_ultima_generacion) medio segundo después
    de responder, para no frenar al usuario. */
-function generarTrasEvento() { setTimeout(() => generarVencidos().catch(e => console.error('[pagos-recurrentes evento]', e.message)), 500); }
+function generarTrasEvento() {
+  if (!porEvento('pagos-recurrentes')) return;   // MOTORES=off (host en espera) o staging: igual que el reloj
+  setTimeout(() => generarVencidos().catch(e => console.error('[pagos-recurrentes evento]', e.message)), 500);
+}
+/* ¿Este recurrente tiene un vencimiento que ya llegó y sin orden? La pantalla lo usa para avisar que la
+   ODP nace sola en segundos (antes recargaba antes del barrido, mostraba "vence" y el botón ⚡, y el
+   clic emitía el período SIGUIENTE). */
+async function vaAGenerar(id) {
+  const [[p]] = await pool.query('SELECT activo, fecha_proximo_pago, fecha_ultima_generacion FROM tesoreria_pagos_recurrentes WHERE id=?', [id]);
+  if (!p || !p.activo) return false;
+  const venc = fc.isoDeBD(p.fecha_proximo_pago) || String(p.fecha_proximo_pago).slice(0, 10);
+  const ult = p.fecha_ultima_generacion ? (fc.isoDeBD(p.fecha_ultima_generacion) || String(p.fecha_ultima_generacion).slice(0, 10)) : null;
+  return venc <= fc.hoyISO() && (!ult || ult < venc);
+}
 
 /* Hook desde Órdenes de Pago al PAGAR una ODP general: si nació de un pago
    recurrente, registra la fecha de último pago y avisa al proveedor con la glosa. */
@@ -312,8 +342,9 @@ exports.crear = async (req, res) => {
       [...campos(b), u.id_usuario || null, [u.nombre, u.apellido].filter(Boolean).join(' ')]);
     auditar({ req, accion: 'CREAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(r.insertId),
       detalle: `Inscribió pago recurrente «${norm(b.apodo)}» (${String(b.periodicidad).toUpperCase()}, ${b.monto_origen} ${b.moneda}, próximo ${b.fecha_proximo_pago})` });
-    ok(res, { id: r.insertId });
-    generarTrasEvento();
+    const genera = await vaAGenerar(r.insertId);
+    ok(res, { id: r.insertId, genera });
+    if (genera) generarTrasEvento();
   } catch (e) { fail(res, e.message); }
 };
 
@@ -326,8 +357,9 @@ exports.editar = async (req, res) => {
          fecha_ultimo_pago=?, fecha_proximo_pago=?, dia_pago=?, id_cuenta_bancaria=?, emisor_retiene=?, propuesto=0 WHERE id=?`, [...campos(b), id]);
     if (!r.affectedRows) return fail(res, 'Pago recurrente no encontrado', 404);
     auditar({ req, accion: 'EDITAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(id), detalle: `Editó «${norm(b.apodo)}»` });
-    ok(res, { id });
-    generarTrasEvento();
+    const genera = await vaAGenerar(id);
+    ok(res, { id, genera });
+    if (genera) generarTrasEvento();
   } catch (e) { fail(res, e.message); }
 };
 
@@ -338,8 +370,9 @@ exports.activar = async (req, res) => {
     const [r] = await pool.query('UPDATE tesoreria_pagos_recurrentes SET activo=?, propuesto=IF(?=1, 0, propuesto) WHERE id=?', [activo, activo, id]);
     if (!r.affectedRows) return fail(res, 'Pago recurrente no encontrado', 404);
     auditar({ req, accion: activo ? 'ACTIVAR' : 'PAUSAR', modulo: 'pagos-recurrentes', entidad: 'pago_recurrente', entidad_id: String(id), detalle: activo ? 'Activó el pago recurrente (genera órdenes)' : 'Desactivó el pago recurrente (no genera órdenes)' });
-    ok(res, { id, activo });
-    if (activo) generarTrasEvento();
+    const genera = activo ? await vaAGenerar(id) : false;
+    ok(res, { id, activo, genera });
+    if (genera) generarTrasEvento();
   } catch (e) { fail(res, e.message); }
 };
 
@@ -382,6 +415,15 @@ exports.generarAhora = async (req, res) => {
     const [[p]] = await pool.query('SELECT * FROM tesoreria_pagos_recurrentes WHERE id=?', [parseInt(req.params.id)]);
     if (!p) return fail(res, 'Pago recurrente no encontrado', 404);
     if (!p.activo) return fail(res, 'El pago está pausado', 400);
+    /* Solo el vencimiento que el usuario CONFIRMÓ en pantalla (30-09-2026): como la ODP de un vencido nace
+       sola al inscribir o activar, la lista puede estar desactualizada y el ⚡ emitía el período siguiente. */
+    const venc = fc.isoDeBD(p.fecha_proximo_pago) || String(p.fecha_proximo_pago).slice(0, 10);
+    const pedido = String((req.body || {}).vencimiento || '').slice(0, 10);
+    if (pedido && pedido !== venc) {
+      const [[ya]] = await pool.query('SELECT numero_odp FROM tesoreria_pagos_recurrentes_log WHERE id_pago=? AND fecha_vencimiento=? ORDER BY id DESC LIMIT 1', [p.id, pedido]);
+      const f = d => String(d).split('-').reverse().join('-');
+      return fail(res, `El vencimiento ${f(pedido)} ya tiene su orden${ya ? ' (ODP ' + ya.numero_odp + ')' : ''}; el próximo es el ${f(venc)}. La lista se actualizó.`, 409);
+    }
     const numero = await generarUno(p, fc.hoyISO(), req);
     if (!numero) return fail(res, 'Ya se generó la orden de este vencimiento', 409);
     ok(res, { numero });

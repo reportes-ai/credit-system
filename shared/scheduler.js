@@ -103,4 +103,13 @@ function anunciar() {
   }
 }
 
-module.exports = { programar, listar, motoresActivos, anunciar };
+/* Un motor que además corre POR EVENTO (una acción del usuario lo dispara al tiro) obedece el mismo
+   interruptor que su reloj: con MOTORES=off (host en espera) o en staging no debe generar nada. Sin
+   esto, inscribir un pago recurrente en el host de contingencia emitía ODP y correos igual (30-09-2026). */
+function porEvento(nombre, opts = {}) {
+  const correr = !MOTORES_OFF && (opts.enStaging === true || !esStaging());
+  if (!correr) console.log(`⏸  [scheduler] "${nombre}" por evento omitido (${MOTORES_OFF ? 'MOTORES=off' : 'entorno staging'})`);
+  return correr;
+}
+
+module.exports = { programar, porEvento, listar, motoresActivos, anunciar };

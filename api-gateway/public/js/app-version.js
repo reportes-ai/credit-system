@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v282.19';
+const APP_VERSION = 'v282.20';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -933,26 +933,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   💓 HEARTBEAT DE SESIÓN — para el informe de Desempeño Analistas.
-   Marca presencia cada 60s; el logout se deriva del último latido.
+   💓 HEARTBEAT DE SESIÓN — motor único en /js/latido-sesion.js (30-09-2026).
+   Late cada 60 s si hubo actividad real en los últimos 10 min (informe de Desempeño Analistas
+   y motor sesiones-inactivas). Vive aparte porque las páginas que NO cargan app-version.js
+   (TV del Cuadro de Mando, PWAs, Generador de Cartas…) también tienen que latir.
    ═══════════════════════════════════════════════════════════════ */
-document.addEventListener('DOMContentLoaded', () => {
-  const token = sessionStorage.getItem('token');
-  if (!token) return;
-  /* El latido solo va si hubo actividad REAL (mouse, teclado, toque, scroll o volver a la pestaña)
-     en los últimos 10 minutos: así last_seen refleja al usuario y no a una pestaña olvidada, y el
-     motor sesiones-inactivas puede cerrar la sesión según "Tiempo de inactividad" (Pato, 28-09-2026). */
-  let ultimaActividad = Date.now();
-  const marcar = () => { ultimaActividad = Date.now(); };
-  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'focus'].forEach(ev => window.addEventListener(ev, marcar, { passive: true }));
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) marcar(); });
-  const ping = () => {
-    if (Date.now() - ultimaActividad > 10 * 60000) return;
-    fetch('/api/desempeno/ping', { method: 'POST', headers: { Authorization: 'Bearer ' + token } }).catch(() => {});
-  };
-  ping();
-  setInterval(ping, 60000);
-});
+(function () { const s = document.createElement('script'); s.src = '/js/latido-sesion.js'; document.head.appendChild(s); })();
 
 /* ═══════════════════════════════════════════════════════════════
    ❔ AYUDA CONTEXTUAL — botón "?" flotante en cada página.
