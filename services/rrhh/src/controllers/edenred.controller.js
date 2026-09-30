@@ -11,7 +11,8 @@
      descuentan al mes siguiente: la nómina de M resta los días no trabajados de M-1
      (ausencias aprobadas de los tipos configurados + vacaciones si están marcadas).
    · Ingreso / baja dentro del mes: solo los días hábiles entre esas fechas.
-   · Quién recibe: rh_fichas.edenred (1 por defecto en toda ficha con sueldo base).
+   · Quién recibe: MANDA LA CASILLA rh_fichas.edenred (Pato 30-09-2026; antes exigía además sueldo base y dejaba
+     fuera a quien está a honorarios). Quien entra sin sueldo base sale EN ROJO en la nómina para que se note.
    · Generar la nómina CONGELA el mes en rh_edenred_nomina; anularla la borra (auditado).
    · 17-09-2026 (archivo real "Solicitud Autorización de Pago #1100"): las ÁREAS de lunes a
      SÁBADO (paramétrico, nace con COMERCIAL) cuentan también los sábados; AJUSTES manuales
@@ -109,11 +110,12 @@ async function calcularMes(mes) {
   const ini = primerDia(mes), fin = ultimoDia(mes);
   const [gente] = await pool.query(
     `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut, u.cargo, u.centro_costo area, u.fecha_ingreso, u.fecha_baja, f.edenred, f.jornada,
-            (x.id_usuario IS NOT NULL AND NOT (COALESCE(f.sueldo_base,0) > 0 AND COALESCE(f.edenred,1)=1)) extra
+            (x.id_usuario IS NOT NULL AND NOT (f.id_usuario IS NOT NULL AND COALESCE(f.edenred,1)=1)) extra,
+            (COALESCE(f.sueldo_base,0) = 0) sin_sueldo
        FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
        LEFT JOIN rh_edenred_extra x ON x.id_usuario=u.id_usuario
       WHERE (u.estado='activo' OR (u.fecha_baja IS NOT NULL AND u.fecha_baja > ?))
-        AND ((COALESCE(f.sueldo_base,0) > 0 AND COALESCE(f.edenred,1)=1) OR x.id_usuario IS NOT NULL)
+        AND ((f.id_usuario IS NOT NULL AND COALESCE(f.edenred,1)=1) OR x.id_usuario IS NOT NULL)
         AND (u.fecha_ingreso IS NULL OR u.fecha_ingreso <= ?)
       ORDER BY nombre`, [ini, fin]);
   // Ausencias del mes ANTERIOR que descuentan (tipos paramétricos) + vacaciones si corresponde
@@ -155,7 +157,7 @@ async function calcularMes(mes) {
     const aj = ajuste[g.id_usuario];
     const diasAj = aj ? Number(aj.dias) : 0;
     const monto = Math.max(0, Math.round((habiles - descuento + diasAj) * p.monto_diario));
-    return { id_usuario: g.id_usuario, nombre: g.nombre, rut: g.rut, cargo: g.cargo, area: g.area, sabado: sab ? 1 : 0, baja: g.fecha_baja ? 1 : 0, extra: Number(g.extra) ? 1 : 0,
+    return { id_usuario: g.id_usuario, nombre: g.nombre, rut: g.rut, cargo: g.cargo, area: g.area, sabado: sab ? 1 : 0, baja: g.fecha_baja ? 1 : 0, extra: Number(g.extra) ? 1 : 0, sin_sueldo: Number(g.sin_sueldo) ? 1 : 0,
              dias_habiles: habiles, dias_descuento: descuento, dias_ajuste: diasAj, observacion: aj?.observacion || null,
              monto_diario: p.monto_diario, monto, detalle: f.det.join(' · ') || null,
              parcial: desde !== ini || hasta !== fin ? `${desde.slice(8)}/${desde.slice(5, 7)} → ${hasta.slice(8)}/${hasta.slice(5, 7)}` : null };
@@ -174,7 +176,9 @@ const getMes = async (req, res) => {
       // Punto de color de la fila (L-S / L-V / contrato terminado): la nómina congelada guarda el área; la baja se lee del usuario
       const [bj] = await pool.query('SELECT id_usuario FROM usuarios WHERE id_usuario IN (?) AND fecha_baja IS NOT NULL', [gen.map(r => r.id_usuario)]);
       const bajas = new Set(bj.map(b => b.id_usuario));
-      data = { param: p, filas: gen.map(r => ({ ...r, sabado: p.areas.includes(sinTilde(r.area)) ? 1 : 0, baja: bajas.has(r.id_usuario) ? 1 : 0, dias_habiles: Number(r.dias_habiles), dias_descuento: Number(r.dias_descuento), dias_ajuste: Number(r.dias_ajuste), monto_diario: Number(r.monto_diario), monto: Number(r.monto) })),
+      const [ss] = await pool.query('SELECT u.id_usuario FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE u.id_usuario IN (?) AND COALESCE(f.sueldo_base,0)=0', [gen.map(r => r.id_usuario)]);
+      const sinSueldo = new Set(ss.map(b => b.id_usuario));
+      data = { param: p, filas: gen.map(r => ({ ...r, sin_sueldo: sinSueldo.has(r.id_usuario) ? 1 : 0, sabado: p.areas.includes(sinTilde(r.area)) ? 1 : 0, baja: bajas.has(r.id_usuario) ? 1 : 0, dias_habiles: Number(r.dias_habiles), dias_descuento: Number(r.dias_descuento), dias_ajuste: Number(r.dias_ajuste), monto_diario: Number(r.monto_diario), monto: Number(r.monto) })),
                mes_descuento: mesAnterior(mes), generada: true, generado_por: gen[0].generado_por, generado_at: gen[0].created_at };
     } else data = { ...(await calcularMes(mes)), generada: false };
     const [params] = await pool.query('SELECT * FROM rh_edenred_param ORDER BY mes_desde DESC');
@@ -336,7 +340,7 @@ const candidatos = async (req, res) => {
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut, u.cargo, COALESCE(f.edenred,1) edenred, COALESCE(f.sueldo_base,0) sueldo_base, f.id_usuario con_ficha
          FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE u.estado='activo' ORDER BY nombre LIMIT 500`);
     ok(res, us.filter(u => !ya.has(u.id_usuario)).map(u => ({ id_usuario: u.id_usuario, nombre: u.nombre, rut: u.rut, cargo: u.cargo,
-      motivo: !u.con_ficha ? 'sin ficha' : !Number(u.edenred) ? 'tarjeta desmarcada en la ficha' : !(Number(u.sueldo_base) > 0) ? 'sin sueldo base' : 'ingresa después de este mes' })));
+      motivo: !u.con_ficha ? 'sin ficha' : !Number(u.edenred) ? 'tarjeta desmarcada en la ficha' : 'ingresa después de este mes' })));
   } catch (e) { console.error('[edenred candidatos]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
