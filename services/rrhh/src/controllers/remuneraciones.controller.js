@@ -1421,9 +1421,11 @@ async function comisionesSinAprobar(mes, comis) {
   if (!conComision.length) return [];
   const [aps] = await pool.query("SELECT ejecutivo FROM comisiones_aprobaciones WHERE mes=? AND estado='aprobado'", [mesAnteriorDe(mes)]).catch(() => [[]]);
   const okSet = new Set(aps.map(a => String(a.ejecutivo).toUpperCase().trim()));
-  // El bono del Jefe Comercial no pasa por Revisión de Comisiones: no exige aprobación de Operaciones
-  const bonos = await bonoJefesDelMes(mesAnteriorDe(mes));
-  return conComision.filter(n => !okSet.has(n) && !(n in bonos));
+  /* `comis` trae SOLO comisiones de colocación (el Bono Jefe es un haber aparte desde el 28-09-2026, no
+     viaja aquí), así que todo lo que hay que aprobar pasa por Revisión de Comisiones: un jefe que coloca
+     necesita su aprobación igual que cualquier ejecutivo. La exención "si tiene bono" era de cuando el
+     bono venía sumado en comisiones y dejaba pasar comisiones sin aprobar (code-review 30-09-2026). */
+  return conComision.filter(n => !okSet.has(n));
 }
 
 /* ── Bono del Jefe Comercial → liquidación (Pato, 28-09-2026) ───────────────
@@ -1638,9 +1640,10 @@ const guardar = async (req, res) => {
    retención judicial tiene cuenta propia, y los anticipos y préstamos REBAJAN el activo que se
    entregó (1105010 / 1105020), no son un pasivo nuevo. */
 const esFonasaNombre = n => /fonasa/i.test(String(n || ''));
-async function totalesLibro(mes) {
+async function totalesLibro(mes, idsLiq = null) {   // idsLiq: solo esas liquidaciones (asiento complementario de una segunda emisión)
   const [liqs] = await pool.query(
-    "SELECT id_usuario, detalle, total_haberes, liquido FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
+    `SELECT id_usuario, detalle, total_haberes, liquido FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'${Array.isArray(idsLiq) ? ' AND id IN (?)' : ''}`,
+    Array.isArray(idsLiq) ? [mes, idsLiq.length ? idsLiq : [0]] : [mes]);
   const m = { sueldo_base: 0, gratificacion: 0, comisiones: 0, otros_imponibles: 0, colacion: 0, movilizacion: 0, otros_no_imponibles: 0,
               aporte_sis: 0, aporte_afc_emp: 0, aporte_mutual: 0,
               liquido: 0, afp: 0, fonasa: 0, isapre: 0, afc: 0, mutual: 0, impuesto: 0, judicial: 0, anticipos: 0, prestamos: 0, otros_descuentos: 0 };
@@ -1700,6 +1703,7 @@ const emitir = async (req, res) => {
     if (sinAprobar.length)
       return fail(res, `No se puede emitir: hay comisiones de ${mesAnteriorDe(mes)} SIN APROBAR en Revisión de Comisiones para: ${sinAprobar.join(', ')}. Apruébalas primero en /comisiones/revision/.`, 409);
     const u = req.usuario || {};
+    const [lote] = await pool.query("SELECT id FROM rh_liquidaciones WHERE mes=? AND estado='BORRADOR'", [mes]);
     const [r] = await pool.query(
       "UPDATE rh_liquidaciones SET estado='EMITIDA', emitido_por=?, emitido_at=NOW() WHERE mes=? AND estado='BORRADOR'",
       [nombreDe(u), mes]);
@@ -1708,10 +1712,16 @@ const emitir = async (req, res) => {
     // descuentos a su institución, aportes patronales al gasto y al pasivo) — motor único totalesLibro
     const [[t]] = await pool.query(
       "SELECT COALESCE(SUM(total_haberes),0) h, COALESCE(SUM(liquido),0) l, COALESCE(SUM(total_descuentos),0) d FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
-    const libro = await totalesLibro(mes);
+    /* Segunda emisión del mismo mes (alguien guardado después de emitir): el asiento REM-mes ya existe y el
+       motor rechazaría el reintento como DUPLICADO, dejando a los nuevos fuera del libro contable. Entonces
+       el asiento lleva SOLO el lote recién emitido, con ref propia REM-mes-Ln (code-review 30-09-2026). */
+    const [lotesPrevios] = await pool.query("SELECT origen_ref FROM ctb_comprobantes WHERE origen='REMUNERACIONES' AND estado='CONTABILIZADO' AND (origen_ref=? OR origen_ref LIKE ?)", [`REM-${mes}`, `REM-${mes}-L%`]);
+    const segundaEmision = lotesPrevios.length > 0;
+    const refLibro = segundaEmision ? `REM-${mes}-L${lotesPrevios.length + 1}` : `REM-${mes}`;
+    const libro = await totalesLibro(mes, segundaEmision ? lote.map(x => x.id) : null);
     if (!libro.cuadra) console.error(`[remuneraciones emitir] el libro ${mes} no cuadra: debe $${libro.debe} ≠ haber $${libro.haber} — el motor de asientos lo va a rechazar como DESCUADRE (ver ctb_eventos_log)`);
     require('../../../contabilidad/src/motor-asientos').contabilizar({
-      evento: 'REMUNERACIONES', glosa: `Libro de remuneraciones ${mes} (${libro.personas} colaboradores)`, ref: `REM-${mes}`,
+      evento: 'REMUNERACIONES', glosa: `Libro de remuneraciones ${mes} (${libro.personas} colaboradores${segundaEmision ? ', lote ' + (lotesPrevios.length + 1) + ' — emitidos después del libro' : ''})`, ref: refLibro,
       fecha: (() => { const [y, m] = mes.split('-').map(Number); return `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; })(),   // último día del mes del libro (auditoría 24-09-2026, A4)
       montos: libro.montos,
     }).then(async (idAsiento) => {
@@ -1719,7 +1729,7 @@ const emitir = async (req, res) => {
       // Solo si el asiento existe (recién creado o ya contabilizado antes por la misma ref): si el motor devolvió null por
       // SIN_REGLA / DESCUADRE / MES_CERRADO, la provisión se queda hasta que el asiento entre (code-review 25-09-2026).
       if (!idAsiento) {
-        const [[ya]] = await pool.query("SELECT id FROM ctb_comprobantes WHERE origen='REMUNERACIONES' AND origen_ref=? AND estado='CONTABILIZADO' LIMIT 1", [`REM-${mes}`]);
+        const [[ya]] = await pool.query("SELECT id FROM ctb_comprobantes WHERE origen='REMUNERACIONES' AND origen_ref=? AND estado='CONTABILIZADO' LIMIT 1", [refLibro]);
         if (!ya) { console.warn(`[remuneraciones emitir→provisión] sin asiento REMUNERACIONES para ${mes}: provisión de sueldos NO liberada (ver ctb_eventos_log)`); return; }
       }
       const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || 'RRHH';
@@ -1925,13 +1935,15 @@ async function onOdpPagadaJudicial(idOrdenPago) {
 const MESES_TXT = ['', 'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
 const mesPalabras = m => `${MESES_TXT[Number(String(m).slice(5, 7))] || ''} ${String(m).slice(0, 4)}`;
 
-async function enviarLiquidacionesCorreo(mes) {
+async function enviarLiquidacionesCorreo(mes, idOdp = null) {
   const cap = t => { const s = String(t || ''); return s.charAt(0).toUpperCase() + s.slice(1); };   // "Septiembre 2026"
   const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
-  // Solo las que aún no se enviaron (correo_enviado_at): el hook de la ODP puede correr más de una vez
+  // Solo las que aún no se enviaron (correo_enviado_at): el hook de la ODP puede correr más de una vez.
+  // Con idOdp, solo las que ESA orden paga (más las sin vínculo, emitidas antes de que existiera).
   const [liqs] = await pool.query(
     `SELECT l.*, u.email FROM rh_liquidaciones l JOIN usuarios u ON u.id_usuario=l.id_usuario
-      WHERE l.mes=? AND l.estado='EMITIDA' AND l.correo_enviado_at IS NULL AND u.email IS NOT NULL`, [mes]);
+      WHERE l.mes=? AND l.estado='EMITIDA' AND l.correo_enviado_at IS NULL AND u.email IS NOT NULL
+        ${idOdp ? 'AND (l.id_odp_sueldos=? OR l.id_odp_sueldos IS NULL)' : ''}`, idOdp ? [mes, idOdp] : [mes]);
   const co = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
   let enviadas = 0;
   for (const l of liqs) {
@@ -1951,7 +1963,9 @@ async function enviarLiquidacionesCorreo(mes) {
       </table>
       <p style="font-size:12px;color:#64748b">El detalle completo e imprimible está en el Business Suite → Recursos Humanos → <a href="https://app.autofacilchile.cl/recursos-humanos/mi-ficha/">Mi Ficha</a>.</p>`;
     try {
-      await enviarCorreo({ to: l.email, subject: `Aviso de Pago de Remuneración ${cap(mesPalabras(mes))} — AutoFácil`, html: envolverHTML ? envolverHTML(html) : html });
+      // enviarCorreo NO lanza: devuelve { ok:false, error } — sin mirar ok, la liquidación quedaba marcada como enviada sin haber salido (code-review 30-09-2026)
+      const r = await enviarCorreo({ to: l.email, subject: `Aviso de Pago de Remuneración ${cap(mesPalabras(mes))} — AutoFácil`, html: envolverHTML ? envolverHTML(html) : html });
+      if (!r || r.ok === false) { console.error('[remuneraciones correo]', l.email, (r && r.error) || 'sin respuesta del mailer'); continue; }
       await pool.query('UPDATE rh_liquidaciones SET correo_enviado_at=NOW() WHERE id=?', [l.id]);
       enviadas++;
     } catch (e) { console.error('[remuneraciones correo]', l.email, e.message); }
@@ -2610,14 +2624,15 @@ async function getNominaBanco(req, res) {
 }
 /* Datos puros de la Nómina Banco (motor único): los usa el botón Nómina Banco y la ODP de sueldos
    que nace al emitir (adjunto CSV). null si el mes no tiene liquidaciones emitidas. */
-async function nominaBancoDatos(mes) {
+async function nominaBancoDatos(mes, idsLiq = null) {   // idsLiq: solo esas liquidaciones (la ODP de sueldos arma la nómina de SUS filas)
   {
     const [liqs] = await pool.query(
-      `SELECT l.id_usuario, l.liquido, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut, u.email,
+      `SELECT l.id, l.id_usuario, l.liquido, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut, u.email,
               f.banco_pago, f.tipo_cuenta_pago, f.num_cuenta_pago
          FROM rh_liquidaciones l JOIN usuarios u ON u.id_usuario=l.id_usuario
          LEFT JOIN rh_fichas f ON f.id_usuario=l.id_usuario
-        WHERE l.mes=? AND l.estado='EMITIDA' ORDER BY u.apellido, u.nombre`, [mes]);
+        WHERE l.mes=? AND l.estado='EMITIDA'${Array.isArray(idsLiq) ? ' AND l.id IN (?)' : ''} ORDER BY u.apellido, u.nombre`,
+      Array.isArray(idsLiq) ? [mes, idsLiq.length ? idsLiq : [0]] : [mes]);
     if (!liqs.length) return null;
     const avisos = [], filas = [];
     let total = 0;
@@ -2633,7 +2648,7 @@ async function nominaBancoDatos(mes) {
       else if (!bancoCod) avisos.push(`${l.nombre}: banco "${l.banco_pago}" sin código SBIF conocido — revisa el nombre en la ficha`);
       // CuentaRUT: el número es el RUT sin DV
       const esRut = /RUT/i.test(String(l.tipo_cuenta_pago || '')) || /RUT/i.test(bancoNom);
-      filas.push({ rut: String(l.rut || '').replace(/\./g, '').toUpperCase(), nombre: l.nombre,
+      filas.push({ id_liq: l.id, rut: String(l.rut || '').replace(/\./g, '').toUpperCase(), nombre: l.nombre,
         banco: l.banco_pago || '', banco_cod: bancoCodCat || (bancoCod ? BANCOS_SBIF[bancoCod] : ''),
         tipo_cuenta: esRut ? 'CUENTA RUT' : String(l.tipo_cuenta_pago || 'CORRIENTE').toUpperCase(),
         cuenta, monto: liquido, email: l.email || '', glosa: `SUELDO ${mes}` });
@@ -2648,56 +2663,109 @@ async function nominaBancoDatos(mes) {
    figura que los anticipos) con la Nómina Banco adjunta en CSV y el detalle por persona. Las
    liquidaciones NO se mandan por correo al emitir: se mandan cuando Tesorería PAGA esta ODP
    (hook onOdpPagadaRemuneraciones) — la persona recibe su liquidación junto con el depósito.
-   Idempotente por concepto. */
+   Cada liquidación sabe qué ODP la paga (rh_liquidaciones.id_odp_sueldos). Si después de emitir se emite a
+   alguien más (un ingreso que faltaba, una liquidación guardada tarde), esas filas NO tienen ODP: si la ODP
+   del mes sigue EMITIDA se le suman (monto, detalle y CSV nuevos); si ya se PAGÓ, nace una ODP complemento
+   con solo las nuevas — y al pagarla salen sus correos. Antes la segunda emisión devolvía la ODP existente
+   sin tocarla: los nuevos líquidos no se pagaban y, si ya estaba pagada, esas personas nunca recibían su
+   liquidación (code-review 30-09-2026). */
 require('../../../../shared/migrate').enFila('rh-liq-correo-enviado', async () => {
   await pool.query('ALTER TABLE rh_liquidaciones ADD COLUMN IF NOT EXISTS correo_enviado_at DATETIME NULL').catch(() => {});
+  await pool.query('ALTER TABLE rh_liquidaciones ADD COLUMN IF NOT EXISTS id_odp_sueldos INT NULL').catch(() => {});
+  // Liquidaciones emitidas antes de esta columna: se cuelgan de la ODP vigente de su mes (idempotente)
+  await pool.query(`UPDATE rh_liquidaciones l JOIN ordenes_pago o ON o.concepto=CONCAT('Remuneraciones ', l.mes, ' — sueldos líquidos según Nómina Banco adjunta') AND o.estado<>'ANULADA'
+    SET l.id_odp_sueldos=o.id WHERE l.estado='EMITIDA' AND l.id_odp_sueldos IS NULL`).catch(() => {});
 });
 const SUELDOS_CONCEPTO = mes => `Remuneraciones ${mes} — sueldos líquidos según Nómina Banco adjunta`;
 // Cómo se reconoce esa ODP (única fuente: la usan el correo de las liquidaciones y el asiento SUELDOS_PAGADOS al pagarla)
 const RE_ODP_SUELDOS = /^Remuneraciones (\d{4}-\d{2}) — sueldos líquidos/;
+/* Observaciones + CSV de la Nómina Banco de una ODP de sueldos (motor único para nacer y para actualizarse) */
+function textoOdpSueldos(mes, d, complemento) {
+  const co = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
+  const obs = `Generada automáticamente al EMITIR las liquidaciones de ${mes}${complemento ? ' (COMPLEMENTO: liquidaciones emitidas después de pagar la ODP anterior del mes)' : ''}. Pagar por Nómina Banco (CSV adjunto). ` +
+    `AL MARCAR PAGADA se envía a cada colaborador su liquidación por correo.\nDetalle (${d.filas.length} personas):\n` +
+    d.filas.map(f => ` • ${f.nombre} (${f.rut || '—'}): ${f.banco || 'sin banco'} ${f.tipo_cuenta || ''} ${f.cuenta || ''} — ${co(f.monto)}`).join('\n') +
+    (d.avisos.length ? `\nAVISOS: ${d.avisos.join(' · ')}` : '') + `\nTOTAL líquidos: ${co(d.total)}`;
+  const csv = '﻿' + ['RUT;Nombre;Banco;Codigo SBIF;Tipo cuenta;N cuenta;Monto;Email;Glosa']
+    .concat(d.filas.map(f => [f.rut, f.nombre, f.banco, f.banco_cod, f.tipo_cuenta, f.cuenta, f.monto, f.email, f.glosa].map(x => String(x == null ? '' : x).replace(/;/g, ',')).join(';'))).join('\r\n');
+  return { obs, csv };
+}
+/* Adjunta la Nómina Banco a la ODP reemplazando la anterior (regla del almacén: capturar doc_ruta antes del DELETE, borrar el objeto después) */
+async function adjuntarNominaOdp(idOdp, mes, csv, usuario) {
+  try {
+    const pv = require('../../../postventa/src/controllers/postventa.controller');
+    const [viejos] = await pool.query("SELECT id, doc_ruta FROM postventa_factura_docs WHERE origen='ODP' AND ref_id=? AND nombre=?", [idOdp, `Nomina-Banco-${mes}.csv`]);
+    await pv.guardarFacturaDoc({ origen: 'ODP', ref_id: idOdp, nombre: `Nomina-Banco-${mes}.csv`, mime: 'text/csv', buffer: Buffer.from(csv, 'utf8'), usuario });
+    if (viejos.length) {
+      await pool.query('DELETE FROM postventa_factura_docs WHERE id IN (?)', [viejos.map(v => v.id)]);
+      const alm = require('../../../../shared/almacen-docs');
+      for (const v of viejos) if (v.doc_ruta) await alm.borrar(v.doc_ruta).catch(() => {});
+    }
+  } catch (e) { console.error('[remuneraciones ODP sueldos adjunto]', e.message); }
+}
 async function ordenPagoSueldos(mes, req) {
-  const d = await nominaBancoDatos(mes);
-  if (!d || !d.filas.length || !(d.total > 0)) return null;
   const concepto = SUELDOS_CONCEPTO(mes);
-  const [[ya]] = await pool.query("SELECT numero FROM ordenes_pago WHERE concepto=? AND estado<>'ANULADA' LIMIT 1", [concepto]);
-  if (ya) return { numero: ya.numero, total: d.total, existente: true };
+  const [[ya]] = await pool.query("SELECT id, numero, estado FROM ordenes_pago WHERE concepto=? AND estado<>'ANULADA' LIMIT 1", [concepto]);
+  // Liquidaciones emitidas del mes que todavía no tienen ODP (o la tenían en una ODP anulada)
+  const [pend] = await pool.query(
+    `SELECT l.id FROM rh_liquidaciones l LEFT JOIN ordenes_pago o ON o.id=l.id_odp_sueldos
+      WHERE l.mes=? AND l.estado='EMITIDA' AND (l.id_odp_sueldos IS NULL OR o.id IS NULL OR o.estado='ANULADA')`, [mes]);
+  const idsPend = pend.map(x => x.id);
+  const u = (req && req.usuario) || {}, hoy = hoyChile();
+  const quien = nombreDe(u) || 'Sistema';
+  if (!idsPend.length) return ya ? { numero: ya.numero, existente: true } : null;
+  const { calcularDoc } = require('../../../ordenes-pago/src/controllers/ordenes-pago.controller');
+  if (ya && ya.estado !== 'PAGADA') {
+    // La ODP del mes sigue sin pagar: absorbe las nuevas liquidaciones (monto, detalle y CSV se rehacen con TODAS sus filas)
+    await pool.query('UPDATE rh_liquidaciones SET id_odp_sueldos=? WHERE id IN (?)', [ya.id, idsPend]);
+    const [suyas] = await pool.query('SELECT id FROM rh_liquidaciones WHERE id_odp_sueldos=?', [ya.id]);
+    const d = await nominaBancoDatos(mes, suyas.map(x => x.id));
+    if (!d || !(d.total > 0)) return { numero: ya.numero, existente: true };
+    const m = await calcularDoc('Otros', 'EXENTO', d.total);
+    const { obs, csv } = textoOdpSueldos(mes, d, false);
+    const [up] = await pool.query('UPDATE ordenes_pago SET monto_bruto=?, monto_neto=?, impuesto_pct=?, impuesto_monto=?, monto=?, observaciones=? WHERE id=? AND estado<>\'PAGADA\'',
+      [m.bruto, m.neto, m.pct, m.imp, m.aPagar, obs, ya.id]);
+    if (!up.affectedRows) { console.error(`[remuneraciones ODP sueldos] la ODP ${ya.numero} no se pudo actualizar (¿se pagó entre medio?)`); return { numero: ya.numero, existente: true }; }
+    await pool.query("UPDATE op_correlativos SET monto=? WHERE origen='GENERAL' AND origen_id=?", [m.aPagar, ya.id]);
+    await adjuntarNominaOdp(ya.id, mes, csv, quien);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'orden_pago', entidad_id: String(ya.id),
+      detalle: `ODP ${ya.numero} de sueldos ${mes} actualizada a $${Math.round(d.total).toLocaleString('es-CL')} (${d.filas.length} personas): se sumaron ${idsPend.length} liquidación(es) emitida(s) después` });
+    return { numero: ya.numero, total: d.total, personas: d.filas.length, actualizada: true, sumadas: idsPend.length };
+  }
+  // Sin ODP del mes (primera emisión) o ya PAGADA (nace un complemento con solo las nuevas)
+  const complemento = !!ya;
+  const d = await nominaBancoDatos(mes, idsPend);
+  if (!d || !d.filas.length || !(d.total > 0)) return ya ? { numero: ya.numero, existente: true } : null;
+  const conceptoOdp = complemento ? `${concepto} (complemento ${hoy})` : concepto;
   let [[prov]] = await pool.query("SELECT id, nombre FROM proveedores WHERE UPPER(nombre) LIKE 'DE ACUERDO A N%MINA ADJUNTA%' LIMIT 1");
   if (!prov) {
     const [np] = await pool.query('INSERT INTO proveedores (nombre, activo, comentario) VALUES (?,1,?)', ['DE ACUERDO A NÓMINA ADJUNTA', 'Beneficiario genérico para pagos masivos al personal (TEF con nómina adjunta).']);
     prov = { id: np.insertId, nombre: 'DE ACUERDO A NÓMINA ADJUNTA' };
   }
-  const { calcularDoc } = require('../../../ordenes-pago/src/controllers/ordenes-pago.controller');
   const m = await calcularDoc('Otros', 'EXENTO', d.total);   // sueldos: sin impuesto
-  const u = (req && req.usuario) || {}, hoy = hoyChile();
   const co = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
-  const obs = `Generada automáticamente al EMITIR las liquidaciones de ${mes}. Pagar por Nómina Banco (CSV adjunto). ` +
-    `AL MARCAR PAGADA se envía a cada colaborador su liquidación por correo.\nDetalle (${d.filas.length} personas):\n` +
-    d.filas.map(f => ` • ${f.nombre} (${f.rut || '—'}): ${f.banco || 'sin banco'} ${f.tipo_cuenta || ''} ${f.cuenta || ''} — ${co(f.monto)}`).join('\n') +
-    (d.avisos.length ? `\nAVISOS: ${d.avisos.join(' · ')}` : '') + `\nTOTAL líquidos: ${co(d.total)}`;
+  const { obs, csv } = textoOdpSueldos(mes, d, complemento);
   const [r] = await pool.query(
     `INSERT INTO ordenes_pago (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento, tratamiento,
         monto_bruto, monto_neto, impuesto_pct, impuesto_monto, monto, destino, fecha_emision, fecha_documento, metodo_pago, estado, observaciones, id_usuario, usuario_nombre)
      VALUES (?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?,'Transferencia','EMITIDA',?,?,?)`,
-    [prov.id, prov.nombre, null, concepto, 'Remuneraciones', 'Otros', m.clase, m.bruto, m.neto, m.pct, m.imp, m.aPagar, 'Según Nómina Banco adjunta', hoy, hoy, obs, u.id_usuario || null, nombreDe(u) || 'Sistema']);
+    [prov.id, prov.nombre, null, conceptoOdp, 'Remuneraciones', 'Otros', m.clase, m.bruto, m.neto, m.pct, m.imp, m.aPagar, 'Según Nómina Banco adjunta', hoy, hoy, obs, u.id_usuario || null, quien]);
   const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
-  const { numero } = await emitirCorrelativo({ origen: 'GENERAL', origen_id: r.insertId, concepto, monto: m.aPagar, id_usuario: u.id_usuario || null, usuario_nombre: nombreDe(u) || 'Sistema' });
+  const { numero } = await emitirCorrelativo({ origen: 'GENERAL', origen_id: r.insertId, concepto: conceptoOdp, monto: m.aPagar, id_usuario: u.id_usuario || null, usuario_nombre: quien });
   await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
-  try {
-    const csv = '﻿' + ['RUT;Nombre;Banco;Codigo SBIF;Tipo cuenta;N cuenta;Monto;Email;Glosa']
-      .concat(d.filas.map(f => [f.rut, f.nombre, f.banco, f.banco_cod, f.tipo_cuenta, f.cuenta, f.monto, f.email, f.glosa].map(x => String(x == null ? '' : x).replace(/;/g, ',')).join(';'))).join('\r\n');
-    const pv = require('../../../postventa/src/controllers/postventa.controller');
-    await pv.guardarFacturaDoc({ origen: 'ODP', ref_id: r.insertId, nombre: `Nomina-Banco-${mes}.csv`, mime: 'text/csv', buffer: Buffer.from(csv, 'utf8'), usuario: nombreDe(u) || 'Sistema' });
-  } catch (e) { console.error('[remuneraciones ODP sueldos adjunto]', e.message); }
+  await pool.query('UPDATE rh_liquidaciones SET id_odp_sueldos=? WHERE id IN (?)', [r.insertId, idsPend]);
+  await adjuntarNominaOdp(r.insertId, mes, csv, quien);
   auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'orden_pago', entidad_id: String(r.insertId),
-    detalle: `ODP ${numero} de sueldos ${mes} por ${co(d.total)} (${d.filas.length} personas, Nómina Banco adjunta), generada al emitir las liquidaciones` });
-  return { numero, total: d.total, personas: d.filas.length };
+    detalle: `ODP ${numero} de sueldos ${mes}${complemento ? ' (complemento: la ODP ' + ya.numero + ' ya estaba pagada)' : ''} por ${co(d.total)} (${d.filas.length} personas, Nómina Banco adjunta), generada al emitir las liquidaciones` });
+  return { numero, total: d.total, personas: d.filas.length, complemento };
 }
-/* Hook desde Órdenes de Pago → Pagar: la ODP de sueldos pagada dispara el correo de las liquidaciones. */
+/* Hook desde Órdenes de Pago → Pagar: la ODP de sueldos pagada dispara el correo de SUS liquidaciones
+   (las que la ODP paga; las emitidas antes de existir el vínculo también salen). */
 async function onOdpPagadaRemuneraciones(idOrdenPago) {
   const [[o]] = await pool.query('SELECT concepto FROM ordenes_pago WHERE id=?', [idOrdenPago]);
   const m = o && String(o.concepto || '').match(RE_ODP_SUELDOS);
   if (!m) return null;
-  const n = await enviarLiquidacionesCorreo(m[1]);
+  const n = await enviarLiquidacionesCorreo(m[1], idOrdenPago);
   console.log(`[remuneraciones] ODP de sueldos ${m[1]} pagada → ${n} liquidaciones enviadas por correo`);
   return n;
 }
@@ -2804,4 +2872,4 @@ const avisoPrelacion = async (req, res) => {
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic, editarAdicional, asignacionFicha,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion, haberesProyectados, prelacionDescuentos, avisoPrelacion,
-  getDescuentos, crearDescuento, editarDescuento, anularDescuento, ordenesPagoJudiciales, proveedorBeneficiario, onOdpPagadaJudicial, onOdpPagadaRemuneraciones, RE_ODP_SUELDOS, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
+  getDescuentos, crearDescuento, editarDescuento, anularDescuento, ordenesPagoJudiciales, proveedorBeneficiario, onOdpPagadaJudicial, onOdpPagadaRemuneraciones, RE_ODP_SUELDOS, nominaBancoDatos, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };

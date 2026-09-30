@@ -700,11 +700,20 @@ async function constituirEjecutivoMes(mes, usuario = 'Motor provisiones') {
     return out;
   } catch (e) { console.error('[provisiones constituirEjecutivoMes]', mes, e.message); return { ...out, error: e.message }; }
 }
+/* Una fila que quedó en $0 no tiene nada que reversar (los ajustes -AJn ya devolvieron todo el monto): se cierra
+   LIBERADA sin asiento. Si se intentara liberarla con un asiento en cero, el motor la rechazaría ("Todos los montos
+   en cero") y la fila volvería a CONSTITUIDA — ERROR en cada sincronización, para siempre (code-review 30-09-2026). */
+async function cerrarFilaEnCero(p, motivo, fecha, contra, idComp = null) {
+  const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, liberada_contra=?, id_comprobante_liberacion=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'",
+    [motivo, fecha, String(contra || motivo).slice(0, 240), idComp, p.id]);
+  return u.affectedRows ? { id: p.id, monto: 0, sin_asiento: true } : { skip: 'carrera: ya liberada' };
+}
 /* Libera una fila EJECUTIVO (mensual, o legado por crédito) */
 async function _liberarFilaEjecutivo(p, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
   const C = CONCEPTOS.EJECUTIVO;
   try {
     const fecha = await fechaContable(fechaISO || hoyISO());
+    if (!Math.round(Number(p.monto))) return cerrarFilaEnCero(p, motivo, fecha, contra || 'Fila en $0: nada que reversar (por ' + usuario + ')');
     const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, liberada_contra=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'",
       [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
     if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
@@ -797,6 +806,7 @@ async function ajustarEjecutivoMes(mes, usuario = 'Motor provisiones') {
     if (!id) continue;   // sin asiento no se mueve la fila (queda en el log del motor)
     mj.ajustes = n; mj.creditos = f ? f.creditos : 0; mj.historial = [...(mj.historial || []), { n, fecha: hoyISO(), de: Math.round(Number(p.monto)), a: nuevo, comp: id }].slice(-8);
     await pool.query('UPDATE ctb_provisiones SET monto=?, montos_json=?, updated_at=NOW() WHERE id=?', [nuevo, jsonFila(mj), p.id]);
+    if (!nuevo) await cerrarFilaEnCero(p, 'AJUSTE', fecha, 'El motor pasó a $0 (ajuste ' + n + ', por ' + usuario + ')', id);   // el -AJn ya reversó todo
     out.ajustadas++; out.delta += delta;
   }
   return out;
@@ -830,7 +840,9 @@ async function sincronizarEjecutivo(usuario = 'Motor provisiones') {
    bucket comisiones). Para no duplicar, la proyección de SUELDOS resta el bono_jefe igual que resta las
    comisiones. */
 const idJefeMes = (idJefe, mes) => 'JEFE' + idJefe + '|' + mes;
-/* Bono del mes por jefe según el motor único del BSC → [{ id_jefe, jefe, total, variable, semana }] */
+/* Bono del mes por jefe según el motor único del BSC → [{ id_jefe, jefe, total, variable, semana }].
+   Si el BSC de un jefe revienta, el jefe sale con { error } y NO como $0: un error del motor no es un bono
+   en cero, y tratarlo así liberaba la provisión entera (code-review 30-09-2026). */
 async function bonosMotorMes(mes) {
   const BJ = require('../../comisiones/src/controllers/bono-jefe.controller');
   const out = [];
@@ -840,7 +852,7 @@ async function bonosMotorMes(mes) {
       const pr = (r && r.premio) || {};
       const total = Math.round(Number(pr.total_variable) || 0);
       if (total > 0) out.push({ id_jefe: j.id_usuario, jefe: String(r.jefe_nombre || j.nombre || '').toUpperCase().trim(), total, variable: Math.round(Number(pr.variable) || 0), semana: Math.round(Number(pr.semana_corrida) || 0) });
-    } catch (e) { console.error('[provisiones bonosMotorMes]', mes, j.nombre, e.message); }
+    } catch (e) { console.error('[provisiones bonosMotorMes]', mes, j.nombre, e.message); out.push({ id_jefe: j.id_usuario, jefe: String(j.nombre || '').toUpperCase().trim(), total: 0, error: e.message }); }
   }
   return out;
 }
@@ -855,6 +867,7 @@ async function constituirJefeMes(mes, usuario = 'Motor provisiones') {
     if (await libroRemuneracionesContabilizado(mesSiguienteDe(mes))) return { ...out, skip: 'ya devengó en la liquidación de ' + mesSiguienteDe(mes) };
     const fecha = await fechaContable(ultimoDiaMes(mes));
     for (const f of await bonosMotorMes(mes)) {
+      if (f.error) { out.omitidas++; continue; }
       const oid = idJefeMes(f.id_jefe, mes);
       const [[ya]] = await pool.query("SELECT id FROM ctb_provisiones WHERE concepto='JEFE' AND origen_tipo='JEFE_MES' AND origen_id=?", [oid]);
       if (ya) { out.omitidas++; continue; }
@@ -883,6 +896,7 @@ async function ajustarJefeMes(mes, usuario = 'Motor provisiones') {
   const fecha = await fechaContable(ultimoDiaMes(mes));
   for (const p of abiertas) {
     const f = motor.get(p.origen_id);
+    if (f && f.error) { console.warn('[provisiones ajustarJefeMes]', p.origen_id, 'BSC con error, la fila se conserva:', f.error); continue; }
     const nuevo = f ? f.total : 0;
     const delta = nuevo - Math.round(Number(p.monto));
     if (!delta) continue;
@@ -896,6 +910,7 @@ async function ajustarJefeMes(mes, usuario = 'Motor provisiones') {
     if (!id) continue;
     mj.ajustes = n; if (f) { mj.variable = f.variable; mj.semana = f.semana; } mj.historial = [...(mj.historial || []), { n, fecha: hoyISO(), de: Math.round(Number(p.monto)), a: nuevo, comp: id }].slice(-8);
     await pool.query('UPDATE ctb_provisiones SET monto=?, montos_json=?, updated_at=NOW() WHERE id=?', [nuevo, jsonFila(mj), p.id]);
+    if (!nuevo) await cerrarFilaEnCero(p, 'AJUSTE', fecha, 'El motor pasó a $0 (ajuste ' + n + ', por ' + usuario + ')', id);   // el -AJn ya reversó todo
     out.ajustadas++; out.delta += delta;
   }
   return out;
@@ -904,6 +919,7 @@ async function _liberarFilaJefe(p, motivo = 'MANUAL', fechaISO = null, usuario =
   const C = CONCEPTOS.JEFE;
   try {
     const fecha = await fechaContable(fechaISO || hoyISO());
+    if (!Math.round(Number(p.monto))) return cerrarFilaEnCero(p, motivo, fecha, contra || 'Fila en $0: nada que reversar (por ' + usuario + ')');
     const [u] = await pool.query("UPDATE ctb_provisiones SET estado='LIBERADA', motivo_liberacion=?, fecha_liberacion=?, liberada_contra=?, updated_at=NOW() WHERE id=? AND estado='CONSTITUIDA'",
       [motivo, fecha, String(contra || (motivo === 'MANUAL' ? 'Liberación manual por ' + usuario : motivo)).slice(0, 240), p.id]);
     if (!u.affectedRows) return { skip: 'carrera: ya liberada' };
