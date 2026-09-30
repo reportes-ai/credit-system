@@ -117,4 +117,22 @@ function isoDeBD(d) {
   return new Date(d.getTime() + ms).toISOString().slice(0, 10);
 }
 
-module.exports = { TZ, isoDe, isoDeBD, mesDe, hoyISO, mesActualISO, desdeISO, sumarDias, sumarMeses, primerDiaMes, finDelDia };
+/* ── LECTOR MIXTO: para helpers que reciben tanto fechas de la base como fechas armadas en
+   el código (new Date(), new Date(y,m,d), 'AAAA-MM-DD'T12:00) ─────────────────────────────
+   Una DATE de la base es medianoche exacta bajo el offset de mysql2: esa se lee con isoDeBD
+   (getDate() la corría al día anterior cuando la fecha cae en el otro horario — cumpleaños
+   01-10-1989 avisado el 30-09, 30-09-2026). Cualquier otro Date se lee con los getters
+   locales, que es como se construyó. Los textos pasan tal cual (primeros 10). */
+function isoFlex(d) {
+  if (d == null || d === '') return '';
+  if (!(d instanceof Date)) return String(d).slice(0, 10);
+  if (isNaN(d)) return '';
+  let off = '-04:00';
+  try { off = require('./config/database').offsetBD() || off; } catch (_) {}
+  const m = /^([+-])(\d{2}):(\d{2})$/.exec(off);
+  const ms = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : -4 * 3600000;
+  if ((d.getTime() + ms) % 86400000 === 0) return new Date(d.getTime() + ms).toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+module.exports = { TZ, isoDe, isoDeBD, isoFlex, mesDe, hoyISO, mesActualISO, desdeISO, sumarDias, sumarMeses, primerDiaMes, finDelDia };

@@ -36,7 +36,7 @@ const fail = (res, msg, code = 500) => res.status(code).json({ success: false, d
 const nombreDe = u => `${u?.nombre || ''} ${u?.apellido || ''}`.trim() || u?.email || null;
 const CLP = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
 const mesOk = m => /^\d{4}-\d{2}$/.test(m || '');
-const iso = d => d instanceof Date ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : String(d || '').slice(0, 10);
+const iso = require('../../../../shared/fecha-chile').isoFlex; // motor único shared/fecha-chile.isoFlex: las DATE de la base no se leen con getDate() (se corrían un día con el cambio de hora)
 const fechaOk = f => /^\d{4}-\d{2}-\d{2}$/.test(f || '');
 const RELACIONES = ['CONYUGE', 'CONVIVIENTE CIVIL', 'HIJO', 'OTRO'];
 

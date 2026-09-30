@@ -340,8 +340,8 @@ async function varsVersion(mes) {
 /* Fecha a medianoche LOCAL. new Date('2026-02-05') se parsea como UTC y en Chile
    (-04) retrocede al día 4: con eso los cortes de tramo salían un día antes. */
 function fechaLocal(f) {
-  if (f instanceof Date) return new Date(f.getFullYear(), f.getMonth(), f.getDate());
-  const [y, m, d] = String(f).slice(0, 10).split('-').map(Number);
+  // isoFlex: una DATE de la base se lee deshaciendo el offset de mysql2, no con getDate() (30-09-2026)
+  const [y, m, d] = require('../../../../shared/fecha-chile').isoFlex(f).split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 }
 

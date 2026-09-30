@@ -42,7 +42,7 @@ const fail = (res, msg, code = 500) => res.status(code).json({ success: false, d
 const TIPOS = ['LAPTOP', 'CELULAR', 'OTRO'];
 const TIPO_LABEL = { LAPTOP: 'Laptop', CELULAR: 'Celular', OTRO: 'Otro' };
 const nombreDe = u => [u?.nombre, u?.apellido].filter(Boolean).join(' ') || u?.email || 'Sistema';
-const isoFecha = f => f instanceof Date ? `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}` : String(f || '').slice(0, 10);
+const isoFecha = require('../../../../shared/fecha-chile').isoFlex; // motor único shared/fecha-chile.isoFlex: las DATE de la base no se leen con getDate() (se corrían un día con el cambio de hora)
 const hoyChile = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const fmtD = s => { const [y, m, d] = isoFecha(s).split('-'); return d ? `${d}/${m}/${y}` : ''; };
 

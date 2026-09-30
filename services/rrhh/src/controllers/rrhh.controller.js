@@ -535,8 +535,7 @@ function hoyChile() {
 }
 // mysql2 devuelve DATE como objeto Date → normalizar SIEMPRE a 'YYYY-MM-DD' local
 function isoFecha(f) {
-  if (f instanceof Date) return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`;
-  return String(f || '').slice(0, 10);
+  return require('../../../../shared/fecha-chile').isoFlex(f); // motor único shared/fecha-chile.isoFlex: las DATE de la base no se leen con getDate() (se corrían un día con el cambio de hora)
 }
 // MOTOR ÚNICO rrhh-core.mesesAntiguedad (mismo del finiquito)
 const mesesAntiguedad = (fechaIngreso, hasta) =>

@@ -33,7 +33,7 @@ const nombreDe = u => `${u?.nombre || ''} ${u?.apellido || ''}`.trim() || u?.ema
 const CLP = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
 const mesOk = m => /^\d{4}-\d{2}$/.test(m || '');
 const mesAnterior = m => { let [y, mm] = m.split('-').map(Number); mm--; if (mm < 1) { mm = 12; y--; } return `${y}-${String(mm).padStart(2, '0')}`; };
-const iso = d => d instanceof Date ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : String(d || '').slice(0, 10);
+const iso = require('../../../../shared/fecha-chile').isoFlex; // motor único shared/fecha-chile.isoFlex: las DATE de la base no se leen con getDate() (se corrían un día con el cambio de hora)
 
 const TIPOS_DEFAULT = 'LICENCIA MEDICA,PERMISO SIN GOCE,AUSENCIA INJUSTIFICADA,VACACIONES';
 
