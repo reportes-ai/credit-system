@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parámetros de Crédito — AutoFácil</title>
-  <!-- v1.4 cap_dias_gracia en el footer · v1.3 navbar migrada al componente topnav -->
+  <!-- v1.5 Incorporación a cartola: fecha de corte · v1.4 cap_dias_gracia en el footer · v1.3 navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -133,12 +133,34 @@
       </div>
     </div>
 
+    <!-- Incorporación a cartola ------------------------------------------- -->
+    <div class="card" style="margin-top:18px">
+      <div class="card-head">
+        <div class="card-head-left"><i class="bi bi-journal-plus"></i> Incorporación a cartola</div>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:6px 0">
+          <div style="flex:1;min-width:280px">
+            <div style="font-weight:600;font-size:.92rem">Otorgadas sin carta: mirar desde</div>
+            <div style="font-size:.8rem;color:#64748b;margin-top:3px">
+              Las operaciones otorgadas antes de esta fecha no aparecen en "Otorgadas sin carta": son anteriores
+              al módulo de cartas y su comisión se pagó por el sistema anterior. Para incorporar una operación
+              más antigua, mueve la fecha hacia atrás.
+            </div>
+          </div>
+          <input id="inp_incorp_desde" type="date" style="width:170px;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px 11px;font:inherit">
+          <button class="btn-save" onclick="guardarIncorpDesde()"><i class="bi bi-floppy"></i> Guardar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Qué afecta este mantenedor ----------------------------------------- -->
     <div style="background:#f8fafc;border-left:4px solid #0141A2;border-radius:10px;padding:16px 20px;font-size:.83rem;color:#475569;margin-top:18px">
       <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
       <ul style="margin:8px 0 0;padding-left:18px">
         <li><b>Gastos operacionales</b> → se capitalizan en el monto financiado y entran al costo de cada operación en <a href="/dashboard/">Dashboard → Rentabilidades</a> y en las <a href="/cotizaciones/">Cotizaciones</a>.</li>
         <li><b>Días de gracia del capitalizado</b> (<code>cap_dias_gracia</code>) → los días entre el curse y la primera cuota que superan este valor capitalizan interés a la tasa cliente; ese <b>monto capitalizado</b> es la base de la comisión que paga AutoFin (Ing. x Colocaciones) en <a href="/dashboard/">Dashboard</a>, <a href="/post-venta/facturacion-af/">Facturación AutoFácil</a> y el recálculo mensual. Si la op ya trae capitalizado (Excel INDEXA o digitado) ese manda.</li>
+        <li><b>Otorgadas sin carta: mirar desde</b> → qué operaciones lista el botón <b>"Otorgadas sin carta"</b> y su contador en <a href="/aprobaciones/">Aprobaciones → Cartolas</a> (proceso 31 del manual). No cambia ningún monto ni el estado de pago de las operaciones anteriores.</li>
         <li><b>Prima de seguro mínima válida</b> → qué créditos entran a la cola de <a href="/carga-masiva/digitacion/">Digitación de Datos Faltantes</a> y al cuadro de otorgados incompletos (mismo motor para los dos).</li>
       </ul>
     </div>
@@ -286,6 +308,21 @@ async function guardarPrima() {
   } catch (e) { showToast('Error al guardar: ' + e.message, 'error'); }
 }
 
+/* Fecha de corte de "Otorgadas sin carta" (config_sistema, vía /api/cartolas/incorporacion-desde) */
+async function cargarIncorpDesde() {
+  try { const j = await (await fetch('/api/cartolas/incorporacion-desde', { headers: authHdr() })).json();
+    if (j.success) document.getElementById('inp_incorp_desde').value = j.data.desde; } catch (_) {}
+}
+async function guardarIncorpDesde() {
+  const desde = document.getElementById('inp_incorp_desde').value;
+  if (!desde) { showToast('Elige una fecha', 'error'); return; }
+  try {
+    const j = await (await fetch('/api/cartolas/incorporacion-desde', { method: 'PUT', headers: authHdr(), body: JSON.stringify({ desde }) })).json();
+    if (!j.success) throw new Error(j.error);
+    showToast('Guardado: otorgadas sin carta desde el ' + desde.split('-').reverse().join('-'), 'success');
+  } catch (e) { showToast('Error al guardar: ' + e.message, 'error'); }
+}
+
 /* ─── GUARDAR ───────────────────────────────────────────────────────────── */
 async function guardar() {
   const body = {};
@@ -333,7 +370,7 @@ function showToast(msg, type = 'info') {
   setTimeout(() => el.remove(), 4000);
 }
 
-cargar();
+cargar(); cargarIncorpDesde();
 </script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>

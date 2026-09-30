@@ -42,8 +42,24 @@ AVISOS.registrarAviso({
 });
 
 /* ── Migración: tabla de solicitudes + permisos ──────────────────────────── */
+/* ── Fecha de corte de la incorporación (mantenedor Parámetros → "Incorporación a cartola") ──
+   Las otorgadas ANTERIORES al módulo de cartas (primera carta: 02-01-2026) nunca tuvieron carta ni
+   la tendrán, y su comisión se pagó por el sistema anterior: en producción eran 935 de las 943
+   "sin carta" y obligaban a recorrerlas cada vez que se abría Aprobaciones. Solo se miran las
+   otorgadas desde esta fecha; el Administrador la mueve sin tocar código. (Pato, 30-09-2026) */
+const CLAVE_DESDE = 'cartola_incorporacion_desde', DESDE_DEFECTO = '2026-01-01';
+async function incorporacionDesde() {
+  try {
+    const [[r]] = await pool.query('SELECT valor FROM config_sistema WHERE clave=?', [CLAVE_DESDE]);
+    const v = r ? JSON.parse(r.valor) : null;
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : DESDE_DEFECTO;
+  } catch (_) { return DESDE_DEFECTO; }
+}
+
 require('../../../../shared/migrate').enFila('cartola-incorporaciones', async () => {
   try {
+    await pool.query('CREATE TABLE IF NOT EXISTS config_sistema (clave VARCHAR(100) PRIMARY KEY, valor TEXT)');
+    await pool.query('INSERT IGNORE INTO config_sistema (clave, valor) VALUES (?,?)', [CLAVE_DESDE, JSON.stringify(DESDE_DEFECTO)]);
     await pool.query(`CREATE TABLE IF NOT EXISTS cartola_incorporaciones (
       id             INT AUTO_INCREMENT PRIMARY KEY,
       id_credito     INT NOT NULL,
@@ -156,6 +172,7 @@ const sinCarta = async (req, res) => {
     // otorgada en mayo e invisible con el selector en agosto).
     const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : null;
     const condMes = mes ? "AND DATE_FORMAT(c.fecha_otorgado, '%Y-%m') = ?" : '';
+    const desde = await incorporacionDesde();
     const [rows] = await pool.query(`
       SELECT c.id AS id_credito, c.num_op, c.id_financiera, c.automotora AS nombre_dealer, c.rut_dealer,
              c.tipo_ubicacion, COALESCE(NULLIF(c.parque,''), c.nombre_parque_mgmt) AS parque_op,
@@ -164,11 +181,12 @@ const sinCarta = async (req, res) => {
              (SELECT COUNT(*) FROM cartola_incorporaciones i WHERE i.id_credito = c.id AND i.estado <> 'RECHAZADA') AS ya_solicitada
         FROM creditos c
        WHERE c.estado_credito = 'OTORGADO'
+         AND c.fecha_otorgado >= ?
          ${condMes}
          AND c.financiera IN ('AUTOFIN','UNIDAD DE CREDITO')
          AND NOT EXISTS (SELECT 1 FROM cartas_aprobacion ca WHERE ca.id_financiera = c.num_op)
          AND NOT EXISTS (SELECT 1 FROM cartolas_movimientos m WHERE m.num_op = c.id_financiera)
-       ORDER BY c.fecha_otorgado DESC, c.num_op`, mes ? [mes] : []);
+       ORDER BY c.fecha_otorgado DESC, c.num_op`, mes ? [desde, mes] : [desde]);
     /* Parque o calle: la carga masiva NO trae ese dato confiable, así que el default
        sale de la FICHA DEL DEALER (dealers.ccs_parque), que es un registro mantenido.
        El crédito solo sirve de respaldo. Si ambos discrepan se marca para que el
@@ -217,8 +235,25 @@ const sinCarta = async (req, res) => {
       r.ubic_discrepa = (fichaParque != null && fichaParque !== credParque) ? 1 : 0;
       r.comision_motor = await comisionMotor({ ...r, ubicacion: r.parque_op }, memo);
     }
-    res.json({ success: true, data: { mes, items: rows }, error: null });
+    res.json({ success: true, data: { mes, desde, items: rows }, error: null });
   } catch (e) { console.error('[cartolas sinCarta]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* GET/PUT /api/cartolas/incorporacion-desde → fecha de corte (mantenedor Parámetros) */
+const getDesde = async (req, res) => {
+  try { res.json({ success: true, data: { desde: await incorporacionDesde() }, error: null }); }
+  catch (e) { console.error('[cartolas desde]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const setDesde = async (req, res) => {
+  try {
+    const desde = String((req.body || {}).desde || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || isNaN(new Date(desde + 'T12:00:00')))
+      return res.status(400).json({ success: false, data: null, error: 'Fecha inválida (AAAA-MM-DD)' });
+    const antes = await incorporacionDesde();
+    await pool.query('INSERT INTO config_sistema (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [CLAVE_DESDE, JSON.stringify(desde)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'cartolas', entidad: 'parametro', detalle: `Incorporación a cartola: otorgadas desde ${antes} → ${desde}` });
+    res.json({ success: true, data: { desde }, error: null });
+  } catch (e) { console.error('[cartolas set desde]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
 /* GET /api/cartolas/comision-motor?... → cuánto DEBERÍA ser con los valores editados.
@@ -351,4 +386,4 @@ const resolver = async (req, res) => {
   } catch (e) { console.error('[cartolas resolver]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { sinCarta, incorporar, listarIncorporaciones, resolver, comisionQueCorresponde };
+module.exports = { sinCarta, incorporar, listarIncorporaciones, resolver, comisionQueCorresponde, getDesde, setDesde };

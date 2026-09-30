@@ -9,6 +9,8 @@ const c = require('../controllers/cartolas.controller');
 const inc = require('../controllers/cartola-incorporaciones.controller');
 router.get('/sin-carta',          verifyToken, requireFunc('cartola_incorporar'), inc.sinCarta);
 router.get('/comision-motor',     verifyToken, requireFunc('cartola_incorporar'), inc.comisionQueCorresponde);
+router.get('/incorporacion-desde', verifyToken, inc.getDesde);
+router.put('/incorporacion-desde', verifyToken, requireFunc('mantenedores_parametros'), inc.setDesde);
 // Buscador de dealers: se REUSA el de Digitación (misma consulta, una sola fuente)
 router.get('/dealer-buscar',      verifyToken, requireFunc('cartola_incorporar'),
   require('../../../creditos/src/controllers/digitacion-faltantes.controller').dealerBuscar);
