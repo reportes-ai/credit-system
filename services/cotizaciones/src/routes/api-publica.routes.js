@@ -25,6 +25,8 @@ publica.get('/v1/finanzas/libro-ventas',         rlFin, kFin, fin.libroVentas);
 publica.get('/v1/finanzas/ordenes-pago',         rlFin, kFin, fin.ordenesPago);
 publica.get('/v1/finanzas/rentabilidad',         rlFin, kFin, fin.rentabilidad);
 publica.get('/v1/finanzas/saldo-proceso-pago',   rlFin, kFin, fin.saldoProcesoPago);
+publica.get('/v1/finanzas/comisiones-facturas',  rlFin, kFin, fin.comisionesFacturas);
+publica.get('/v1/finanzas/provisiones-liberaciones', rlFin, kFin, fin.provisionesLiberaciones);
 /* Buzón: la empresa (o su asistente) pregunta y lee respuestas con la misma llave */
 const msj = require('../controllers/api-mensajes.controller');
 const rlMsj = rateLimit({ ventanaMs: 60000, max: 20, mensaje: 'Límite de 20 mensajes por minuto excedido' });
