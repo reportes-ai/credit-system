@@ -625,7 +625,9 @@ exports.previewCorreo = async (req, res) => {
     const { envolverHTML } = require('../../../../shared/mailer');
     ok(res, {
       para: EMAILS(p.l.correo_para), cc: [...new Set([...EMAILS(p.l.correo_cc), ...EMAILS(t.cc)])],
-      asunto: plant.render(t.asunto, datos), html: envolverHTML(plant.aHTML(cuerpo)),
+      asunto: plant.render(t.asunto, datos),
+      // El logo del correo real va incrustado (cid:); en pantalla se muestra el mismo archivo por URL.
+      html: envolverHTML(plant.aHTML(cuerpo)).replace(/cid:aflogobs/g, '/img/logo-bs-mail.png'),
       adjunto: `${p.d.numero_txt}_OP${p.d.operacion.num_op}.pdf`, activa: !!t.activo, ejemplo_op: p.d.operacion.num_op,
     });
   } catch (e) { fail(res, e.message); }
