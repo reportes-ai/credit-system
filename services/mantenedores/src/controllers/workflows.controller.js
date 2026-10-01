@@ -358,9 +358,18 @@ async function escalar() {
       const ciclos = (r.ciclos_seguidos || 0) + 1;
       await pool.query('UPDATE wf_registro SET ultima_alarma=NOW(), ciclos_seguidos=? WHERE codigo=?', [ciclos, r.codigo]);
       await pool.query("INSERT INTO wf_log (codigo, tipo, n, ciclos) VALUES (?,'ALARMA',?,?)", [r.codigo, n, ciclos]).catch(() => {});
+      /* El aviso NOMBRA lo detenido (Pato, 01-10-2026): el link lleva a la pantalla de trabajo, que puede no mostrar
+         el ítem (fundantes RECHAZADOS no salen en "Por validar") y nadie sabía qué operación era ni desde cuándo. */
+      let cuales = '';
+      if (w.det) try {
+        const [its] = await pool.query(w.det, [r.recordatorio_horas]);
+        const f = require('../../../../shared/fecha-chile').isoFlex;
+        cuales = its.slice(0, 4).map(i => i.ref + (i.desde ? ' desde ' + String(f(i.desde) || '').slice(0, 10).split('-').reverse().join('-') : '')).join('; ');
+        if (cuales) cuales = ' Detenido: ' + cuales + (its.length > 4 ? ` y ${its.length - 4} más` : '') + '.';
+      } catch (_) {}
       await AVISOS.avisar('wf_esc_' + r.codigo, {
         titulo: '⏰ ' + w.nombre + ': ' + n + ' detenida' + (n === 1 ? '' : 's'),
-        mensaje: `${n} ítem${n === 1 ? '' : 's'} lleva${n === 1 ? '' : 'n'} más de ${r.recordatorio_horas} h sin avanzar en "${w.nombre}".` + (ciclos > 1 ? ` (${ciclos}° aviso)` : ''),
+        mensaje: `${n} ítem${n === 1 ? '' : 's'} lleva${n === 1 ? '' : 'n'} más de ${r.recordatorio_horas} h sin avanzar en "${w.nombre}".` + (ciclos > 1 ? ` (${ciclos}° aviso)` : '') + cuales,
         href: w.operar,
       }).catch(() => {});
       // ESCALAMIENTO A JEFATURA: tras N ciclos sin resolverse, al jefe directo
@@ -370,7 +379,7 @@ async function escalar() {
         await pool.query("INSERT INTO wf_log (codigo, tipo, n, ciclos) VALUES (?,'JEFATURA',?,?)", [r.codigo, n, ciclos]).catch(() => {});
         await AVISOS.avisar('wf_esc_jefatura', {
           titulo: '🚨 ESCALADO A JEFATURA — ' + w.nombre,
-          mensaje: `"${w.nombre}" acumula ${ciclos} avisos sin resolverse (${n} ítem${n === 1 ? '' : 's'} detenido${n === 1 ? '' : 's'} > ${r.recordatorio_horas} h). Tu equipo es responsable de destrancarlo.`,
+          mensaje: `"${w.nombre}" acumula ${ciclos} avisos sin resolverse (${n} ítem${n === 1 ? '' : 's'} detenido${n === 1 ? '' : 's'} > ${r.recordatorio_horas} h). Tu equipo es responsable de destrancarlo.` + cuales,
           href: w.operar,
         }, { extra: jefes }).catch(() => {});
       }
