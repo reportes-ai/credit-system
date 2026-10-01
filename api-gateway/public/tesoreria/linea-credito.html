@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<!-- v1.1 — Línea de Crédito Unidad: pestaña Cartola (abonos manuales, cargos por cada certificado emitido con saldo corrido, detalle del certificado enviado) y pestaña Parámetros (línea, texto del certificado, destinatarios y CC) (01-10-2026). v1.0 — cuenta corriente de la línea rotativa y Certificado de Saldo Insoluto automático por cada OP compensada -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Línea de Crédito Unidad — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; --ok:#16a34a; --bad:#dc2626; --warn:#d97706; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .wrap { margin:20px auto; padding:0 26px 60px; max-width:none; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 26px; margin-bottom:16px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .banner > i { font-size:2.3rem; opacity:.85; }
+  .banner h2 { margin:0 0 3px; font-size:1.2rem; font-weight:700; }
+  .banner p { margin:0; opacity:.85; font-size:.84rem; max-width:760px; }
+  .banner .der { margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .panel { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:14px; }
+  .panel h5 { margin:0 0 12px; font-size:.95rem; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  label { font-size:.7rem; font-weight:700; color:#374151; display:block; margin-bottom:3px; text-transform:uppercase; }
+  input, select, textarea { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.84rem; font-family:inherit; outline:none; width:100%; }
+  textarea { resize:vertical; min-height:92px; line-height:1.4; }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+  input:disabled, textarea:disabled { background:#f8fafc; color:#64748b; }
+  table { width:100%; border-collapse:collapse; font-size:.78rem; }
+  th { background:#f8fafc; text-align:left; padding:6px 8px; font-size:.6rem; text-transform:uppercase; color:#6b7280; white-space:nowrap; }
+  td { padding:7px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  td.num, th.num { text-align:right; white-space:nowrap; } td.c, th.c { text-align:center; }
+  tr.nulo td { color:#94a3b8; } tr.nulo td.num { text-decoration:line-through; }
+  .abono { color:var(--ok); font-weight:700; } .cargo { color:var(--bad); font-weight:700; }
+  .btnx { border:none; border-radius:9px; padding:8px 14px; font-size:.8rem; font-weight:700; cursor:pointer; }
+  .btn-azul { background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
+  .btn-blanco { background:#fff; color:var(--accent); }
+  .btn-verde { background:var(--ok); color:#fff; } .btn-gris { background:#f1f5f9; color:#475569; } .btn-rojo { background:#fee2e2; color:#b91c1c; }
+  .icon-btn { border:none; background:#f1f5f9; border-radius:7px; width:28px; height:28px; cursor:pointer; color:#475569; margin-left:3px; }
+  .icon-btn:hover { background:#e2e8f0; }
+  .chip { border-radius:8px; padding:2px 8px; font-size:.64rem; font-weight:700; display:inline-block; white-space:nowrap; }
+  .e-EMITIDO { background:#fef3c7; color:#92400e; } .e-ENVIADO { background:#dbeafe; color:#1e40af; } .e-ACEPTADO { background:#dcfce7; color:#166534; }
+  .e-OBJETADO { background:#fee2e2; color:#b91c1c; } .e-SIN_SALDO { background:#f1f5f9; color:#64748b; } .e-REGISTRADO { background:#dcfce7; color:#166534; } .e-ANULADO { background:#fee2e2; color:#b91c1c; }
+  .vacio { color:#9ca3af; font-size:.83rem; text-align:center; padding:18px; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-bottom:14px; }
+  .kpi { background:#fff; border-radius:12px; padding:12px 14px; box-shadow:0 1px 5px rgba(0,0,0,.06); }
+  .kpi .l { font-size:.62rem; font-weight:800; text-transform:uppercase; color:#64748b; }
+  .kpi .v { font-size:1.15rem; font-weight:800; color:var(--navy); margin-top:2px; }
+  .kpi .s { font-size:.66rem; color:#94a3b8; }
+  .barra { height:8px; background:#e2e8f0; border-radius:6px; margin-top:6px; overflow:hidden; }
+  .barra > div { height:100%; border-radius:6px; }
+  .aviso { border-radius:10px; padding:10px 14px; font-size:.8rem; margin-bottom:12px; display:flex; gap:10px; align-items:flex-start; }
+  .aviso.warn { background:#fffbeb; border:1.5px solid #fde68a; color:#92400e; }
+  .aviso.info { background:#eff6ff; border:1.5px solid #bfdbfe; color:#1e40af; }
+  .tabs { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .tab { border:none; background:#e2e8f0; color:#475569; border-radius:9px; padding:8px 16px; font-weight:700; font-size:.82rem; cursor:pointer; }
+  .tab.on { background:var(--accent); color:#fff; }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; } .g2 { grid-column:span 2; } .g4 { grid-column:span 4; }
+  .sw { display:flex; align-items:center; gap:8px; font-size:.82rem; font-weight:600; text-transform:none; }
+  .sw input { width:auto; }
+  .nota { font-size:.72rem; color:#64748b; margin-top:3px; text-transform:none; font-weight:500; }
+  .vars code { background:#eef2ff; color:#3730a3; border-radius:5px; padding:1px 5px; font-size:.72rem; cursor:pointer; margin-right:3px; }
+  .det { display:grid; grid-template-columns:200px 1fr; gap:6px 14px; font-size:.82rem; }
+  .det .k { color:#64748b; } .det .v { font-weight:600; }
+  .det-sec { font-size:.66rem; font-weight:800; text-transform:uppercase; color:var(--accent); letter-spacing:.06em; margin:14px 0 6px; }
+  dialog { border:none; border-radius:16px; padding:0; width:min(720px,95vw); box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  dialog::backdrop { background:rgba(2,6,23,.45); backdrop-filter:blur(3px); }
+  .dlg-head { background:linear-gradient(135deg,#012d70,#0141A2); color:#fff; padding:14px 20px; font-weight:800; display:flex; align-items:center; gap:10px; }
+  .dlg-body { padding:18px 20px; max-height:72vh; overflow:auto; }
+  .dlg-foot { padding:12px 20px; border-top:1px solid #f1f5f9; display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+  .afecta { background:#f8fafc; border-left:4px solid var(--accent); border-radius:10px; padding:14px 18px; font-size:.8rem; color:#334155; margin-top:18px; }
+  .afecta h6 { margin:0 0 8px; font-size:.86rem; font-weight:800; color:var(--navy); }
+  .afecta ul { margin:0; padding-left:18px; } .afecta li { margin-bottom:4px; } .afecta a { color:var(--accent); font-weight:600; }
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:10px 18px; border-radius:10px; font-size:.84rem; display:none; z-index:9999; }
+  @media (max-width:800px) { .wrap { padding:0 16px 60px; } .grid { grid-template-columns:1fr 1fr; } .g2,.g4 { grid-column:span 2; } .det { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Tesorería', href:'/tesoreria/' },
+  { label:'Línea de Crédito Unidad', icon:'bi-bank', current:true }
+] };</script>
+<div id="af-topnav"></div>
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-bank"></i>
+    <div>
+      <h2>Línea de Crédito Unidad</h2>
+      <p id="subtitulo">Cartola de la línea rotativa: los abonos se registran a mano y cada Certificado de Saldo Insoluto que el sistema emite por una operación compensada se descuenta solo.</p>
+    </div>
+    <div class="der">
+      <button class="btnx btn-blanco" onclick="cargar()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+      <span class="gest"><button class="btnx btn-blanco" onclick="procesar()" title="Revisa ahora si hay operaciones nuevas por compensar (el motor lo hace solo cada 30 minutos)"><i class="bi bi-lightning-charge"></i> Procesar ahora</button></span>
+    </div>
+  </div>
+
+  <div id="avisos"></div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="tabs">
+    <button class="tab on" data-t="CARTOLA" onclick="verTab('CARTOLA')"><i class="bi bi-journal-text"></i> Cartola</button>
+    <button class="tab" data-t="PARAM" onclick="verTab('PARAM')"><i class="bi bi-sliders"></i> Parámetros</button>
+  </div>
+
+  <!-- ═══ CARTOLA ═══ -->
+  <div id="vCARTOLA">
+    <div class="panel">
+      <h5><i class="bi bi-journal-text"></i> Cartola de la línea
+        <span class="gest" style="margin-left:auto;display:flex;gap:6px">
+          <button class="btnx btn-verde" onclick="abrirMov('GIRO')"><i class="bi bi-plus-lg"></i> Registrar abono</button>
+          <button class="btnx btn-gris" onclick="abrirMov('PAGO')" title="Devolución en efectivo del capital (prepago o vencimiento)"><i class="bi bi-box-arrow-up"></i> Pago de capital</button>
+        </span></h5>
+      <div style="overflow:auto"><table>
+        <thead><tr><th>Fecha</th><th>Movimiento</th><th>Detalle</th><th class="num">Abono</th><th class="num">Cargo</th><th class="num">Saldo de la línea</th><th class="c">Estado</th><th></th></tr></thead>
+        <tbody id="tbCartola"><tr><td colspan="8" class="vacio">Cargando…</td></tr></tbody>
+      </table></div>
+      <div class="nota" style="margin-top:8px">Abono = fondos que Unidad gira con cargo a la línea. Cargo = saldo de precio compensado por cada certificado emitido (o pago de capital). Los certificados objetados y las operaciones sin saldo no mueven el saldo.</div>
+    </div>
+  </div>
+
+  <!-- ═══ PARÁMETROS ═══ -->
+  <div id="vPARAM" style="display:none">
+    <div class="panel">
+      <h5><i class="bi bi-bank"></i> Línea</h5>
+      <div class="grid">
+        <div><label>Nombre</label><input id="cNombre" maxlength="80"></div>
+        <div><label>Financiera (operaciones que compensa)</label><input id="cFin" disabled></div>
+        <div><label>Acreedor (razón social) *</label><input id="cAcr" maxlength="150"></div>
+        <div><label>RUT acreedor</label><input id="cAcrRut" maxlength="20"></div>
+        <div><label>Monto máximo ($) *</label><input id="cLimite" type="number" min="1"></div>
+        <div><label>Umbral de reposición (%) *</label><input id="cUmbral" type="number" min="1" max="100" step="0.5"><div class="nota">Desde esta utilización se puede pedir el giro del cupo repuesto.</div></div>
+        <div><label>Días hábiles de respuesta *</label><input id="cDias" type="number" min="1" max="30"></div>
+        <div><label>Fecha del contrato</label><input id="cContrato" type="date"></div>
+        <div><label>Fecha de inicio</label><input id="cInicio" type="date"><div class="nota">Se compensan las operaciones otorgadas desde esta fecha.</div></div>
+        <div><label>Fecha de vencimiento</label><input id="cVenc" type="date"></div>
+        <div><label>Firmante del certificado</label><input id="cFirmante" maxlength="120"></div>
+        <div><label>Cargo del firmante</label><input id="cCargo" maxlength="120"></div>
+        <div class="g4"><label class="sw"><input type="checkbox" id="cActiva"> Línea activa (el motor compensa y emite certificados)</label></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h5><i class="bi bi-envelope"></i> Destinatarios de los correos</h5>
+      <div class="grid">
+        <div class="g2"><label>Para (casilla de Unidad, Anexo 3) *</label><input id="cPara" maxlength="300" placeholder="correo@unidadcreditos.cl"><div class="nota">Varios correos separados por coma.</div></div>
+        <div class="g2"><label>Copia (CC)</label><input id="cCc" maxlength="300" placeholder="separados por coma"></div>
+        <div class="g4"><label class="sw"><input type="checkbox" id="cAuto"> Enviar cada certificado automáticamente apenas se emite</label>
+          <div class="nota">Apagado: el certificado queda EMITIDO y se manda desde la Cartola. El asunto y el cuerpo del correo se editan en <a href="/mantenedores/correos-programados/">Correos del Sistema</a> (plantilla <code>linea_certificado_saldo</code>).</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h5><i class="bi bi-file-earmark-text"></i> Texto del certificado
+        <span class="vars" style="margin-left:auto;font-weight:500;font-size:.72rem;color:#64748b" id="vars"></span></h5>
+      <div class="grid">
+        <div class="g4"><label>Párrafo inicial</label><textarea id="cIntro" maxlength="2000" onfocus="FOCO=this"></textarea></div>
+        <div class="g4"><label>Párrafo final (plazo de respuesta)</label><textarea id="cCierre" maxlength="2000" onfocus="FOCO=this"></textarea></div>
+        <div class="g4 nota">Entre los dos párrafos el certificado lleva siempre el detalle fijo: operación, compensación (saldo anterior, saldo de precio, monto compensado, exceso, saldo nuevo) y estado de la línea. Haz clic en una variable para insertarla. Un cambio rige para los certificados que se emitan desde ahora; los ya emitidos no cambian.
+          <a href="#" onclick="restaurarTextos();return false">Restaurar texto por defecto</a></div>
+      </div>
+    </div>
+
+    <div class="gest" style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btnx btn-gris" onclick="pintarParam()">Descartar cambios</button>
+      <button class="btnx btn-azul" onclick="guardarConfig()"><i class="bi bi-check-lg"></i> Guardar parámetros</button>
+    </div>
+  </div>
+
+  <div class="afecta">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h6>
+    <ul>
+      <li><b>Línea activa + Fecha de inicio</b> → el motor (cada 30 minutos y con <i>Procesar ahora</i>) toma las operaciones de Unidad que pasan a OTORGADO desde esa fecha en <a href="/creditos/">Créditos</a>, compensa su saldo de precio contra el saldo de la línea y emite el certificado, que aparece como cargo en la Cartola. Apagada, no hace nada.</li>
+      <li><b>Saldo de precio</b> → sale de la ficha del crédito con el mismo motor que arma la Orden de Pago al dealer en <a href="/postventa/seguimiento/">Post Venta → Seguimiento</a>. Si el monto está mal, se corrige en la ficha y el certificado objetado se reprocesa.</li>
+      <li><b>Monto máximo y umbral de reposición</b> → definen el cupo disponible, la utilización que muestra cada certificado y desde cuándo se puede pedir el giro del cupo repuesto (letra C/ del numeral Tres.Uno del contrato). Un abono mayor al cupo disponible se rechaza.</li>
+      <li><b>Días de respuesta</b> → plazo que se le da a Unidad en el certificado y en el correo; pasado ese plazo el certificado aparece "fuera de plazo" (no se acepta solo).</li>
+      <li><b>Para, CC y envío automático</b> → a quién sale cada certificado con el PDF adjunto (plantilla <code>linea_certificado_saldo</code> en <a href="/mantenedores/correos-programados/">Correos del Sistema</a>). El detalle de cada envío (fecha, destinatarios, respuesta) se ve en la Cartola.</li>
+      <li><b>Texto del certificado y firmante</b> → aparecen en el PDF y quedan congelados en el folio de <a href="/verificar/">Verificación de documentos</a>; los datos de AutoFácil salen de <a href="/mantenedores/datos-empresa/">Datos de la Empresa</a>.</li>
+      <li><b>Contabilidad</b> → el abono (<code>LINEA_GIRO</code>), cada certificado (<code>LINEA_COMPENSACION</code>) y el pago de capital (<code>LINEA_PAGO</code>) generan su asiento con las reglas de <a href="/contabilidad/reglas/">Reglas de Centralización</a>. Al marcar FONDOS RECIBIDOS en Post Venta solo entra al banco el exceso no compensado. Objetar un certificado o anular un abono anula su asiento si el mes está abierto.</li>
+    </ul>
+  </div>
+</div>
+
+<dialog id="dlgMov">
+  <div class="dlg-head"><i class="bi bi-cash-coin"></i> <span id="mTitulo">Registrar abono</span></div>
+  <div class="dlg-body">
+    <div class="aviso info" id="mNota"></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div><label>Fecha *</label><input id="mFecha" type="date"></div>
+      <div><label>Monto ($) *</label><input id="mMonto" type="number" min="1"></div>
+      <div class="g2"><label>Cuenta bancaria</label><select id="mCta"></select><div class="nota">El asiento usa la cuenta contable de esta cuenta; vacía = banco genérico de la regla.</div></div>
+      <div class="g2"><label>Glosa</label><input id="mGlosa" maxlength="300" placeholder="Ej: primer desembolso"></div>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btnx btn-gris" onclick="dlgMov.close()">Cancelar</button>
+    <button class="btnx btn-azul" onclick="guardarMov()"><i class="bi bi-check-lg"></i> Registrar</button>
+  </div>
+</dialog>
+
+<dialog id="dlgCert">
+  <div class="dlg-head"><i class="bi bi-file-earmark-check"></i> <span id="dTitulo">Certificado</span></div>
+  <div class="dlg-body" id="dBody"></div>
+  <div class="dlg-foot" id="dFoot"></div>
+</dialog>
+
+<div id="toast"></div>
+
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+function chk401(r){ if(r.status===401){ sessionStorage.clear(); location.href='/login.html'; return true; } return false; }
+async function api(m, url, body){ const r = await fetch(url,{method:m,headers:H,body:body?JSON.stringify(body):undefined}); if(chk401(r)) return null; return r.json(); }
+const clp = v => '$' + Math.round(Number(v)||0).toLocaleString('es-CL');
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fd = s => s ? String(s).slice(0,10).split('-').reverse().join('-') : '—';
+const fdt = s => s ? new Date(s).toLocaleString('es-CL',{ timeZone:'America/Santiago', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+const csi = n => n ? 'CSI-' + String(n).padStart(4,'0') : '—';
+function toast(t){ const e=document.getElementById('toast'); e.textContent=t; e.style.display='block'; clearTimeout(e._t); e._t=setTimeout(()=>e.style.display='none',3500); }
+const hoy = () => new Date().toLocaleDateString('sv-SE',{ timeZone:'America/Santiago' });
+
+let L = null, TAB = 'CARTOLA', MOVS = [], GEST = false, CTAS = [], MTIPO = 'GIRO', FOCO = null;
+const TABS = { CARTOLA:'Cartola', PARAM:'Parámetros' };
+
+async function permisos(){
+  try {
+    const j = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } }).then(r=>r.json());
+    const f = j.funcionalidades || [];
+    if (!f.includes('linea_credito') && !f.includes('linea_credito_gestionar')) { alert('Acceso restringido'); location.href='/tesoreria/'; return; }
+    GEST = f.includes('linea_credito_gestionar');
+  } catch(e){}
+  document.querySelectorAll('.gest').forEach(e => e.style.display = GEST ? '' : 'none');
+}
+
+async function cargar(){
+  const j = await api('GET','/api/linea-credito');
+  if (!j || !j.success) { toast((j && j.error) || 'No se pudo cargar'); return; }
+  L = (j.data || []).find(x => String(x.financiera).toUpperCase() === 'UNIDAD DE CREDITO') || j.data[0] || null;
+  if (!L) { document.getElementById('kpis').innerHTML = '<div class="vacio">No hay línea configurada.</div>'; return; }
+  pintarKpis();
+  pintarParam();
+  const m = await api('GET', `/api/linea-credito/${L.id}/movimientos`);
+  MOVS = (m && m.data) || [];
+  pintarCartola();
+}
+
+function pintarKpis(){
+  const s = L.estado;
+  const pct = Math.min(100, Math.max(0, s.uso_pct));
+  const colorUso = s.uso_pct >= s.umbral_pct ? 'var(--warn)' : 'var(--accent)';
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="l">Monto máximo</div><div class="v">${clp(s.limite)}</div><div class="s">Vence ${fd(L.fecha_vencimiento)}</div></div>
+    <div class="kpi"><div class="l">Saldo de la línea</div><div class="v">${clp(s.insoluto)}</div><div class="s">Abonos ${clp(s.giros)} · Certificados ${clp(s.comps)} · Pagos ${clp(s.pagos)}</div></div>
+    <div class="kpi"><div class="l">Cupo disponible</div><div class="v" style="color:var(--ok)">${clp(s.disponible)}</div><div class="s">Solo cuentan los certificados aceptados</div></div>
+    <div class="kpi"><div class="l">Utilización</div><div class="v" style="color:${colorUso}">${s.uso_pct.toLocaleString('es-CL')}%</div>
+      <div class="barra"><div style="width:${pct}%;background:${colorUso}"></div></div><div class="s">Umbral de reposición ${s.umbral_pct}%</div></div>
+    <div class="kpi"><div class="l">Por responder</div><div class="v" style="color:${s.pendientes?'var(--warn)':'var(--navy)'}">${s.pendientes}</div><div class="s">${L.sin_respuesta ? L.sin_respuesta+' fuera de plazo' : 'certificados sin respuesta de Unidad'}</div></div>`;
+  const av = [];
+  if (!L.activa) av.push(`<div class="aviso info"><i class="bi bi-pause-circle"></i><div><b>Línea apagada.</b> No se compensa ni se emite nada hasta activarla en Parámetros, con la fecha de inicio del contrato.</div></div>`);
+  else if (!L.envio_automatico) av.push(`<div class="aviso info"><i class="bi bi-envelope"></i><div>Envío <b>manual</b>: los certificados quedan EMITIDOS y se mandan a ${esc(L.correo_para||'—')} desde la Cartola.</div></div>`);
+  if (s.puede_girar) av.push(`<div class="aviso warn"><i class="bi bi-exclamation-triangle"></i><div>La línea está utilizada al <b>${s.uso_pct.toLocaleString('es-CL')}%</b> (umbral ${s.umbral_pct}%): ya se puede pedir el giro del cupo repuesto por correo a Unidad. Cupo disponible ${clp(s.disponible)}.</div></div>`);
+  if (L.sin_respuesta) av.push(`<div class="aviso warn"><i class="bi bi-hourglass-split"></i><div>${L.sin_respuesta} certificado(s) llevan más de ${L.dias_respuesta} días sin respuesta. El contrato no los da por aceptados: hay que pedir la conformidad.</div></div>`);
+  document.getElementById('avisos').innerHTML = av.join('');
+}
+
+function verTab(t){
+  TAB = t;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  Object.keys(TABS).forEach(k => document.getElementById('v' + k).style.display = k === t ? '' : 'none');
+  if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(TABS[t]);
+}
+
+/* Cartola: orden cronológico de registro, saldo corrido. Abono = giro; cargo = certificado vivo o pago. */
+const VIVO = ['EMITIDO','ENVIADO','ACEPTADO'];
+function efecto(m){
+  if (m.tipo === 'GIRO') return m.estado === 'REGISTRADO' ? Number(m.monto) : 0;
+  if (m.tipo === 'PAGO') return m.estado === 'REGISTRADO' ? -Number(m.monto) : 0;
+  return VIVO.includes(m.estado) ? -Number(m.monto) : 0;
+}
+function pintarCartola(){
+  const tb = document.getElementById('tbCartola');
+  if (!MOVS.length) { tb.innerHTML = '<tr><td colspan="8" class="vacio">Sin movimientos. Registra el primer abono cuando Unidad gire los fondos.</td></tr>'; return; }
+  let saldo = 0;
+  const filas = MOVS.slice().sort((a, b) => a.id - b.id).map(m => {
+    const ef = efecto(m); saldo += ef;
+    const nulo = ef === 0 && !(m.tipo === 'COMPENSACION' && m.estado === 'SIN_SALDO');
+    let mov, det, abono = '', cargo = '';
+    if (m.tipo === 'GIRO') {
+      mov = '<i class="bi bi-box-arrow-in-down"></i> Abono (giro de Unidad)';
+      det = esc(m.glosa || '') + (m.cuenta_nombre ? `<div style="font-size:.66rem;color:#94a3b8">${esc(m.cuenta_nombre)}</div>` : '');
+      abono = `<span class="abono">${clp(m.monto)}</span>`;
+    } else if (m.tipo === 'PAGO') {
+      mov = '<i class="bi bi-box-arrow-up"></i> Pago de capital';
+      det = esc(m.glosa || '') + (m.cuenta_nombre ? `<div style="font-size:.66rem;color:#94a3b8">${esc(m.cuenta_nombre)}</div>` : '');
+      cargo = `<span class="cargo">${clp(m.monto)}</span>`;
+    } else {
+      mov = m.cert_numero ? `<i class="bi bi-file-earmark-check"></i> Certificado <b>${csi(m.cert_numero)}</b>` : '<i class="bi bi-dash-circle"></i> Operación sin saldo';
+      det = `OP <b>${esc(m.num_op)}</b> · ${esc(m.cliente||'—')}<div style="font-size:.66rem;color:#94a3b8">Saldo de precio ${clp(m.saldo_precio)}${Number(m.exceso) ? ' · exceso ' + clp(m.exceso) + ' lo paga Unidad' : ''}</div>`;
+      if (Number(m.monto)) cargo = `<span class="cargo">${clp(m.monto)}</span>`;
+    }
+    if (m.motivo) det += `<div style="font-size:.66rem;color:#b91c1c">${m.estado === 'OBJETADO' ? 'Objetado' : 'Anulado'}: ${esc(m.motivo)}</div>`;
+    const est = m.estado === 'SIN_SALDO' ? 'SIN SALDO' : m.estado;
+    const acc = m.tipo === 'COMPENSACION'
+      ? `<button class="icon-btn" title="Ver certificado y detalle del envío" onclick="verCert(${m.id})"><i class="bi bi-eye"></i></button>`
+      : (GEST && m.estado === 'REGISTRADO' ? `<button class="icon-btn" title="Anular" onclick="anular(${m.id})"><i class="bi bi-trash"></i></button>` : '');
+    return `<tr class="${nulo ? 'nulo' : ''}"><td>${fd(m.fecha)}</td><td>${mov}</td><td>${det}</td>
+      <td class="num">${abono}</td><td class="num">${cargo}</td><td class="num"><b>${clp(saldo)}</b></td>
+      <td class="c"><span class="chip e-${m.estado}">${est}</span></td><td style="white-space:nowrap">${acc}</td></tr>`;
+  });
+  tb.innerHTML = filas.reverse().join('');   // lo más nuevo arriba, con su saldo corrido
+}
+
+/* Detalle del certificado: datos, envío y respuesta, con sus acciones. */
+function verCert(id){
+  const m = MOVS.find(x => x.id === id); if (!m) return;
+  const fila = (k, v) => `<div class="k">${k}</div><div class="v">${v}</div>`;
+  document.getElementById('dTitulo').textContent = m.cert_numero ? `Certificado ${csi(m.cert_numero)} — OP ${m.num_op}` : `OP ${m.num_op} — sin saldo`;
+  let html = '<div class="det">' +
+    fila('Operación', `${esc(m.num_op)} · ${esc(m.cliente||'—')}`) +
+    fila('Fecha de otorgamiento', fd(m.fecha)) +
+    fila('Saldo anterior de la línea', clp(m.saldo_anterior)) +
+    fila('Saldo de precio', clp(m.saldo_precio)) +
+    fila('Monto compensado', `<b>${clp(m.monto)}</b>`) +
+    (Number(m.exceso) ? fila('Exceso que paga Unidad', clp(m.exceso)) : '') +
+    fila('Saldo nuevo de la línea', clp(m.saldo_nuevo)) +
+    fila('Estado', `<span class="chip e-${m.estado}">${m.estado === 'SIN_SALDO' ? 'SIN SALDO' : m.estado}</span>`) + '</div>';
+  if (m.cert_numero) {
+    html += '<div class="det-sec">Emisión y envío</div><div class="det">' +
+      fila('Emitido', fdt(m.created_at)) +
+      fila('Folio verificable', m.cert_codigo ? `<a href="/verificar/${esc(m.cert_codigo)}" target="_blank">${esc(m.cert_codigo)}</a>` : '—') +
+      fila('Enviado', m.enviado_at ? fdt(m.enviado_at) : '<span style="color:#d97706">No enviado aún</span>') +
+      fila('Destinatarios', esc(m.enviado_a || '—')) + '</div>';
+    html += '<div class="det-sec">Respuesta de Unidad</div><div class="det">' +
+      fila('Respuesta', m.respuesta_at ? `${m.estado} el ${fdt(m.respuesta_at)}` : 'Pendiente') +
+      fila('Registrada por', esc(m.respuesta_por || '—')) +
+      (m.motivo ? fila('Motivo', esc(m.motivo)) : '') + '</div>';
+  } else {
+    html += `<div class="aviso info" style="margin-top:14px"><i class="bi bi-info-circle"></i><div>La línea no tenía saldo cuando se otorgó: Unidad paga este saldo de precio en efectivo y no hay certificado. Si el abono se registró tarde, reprocesa la operación.</div></div>`;
+  }
+  document.getElementById('dBody').innerHTML = html;
+  const b = [];
+  if (m.cert_codigo) b.push(`<button class="btnx btn-gris" onclick="verPdf(${m.id})"><i class="bi bi-file-earmark-pdf"></i> Ver certificado PDF</button>`);
+  if (GEST && ['EMITIDO','ENVIADO'].includes(m.estado)) {
+    b.push(`<button class="btnx btn-azul" onclick="enviar(${m.id})"><i class="bi bi-send"></i> ${m.estado === 'ENVIADO' ? 'Reenviar' : 'Enviar'} a Unidad</button>`);
+    b.push(`<button class="btnx btn-verde" onclick="responder(${m.id},'ACEPTADO')"><i class="bi bi-check2-circle"></i> Aceptado</button>`);
+    b.push(`<button class="btnx btn-rojo" onclick="responder(${m.id},'OBJETADO')"><i class="bi bi-x-circle"></i> Objetado</button>`);
+  }
+  if (GEST && ['OBJETADO','SIN_SALDO'].includes(m.estado) && m.ref_unica)
+    b.push(`<button class="btnx btn-gris" onclick="reemitir(${m.id})"><i class="bi bi-arrow-repeat"></i> Reprocesar</button>`);
+  b.push(`<button class="btnx btn-gris" onclick="dlgCert.close()">Cerrar</button>`);
+  document.getElementById('dFoot').innerHTML = b.join('');
+  dlgCert.showModal();
+  if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(m.cert_numero ? 'Certificado ' + csi(m.cert_numero) : 'Operación ' + m.num_op);
+}
+
+async function verPdf(id){
+  const r = await fetch(`/api/linea-credito/certificado/${id}/pdf`, { headers:{ Authorization:'Bearer '+token } });
+  if (chk401(r)) return;
+  if (!r.ok) { toast('No se pudo abrir el PDF'); return; }
+  window.open(URL.createObjectURL(await r.blob()), '_blank');
+}
+async function enviar(id){
+  if (!confirm(`¿Enviar el certificado a ${L.correo_para}${L.correo_cc ? ' (CC ' + L.correo_cc + ')' : ''}?`)) return;
+  const j = await api('POST', `/api/linea-credito/certificado/${id}/enviar`);
+  if (j && j.success) { dlgCert.close(); toast('✓ Enviado a ' + j.data.to.join(', ')); cargar(); } else toast((j && j.error) || 'No se pudo enviar');
+}
+async function responder(id, resp){
+  let motivo = '';
+  if (resp === 'OBJETADO') {
+    motivo = prompt('¿Qué objetó Unidad? (se anula el cargo y su asiento; corrige el dato en la ficha del crédito y reprocesa)');
+    if (motivo === null) return;
+    if (!motivo.trim()) { toast('Indica el motivo'); return; }
+  } else if (!confirm('¿Unidad aceptó este certificado? El monto compensado vuelve a ser cupo disponible.')) return;
+  const j = await api('POST', `/api/linea-credito/certificado/${id}/respuesta`, { respuesta: resp, motivo });
+  if (j && j.success) { dlgCert.close(); toast(resp === 'ACEPTADO' ? '✓ Certificado aceptado' : 'Certificado objetado'); cargar(); } else toast((j && j.error) || 'No se pudo registrar');
+}
+async function reemitir(id){
+  if (!confirm('Se vuelve a procesar la operación con los datos actuales del crédito y el saldo actual de la línea. ¿Seguir?')) return;
+  const j = await api('POST', `/api/linea-credito/certificado/${id}/reemitir`);
+  if (j && j.success) { dlgCert.close(); toast(`✓ Reprocesada (${j.data.procesadas} operación(es))`); cargar(); } else toast((j && j.error) || 'No se pudo reprocesar');
+}
+async function procesar(){
+  const j = await api('POST', '/api/linea-credito/procesar');
+  if (j && j.success) { toast(j.data.procesadas ? `✓ ${j.data.procesadas} operación(es) procesada(s)` : 'No hay operaciones nuevas por compensar'); cargar(); }
+  else toast((j && j.error) || 'No se pudo procesar');
+}
+async function anular(id){
+  const motivo = prompt('Motivo de la anulación (se anula también su asiento si el mes está abierto):');
+  if (motivo === null) return; if (!motivo.trim()) { toast('Indica el motivo'); return; }
+  const j = await api('POST', `/api/linea-credito/movimiento/${id}/anular`, { motivo });
+  if (j && j.success) { toast('Movimiento anulado'); cargar(); } else toast((j && j.error) || 'No se pudo anular');
+}
+
+/* ── Parámetros ── */
+function pintarParam(){
+  if (!L) return;
+  const v = (id, x) => document.getElementById(id).value = x == null ? '' : x;
+  v('cNombre', L.nombre); v('cFin', L.financiera); v('cAcr', L.acreedor_nombre); v('cAcrRut', L.acreedor_rut);
+  v('cLimite', L.limite); v('cUmbral', Number(L.umbral_pct)); v('cDias', L.dias_respuesta);
+  v('cContrato', L.contrato_fecha); v('cInicio', L.fecha_inicio); v('cVenc', L.fecha_vencimiento);
+  v('cPara', L.correo_para); v('cCc', L.correo_cc); v('cFirmante', L.firmante_nombre); v('cCargo', L.firmante_cargo);
+  v('cIntro', L.cert_texto_intro || L.texto_intro_def); v('cCierre', L.cert_texto_cierre || L.texto_cierre_def);
+  document.getElementById('cAuto').checked = !!L.envio_automatico; document.getElementById('cActiva').checked = !!L.activa;
+  document.getElementById('vars').innerHTML = 'Variables: ' + (L.variables_texto || []).map(x => `<code onclick="insVar('${x}')">${x}</code>`).join('');
+  document.querySelectorAll('#vPARAM input, #vPARAM textarea').forEach(e => { if (e.id !== 'cFin') e.disabled = !GEST; });
+}
+function insVar(x){
+  const t = FOCO || document.getElementById('cIntro');
+  const i = t.selectionStart ?? t.value.length;
+  t.value = t.value.slice(0, i) + x + t.value.slice(t.selectionEnd ?? i);
+  t.focus(); t.selectionStart = t.selectionEnd = i + x.length;
+}
+function restaurarTextos(){
+  if (!confirm('¿Volver al texto por defecto en los dos párrafos? (se aplica al guardar)')) return;
+  document.getElementById('cIntro').value = L.texto_intro_def; document.getElementById('cCierre').value = L.texto_cierre_def;
+}
+async function guardarConfig(){
+  const g = id => document.getElementById(id).value.trim();
+  const body = { nombre:g('cNombre'), acreedor_nombre:g('cAcr'), acreedor_rut:g('cAcrRut'), limite:g('cLimite'), umbral_pct:g('cUmbral'),
+    dias_respuesta:g('cDias'), contrato_fecha:g('cContrato'), fecha_inicio:g('cInicio'), fecha_vencimiento:g('cVenc'),
+    correo_para:g('cPara'), correo_cc:g('cCc'), firmante_nombre:g('cFirmante'), firmante_cargo:g('cCargo'),
+    cert_texto_intro:g('cIntro'), cert_texto_cierre:g('cCierre'),
+    envio_automatico: document.getElementById('cAuto').checked, activa: document.getElementById('cActiva').checked };
+  const j = await api('PUT', `/api/linea-credito/${L.id}/config`, body);
+  if (j && j.success) { toast('✓ Parámetros guardados'); cargar(); } else toast((j && j.error) || 'No se pudo guardar');
+}
+
+/* ── Abono / pago de capital ── */
+const dlgMov = document.getElementById('dlgMov'), dlgCert = document.getElementById('dlgCert');
+dlgCert.addEventListener('close', () => { if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(TABS[TAB]); });
+async function abrirMov(tipo){
+  MTIPO = tipo;
+  if (!CTAS.length) { try { const j = await api('GET','/api/cuentas-bancarias'); CTAS = (j && j.data || []).filter(c => c.activo !== 0 && String(c.moneda||'CLP').toUpperCase() === 'CLP'); } catch(e){} }
+  document.getElementById('mCta').innerHTML = '<option value="">— banco genérico de la regla —</option>' +
+    CTAS.map(c => `<option value="${c.id_cuenta}">${esc(c.nombre)}${c.banco ? ' · ' + esc(c.banco) : ''} ${esc(c.numero_cuenta||'')}</option>`).join('');
+  const s = L.estado;
+  document.getElementById('mTitulo').textContent = tipo === 'GIRO' ? 'Registrar abono (giro de Unidad)' : 'Registrar pago de capital';
+  document.getElementById('mNota').innerHTML = tipo === 'GIRO'
+    ? `<i class="bi bi-info-circle"></i><div>Regístralo cuando Unidad transfiera los fondos. Cupo disponible: <b>${clp(s.disponible)}</b> (los certificados sin aceptar todavía no reponen cupo).</div>`
+    : `<i class="bi bi-info-circle"></i><div>Devolución en efectivo del capital (prepago o vencimiento). Saldo de la línea: <b>${clp(s.insoluto)}</b>.</div>`;
+  document.getElementById('mFecha').value = hoy(); document.getElementById('mMonto').value = ''; document.getElementById('mGlosa').value = '';
+  dlgMov.showModal();
+}
+async function guardarMov(){
+  const body = { fecha: document.getElementById('mFecha').value, monto: document.getElementById('mMonto').value,
+    id_cuenta_bancaria: document.getElementById('mCta').value || null, glosa: document.getElementById('mGlosa').value.trim() };
+  const j = await api('POST', `/api/linea-credito/${L.id}/${MTIPO === 'GIRO' ? 'giros' : 'pagos'}`, body);
+  if (j && j.success) { dlgMov.close(); toast(MTIPO === 'GIRO' ? '✓ Abono registrado' : '✓ Pago registrado'); cargar(); }
+  else toast((j && j.error) || 'No se pudo registrar');
+}
+
+(async () => { await permisos(); verTab('CARTOLA'); await cargar(); })();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

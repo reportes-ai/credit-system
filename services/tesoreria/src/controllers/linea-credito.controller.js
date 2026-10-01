@@ -1,0 +1,543 @@
+'use strict';
+/* ═══════════════════════════════════════════════════════════════════════════
+   LÍNEA DE CRÉDITO UNIDAD (Tesorería) — línea rotativa de una financiera; hoy UCA
+
+   Qué hace: lleva la cuenta corriente de la línea que la financiera abre a
+   AutoFácil y genera SOLO el Certificado de Saldo Insoluto que exige la
+   cláusula Cuarta del contrato.
+     · GIRO: la financiera transfiere fondos con cargo a la línea (se registra
+       a mano al llegar la plata) → sube el saldo insoluto.
+     · COMPENSACIÓN: cada operación de esa financiera que se otorga deja un saldo
+       de precio que la financiera nos debe; en vez de pagarlo, se compensa
+       contra el capital de la línea. El motor la detecta, la registra, emite el
+       certificado (PDF verificable con QR) y, si está encendido, lo manda por
+       correo a la casilla de la financiera (Anexo 3 del contrato).
+     · PAGO: devolución en efectivo del capital (prepago o vencimiento).
+   La financiera tiene N días hábiles para aceptar u objetar cada certificado;
+   la respuesta se marca acá. Recién ACEPTADO el monto vuelve a ser cupo.
+
+   Motores que reusa (Máxima 1): montoSaldoOrden() de Post Venta para el monto
+   del saldo de precio, registrarVerificable() para el folio QR, contabilizar()
+   para los asientos (LINEA_GIRO / LINEA_COMPENSACION / LINEA_PAGO — Máxima 4),
+   plantillas-correo para el correo y datosEmpresa() para los datos de AutoFácil.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
+const { programar, porEvento } = require('../../../../shared/scheduler');
+const fc = require('../../../../shared/fecha-chile');
+const { ES_ETAPA } = require('../../../../shared/etapa-credito');
+
+const ok   = (res, data) => res.json({ success: true, data, error: null });
+const fail = (res, error, code = 500) => res.status(code).json({ success: false, data: null, error });
+const norm = s => String(s ?? '').trim();
+const HOST = process.env.APP_URL || 'https://afbs.autofacilchile.cl';
+const USUARIO_SISTEMA = 'Sistema — Línea de Crédito';
+const fmtCLP = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');
+const fmtD = s => s ? String(s).slice(0, 10).split('-').reverse().join('-') : '—';
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+const EMAILS = s => String(s || '').split(/[,;\s]+/).map(x => x.trim().toLowerCase()).filter(Boolean);
+const EMAIL_OK = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
+// Compensaciones vivas: las que rebajan el saldo. OBJETADO / SIN_SALDO no.
+const COMP_VIVAS = "('EMITIDO','ENVIADO','ACEPTADO')";
+
+/* ── Migración (idempotente, por el capataz) ─────────────────────────────── */
+require('../../../../shared/migrate').enFila('linea-credito', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS linea_credito (
+        id                 INT AUTO_INCREMENT PRIMARY KEY,
+        nombre             VARCHAR(80)  NOT NULL,
+        financiera         VARCHAR(60)  NOT NULL,
+        acreedor_nombre    VARCHAR(150) NOT NULL,
+        acreedor_rut       VARCHAR(20)  NULL,
+        limite             BIGINT       NOT NULL DEFAULT 0,
+        umbral_pct         DECIMAL(5,2) NOT NULL DEFAULT 80,
+        dias_respuesta     TINYINT      NOT NULL DEFAULT 2,
+        contrato_fecha     DATE         NULL,
+        fecha_inicio       DATE         NULL,
+        fecha_vencimiento  DATE         NULL,
+        correo_para        VARCHAR(300) NULL,
+        correo_cc          VARCHAR(300) NULL,
+        envio_automatico   TINYINT(1)   NOT NULL DEFAULT 0,
+        firmante_nombre    VARCHAR(120) NULL,
+        firmante_cargo     VARCHAR(120) NULL,
+        activa             TINYINT(1)   NOT NULL DEFAULT 0,
+        updated_por        VARCHAR(150) NULL,
+        created_at         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_fin (financiera)
+      )`);
+    /* Movimientos. `ref_unica` = 'COMP-<id_credito>' para la compensación vigente de una operación:
+       así dos barridos simultáneos no compensan dos veces la misma OP (gana el INSERT). Al reemitir
+       una objetada, la vieja libera la referencia. Giros y pagos la dejan NULL. */
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS linea_credito_movs (
+        id                 INT AUTO_INCREMENT PRIMARY KEY,
+        id_linea           INT          NOT NULL,
+        tipo               VARCHAR(15)  NOT NULL,
+        fecha              DATE         NOT NULL,
+        monto              BIGINT       NOT NULL DEFAULT 0,
+        saldo_precio       BIGINT       NULL,
+        exceso             BIGINT       NULL,
+        saldo_anterior     BIGINT       NULL,
+        saldo_nuevo        BIGINT       NULL,
+        id_credito         INT          NULL,
+        num_op             VARCHAR(30)  NULL,
+        cert_numero        INT          NULL,
+        cert_codigo        VARCHAR(40)  NULL,
+        estado             VARCHAR(15)  NOT NULL,
+        enviado_at         DATETIME     NULL,
+        enviado_a          VARCHAR(400) NULL,
+        respuesta_at       DATETIME     NULL,
+        respuesta_por      VARCHAR(150) NULL,
+        motivo             VARCHAR(400) NULL,
+        id_cuenta_bancaria INT          NULL,
+        glosa              VARCHAR(300) NULL,
+        ref_unica          VARCHAR(40)  NULL,
+        usuario            VARCHAR(150) NULL,
+        created_at         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_ref (ref_unica),
+        INDEX idx_linea (id_linea, tipo, estado), INDEX idx_cred (id_credito), INDEX idx_op (num_op)
+      )`);
+    /* Semilla: la línea UCA nace APAGADA y sin fecha de inicio — no hace nada hasta que el
+       contrato esté firmado y Tesorería la encienda. Datos del contrato y del Anexo 3 (editables). */
+    await pool.query(
+      `INSERT IGNORE INTO linea_credito (nombre, financiera, acreedor_nombre, acreedor_rut, limite, umbral_pct, dias_respuesta,
+         fecha_vencimiento, correo_para, correo_cc, envio_automatico, firmante_nombre, firmante_cargo, activa)
+       VALUES ('Línea UCA', 'UNIDAD DE CREDITO', 'UNIDAD CRÉDITOS S.A.', '76.697.501-1', 100000000, 80, 2,
+         '2026-12-14', 'erick.rodriguez@unidadcreditos.cl', 'juan.bustamante@autofacilchile.cl', 0,
+         'Juan Manuel Bustamante', 'Gerente de Finanzas', 0)`);
+    // Texto del certificado editable (pestaña Parámetros). NULL = el texto por defecto del contrato.
+    await pool.query('ALTER TABLE linea_credito ADD COLUMN IF NOT EXISTS cert_texto_intro TEXT NULL');
+    await pool.query('ALTER TABLE linea_credito ADD COLUMN IF NOT EXISTS cert_texto_cierre TEXT NULL');
+
+    // Card en Tesorería + permisos (anti-hardcode: módulos y cards salen de la BD)
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Tesorería' OR ruta LIKE '/tesoreria%' LIMIT 1");
+    if (mod) {
+      for (const [codigo, nombre, href, icono] of [
+        ['linea_credito', 'Línea de Crédito Unidad', '/tesoreria/linea-credito', 'bi-bank'],
+        ['linea_credito_gestionar', 'Línea de Crédito: registrar giros, respuestas y configuración', null, 'bi-pencil-square'],
+      ]) {
+        const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [codigo]);
+        let idF = ex && ex.id_funcionalidad;
+        if (!idF) {
+          const [r] = await pool.query('INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)',
+            [mod.id_modulo, nombre, codigo, href, icono]);
+          idF = r.insertId;
+        } else if (codigo === 'linea_credito') {
+          // Renombrada a "Línea de Crédito Unidad" (Pato, 01-10-2026)
+          await pool.query("UPDATE funcionalidades SET nombre=? WHERE id_funcionalidad=? AND nombre='Línea de Crédito Financiera'", [nombre, idF]);
+        }
+        // Admin, Tesorero, Analista Financiero, Gerente de Finanzas — el resto por la matriz de Perfiles
+        for (const idp of [1, 30001, 90003, 90007])
+          await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idF]);
+      }
+    }
+    console.log('[linea-credito] módulo listo');
+  } catch (e) { console.error('[linea-credito migration]', e.message); }
+});
+
+/* ── Saldo de la línea (motor único) ─────────────────────────────────────
+   insoluto = giros − pagos − compensaciones vivas (lo que se debe hoy)
+   firme    = giros − pagos − compensaciones ACEPTADAS (base del cupo girable) */
+async function saldoLinea(idLinea, db = pool) {
+  const [[s]] = await db.query(`
+    SELECT COALESCE(SUM(CASE WHEN tipo='GIRO' AND estado='REGISTRADO' THEN monto END),0) giros,
+           COALESCE(SUM(CASE WHEN tipo='PAGO' AND estado='REGISTRADO' THEN monto END),0) pagos,
+           COALESCE(SUM(CASE WHEN tipo='COMPENSACION' AND estado IN ${COMP_VIVAS} THEN monto END),0) comps,
+           COALESCE(SUM(CASE WHEN tipo='COMPENSACION' AND estado='ACEPTADO' THEN monto END),0) comps_firmes,
+           SUM(tipo='COMPENSACION' AND estado IN ('EMITIDO','ENVIADO')) pendientes
+      FROM linea_credito_movs WHERE id_linea=?`, [idLinea]);
+  const giros = Number(s.giros), pagos = Number(s.pagos);
+  return {
+    giros, pagos, comps: Number(s.comps), comps_firmes: Number(s.comps_firmes), pendientes: Number(s.pendientes) || 0,
+    insoluto: giros - pagos - Number(s.comps),
+    firme: giros - pagos - Number(s.comps_firmes),
+  };
+}
+function estadoLinea(l, s) {
+  const limite = Number(l.limite) || 0;
+  const uso = limite ? (s.insoluto / limite) * 100 : 0;
+  return { ...s, limite, disponible: Math.max(0, limite - s.firme), uso_pct: Math.round(uso * 10) / 10,
+    umbral_pct: Number(l.umbral_pct), puede_girar: limite > 0 && uso >= Number(l.umbral_pct) };
+}
+
+/* ── Anular el asiento de un movimiento (mes abierto) ──────────────────── */
+async function anularAsiento(evento, ref, usuario, motivo) {
+  const [[c]] = await pool.query(
+    "SELECT id, fecha FROM ctb_comprobantes WHERE origen=? AND origen_ref=? AND estado='CONTABILIZADO' ORDER BY id DESC LIMIT 1", [evento, ref]);
+  if (!c) return { anulado: false };
+  const mes = fc.isoDeBD(c.fecha).slice(0, 7);
+  const [[cerrado]] = await pool.query('SELECT mes FROM ctb_meses_cerrados WHERE mes=?', [mes]);
+  if (cerrado) return { anulado: false, mesCerrado: mes, id_comprobante: c.id };
+  const [r] = await pool.query("UPDATE ctb_comprobantes SET estado='ANULADO', anulado_por=?, anulado_motivo=? WHERE id=? AND estado='CONTABILIZADO'",
+    [usuario, String(motivo || '').slice(0, 400), c.id]);
+  return { anulado: !!r.affectedRows };
+}
+
+/* ── Texto del certificado (paramétrico) ─────────────────────────────────
+   Variables: {ACREEDOR} {RUT_ACREEDOR} {DEUDOR} {RUT_DEUDOR} {FECHA_CONTRATO} {DIAS} */
+const TEXTO_INTRO_DEF = 'Señores {ACREEDOR}, RUT {RUT_ACREEDOR}: en cumplimiento de la cláusula Cuarta del Contrato de Apertura de Línea de Crédito suscrito con {DEUDOR} (RUT {RUT_DEUDOR}) con fecha {FECHA_CONTRATO}, certificamos el saldo de capital insoluto de la línea una vez aplicada la Compensación del Saldo de Precio de la operación que se indica.';
+const TEXTO_CIERRE_DEF = 'Conforme a la letra d/ del numeral Cuatro.Dos del Contrato, {ACREEDOR} dispone de {DIAS} días hábiles bancarios para manifestar su conformidad o disconformidad con este certificado. Aceptado, la Compensación queda firme y el monto compensado queda disponible como cupo de la línea.';
+const VARIABLES_TEXTO = ['{ACREEDOR}', '{RUT_ACREEDOR}', '{DEUDOR}', '{RUT_DEUDOR}', '{FECHA_CONTRATO}', '{DIAS}'];
+const renderTexto = (t, v) => String(t || '').replace(/\{(\w+)\}/g, (m, k) => (v[k] != null && v[k] !== '' ? String(v[k]) : m === '{FECHA_CONTRATO}' ? '—' : m));
+
+/* ── Snapshot del certificado (lo que se congela en el folio verificable) ── */
+async function datosCertificado(l, m) {
+  const E = await require('../../../../shared/empresa').datosEmpresa();
+  const [[op]] = await pool.query(
+    `SELECT c.num_op, c.id_financiera, DATE_FORMAT(c.fecha_otorgado,'%Y-%m-%d') fecha_otorgado, cl.rut, cl.nombre_completo cliente
+       FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente WHERE c.id=?`, [m.id_credito]);
+  const limite = Number(l.limite) || 0;
+  const saldoNuevo = Number(m.saldo_nuevo) || 0;
+  const vars = { ACREEDOR: l.acreedor_nombre, RUT_ACREEDOR: l.acreedor_rut || '—', DEUDOR: E.razon_social, RUT_DEUDOR: E.rut_formateado || E.rut,
+    FECHA_CONTRATO: fmtD(fc.isoDeBD(l.contrato_fecha)), DIAS: Number(l.dias_respuesta) || 2 };
+  return {
+    // Los textos se congelan ya resueltos: cambiar el parámetro no altera certificados emitidos.
+    texto_intro: renderTexto(l.cert_texto_intro || TEXTO_INTRO_DEF, vars),
+    texto_cierre: renderTexto(l.cert_texto_cierre || TEXTO_CIERRE_DEF, vars),
+    numero: m.cert_numero, numero_txt: `CSI-${String(m.cert_numero).padStart(4, '0')}`,
+    fecha_emision: fc.isoDeBD(m.created_at) || fc.hoyISO(),
+    acreedor: { razon_social: l.acreedor_nombre, rut: l.acreedor_rut },
+    deudor: { razon_social: E.razon_social, rut: E.rut_formateado || E.rut },
+    linea: { nombre: l.nombre, limite, contrato_fecha: fc.isoDeBD(l.contrato_fecha), vencimiento: fc.isoDeBD(l.fecha_vencimiento),
+      disponible: Math.max(0, limite - saldoNuevo), uso_pct: limite ? Math.round(saldoNuevo / limite * 1000) / 10 : 0 },
+    operacion: { num_op: m.num_op, id_financiera: op && op.id_financiera || null, cliente: op && op.cliente || '—', rut: op && op.rut || '—',
+      fecha_otorgado: op && op.fecha_otorgado || fc.isoDeBD(m.fecha) },
+    saldo_anterior: Number(m.saldo_anterior), saldo_precio: Number(m.saldo_precio), compensado: Number(m.monto),
+    exceso: Number(m.exceso) || 0, saldo_nuevo: saldoNuevo,
+    dias_respuesta: Number(l.dias_respuesta) || 2, firmante_nombre: l.firmante_nombre, firmante_cargo: l.firmante_cargo,
+  };
+}
+
+async function pdfDeMovimiento(idMov) {
+  const { getVerificable } = require('../../../../shared/verificacion');
+  const [[m]] = await pool.query('SELECT * FROM linea_credito_movs WHERE id=?', [idMov]);
+  if (!m || !m.cert_codigo) return null;
+  const v = await getVerificable(m.cert_codigo);
+  if (!v || !v.datos) return null;
+  const { generarCertificadoSaldoLineaPDF } = require('../../../../shared/certificado-saldo-linea-pdf');
+  const buf = await generarCertificadoSaldoLineaPDF({ d: v.datos, codigo: m.cert_codigo, host: HOST });
+  return { buf, nombre: `${v.datos.numero_txt}_OP${m.num_op}.pdf`, datos: v.datos, mov: m };
+}
+
+/* ── Envío a la casilla de la financiera (plantilla paramétrica) ────────── */
+async function enviarCertificado(idMov, quien) {
+  const [[m]] = await pool.query('SELECT * FROM linea_credito_movs WHERE id=? AND tipo=\'COMPENSACION\'', [idMov]);
+  if (!m) return { enviado: false, motivo: 'Movimiento no encontrado' };
+  if (!['EMITIDO', 'ENVIADO'].includes(m.estado)) return { enviado: false, motivo: `El certificado está ${m.estado}` };
+  const [[l]] = await pool.query('SELECT * FROM linea_credito WHERE id=?', [m.id_linea]);
+  const para = EMAILS(l && l.correo_para);
+  if (!para.length) return { enviado: false, motivo: 'La línea no tiene casilla de destino configurada' };
+  const pdf = await pdfDeMovimiento(idMov);
+  if (!pdf) return { enviado: false, motivo: 'No se pudo armar el PDF del certificado' };
+  const d = pdf.datos;
+  const plant = require('../../../../shared/plantillas-correo');
+  const env = await plant.enviar({
+    codigo: 'linea_certificado_saldo', to: para, cc: EMAILS(l.correo_cc),
+    datos: {
+      ACREEDOR: l.acreedor_nombre, CERTIFICADO: d.numero_txt, OP: d.operacion.num_op, OP_FINANCIERA: d.operacion.id_financiera || '—',
+      CLIENTE: d.operacion.cliente, SALDO_ANTERIOR: fmtCLP(d.saldo_anterior), SALDO_PRECIO: fmtCLP(d.saldo_precio),
+      COMPENSADO: fmtCLP(d.compensado), EXCESO: fmtCLP(d.exceso), SALDO_NUEVO: fmtCLP(d.saldo_nuevo),
+      DISPONIBLE: fmtCLP(d.linea.disponible), USO: `${d.linea.uso_pct.toLocaleString('es-CL')}%`, DIAS: d.dias_respuesta,
+      LINK: `${HOST}/verificar/${m.cert_codigo}`,
+    },
+    adjuntos: [{ filename: pdf.nombre, content: pdf.buf, contentType: 'application/pdf' }],
+  });
+  if (!env.enviado) return { enviado: false, motivo: env.motivo };
+  await pool.query("UPDATE linea_credito_movs SET estado='ENVIADO', enviado_at=NOW(), enviado_a=? WHERE id=? AND estado IN ('EMITIDO','ENVIADO')",
+    [[...env.to, ...(env.cc || [])].join(', ').slice(0, 400), idMov]);
+  auditar({ accion: 'ENVIAR', modulo: 'linea-credito', entidad: 'certificado_saldo', entidad_id: String(idMov),
+    detalle: `${d.numero_txt} (OP ${d.operacion.num_op}) enviado a ${env.to.join(', ')} por ${quien || USUARIO_SISTEMA}` });
+  return { enviado: true, to: env.to, cc: env.cc };
+}
+
+/* ── El motor: compensa cada OP otorgada de la financiera y emite el certificado ──
+   Solo con la línea ACTIVA y con fecha de inicio: toma las OP de esa financiera otorgadas desde esa
+   fecha, con saldo de precio y sin compensación vigente, en orden de otorgamiento. Con saldo insoluto en
+   cero la OP queda SIN_SALDO (la financiera paga ese saldo en efectivo) y no se vuelve a mirar. */
+async function compensarUna(l, c, fijos) {
+  const { montoSaldoOrden } = require('../../../postventa/src/controllers/postventa.controller');
+  const saldoPrecio = Math.round(montoSaldoOrden(c.financiera, c.saldo_precio, fijos, false));
+  if (!(saldoPrecio > 0)) return null;
+  const conn = await pool.getConnection();
+  let mov;
+  try {
+    await conn.beginTransaction();
+    await conn.query('SELECT id FROM linea_credito WHERE id=? FOR UPDATE', [l.id]);   // serializa el cálculo del saldo
+    const s = await saldoLinea(l.id, conn);
+    const comp = Math.max(0, Math.min(saldoPrecio, s.insoluto));
+    const [[n]] = await conn.query("SELECT COALESCE(MAX(cert_numero),0)+1 sig FROM linea_credito_movs WHERE id_linea=?", [l.id]);
+    const fecha = fc.isoDeBD(c.fecha_otorgado) || fc.hoyISO();
+    const [r] = await conn.query(
+      `INSERT IGNORE INTO linea_credito_movs (id_linea, tipo, fecha, monto, saldo_precio, exceso, saldo_anterior, saldo_nuevo,
+         id_credito, num_op, cert_numero, estado, ref_unica, usuario)
+       VALUES (?, 'COMPENSACION', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [l.id, fecha, comp, saldoPrecio, saldoPrecio - comp, s.insoluto, s.insoluto - comp, c.id, c.num_op,
+       comp > 0 ? n.sig : null, comp > 0 ? 'EMITIDO' : 'SIN_SALDO', `COMP-${c.id}`, USUARIO_SISTEMA]);
+    await conn.commit();
+    if (!r.affectedRows) return null;                                       // otro barrido ya la tomó
+    [[mov]] = await pool.query('SELECT * FROM linea_credito_movs WHERE id=?', [r.insertId]);
+  } catch (e) { await conn.rollback().catch(() => {}); throw e; }
+  finally { conn.release(); }
+  if (mov.estado === 'SIN_SALDO') return mov;
+
+  // Folio verificable (snapshot inmutable) + asiento + envío
+  const datos = await datosCertificado(l, mov);
+  const { registrarVerificable } = require('../../../../shared/verificacion');
+  const codigo = await registrarVerificable({ tipo: 'CERT_SALDO_LINEA', ref_tabla: 'linea_credito_movs', ref_id: mov.id,
+    num_op: mov.num_op, rut: datos.operacion.rut, nombre: datos.operacion.cliente, datos, emitido_por: USUARIO_SISTEMA,
+    firmante: { nombre: l.firmante_nombre, cargo: l.firmante_cargo } });
+  await pool.query('UPDATE linea_credito_movs SET cert_codigo=? WHERE id=?', [codigo, mov.id]);
+  // Se asienta el día de la emisión (no el del otorgamiento): un otorgado que se detecta tarde no
+  // puede caer en un mes ya cerrado y perder su asiento.
+  await require('../../../contabilidad/src/motor-asientos').contabilizar({
+    evento: 'LINEA_COMPENSACION', fecha: fc.hoyISO(),
+    glosa: `Compensación saldo precio OP ${mov.num_op} contra ${l.nombre} — ${datos.numero_txt}`.slice(0, 300),
+    ref: `LCOMP-${mov.id}`, montos: { monto: Number(mov.monto) }, num_op: mov.num_op, detalle: `${datos.numero_txt} · ${l.acreedor_nombre}` });
+  auditar({ accion: 'CREAR', modulo: 'linea-credito', entidad: 'certificado_saldo', entidad_id: String(mov.id),
+    detalle: `${datos.numero_txt}: OP ${mov.num_op} compensa ${fmtCLP(mov.monto)} (saldo de precio ${fmtCLP(mov.saldo_precio)}); saldo insoluto ${fmtCLP(mov.saldo_anterior)} → ${fmtCLP(mov.saldo_nuevo)}` });
+  if (l.envio_automatico) {
+    const env = await enviarCertificado(mov.id);
+    if (!env.enviado) console.warn(`[linea-credito] ${datos.numero_txt} no se envió:`, env.motivo);
+  }
+  return mov;
+}
+
+async function procesarLineas() {
+  const [lineas] = await pool.query('SELECT * FROM linea_credito WHERE activa=1 AND fecha_inicio IS NOT NULL');
+  let n = 0;
+  for (const l of lineas) {
+    const [ops] = await pool.query(
+      `SELECT c.id, c.num_op, c.financiera, c.saldo_precio, c.fecha_otorgado
+         FROM creditos c
+        WHERE UPPER(c.financiera) = UPPER(?) AND ${ES_ETAPA('OTORGADO', 'c')}
+          AND c.fecha_otorgado >= ? AND c.saldo_precio > 0
+          AND NOT EXISTS (SELECT 1 FROM linea_credito_movs m WHERE m.ref_unica = CONCAT('COMP-', c.id))
+        ORDER BY c.fecha_otorgado, c.id LIMIT 200`, [l.financiera, fc.isoDeBD(l.fecha_inicio)]);
+    if (!ops.length) continue;
+    const { getFijosAutoFin } = require('../../../postventa/src/controllers/postventa.controller');
+    const fijos = await getFijosAutoFin();
+    for (const c of ops) {
+      try { if (await compensarUna(l, c, fijos)) n++; }
+      catch (e) { console.error(`[linea-credito] OP ${c.num_op}:`, e.message); }
+    }
+  }
+  if (n) console.log(`[linea-credito] ${n} operación(es) procesada(s)`);
+  return n;
+}
+programar('linea-credito', procesarLineas, 30 * 60 * 1000, { arranqueMs: 2 * 60 * 1000 });
+function procesarTrasEvento() {
+  if (!porEvento('linea-credito')) return;
+  setTimeout(() => procesarLineas().catch(e => console.error('[linea-credito evento]', e.message)), 500);
+}
+
+/* Post Venta → FONDOS RECIBIDOS: la parte compensada no entra al banco (ya la asentó la compensación). */
+async function compensadoDeOp(numOp) {
+  if (!numOp) return 0;
+  const [[r]] = await pool.query(
+    `SELECT COALESCE(SUM(monto),0) n FROM linea_credito_movs WHERE tipo='COMPENSACION' AND num_op=? AND estado IN ${COMP_VIVAS}`, [String(numOp)]);
+  return Number(r.n) || 0;
+}
+
+/* ── API ─────────────────────────────────────────────────────────────────── */
+const quien = req => { const u = req.usuario || {}; return [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || 'usuario'; };
+
+exports.resumen = async (req, res) => {
+  try {
+    const [lineas] = await pool.query('SELECT * FROM linea_credito ORDER BY id');
+    const out = [];
+    for (const l of lineas) {
+      const s = estadoLinea(l, await saldoLinea(l.id));
+      const [[venc]] = await pool.query(
+        `SELECT COUNT(*) n FROM linea_credito_movs WHERE id_linea=? AND tipo='COMPENSACION' AND estado IN ('EMITIDO','ENVIADO')
+            AND created_at < NOW() - INTERVAL ? DAY`, [l.id, Number(l.dias_respuesta) || 2]);
+      out.push({ ...l, contrato_fecha: fc.isoDeBD(l.contrato_fecha), fecha_inicio: fc.isoDeBD(l.fecha_inicio),
+        fecha_vencimiento: fc.isoDeBD(l.fecha_vencimiento), estado: s, sin_respuesta: Number(venc.n) || 0,
+        texto_intro_def: TEXTO_INTRO_DEF, texto_cierre_def: TEXTO_CIERRE_DEF, variables_texto: VARIABLES_TEXTO });
+    }
+    ok(res, out);
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.movimientos = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id); if (!id) return fail(res, 'Línea inválida', 400);
+    const tipo = norm(req.query.tipo).toUpperCase();
+    if (tipo && !['GIRO', 'COMPENSACION', 'PAGO'].includes(tipo)) return fail(res, 'Tipo inválido', 400);
+    const [rows] = await pool.query(
+      `SELECT m.*, DATE_FORMAT(m.fecha,'%Y-%m-%d') fecha, cl.nombre_completo cliente, cb.nombre cuenta_nombre
+         FROM linea_credito_movs m
+         LEFT JOIN creditos c ON c.id = m.id_credito
+         LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+         LEFT JOIN cuentas_bancarias cb ON cb.id_cuenta = m.id_cuenta_bancaria
+        WHERE m.id_linea=? ${tipo ? 'AND m.tipo=?' : ''}
+        ORDER BY m.id DESC LIMIT 500`, tipo ? [id, tipo] : [id]);
+    ok(res, rows);
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.guardarConfig = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id); const b = req.body || {};
+    const limite = Math.round(Number(b.limite));
+    if (!(limite > 0)) return fail(res, 'El monto máximo de la línea debe ser mayor a 0', 400);
+    const umbral = Number(b.umbral_pct);
+    if (!(umbral > 0 && umbral <= 100)) return fail(res, 'El umbral de reposición debe estar entre 1 y 100%', 400);
+    const dias = parseInt(b.dias_respuesta);
+    if (!(dias >= 1 && dias <= 30)) return fail(res, 'El plazo de respuesta debe estar entre 1 y 30 días hábiles', 400);
+    for (const k of ['contrato_fecha', 'fecha_inicio', 'fecha_vencimiento'])
+      if (b[k] && !ISO.test(String(b[k]))) return fail(res, `Fecha inválida: ${k}`, 400);
+    const para = EMAILS(b.correo_para), cc = EMAILS(b.correo_cc);
+    if ([...para, ...cc].some(e => !EMAIL_OK(e))) return fail(res, 'Hay un correo con formato inválido', 400);
+    const activa = b.activa ? 1 : 0, auto = b.envio_automatico ? 1 : 0;
+    if (activa && !b.fecha_inicio) return fail(res, 'Para activar la línea indica la fecha de inicio (desde qué otorgamiento se compensa)', 400);
+    if (auto && !para.length) return fail(res, 'Para el envío automático indica la casilla de la financiera', 400);
+    if (!norm(b.acreedor_nombre)) return fail(res, 'La razón social del acreedor es obligatoria', 400);
+    // Texto igual al por defecto (o vacío) se guarda NULL: sigue al default si este cambia.
+    const txtIntro = norm(b.cert_texto_intro), txtCierre = norm(b.cert_texto_cierre);
+    if (txtIntro.length > 2000 || txtCierre.length > 2000) return fail(res, 'Cada texto del certificado admite hasta 2.000 caracteres', 400);
+    const [r] = await pool.query(
+      `UPDATE linea_credito SET nombre=?, acreedor_nombre=?, acreedor_rut=?, limite=?, umbral_pct=?, dias_respuesta=?, contrato_fecha=?,
+         fecha_inicio=?, fecha_vencimiento=?, correo_para=?, correo_cc=?, envio_automatico=?, firmante_nombre=?, firmante_cargo=?, activa=?, updated_por=?,
+         cert_texto_intro=?, cert_texto_cierre=?
+       WHERE id=?`,
+      [norm(b.nombre) || 'Línea', norm(b.acreedor_nombre), norm(b.acreedor_rut) || null, limite, umbral, dias, b.contrato_fecha || null,
+       b.fecha_inicio || null, b.fecha_vencimiento || null, para.join(', ') || null, cc.join(', ') || null, auto,
+       norm(b.firmante_nombre) || null, norm(b.firmante_cargo) || null, activa, quien(req),
+       (txtIntro && txtIntro !== TEXTO_INTRO_DEF) ? txtIntro : null, (txtCierre && txtCierre !== TEXTO_CIERRE_DEF) ? txtCierre : null, id]);
+    if (!r.affectedRows) return fail(res, 'Línea no encontrada', 404);
+    auditar({ req, accion: 'EDITAR', modulo: 'linea-credito', entidad: 'linea_credito', entidad_id: String(id),
+      detalle: `Configuración: límite ${fmtCLP(limite)}, umbral ${umbral}%, ${dias} días, inicio ${b.fecha_inicio || '—'}, vence ${b.fecha_vencimiento || '—'}, ${activa ? 'ACTIVA' : 'apagada'}, envío ${auto ? 'automático' : 'manual'} a ${para.join(', ') || '—'}` });
+    ok(res, { id });
+    if (activa) procesarTrasEvento();
+  } catch (e) { fail(res, e.message); }
+};
+
+/* GIRO / PAGO en efectivo: se registran cuando el dinero se mueve en el banco. */
+async function registrarMov(req, res, tipo) {
+  try {
+    const id = parseInt(req.params.id); const b = req.body || {};
+    const monto = Math.round(Number(b.monto));
+    if (!(monto > 0)) return fail(res, 'El monto debe ser mayor a 0', 400);
+    if (!ISO.test(String(b.fecha || ''))) return fail(res, 'Fecha inválida', 400);
+    if (b.fecha > fc.hoyISO()) return fail(res, 'La fecha no puede ser futura', 400);
+    const idCta = parseInt(b.id_cuenta_bancaria) || null;
+    let cta = null;
+    if (idCta) {
+      [[cta]] = await pool.query('SELECT id_cuenta, nombre, cuenta_contable FROM cuentas_bancarias WHERE id_cuenta=? AND activo=1', [idCta]);
+      if (!cta) return fail(res, 'Cuenta bancaria inválida o inactiva', 400);
+    }
+    const [[l]] = await pool.query('SELECT * FROM linea_credito WHERE id=?', [id]);
+    if (!l) return fail(res, 'Línea no encontrada', 404);
+    const s = estadoLinea(l, await saldoLinea(id));
+    if (tipo === 'GIRO' && monto > s.disponible)
+      return fail(res, `El giro excede el cupo disponible (${fmtCLP(s.disponible)}). Las compensaciones sin aceptar todavía no reponen cupo.`, 400);
+    if (tipo === 'PAGO' && monto > s.insoluto) return fail(res, `El pago excede el saldo insoluto (${fmtCLP(s.insoluto)})`, 400);
+    const glosa = norm(b.glosa).slice(0, 300) || null;
+    const [r] = await pool.query(
+      `INSERT INTO linea_credito_movs (id_linea, tipo, fecha, monto, saldo_anterior, saldo_nuevo, estado, id_cuenta_bancaria, glosa, usuario)
+       VALUES (?,?,?,?,?,?,'REGISTRADO',?,?,?)`,
+      [id, tipo, b.fecha, monto, s.insoluto, s.insoluto + (tipo === 'GIRO' ? monto : -monto), idCta, glosa, quien(req)]);
+    await require('../../../contabilidad/src/motor-asientos').contabilizar({
+      evento: tipo === 'GIRO' ? 'LINEA_GIRO' : 'LINEA_PAGO', fecha: b.fecha,
+      glosa: `${tipo === 'GIRO' ? 'Giro' : 'Pago'} ${l.nombre}${glosa ? ' — ' + glosa : ''}`.slice(0, 300),
+      ref: `L${tipo}-${r.insertId}`, montos: { monto }, detalle: [l.acreedor_nombre, cta && cta.nombre].filter(Boolean).join(' · '),
+      reemplazos: cta && cta.cuenta_contable ? { '1101090': cta.cuenta_contable } : null });
+    auditar({ req, accion: 'CREAR', modulo: 'linea-credito', entidad: tipo.toLowerCase(), entidad_id: String(r.insertId),
+      detalle: `${tipo} ${l.nombre} ${fmtCLP(monto)} del ${b.fecha}${glosa ? ' (' + glosa + ')' : ''}` });
+    ok(res, { id: r.insertId });
+    // Un giro con OP otorgadas pendientes no las compensa hacia atrás: el barrido solo toma las nuevas.
+  } catch (e) { fail(res, e.message); }
+}
+exports.registrarGiro = (req, res) => registrarMov(req, res, 'GIRO');
+exports.registrarPago = (req, res) => registrarMov(req, res, 'PAGO');
+
+exports.anularMov = async (req, res) => {
+  try {
+    const idMov = parseInt(req.params.idMov); const motivo = norm((req.body || {}).motivo);
+    if (!motivo) return fail(res, 'Indica el motivo de la anulación', 400);
+    const [[m]] = await pool.query("SELECT * FROM linea_credito_movs WHERE id=? AND tipo IN ('GIRO','PAGO')", [idMov]);
+    if (!m) return fail(res, 'Movimiento no encontrado', 404);
+    if (m.estado !== 'REGISTRADO') return fail(res, 'El movimiento ya está anulado', 400);
+    const a = await anularAsiento(m.tipo === 'GIRO' ? 'LINEA_GIRO' : 'LINEA_PAGO', `L${m.tipo}-${m.id}`, quien(req), `Anulación ${m.tipo} línea: ${motivo}`);
+    if (a.mesCerrado) return fail(res, `El asiento es del mes ${a.mesCerrado}, que está cerrado. Reábrelo en Contabilidad o regulariza con un asiento manual.`, 409);
+    const [r] = await pool.query("UPDATE linea_credito_movs SET estado='ANULADO', motivo=? WHERE id=? AND estado='REGISTRADO'", [motivo.slice(0, 400), idMov]);
+    if (!r.affectedRows) return fail(res, 'El movimiento cambió mientras tanto; recarga la página', 409);
+    auditar({ req, accion: 'ANULAR', modulo: 'linea-credito', entidad: m.tipo.toLowerCase(), entidad_id: String(idMov),
+      detalle: `${m.tipo} ${fmtCLP(m.monto)} del ${fc.isoDeBD(m.fecha)} anulado: ${motivo}` });
+    ok(res, { id: idMov });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* Respuesta de la financiera al certificado: ACEPTADO (repone el cupo) u OBJETADO (se anula la
+   compensación y su asiento; se corrige el dato en la ficha del crédito y se reemite). */
+exports.responder = async (req, res) => {
+  try {
+    const idMov = parseInt(req.params.idMov); const b = req.body || {};
+    const resp = norm(b.respuesta).toUpperCase(); const motivo = norm(b.motivo);
+    if (!['ACEPTADO', 'OBJETADO'].includes(resp)) return fail(res, 'Respuesta inválida', 400);
+    if (resp === 'OBJETADO' && !motivo) return fail(res, 'Indica qué objetó la financiera', 400);
+    const [[m]] = await pool.query("SELECT * FROM linea_credito_movs WHERE id=? AND tipo='COMPENSACION'", [idMov]);
+    if (!m) return fail(res, 'Certificado no encontrado', 404);
+    if (!['EMITIDO', 'ENVIADO'].includes(m.estado)) return fail(res, `El certificado ya está ${m.estado}`, 400);
+    if (resp === 'OBJETADO') {
+      const a = await anularAsiento('LINEA_COMPENSACION', `LCOMP-${m.id}`, quien(req), `Certificado objetado: ${motivo}`);
+      if (a.mesCerrado) return fail(res, `El asiento de la compensación es del mes ${a.mesCerrado}, que está cerrado. Reábrelo en Contabilidad antes de registrar la objeción.`, 409);
+    }
+    const [r] = await pool.query(
+      "UPDATE linea_credito_movs SET estado=?, respuesta_at=NOW(), respuesta_por=?, motivo=? WHERE id=? AND estado IN ('EMITIDO','ENVIADO')",
+      [resp, quien(req), motivo.slice(0, 400) || null, idMov]);
+    if (!r.affectedRows) return fail(res, 'El certificado cambió mientras tanto; recarga la página', 409);
+    if (resp === 'OBJETADO' && m.cert_codigo)
+      await require('../../../../shared/verificacion').anularVerificable(m.cert_codigo, `Objetado por la financiera: ${motivo}`).catch(() => {});
+    auditar({ req, accion: resp === 'ACEPTADO' ? 'APROBAR' : 'RECHAZAR', modulo: 'linea-credito', entidad: 'certificado_saldo', entidad_id: String(idMov),
+      detalle: `CSI-${String(m.cert_numero).padStart(4, '0')} (OP ${m.num_op}) ${resp}${motivo ? ': ' + motivo : ''}` });
+    ok(res, { id: idMov, estado: resp });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* Reemitir: libera la referencia de la compensación objetada (o de una SIN_SALDO mal tomada, p. ej.
+   porque el giro se registró tarde) y el motor la vuelve a procesar con los datos actuales del crédito. */
+exports.reemitir = async (req, res) => {
+  try {
+    const idMov = parseInt(req.params.idMov);
+    const [[m]] = await pool.query("SELECT * FROM linea_credito_movs WHERE id=? AND tipo='COMPENSACION'", [idMov]);
+    if (!m) return fail(res, 'Movimiento no encontrado', 404);
+    if (!['OBJETADO', 'SIN_SALDO'].includes(m.estado)) return fail(res, 'Solo se reemite un certificado objetado o una operación sin saldo', 400);
+    if (!m.ref_unica) return fail(res, 'Esta operación ya se reemitió', 400);
+    const [r] = await pool.query('UPDATE linea_credito_movs SET ref_unica=NULL WHERE id=? AND ref_unica IS NOT NULL', [idMov]);
+    if (!r.affectedRows) return fail(res, 'Esta operación ya se reemitió', 409);
+    auditar({ req, accion: 'EDITAR', modulo: 'linea-credito', entidad: 'certificado_saldo', entidad_id: String(idMov),
+      detalle: `OP ${m.num_op}: se libera para reprocesar (estaba ${m.estado})` });
+    const n = await procesarLineas();
+    ok(res, { id: idMov, procesadas: n });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.enviar = async (req, res) => {
+  try {
+    const env = await enviarCertificado(parseInt(req.params.idMov), quien(req));
+    if (!env.enviado) return fail(res, env.motivo || 'No se pudo enviar', 400);
+    ok(res, env);
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.pdf = async (req, res) => {
+  try {
+    const pdf = await pdfDeMovimiento(parseInt(req.params.idMov));
+    if (!pdf) return fail(res, 'Certificado no encontrado', 404);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${pdf.nombre}"`);
+    res.send(pdf.buf);
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.procesarAhora = async (req, res) => {
+  try { ok(res, { procesadas: await procesarLineas() }); }
+  catch (e) { fail(res, e.message); }
+};
+
+exports.procesarLineas = procesarLineas;
+exports.compensadoDeOp = compensadoDeOp;
+exports.saldoLinea = saldoLinea;

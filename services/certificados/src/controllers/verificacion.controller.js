@@ -14,6 +14,7 @@ const TIPO_LABEL = {
   COMPROBANTE_CUOTA:    'Comprobante de Pago de Cuota',
   ORDEN_PAGO:           'Orden de Pago',
   CERT_ANTIGUEDAD:      'Certificado de Antigüedad Laboral',
+  CERT_SALDO_LINEA:     'Certificado de Saldo Insoluto — Línea de Crédito',
 };
 
 function maskRut(rut) {

@@ -730,11 +730,14 @@ async function contabilizarSaldoPrecio(idSeguimiento, etapa, fecha = null, ctaBa
        saldo pelado, la cuenta de paso 2102045 quedaba descuadrada en $45.380 por
        operación. Se usa el monto CONGELADO de la orden cuando ya existe; si aún
        no se emite (caso FONDOS RECIBIDOS), lo calcula el motor único. */
-    const monto = Math.round(s.odp_monto != null
+    let monto = Math.round(s.odp_monto != null
       ? Number(s.odp_monto)
       : montoSaldoOrden(s.financiera, s.saldo_precio, await getFijosAutoFin(), Number(s.sin_limitacion) === 1));
-    if (!monto) return;
     const recibido = etapa === 'FONDOS RECIBIDOS';
+    /* Línea de crédito de la financiera: la parte del saldo que se compensó contra la línea no
+       entra al banco — ya la asentó LINEA_COMPENSACION. Acá solo va el exceso que se pagó en efectivo. */
+    if (recibido) monto -= await require('../../../tesoreria/src/controllers/linea-credito.controller').compensadoDeOp(s.num_op);
+    if (!(monto > 0)) return;
     // Trazabilidad en el libro: N° de orden de pago + dealer (+ cuenta de cargo) en cada línea.
     const detalle = [s.num_orden, s.nombre_dealer, ctaBancaria && ctaBancaria.nombre].filter(Boolean).join(' · ');
     const reemplazos = (ctaBancaria && ctaBancaria.cuenta_contable) ? { '1101090': ctaBancaria.cuenta_contable } : null;

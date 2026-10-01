@@ -350,6 +350,33 @@ AutoFácil Crédito Automotriz — Tesorería`,
     variables: '{PROVEEDOR} {GLOSA} {MONTO} {ODP} {FECHA_PAGO}',
   },
   {
+    codigo: 'linea_certificado_saldo',
+    ambito: 'Tesorería',
+    nombre: 'Línea de crédito: Certificado de Saldo Insoluto → a la FINANCIERA',
+    descripcion: 'Sale a la casilla de la financiera (Tesorería → Línea de Crédito Unidad → Parámetros, Anexo 3 del contrato) cada vez que un saldo de precio se compensa contra la línea, con el certificado en PDF adjunto. Automático solo si la línea tiene encendido el envío automático; si no, se manda con el botón Enviar.',
+    asunto: 'Certificado de Saldo Insoluto {CERTIFICADO} — OP {OP}',
+    cuerpo: `Estimados {ACREEDOR}:
+
+Conforme a la cláusula Cuarta del Contrato de Apertura de Línea de Crédito, adjuntamos el Certificado de Saldo Insoluto {CERTIFICADO}, por la compensación del saldo de precio de la operación {OP} (N° UCA {OP_FINANCIERA}), cliente {CLIENTE}.
+
+Saldo insoluto anterior: {SALDO_ANTERIOR}
+Saldo de precio: {SALDO_PRECIO}
+Monto compensado: {COMPENSADO}
+Saldo insoluto de la línea: {SALDO_NUEVO}
+Cupo disponible, aceptado este certificado: {DISPONIBLE} (utilización {USO})
+
+Les agradecemos confirmar su conformidad dentro de {DIAS} días hábiles bancarios respondiendo este correo.
+
+Verificación del documento: {LINK}
+
+Atentamente,
+AutoFácil Crédito Automotriz — Finanzas`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'La casilla de la financiera y la copia configuradas en Tesorería → Línea de Crédito Unidad → Parámetros',
+    variables: '{ACREEDOR} {CERTIFICADO} {OP} {OP_FINANCIERA} {CLIENTE} {SALDO_ANTERIOR} {SALDO_PRECIO} {COMPENSADO} {EXCESO} {SALDO_NUEVO} {DISPONIBLE} {USO} {DIAS} {LINK}',
+  },
+  {
     codigo: 'cliente_comprobante_cuota',
     ambito: 'Cobranza',
     nombre: 'Comprobante de pago de cuotas → al CLIENTE',

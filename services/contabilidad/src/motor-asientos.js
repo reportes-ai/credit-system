@@ -243,6 +243,21 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['2102045', 'DEBE',  'monto', 'Rebaja saldo precio por pagar'],
         ['1101090', 'HABER', 'monto', 'Salida de banco'],
       ]],
+      /* ── LÍNEA DE CRÉDITO ROTATIVA DE UNA FINANCIERA (Tesorería → Línea de Crédito) ──
+         La financiera presta (giro) y se cobra compensando los saldos de precio que nos
+         debe: la compensación hace las veces de FONDOS RECIBIDOS sin pasar por el banco. */
+      ['LINEA_GIRO', 'Giro de la línea de crédito de una financiera', 'Se dispara al registrar un GIRO en Tesorería → Línea de Crédito: entra la plata al banco y nace la deuda con la financiera. Campos: monto.', 'INGRESO', 1, [
+        ['1101090', 'DEBE',  'monto', 'Ingreso giro línea de crédito'],
+        ['2101040', 'HABER', 'monto', 'Línea de crédito financiera por pagar'],
+      ]],
+      ['LINEA_COMPENSACION', 'Saldo precio compensado contra la línea de crédito', 'Se dispara al emitir el Certificado de Saldo Insoluto (Tesorería → Línea de Crédito): el saldo de precio que la financiera nos debe rebaja la deuda de la línea y queda por pagar al dealer, sin pasar por el banco. Reemplaza a SALDO_FONDOS_RECIBIDOS en la parte compensada. Campos: monto.', 'TRASPASO', 1, [
+        ['2101040', 'DEBE',  'monto', 'Rebaja línea de crédito por compensación'],
+        ['2102045', 'HABER', 'monto', 'Saldo precio por pagar al dealer'],
+      ]],
+      ['LINEA_PAGO', 'Pago en efectivo de la línea de crédito', 'Se dispara al registrar un PAGO de capital en Tesorería → Línea de Crédito (prepago o vencimiento): rebaja la deuda contra banco. Campos: monto.', 'EGRESO', 1, [
+        ['2101040', 'DEBE',  'monto', 'Pago línea de crédito financiera'],
+        ['1101090', 'HABER', 'monto', 'Salida de banco'],
+      ]],
       /* ── COMISIONES INTERNAS: ejecutivos y parques (devengo al aprobar el mes) ── */
       ['COMISION_EJECUTIVOS', 'Comisiones de ejecutivos aprobadas (mes)', 'Se dispara al APROBAR las comisiones del mes en Comisión Ejecutivos → Revisión. Reconoce el gasto y deja el monto por pagar (el pago se registra al emitir/pagar su ODP). Campos: monto (total aprobado del mes).', 'TRASPASO', 1, [
         ['4001100', 'DEBE',  'monto', 'Gasto comisiones de ejecutivos'],
