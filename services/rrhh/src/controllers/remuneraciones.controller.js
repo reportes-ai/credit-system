@@ -2235,6 +2235,18 @@ const putIndicadores = async (req, res) => {
       if (!(v >= 50 && v <= 300)) return fail(res, 'El recargo de la hora extraordinaria no puede ser menor al 50% legal (art. 32 CT)', 400);
       he.he_recargo_pct = v;
     }
+    /* Cuatro parámetros que la página mostraba y este PUT no guardaba (01-10-2026): se validan ANTES de escribir nada,
+       porque un valor fuera de rango cambia el cálculo en silencio (prorrateo de topes, costo empresa, vencimiento de la ODP). */
+    for (const [k, valido, msg] of [
+      ['rem_sanna_pct', v => v >= 0 && v <= 100, 'La Ley SANNA debe ser un porcentaje entre 0 y 100'],
+      ['rem_apv_tope_uf', v => v >= 0, 'El tope APV (UF/mes) no puede ser negativo'],
+      ['rem_prorratea_topes', v => v === 0 || v === 1, 'Topes proporcionales a días pagados: solo 1 (sí) o 0 (no)'],
+      ['rem_pension_dia_pago', v => Number.isInteger(v) && v >= 1 && v <= 28, 'El día de pago de la retención judicial debe ser un entero entre 1 y 28'],
+    ]) if (k in b && b[k] !== '') {
+      const v = Number(b[k]);
+      if (!valido(v)) return fail(res, msg, 400);
+      he[k] = v;
+    }
     for (const [k, v] of Object.entries(he))
       await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(v)]);
     // Config rem_* permitidas
