@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — latido de sesión (30-09-2026). v1.1 — breadcrumb Inicio › Reportería › Diseño de Consulta -->
+<!-- v1.3 — Excel: montos, sumas y promedios salen como número (01-10-2026). v1.2 — latido de sesión (30-09-2026). v1.1 — breadcrumb Inicio › Reportería › Diseño de Consulta -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -284,7 +284,10 @@ async function verSQL() {
 }
 function exportar() {
   if (!RES?.rows?.length) return;
-  const ws = XLSX.utils.json_to_sheet(RES.rows);
+  // Los DECIMAL (montos, sumas, promedios) llegan como texto: el servidor dice cuáles son y van al Excel como número
+  const num = RES.numericas || [];
+  const filas = !num.length ? RES.rows : RES.rows.map(r => { const o = { ...r }; for (const c of num) if (o[c] != null && o[c] !== '' && !isNaN(o[c])) o[c] = Number(o[c]); return o; });
+  const ws = XLSX.utils.json_to_sheet(filas);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'consulta');
   XLSX.writeFile(wb, 'consulta.xlsx');

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mapa de Dealers — AutoFácil</title>
-  <!-- v1.2 — navbar migrada al componente topnav -->
+  <!-- v1.3 — Excel: coordenadas como número (01-10-2026) · v1.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -221,9 +221,9 @@ function exportarExcel(){
     categoria: d.categoria_asignada || d.categoria_propuesta || '',
     comuna: d.comuna || '', region: d.region || '',
     direccion: d.direccion || '', direccion_google: d.geo_dir || '',
-    telefono: d.telefono || '', lat: d.lat, lng: d.lng,
+    telefono: d.telefono || '', lat: d.lat != null ? Number(d.lat) : null, lng: d.lng != null ? Number(d.lng) : null,
     direccion_parque: d.direccion_parque || '', comuna_parque: d.comuna_parque || '',
-    lat_parque: d.lat_parque, lng_parque: d.lng_parque,
+    lat_parque: d.lat_parque != null ? Number(d.lat_parque) : null, lng_parque: d.lng_parque != null ? Number(d.lng_parque) : null,
   }));
   const ws = XLSX.utils.json_to_sheet(filas);
   ws['!cols'] = Object.keys(filas[0]).map(k => ({ wch: Math.min(42, Math.max(k.length, ...filas.slice(0,150).map(f => String(f[k]??'').length)) + 2) }));

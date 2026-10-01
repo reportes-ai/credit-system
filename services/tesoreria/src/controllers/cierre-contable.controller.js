@@ -233,6 +233,8 @@ exports.tablaDesarrollo = async (req, res) => {
       LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
       WHERE c.origen IN ('CARTERA_AFA','CARTERA_XLSX')
       ORDER BY q.num_op, q.numero_cuota`);
+    // Estas filas van directo al Excel: los DECIMAL llegan como texto y quedaban como celdas que no suman (01-10-2026)
+    for (const r of rows) for (const k of ['Interes_Cuota', 'Amortizacion_Cuota', 'Valor_Cuota', 'Saldo_Insoluto', 'Tasa_Interes']) if (r[k] != null) r[k] = Number(r[k]);
     ok(res, { rows });
   } catch (e) { fail(res, e.message); }
 };

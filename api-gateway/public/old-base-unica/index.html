@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v99.5 -->
+<!-- v99.6 — nombre del Excel con la fecha local (01-10-2026) · v99.5 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -325,7 +325,7 @@ async function exportarExcel() {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Old Base Unica');
-    XLSX.writeFile(wb, `old-base-unica-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `old-base-unica-${new Date().toLocaleDateString('en-CA')}.xlsx`);
   } catch (e) { alert('Error al exportar: ' + e.message); }
   btn.disabled = false;
 }

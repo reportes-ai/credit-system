@@ -228,10 +228,14 @@ exports.ejecutar = async (req, res) => {
   try {
     const sql = await construirSQL(req.body || {});
     const t0 = Date.now();
-    const [rows] = await pool.query({ sql, timeout: 30000 });
+    const [rows, fields] = await pool.query({ sql, timeout: 30000 });
     auditar({ req, accion: 'CONSULTAR', modulo: 'reporteria', entidad: 'diseno_consulta', entidad_id: '-',
       detalle: `Ejecutó consulta diseñada (${rows.length} filas)`, meta: { sql: sql.slice(0, 1000) } });
-    ok(res, { sql, rows, n: rows.length, ms: Date.now() - t0 });
+    /* Columnas DECIMAL (montos, y todo SUM/AVG): mysql2 las entrega como TEXTO y en el Excel quedaban como celdas
+       de texto que no suman. El navegador no puede distinguirlas de un código (N° de operación, RUT), así que se le
+       dice cuáles son. Tipos MySQL: 0 = DECIMAL, 246 = NEWDECIMAL. Las filas no cambian (01-10-2026). */
+    const numericas = (fields || []).filter(f => [0, 246].includes(f.columnType != null ? f.columnType : f.type)).map(f => f.name);
+    ok(res, { sql, rows, numericas, n: rows.length, ms: Date.now() - t0 });
   } catch (e) { fail(res, e.message, 400); }
 };
 
