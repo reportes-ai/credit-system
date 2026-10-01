@@ -232,6 +232,8 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
     // Comentario de quien autoriza (obligatorio en el visto de Gerencia por RUT repetido) y condición del nivel firmado (01-10-2026)
     await pool.query('ALTER TABLE dealer_ficha_autorizaciones ADD COLUMN IF NOT EXISTS comentario VARCHAR(500) NULL');
     await pool.query('ALTER TABLE dealer_ficha_autorizaciones ADD COLUMN IF NOT EXISTS condicion VARCHAR(30) NULL');
+    // Un comentario por cada excepción que el gerente aprueba: [{tipo,label,comentario}] (01-10-2026)
+    await pool.query('ALTER TABLE dealer_ficha_autorizaciones ADD COLUMN IF NOT EXISTS comentarios_exc TEXT NULL');
     // Quién ENVIÓ la ficha a autorización (29-09-2026): no puede autorizarla él mismo (caso Bryan, Vespucio Norte)
     await pool.query('ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS enviado_por INT NULL');
   } catch (e) { if (e.errno !== 1050) console.error('[dealer_ficha_autorizaciones migration]', e.message); }
@@ -400,6 +402,40 @@ async function nivelAplica(niv, f) {
   if (niv.condicion === 'PARQUE_RUT_REPETIDO')    return (await parquesMismoRut(f)).length > 0;
   return true;   // SIEMPRE (o condición desconocida → fail-safe: exige autorización)
 }
+/* EXCEPCIONES QUE APRUEBA QUIEN FIRMA UN NIVEL — Pato, 01-10-2026: "cuando un gerente apruebe una excepción de un
+   dealer o de una ficha dealer o parque debe colocar un comentario válido por cada una de las excepciones".
+   Un nivel cuya condición no es SIEMPRE existe porque la ficha se sale del estándar: ese es el visto de Gerencia.
+   Quien lo firma comenta, una por una:
+     · la excepción del propio nivel (comisión sobre la pizarra, depósito modificado, RUT de otro parque), y
+     · las que declaró el ejecutivo al grabar (comisión modificada, boleta), si un gerente anterior no las comentó ya.
+   "Comisión modificada" no se pide aparte cuando el nivel ES el de comisión sobre la pizarra: es la misma excepción.
+   Vale igual para ficha de dealer nuevo, modificación de dealer y parque: todas pasan por esta cadena.
+   @returns {Promise<Array<{tipo:string,label:string,detalle:string}>>} */
+const jsonArr = v => { if (Array.isArray(v)) return v; try { const a = JSON.parse(v || '[]'); return Array.isArray(a) ? a : []; } catch (_) { return []; } };
+async function excepcionesDelNivel(f, niv) {
+  if (!niv || !niv.condicion || niv.condicion === 'SIEMPRE') return [];
+  const out = [];
+  if (niv.condicion === 'COMISION_SOBRE_PIZARRA')
+    out.push({ tipo: niv.condicion, label: 'Participación especial: comisión pactada sobre la pizarra', detalle: '' });
+  else if (niv.condicion === 'DEPOSITO_MODIFICADO')
+    out.push({ tipo: niv.condicion, label: 'Depósito modificado respecto al dealer vigente', detalle: [f.banco, f.num_cuenta, f.rut_cuenta].filter(Boolean).join(' · ') });
+  else if (niv.condicion === 'PARQUE_RUT_REPETIDO') {
+    const otros = await parquesMismoRut(f);
+    out.push({ tipo: niv.condicion, label: `Parque con el mismo RUT (${RUT.normalizar(f.rut) || f.rut}) que ${otros.map(o => o.nombre + (o.activo ? '' : ' (inactivo)')).join(', ') || 'otro parque'}`,
+      detalle: 'Explica por qué es OTRO parque y no el mismo repetido.' });
+  } else out.push({ tipo: niv.condicion, label: niv.nombre, detalle: '' });
+  // Excepciones declaradas por el ejecutivo, con su justificación a la vista
+  const just = Object.fromEntries(jsonArr(f.excepciones_comentarios).map(c => [c && c.tipo, c && c.comentario]));
+  const [prev] = await pool.query('SELECT comentarios_exc FROM dealer_ficha_autorizaciones WHERE id_ficha=? AND comentarios_exc IS NOT NULL', [f.id]);
+  const yaComentadas = new Set(prev.flatMap(p => jsonArr(p.comentarios_exc).map(c => c && c.tipo)));
+  for (const e of jsonArr(f.excepciones)) {
+    if (!e || !e.tipo || yaComentadas.has(e.tipo) || out.some(x => x.tipo === e.tipo)) continue;
+    if (e.tipo === 'COMISION_MODIFICADA' && niv.condicion === 'COMISION_SOBRE_PIZARRA') continue;
+    out.push({ tipo: e.tipo, label: e.label || e.tipo, detalle: just[e.tipo] ? `Justificación del ejecutivo: ${just[e.tipo]}` : '' });
+  }
+  return out;
+}
+
 // Niveles aplicables a la ficha, en orden.
 async function nivelesAplicables(f) {
   const out = [];
@@ -663,8 +699,8 @@ const obtener = async (req, res) => {
       return res.status(403).json({ success: false, data: null, error: 'Sin acceso a esta ficha' });
     // Autorizaciones registradas (para la letra chica) + nombre del nivel actual pendiente.
     const [autoriz] = await pool.query(
-      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha, sin_revision, comentario FROM dealer_ficha_autorizaciones WHERE id_ficha=? ORDER BY orden, id', [req.params.id]);
-    f.autorizaciones = autoriz;
+      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha, sin_revision, comentario, comentarios_exc FROM dealer_ficha_autorizaciones WHERE id_ficha=? ORDER BY orden, id', [req.params.id]);
+    f.autorizaciones = autoriz.map(a => ({ ...a, comentarios_exc: jsonArr(a.comentarios_exc) }));
     if (f.estado === 'PEND_AUTORIZACION') {
       const [[niv]] = await pool.query('SELECT nombre FROM dealer_aprob_niveles WHERE orden=? AND activo=1 ORDER BY id LIMIT 1', [f.nivel_actual]);
       f.nivel_actual_nombre = niv ? niv.nombre : null;
@@ -685,8 +721,8 @@ const fichaPorDealer = async (req, res) => {
       [req.params.idDealer]);
     if (!f) return res.json({ success: true, data: null, error: null });
     const [autoriz] = await pool.query(
-      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha, sin_revision, comentario FROM dealer_ficha_autorizaciones WHERE id_ficha = ? ORDER BY orden, id', [f.id]);
-    f.autorizaciones = autoriz;
+      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha, sin_revision, comentario, comentarios_exc FROM dealer_ficha_autorizaciones WHERE id_ficha = ? ORDER BY orden, id', [f.id]);
+    f.autorizaciones = autoriz.map(a => ({ ...a, comentarios_exc: jsonArr(a.comentarios_exc) }));
     res.json({ success: true, data: f, error: null });
   } catch (e) { console.error('[fichas porDealer]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -1088,18 +1124,23 @@ const autorizar = async (req, res) => {
     if (yaFirmo)
       return res.status(403).json({ success: false, data: null, error: `Segregación de funciones: ya autorizaste el nivel ${yaFirmo.orden} de esta ficha, otro nivel lo firma otra persona` });
 
-    /* Visto de Gerencia por RUT repetido: no basta el clic. El gerente ve qué parque ya usa ese RUT y deja un
-       comentario válido (≥10 caracteres, más de una palabra) que queda en la ficha y en la auditoría. Sin
-       comentario responde 409 con los parques, y la pantalla lo pide. */
-    let comentario = null, parquesRut = [];
-    if (niv.condicion === 'PARQUE_RUT_REPETIDO') {
-      parquesRut = await parquesMismoRut(f);
-      comentario = norm(req.body && req.body.comentario).slice(0, 500);
-      if (!comentarioOK(comentario)) {
-        const lista = parquesRut.map(o => o.nombre + (o.activo ? '' : ' (inactivo)')).join(', ') || 'otro parque';
-        const mensaje = `El RUT ${RUT.normalizar(f.rut) || f.rut} de esta ficha ya está en la ficha de ${lista}. ` +
-          `Autorizar un segundo parque con el mismo RUT requiere tu comentario (mínimo 10 caracteres): por qué es OTRO parque y no el mismo repetido.`;
-        return res.status(409).json({ success: false, data: { confirmar: 'comentario_rut_parque', parques: parquesRut, mensaje }, error: mensaje });
+    /* Visto de Gerencia: no basta el clic. Quien aprueba una excepción deja un comentario válido (≥10 caracteres,
+       más de una palabra) POR CADA UNA (excepcionesDelNivel). Quedan en la cadena de autorización de la ficha y en
+       la auditoría. Si falta alguno responde 409 con la lista, y la pantalla los pide uno por uno. */
+    let comentario = null, comentariosExc = [];
+    {
+      const lista = await excepcionesDelNivel(f, niv);
+      if (lista.length) {
+        const recibidos = Object.fromEntries(jsonArr(req.body && req.body.comentarios).map(c => [c && c.tipo, norm(c && c.comentario).slice(0, 500)]));
+        const faltan = lista.filter(e => !comentarioOK(recibidos[e.tipo]));
+        if (faltan.length) {
+          const mensaje = lista.length === 1
+            ? `Para aprobar esta excepción debes dejar un comentario válido (mínimo 10 caracteres): ${lista[0].label}.`
+            : `Esta ficha tiene ${lista.length} excepciones: para aprobar debes dejar un comentario válido (mínimo 10 caracteres) por cada una.`;
+          return res.status(409).json({ success: false, data: { confirmar: 'comentarios_excepciones', nivel: niv.nombre, excepciones: lista, faltan: faltan.map(e => e.tipo), mensaje }, error: mensaje });
+        }
+        comentariosExc = lista.map(e => ({ tipo: e.tipo, label: e.label, comentario: recibidos[e.tipo] }));
+        comentario = (comentariosExc.find(c => c.tipo === niv.condicion) || comentariosExc[0]).comentario;
       }
     }
 
@@ -1109,8 +1150,9 @@ const autorizar = async (req, res) => {
     const sinRevision = rev ? 0 : 1;
     const sinRevTxt = sinRevision ? ` · ⚠ APROBADO SIN REVISIÓN DE FICHA por ${nombre}` : '';
     await pool.query(
-      'INSERT INTO dealer_ficha_autorizaciones (id_ficha, orden, nombre_nivel, permiso, usuario_id, usuario_nombre, perfil, sin_revision, comentario, condicion) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      [f.id, niv.orden, niv.nombre, niv.permiso, req.usuario.id_usuario, nombre, req.usuario.perfil_nombre || null, sinRevision, comentario, niv.condicion || null]);
+      'INSERT INTO dealer_ficha_autorizaciones (id_ficha, orden, nombre_nivel, permiso, usuario_id, usuario_nombre, perfil, sin_revision, comentario, condicion, comentarios_exc) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [f.id, niv.orden, niv.nombre, niv.permiso, req.usuario.id_usuario, nombre, req.usuario.perfil_nombre || null, sinRevision, comentario, niv.condicion || null,
+       comentariosExc.length ? JSON.stringify(comentariosExc) : null]);
     // Si este nivel es el de participación especial, sella "aprobada por XXXX".
     if (niv.condicion === 'COMISION_SOBRE_PIZARRA')
       await pool.query('UPDATE dealer_fichas SET part_especial=1, part_especial_por=?, part_especial_por_id=?, part_especial_fecha=NOW() WHERE id=?',
@@ -1134,7 +1176,8 @@ const autorizar = async (req, res) => {
     }
     auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
       detalle: `Autorizó el nivel "${niv.nombre}" de la ficha de ${f.nombre_razon || f.rut || ''}` + (sinRevision ? ' (SIN revisión de ficha)' : '') +
-        (comentario ? ` — comparte RUT con ${parquesRut.map(o => o.nombre).join(', ') || 'otro parque'}; comentario: «${comentario}»` : ''), rut: f.rut });
+        (comentariosExc.length ? ' — excepciones aprobadas: ' + comentariosExc.map(c => `${c.label}: «${c.comentario}»`).join(' · ') : ''),
+      rut: f.rut, meta: comentariosExc.length ? { excepciones: comentariosExc } : undefined });
     res.json({ success: true, data: { estado: next ? 'PEND_AUTORIZACION' : 'AUTORIZADA', siguiente: next ? next.nombre : null, sin_revision: !!sinRevision }, error: null });
   } catch (e) { console.error('[fichas autorizar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
