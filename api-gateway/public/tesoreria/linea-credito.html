@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.4 — el correo del certificado ya no lleva la línea "Verificación del documento" (el QR va en el PDF) (01-10-2026). v1.3 — la vista previa del correo muestra el logo (01-10-2026). v1.2 — vista previa del certificado (PDF con marca de agua) y del correo con los parámetros en pantalla; el certificado se emite al otorgar (gatillo) y el barrido queda cada 1 hora (01-10-2026). v1.1 — Línea de Crédito Unidad: pestaña Cartola (abonos manuales, cargos por cada certificado emitido con saldo corrido, detalle del certificado enviado) y pestaña Parámetros (línea, texto del certificado, destinatarios y CC) (01-10-2026). v1.0 — cuenta corriente de la línea rotativa y Certificado de Saldo Insoluto automático por cada OP compensada -->
+<!-- v1.5 — solicitud de reposición de cupo: correo automático a Unidad al compensarse el umbral (80%) del último abono, con saldo inicial y operaciones (ID UCA, RUT, cliente, monto, % del saldo); envío manual desde la Cartola y vista previa en Parámetros (01-10-2026). v1.4 — el correo del certificado ya no lleva la línea "Verificación del documento" (el QR va en el PDF) (01-10-2026). v1.3 — la vista previa del correo muestra el logo (01-10-2026). v1.2 — vista previa del certificado (PDF con marca de agua) y del correo con los parámetros en pantalla; el certificado se emite al otorgar (gatillo) y el barrido queda cada 1 hora (01-10-2026). v1.1 — Línea de Crédito Unidad: pestaña Cartola (abonos manuales, cargos por cada certificado emitido con saldo corrido, detalle del certificado enviado) y pestaña Parámetros (línea, texto del certificado, destinatarios y CC) (01-10-2026). v1.0 — cuenta corriente de la línea rotativa y Certificado de Saldo Insoluto automático por cada OP compensada -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -125,7 +125,7 @@
         <div><label>Acreedor (razón social) *</label><input id="cAcr" maxlength="150"></div>
         <div><label>RUT acreedor</label><input id="cAcrRut" maxlength="20"></div>
         <div><label>Monto máximo ($) *</label><input id="cLimite" type="number" min="1"></div>
-        <div><label>Umbral de reposición (%) *</label><input id="cUmbral" type="number" min="1" max="100" step="0.5"><div class="nota">Desde esta utilización se puede pedir el giro del cupo repuesto.</div></div>
+        <div><label>Umbral de reposición (%) *</label><input id="cUmbral" type="number" min="1" max="100" step="0.5"><div class="nota">% del último abono ya compensado con operaciones desde el que se pide la reposición.</div></div>
         <div><label>Días hábiles de respuesta *</label><input id="cDias" type="number" min="1" max="30"></div>
         <div><label>Fecha del contrato</label><input id="cContrato" type="date"></div>
         <div><label>Fecha de inicio</label><input id="cInicio" type="date"><div class="nota">Se compensan las operaciones otorgadas desde esta fecha.</div></div>
@@ -142,7 +142,9 @@
         <div class="g2"><label>Para (casilla de Unidad, Anexo 3) *</label><input id="cPara" maxlength="300" placeholder="correo@unidadcreditos.cl"><div class="nota">Varios correos separados por coma.</div></div>
         <div class="g2"><label>Copia (CC)</label><input id="cCc" maxlength="300" placeholder="separados por coma"></div>
         <div class="g4"><label class="sw"><input type="checkbox" id="cAuto"> Enviar cada certificado automáticamente apenas se emite</label>
-          <div class="nota">Apagado: el certificado queda EMITIDO y se manda desde la Cartola. El asunto y el cuerpo del correo se editan en <a href="/mantenedores/correos-programados/">Correos del Sistema</a> (plantilla <code>linea_certificado_saldo</code>).</div></div>
+          <div class="nota">Apagado: el certificado queda EMITIDO y se manda desde la Cartola.</div></div>
+        <div class="g4"><label class="sw"><input type="checkbox" id="cRepAuto"> Enviar la solicitud de reposición de cupo automáticamente al alcanzar el umbral</label>
+          <div class="nota">Una vez por abono, con el saldo inicial y las operaciones compensadas (ID UCA, RUT, cliente, monto, % del saldo). Apagado: se manda desde el aviso de la Cartola. Plantilla <code>linea_reposicion_cupo</code>. El asunto y el cuerpo del correo se editan en <a href="/mantenedores/correos-programados/">Correos del Sistema</a> (plantilla <code>linea_certificado_saldo</code>).</div></div>
       </div>
     </div>
 
@@ -162,7 +164,8 @@
         <span style="margin-left:auto;font-weight:500;font-size:.72rem;color:#64748b">Con los parámetros que están en pantalla, aunque no estén guardados. No se graba ni se envía nada.</span></h5>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btnx btn-gris" onclick="previewCert()"><i class="bi bi-file-earmark-pdf"></i> Vista previa del certificado</button>
-        <button class="btnx btn-gris" onclick="previewMail()"><i class="bi bi-envelope-open"></i> Vista previa del correo</button>
+        <button class="btnx btn-gris" onclick="previewMail()"><i class="bi bi-envelope-open"></i> Vista previa del correo del certificado</button>
+        <button class="btnx btn-gris" onclick="previewMail('reposicion')"><i class="bi bi-arrow-repeat"></i> Vista previa de la solicitud de reposición</button>
       </div>
       <div class="nota" style="margin-top:6px">Usa como ejemplo el último certificado emitido o, si aún no hay, la última operación de Unidad otorgada (con un saldo de ejemplo del 60% de la línea).</div>
     </div>
@@ -178,9 +181,10 @@
     <ul>
       <li><b>Línea activa + Fecha de inicio</b> → apenas una operación de Unidad pasa a OTORGADO (Cartas Vigentes, carga masiva de cartas o edición del crédito; más un barrido cada hora y <i>Procesar ahora</i> para cualquier otro camino) el sistema toma las otorgadas desde esa fecha en <a href="/creditos/">Créditos</a>, compensa su saldo de precio contra el saldo de la línea y emite el certificado, que aparece como cargo en la Cartola. Apagada, no hace nada.</li>
       <li><b>Saldo de precio</b> → sale de la ficha del crédito con el mismo motor que arma la Orden de Pago al dealer en <a href="/postventa/seguimiento/">Post Venta → Seguimiento</a>. Si el monto está mal, se corrige en la ficha y el certificado objetado se reprocesa.</li>
-      <li><b>Monto máximo y umbral de reposición</b> → definen el cupo disponible, la utilización que muestra cada certificado y desde cuándo se puede pedir el giro del cupo repuesto (letra C/ del numeral Tres.Uno del contrato). Un abono mayor al cupo disponible se rechaza.</li>
+      <li><b>Monto máximo</b> → define el cupo disponible y la utilización que muestra cada certificado (saldo ÷ monto máximo). Un abono mayor al cupo disponible se rechaza.</li>
       <li><b>Días de respuesta</b> → plazo que se le da a Unidad en el certificado y en el correo; pasado ese plazo el certificado aparece "fuera de plazo" (no se acepta solo).</li>
       <li><b>Para, CC y envío automático</b> → a quién sale cada certificado con el PDF adjunto (plantilla <code>linea_certificado_saldo</code> en <a href="/mantenedores/correos-programados/">Correos del Sistema</a>). El detalle de cada envío (fecha, destinatarios, respuesta) se ve en la Cartola.</li>
+      <li><b>Umbral de reposición + envío automático de la solicitud</b> → cuando las operaciones compensadas desde el último abono llegan a ese % del saldo inicial, sale a Unidad (una vez por abono) la solicitud de reposición con el detalle de las operaciones (plantilla <code>linea_reposicion_cupo</code> en <a href="/mantenedores/correos-programados/">Correos del Sistema</a>). La fecha del envío queda en el abono de la Cartola.</li>
       <li><b>Vista previa</b> → arma el certificado (PDF con marca de agua) y el correo con lo que está en pantalla, sin grabar ni enviar.</li>
       <li><b>Texto del certificado y firmante</b> → aparecen en el PDF y quedan congelados en el folio de <a href="/verificar/">Verificación de documentos</a>; los datos de AutoFácil salen de <a href="/mantenedores/datos-empresa/">Datos de la Empresa</a>.</li>
       <li><b>Contabilidad</b> → el abono (<code>LINEA_GIRO</code>), cada certificado (<code>LINEA_COMPENSACION</code>) y el pago de capital (<code>LINEA_PAGO</code>) generan su asiento con las reglas de <a href="/contabilidad/reglas/">Reglas de Centralización</a>. Al marcar FONDOS RECIBIDOS en Post Venta solo entra al banco el exceso no compensado. Objetar un certificado o anular un abono anula su asiento si el mes está abierto.</li>
@@ -219,7 +223,7 @@
   </div>
   <div class="dlg-foot">
     <a class="btnx btn-gris" href="/mantenedores/correos-programados/" target="_blank" style="text-decoration:none"><i class="bi bi-pencil"></i> Editar asunto y cuerpo</a>
-    <button class="btnx btn-gris" onclick="previewCert()"><i class="bi bi-paperclip"></i> Ver adjunto</button>
+    <button class="btnx btn-gris" id="btnAdjunto" onclick="previewCert()"><i class="bi bi-paperclip"></i> Ver adjunto</button>
     <button class="btnx btn-azul" onclick="dlgMail.close()">Cerrar</button>
   </div>
 </dialog>
@@ -267,19 +271,22 @@ async function cargar(){
 
 function pintarKpis(){
   const s = L.estado;
-  const pct = Math.min(100, Math.max(0, s.uso_pct));
-  const colorUso = s.uso_pct >= s.umbral_pct ? 'var(--warn)' : 'var(--accent)';
+  const ci = s.ciclo;
+  const pct = Math.min(100, Math.max(0, ci ? ci.consumo_pct : 0));
+  const colorUso = s.puede_girar ? 'var(--warn)' : 'var(--accent)';
   document.getElementById('kpis').innerHTML = `
     <div class="kpi"><div class="l">Monto máximo</div><div class="v">${clp(s.limite)}</div><div class="s">Vence ${fd(L.fecha_vencimiento)}</div></div>
     <div class="kpi"><div class="l">Saldo de la línea</div><div class="v">${clp(s.insoluto)}</div><div class="s">Abonos ${clp(s.giros)} · Certificados ${clp(s.comps)} · Pagos ${clp(s.pagos)}</div></div>
     <div class="kpi"><div class="l">Cupo disponible</div><div class="v" style="color:var(--ok)">${clp(s.disponible)}</div><div class="s">Solo cuentan los certificados aceptados</div></div>
-    <div class="kpi"><div class="l">Utilización</div><div class="v" style="color:${colorUso}">${s.uso_pct.toLocaleString('es-CL')}%</div>
-      <div class="barra"><div style="width:${pct}%;background:${colorUso}"></div></div><div class="s">Umbral de reposición ${s.umbral_pct}%</div></div>
+    <div class="kpi"><div class="l">Uso del último abono</div><div class="v" style="color:${colorUso}">${ci ? ci.consumo_pct.toLocaleString('es-CL') + '%' : '—'}</div>
+      <div class="barra"><div style="width:${pct}%;background:${colorUso}"></div></div><div class="s">${ci ? `Abono del ${fd(ci.fecha_abono)} · compensado ${clp(ci.compensado)} de ${clp(ci.saldo_inicial)}` : 'Sin abonos registrados'} · umbral ${s.umbral_pct}%</div></div>
     <div class="kpi"><div class="l">Por responder</div><div class="v" style="color:${s.pendientes?'var(--warn)':'var(--navy)'}">${s.pendientes}</div><div class="s">${L.sin_respuesta ? L.sin_respuesta+' fuera de plazo' : 'certificados sin respuesta de Unidad'}</div></div>`;
   const av = [];
   if (!L.activa) av.push(`<div class="aviso info"><i class="bi bi-pause-circle"></i><div><b>Línea apagada.</b> No se compensa ni se emite nada hasta activarla en Parámetros, con la fecha de inicio del contrato.</div></div>`);
   else if (!L.envio_automatico) av.push(`<div class="aviso info"><i class="bi bi-envelope"></i><div>Envío <b>manual</b>: los certificados quedan EMITIDOS y se mandan a ${esc(L.correo_para||'—')} desde la Cartola.</div></div>`);
-  if (s.puede_girar) av.push(`<div class="aviso warn"><i class="bi bi-exclamation-triangle"></i><div>La línea está utilizada al <b>${s.uso_pct.toLocaleString('es-CL')}%</b> (umbral ${s.umbral_pct}%): ya se puede pedir el giro del cupo repuesto por correo a Unidad. Cupo disponible ${clp(s.disponible)}.</div></div>`);
+  if (s.puede_girar) av.push(`<div class="aviso warn"><i class="bi bi-exclamation-triangle"></i><div style="flex:1">Se compensó el <b>${ci.consumo_pct.toLocaleString('es-CL')}%</b> del abono del ${fd(ci.fecha_abono)} (umbral ${s.umbral_pct}%): corresponde pedir a Unidad la reposición de <b>${clp(ci.compensado)}</b>.
+      ${ci.aviso_at ? `<div style="margin-top:4px">✓ Solicitud enviada el ${fdt(ci.aviso_at)} a ${esc(ci.aviso_a || '')}.</div>` : (L.aviso_reposicion_auto ? '' : '<div style="margin-top:4px">El envío automático de la solicitud está apagado en Parámetros.</div>')}</div>
+      ${GEST ? `<button class="btnx btn-azul" style="white-space:nowrap" onclick="enviarReposicion()"><i class="bi bi-send"></i> ${ci.aviso_at ? 'Reenviar' : 'Enviar'} solicitud</button>` : ''}</div>`);
   if (L.sin_respuesta) av.push(`<div class="aviso warn"><i class="bi bi-hourglass-split"></i><div>${L.sin_respuesta} certificado(s) llevan más de ${L.dias_respuesta} días sin respuesta. El contrato no los da por aceptados: hay que pedir la conformidad.</div></div>`);
   document.getElementById('avisos').innerHTML = av.join('');
 }
@@ -308,7 +315,8 @@ function pintarCartola(){
     let mov, det, abono = '', cargo = '';
     if (m.tipo === 'GIRO') {
       mov = '<i class="bi bi-box-arrow-in-down"></i> Abono (giro de Unidad)';
-      det = esc(m.glosa || '') + (m.cuenta_nombre ? `<div style="font-size:.66rem;color:#94a3b8">${esc(m.cuenta_nombre)}</div>` : '');
+      det = esc(m.glosa || '') + (m.cuenta_nombre ? `<div style="font-size:.66rem;color:#94a3b8">${esc(m.cuenta_nombre)}</div>` : '') +
+        (m.aviso_reposicion_at ? `<div style="font-size:.66rem;color:#1e40af" title="${esc(m.aviso_reposicion_a || '')}"><i class="bi bi-send-check"></i> Reposición pedida el ${fdt(m.aviso_reposicion_at)}</div>` : '');
       abono = `<span class="abono">${clp(m.monto)}</span>`;
     } else if (m.tipo === 'PAGO') {
       mov = '<i class="bi bi-box-arrow-up"></i> Pago de capital';
@@ -400,6 +408,12 @@ async function reemitir(id){
   const j = await api('POST', `/api/linea-credito/certificado/${id}/reemitir`);
   if (j && j.success) { dlgCert.close(); toast(`✓ Reprocesada (${j.data.procesadas} operación(es))`); cargar(); } else toast((j && j.error) || 'No se pudo reprocesar');
 }
+async function enviarReposicion(){
+  const ci = L.estado.ciclo;
+  if (!confirm(`¿Enviar a ${L.correo_para}${L.correo_cc ? ' (CC ' + L.correo_cc + ')' : ''} la solicitud de reposición por ${clp(ci.compensado)} (${ci.operaciones.length} operaciones)?`)) return;
+  const j = await api('POST', `/api/linea-credito/${L.id}/reposicion/enviar`);
+  if (j && j.success) { toast('✓ Solicitud enviada a ' + j.data.to.join(', ')); cargar(); } else toast((j && j.error) || 'No se pudo enviar');
+}
 async function procesar(){
   const j = await api('POST', '/api/linea-credito/procesar');
   if (j && j.success) { toast(j.data.procesadas ? `✓ ${j.data.procesadas} operación(es) procesada(s)` : 'No hay operaciones nuevas por compensar'); cargar(); }
@@ -422,6 +436,7 @@ function pintarParam(){
   v('cPara', L.correo_para); v('cCc', L.correo_cc); v('cFirmante', L.firmante_nombre); v('cCargo', L.firmante_cargo);
   v('cIntro', L.cert_texto_intro || L.texto_intro_def); v('cCierre', L.cert_texto_cierre || L.texto_cierre_def);
   document.getElementById('cAuto').checked = !!L.envio_automatico; document.getElementById('cActiva').checked = !!L.activa;
+  document.getElementById('cRepAuto').checked = !!L.aviso_reposicion_auto;
   document.getElementById('vars').innerHTML = 'Variables: ' + (L.variables_texto || []).map(x => `<code onclick="insVar('${x}')">${x}</code>`).join('');
   document.querySelectorAll('#vPARAM input, #vPARAM textarea').forEach(e => { if (e.id !== 'cFin') e.disabled = !GEST; });
 }
@@ -448,16 +463,17 @@ async function previewCert(){
   if (!r.ok) { const j = await r.json().catch(() => null); toast((j && j.error) || 'No se pudo armar la vista previa'); return; }
   window.open(URL.createObjectURL(await r.blob()), '_blank');
 }
-async function previewMail(){
-  const j = await api('POST', `/api/linea-credito/${L.id}/preview/correo`, formParam());
+async function previewMail(tipo){
+  const j = await api('POST', `/api/linea-credito/${L.id}/preview/${tipo === 'reposicion' ? 'reposicion' : 'correo'}`, { ...formParam(), umbral_pct: document.getElementById('cUmbral').value });
   if (!j || !j.success) { toast((j && j.error) || 'No se pudo armar la vista previa'); return; }
   const d = j.data, fila = (k, v) => `<div class="k">${k}</div><div class="v">${v}</div>`;
   document.getElementById('mailHead').innerHTML =
     fila('Para', esc(d.para.join(', ') || '— sin casilla —')) + fila('CC', esc(d.cc.join(', ') || '—')) +
-    fila('Asunto', esc(d.asunto)) + fila('Adjunto', `<i class="bi bi-paperclip"></i> ${esc(d.adjunto)}`) +
-    fila('Ejemplo', `OP ${esc(d.ejemplo_op)}`) +
+    fila('Asunto', esc(d.asunto)) + (d.adjunto ? fila('Adjunto', `<i class="bi bi-paperclip"></i> ${esc(d.adjunto)}`) : '') +
+    fila('Ejemplo', tipo === 'reposicion' ? esc(d.ejemplo_op) : `OP ${esc(d.ejemplo_op)}`) +
     (d.activa ? '' : fila('Ojo', '<span style="color:#b91c1c">La plantilla está desactivada en Correos del Sistema: no se enviaría</span>'));
   document.getElementById('mailFrame').srcdoc = d.html;
+  document.getElementById('btnAdjunto').style.display = d.adjunto ? '' : 'none';
   dlgMail.showModal();
   if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA('Vista previa del correo');
 }
@@ -467,7 +483,8 @@ async function guardarConfig(){
     dias_respuesta:g('cDias'), contrato_fecha:g('cContrato'), fecha_inicio:g('cInicio'), fecha_vencimiento:g('cVenc'),
     correo_para:g('cPara'), correo_cc:g('cCc'), firmante_nombre:g('cFirmante'), firmante_cargo:g('cCargo'),
     cert_texto_intro:g('cIntro'), cert_texto_cierre:g('cCierre'),
-    envio_automatico: document.getElementById('cAuto').checked, activa: document.getElementById('cActiva').checked };
+    envio_automatico: document.getElementById('cAuto').checked, activa: document.getElementById('cActiva').checked,
+    aviso_reposicion_auto: document.getElementById('cRepAuto').checked };
   const j = await api('PUT', `/api/linea-credito/${L.id}/config`, body);
   if (j && j.success) { toast('✓ Parámetros guardados'); cargar(); } else toast((j && j.error) || 'No se pudo guardar');
 }

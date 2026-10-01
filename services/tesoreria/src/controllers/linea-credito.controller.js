@@ -110,6 +110,10 @@ require('../../../../shared/migrate').enFila('linea-credito', async () => {
     // Texto del certificado editable (pestaña Parámetros). NULL = el texto por defecto del contrato.
     await pool.query('ALTER TABLE linea_credito ADD COLUMN IF NOT EXISTS cert_texto_intro TEXT NULL');
     await pool.query('ALTER TABLE linea_credito ADD COLUMN IF NOT EXISTS cert_texto_cierre TEXT NULL');
+    // Solicitud de reposición del cupo al llegar al umbral (Pato, 01-10-2026): se marca en el ABONO del ciclo.
+    await pool.query('ALTER TABLE linea_credito ADD COLUMN IF NOT EXISTS aviso_reposicion_auto TINYINT(1) NOT NULL DEFAULT 1');
+    await pool.query('ALTER TABLE linea_credito_movs ADD COLUMN IF NOT EXISTS aviso_reposicion_at DATETIME NULL');
+    await pool.query('ALTER TABLE linea_credito_movs ADD COLUMN IF NOT EXISTS aviso_reposicion_a VARCHAR(400) NULL');
 
     // Card en Tesorería + permisos (anti-hardcode: módulos y cards salen de la BD)
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Tesorería' OR ruta LIKE '/tesoreria%' LIMIT 1");
@@ -172,11 +176,41 @@ async function saldoLinea(idLinea, db = pool) {
     firme: giros - pagos - Number(s.comps_firmes),
   };
 }
-function estadoLinea(l, s) {
+/* uso_pct = saldo insoluto / monto máximo (lo que muestra el certificado).
+   La REPOSICIÓN no se mide con eso: se mide con el CICLO del último abono (ver cicloActual). */
+function estadoLinea(l, s, ciclo = null) {
   const limite = Number(l.limite) || 0;
   const uso = limite ? (s.insoluto / limite) * 100 : 0;
   return { ...s, limite, disponible: Math.max(0, limite - s.firme), uso_pct: Math.round(uso * 10) / 10,
-    umbral_pct: Number(l.umbral_pct), puede_girar: limite > 0 && uso >= Number(l.umbral_pct) };
+    umbral_pct: Number(l.umbral_pct), ciclo,
+    puede_girar: !!(ciclo && ciclo.consumo_pct >= Number(l.umbral_pct)) };
+}
+
+/* Ciclo de reposición: desde el ÚLTIMO abono (giro) registrado. Saldo inicial = saldo de la línea
+   recién hecho ese abono; operaciones = compensaciones vivas posteriores. Consumo = compensado ÷ saldo
+   inicial. Al llegar al umbral (80%) se pide a la financiera reponer lo compensado (letra C/ Tres.Uno). */
+async function cicloActual(idLinea) {
+  const [[g]] = await pool.query(
+    "SELECT * FROM linea_credito_movs WHERE id_linea=? AND tipo='GIRO' AND estado='REGISTRADO' ORDER BY id DESC LIMIT 1", [idLinea]);
+  if (!g) return null;
+  const [ops] = await pool.query(
+    `SELECT m.id, m.num_op, m.monto, m.cert_numero, m.estado, DATE_FORMAT(m.fecha,'%Y-%m-%d') fecha,
+            c.id_financiera, cl.rut, cl.nombre_completo cliente
+       FROM linea_credito_movs m
+       LEFT JOIN creditos c ON c.id = m.id_credito
+       LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+      WHERE m.id_linea=? AND m.tipo='COMPENSACION' AND m.id > ? AND m.estado IN ${COMP_VIVAS}
+      ORDER BY m.id`, [idLinea, g.id]);
+  const inicial = Number(g.saldo_nuevo) || 0;
+  let acum = 0;
+  const filas = ops.map(o => {
+    acum += Number(o.monto);
+    return { ...o, monto: Number(o.monto), pct: inicial ? Math.round(Number(o.monto) / inicial * 1000) / 10 : 0,
+      pct_acum: inicial ? Math.round(acum / inicial * 1000) / 10 : 0 };
+  });
+  return { id_giro: g.id, fecha_abono: fc.isoDeBD(g.fecha), monto_abono: Number(g.monto), saldo_inicial: inicial,
+    compensado: acum, saldo_actual: inicial - acum, consumo_pct: inicial ? Math.round(acum / inicial * 1000) / 10 : 0,
+    aviso_at: g.aviso_reposicion_at || null, aviso_a: g.aviso_reposicion_a || null, operaciones: filas };
 }
 
 /* ── Anular el asiento de un movimiento (mes abierto) ──────────────────── */
@@ -249,6 +283,65 @@ const datosCorreo = (l, d, codigo) => ({
   // El correo sale desde una casilla que no recibe respuestas: la conformidad va a la copia de AutoFácil.
   RESPONDER_A: EMAILS(l.correo_cc).join(', ') || 'nuestro equipo de Finanzas',
 });
+
+/* Solicitud de reposición: variables de la plantilla + tabla de operaciones (HTML fijo, va después del cuerpo). */
+const rutPuntos = r => { const m = String(r || '').replace(/\./g, '').match(/^(\d+)-?([\dkK])$/); return m ? m[1].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + m[2].toUpperCase() : (r || '—'); };
+const escH = t => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const pctTxt = n => `${(Number(n) || 0).toLocaleString('es-CL', { maximumFractionDigits: 1 })}%`;
+function correoReposicion(l, ci) {
+  const datos = {
+    ACREEDOR: l.acreedor_nombre, FECHA_ABONO: fmtD(ci.fecha_abono), SALDO_INICIAL: fmtCLP(ci.saldo_inicial),
+    N_OPERACIONES: ci.operaciones.length, TOTAL_COMPENSADO: fmtCLP(ci.compensado), USO: pctTxt(ci.consumo_pct),
+    SALDO_ACTUAL: fmtCLP(ci.saldo_actual), MONTO_REPOSICION: fmtCLP(ci.compensado),
+    RESPONDER_A: EMAILS(l.correo_cc).join(', ') || 'nuestro equipo de Finanzas',
+  };
+  const th = 'style="text-align:left;padding:6px 8px;background:#f1f5f9;color:#475569;font-size:11px;text-transform:uppercase;border-bottom:1px solid #e2e8f0"';
+  const td = 'style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:12px"';
+  const tdn = 'style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;text-align:right;white-space:nowrap"';
+  const filas = ci.operaciones.map(o => `<tr><td ${td}>${escH(o.id_financiera || '—')}</td><td ${td}>${escH(rutPuntos(o.rut))}</td><td ${td}>${escH(o.cliente || '—')}</td>` +
+    `<td ${tdn}>${fmtCLP(o.monto)}</td><td ${tdn}>${pctTxt(o.pct)}</td><td ${tdn}>${pctTxt(o.pct_acum)}</td></tr>`).join('');
+  const tabla = `<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;margin-top:4px">` +
+    `<tr><td colspan="6" style="padding:6px 8px;font-size:12px;background:#eff6ff;color:#1e3a8a"><b>Saldo inicial ${fmtD(ci.fecha_abono)}: ${fmtCLP(ci.saldo_inicial)}</b></td></tr>` +
+    `<tr><th ${th}>ID UCA</th><th ${th}>RUT cliente</th><th ${th}>Cliente</th><th ${th} align="right">Monto</th><th ${th} align="right">% saldo</th><th ${th} align="right">% acum.</th></tr>` +
+    (filas || `<tr><td colspan="6" ${td}>Sin operaciones compensadas desde el abono.</td></tr>`) +
+    `<tr><td colspan="3" style="padding:7px 8px;font-size:12px;font-weight:bold;border-top:2px solid #cbd5e1">Total compensado</td>` +
+    `<td style="padding:7px 8px;font-size:12px;font-weight:bold;text-align:right;border-top:2px solid #cbd5e1">${fmtCLP(ci.compensado)}</td>` +
+    `<td colspan="2" style="padding:7px 8px;font-size:12px;font-weight:bold;text-align:right;border-top:2px solid #cbd5e1">${pctTxt(ci.consumo_pct)}</td></tr>` +
+    `<tr><td colspan="3" style="padding:7px 8px;font-size:12px">Saldo actual</td><td colspan="3" style="padding:7px 8px;font-size:12px;text-align:right">${fmtCLP(ci.saldo_actual)}</td></tr></table>`;
+  return { datos, tabla };
+}
+
+async function enviarReposicion(l, quien) {
+  const ci = await cicloActual(l.id);
+  if (!ci) return { enviado: false, motivo: 'No hay un abono registrado: no hay ciclo que reponer' };
+  if (!ci.operaciones.length) return { enviado: false, motivo: 'No hay operaciones compensadas desde el último abono' };
+  const para = EMAILS(l.correo_para);
+  if (!para.length) return { enviado: false, motivo: 'La línea no tiene casilla de destino configurada' };
+  const { datos, tabla } = correoReposicion(l, ci);
+  const plant = require('../../../../shared/plantillas-correo');
+  const env = await plant.enviar({ codigo: 'linea_reposicion_cupo', to: para, cc: EMAILS(l.correo_cc), datos, htmlExtra: tabla });
+  if (!env.enviado) return { enviado: false, motivo: env.motivo };
+  await pool.query('UPDATE linea_credito_movs SET aviso_reposicion_at=NOW(), aviso_reposicion_a=? WHERE id=?',
+    [[...env.to, ...(env.cc || [])].join(', ').slice(0, 400), ci.id_giro]);
+  auditar({ accion: 'ENVIAR', modulo: 'linea-credito', entidad: 'solicitud_reposicion', entidad_id: String(ci.id_giro),
+    detalle: `Solicitud de reposición (${pctTxt(ci.consumo_pct)} del abono del ${fmtD(ci.fecha_abono)}; ${ci.operaciones.length} OP por ${fmtCLP(ci.compensado)}) a ${env.to.join(', ')} por ${quien || USUARIO_SISTEMA}` });
+  return { enviado: true, to: env.to, cc: env.cc, ciclo: ci };
+}
+
+/* Automático: tras cada compensación, si el ciclo llegó al umbral y aún no se pidió. La marca se toma
+   ANTES de enviar (UPDATE atómico): dos corridas a la vez no mandan dos correos; si el envío falla, se devuelve. */
+async function revisarReposicion(l) {
+  if (!l.aviso_reposicion_auto) return;
+  const ci = await cicloActual(l.id);
+  if (!ci || ci.aviso_at || !ci.operaciones.length || ci.consumo_pct < Number(l.umbral_pct)) return;
+  const [cl] = await pool.query("UPDATE linea_credito_movs SET aviso_reposicion_at=NOW(), aviso_reposicion_a='(enviando)' WHERE id=? AND aviso_reposicion_at IS NULL", [ci.id_giro]);
+  if (!cl.affectedRows) return;
+  const env = await enviarReposicion(l).catch(e => ({ enviado: false, motivo: e.message }));
+  if (!env.enviado) {
+    await pool.query('UPDATE linea_credito_movs SET aviso_reposicion_at=NULL, aviso_reposicion_a=NULL WHERE id=?', [ci.id_giro]).catch(() => {});
+    console.warn('[linea-credito] solicitud de reposición no enviada:', env.motivo);
+  }
+}
 
 async function enviarCertificado(idMov, quien) {
   const [[m]] = await pool.query('SELECT * FROM linea_credito_movs WHERE id=? AND tipo=\'COMPENSACION\'', [idMov]);
@@ -323,6 +416,7 @@ async function compensarUna(l, c, fijos) {
     const env = await enviarCertificado(mov.id);
     if (!env.enviado) console.warn(`[linea-credito] ${datos.numero_txt} no se envió:`, env.motivo);
   }
+  await revisarReposicion(l).catch(e => console.error('[linea-credito reposición]', e.message));
   return mov;
 }
 
@@ -379,7 +473,7 @@ exports.resumen = async (req, res) => {
     const [lineas] = await pool.query('SELECT * FROM linea_credito ORDER BY id');
     const out = [];
     for (const l of lineas) {
-      const s = estadoLinea(l, await saldoLinea(l.id));
+      const s = estadoLinea(l, await saldoLinea(l.id), await cicloActual(l.id));
       const [[venc]] = await pool.query(
         `SELECT COUNT(*) n FROM linea_credito_movs WHERE id_linea=? AND tipo='COMPENSACION' AND estado IN ('EMITIDO','ENVIADO')
             AND created_at < NOW() - INTERVAL ? DAY`, [l.id, Number(l.dias_respuesta) || 2]);
@@ -421,7 +515,7 @@ exports.guardarConfig = async (req, res) => {
       if (b[k] && !ISO.test(String(b[k]))) return fail(res, `Fecha inválida: ${k}`, 400);
     const para = EMAILS(b.correo_para), cc = EMAILS(b.correo_cc);
     if ([...para, ...cc].some(e => !EMAIL_OK(e))) return fail(res, 'Hay un correo con formato inválido', 400);
-    const activa = b.activa ? 1 : 0, auto = b.envio_automatico ? 1 : 0;
+    const activa = b.activa ? 1 : 0, auto = b.envio_automatico ? 1 : 0, autoRep = b.aviso_reposicion_auto ? 1 : 0;
     if (activa && !b.fecha_inicio) return fail(res, 'Para activar la línea indica la fecha de inicio (desde qué otorgamiento se compensa)', 400);
     if (auto && !para.length) return fail(res, 'Para el envío automático indica la casilla de la financiera', 400);
     if (!norm(b.acreedor_nombre)) return fail(res, 'La razón social del acreedor es obligatoria', 400);
@@ -431,12 +525,12 @@ exports.guardarConfig = async (req, res) => {
     const [r] = await pool.query(
       `UPDATE linea_credito SET nombre=?, acreedor_nombre=?, acreedor_rut=?, limite=?, umbral_pct=?, dias_respuesta=?, contrato_fecha=?,
          fecha_inicio=?, fecha_vencimiento=?, correo_para=?, correo_cc=?, envio_automatico=?, firmante_nombre=?, firmante_cargo=?, activa=?, updated_por=?,
-         cert_texto_intro=?, cert_texto_cierre=?
+         cert_texto_intro=?, cert_texto_cierre=?, aviso_reposicion_auto=?
        WHERE id=?`,
       [norm(b.nombre) || 'Línea', norm(b.acreedor_nombre), norm(b.acreedor_rut) || null, limite, umbral, dias, b.contrato_fecha || null,
        b.fecha_inicio || null, b.fecha_vencimiento || null, para.join(', ') || null, cc.join(', ') || null, auto,
        norm(b.firmante_nombre) || null, norm(b.firmante_cargo) || null, activa, quien(req),
-       (txtIntro && txtIntro !== TEXTO_INTRO_DEF) ? txtIntro : null, (txtCierre && txtCierre !== TEXTO_CIERRE_DEF) ? txtCierre : null, id]);
+       (txtIntro && txtIntro !== TEXTO_INTRO_DEF) ? txtIntro : null, (txtCierre && txtCierre !== TEXTO_CIERRE_DEF) ? txtCierre : null, autoRep, id]);
     if (!r.affectedRows) return fail(res, 'Línea no encontrada', 404);
     auditar({ req, accion: 'EDITAR', modulo: 'linea-credito', entidad: 'linea_credito', entidad_id: String(id),
       detalle: `Configuración: límite ${fmtCLP(limite)}, umbral ${umbral}%, ${dias} días, inicio ${b.fecha_inicio || '—'}, vence ${b.fecha_vencimiento || '—'}, ${activa ? 'ACTIVA' : 'apagada'}, envío ${auto ? 'automático' : 'manual'} a ${para.join(', ') || '—'}` });
@@ -635,6 +729,54 @@ exports.previewCorreo = async (req, res) => {
       // El logo del correo real va incrustado (cid:); en pantalla se muestra el mismo archivo por URL.
       html: envolverHTML(plant.aHTML(cuerpo)).replace(/cid:aflogobs/g, '/img/logo-bs-mail.png'),
       adjunto: `${p.d.numero_txt}_OP${p.d.operacion.num_op}.pdf`, activa: !!t.activo, ejemplo_op: p.d.operacion.num_op,
+    });
+  } catch (e) { fail(res, e.message); }
+};
+
+// Envío manual de la solicitud de reposición (botón en la Cartola). Se puede repetir (p. ej. si Unidad no contestó).
+exports.enviarReposicion = async (req, res) => {
+  try {
+    const [[l]] = await pool.query('SELECT * FROM linea_credito WHERE id=?', [parseInt(req.params.id)]);
+    if (!l) return fail(res, 'Línea no encontrada', 404);
+    const env = await enviarReposicion(l, quien(req));
+    if (!env.enviado) return fail(res, env.motivo || 'No se pudo enviar', 400);
+    ok(res, { to: env.to, cc: env.cc });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* Vista previa de la solicitud de reposición: el ciclo real si hay abono con operaciones; si no, un
+   ejemplo con las últimas OP de la financiera hasta el umbral sobre el monto máximo. Nada se graba. */
+exports.previewReposicion = async (req, res) => {
+  try {
+    const p = await datosPreview(parseInt(req.params.id), req.body || {});
+    if (!p) return fail(res, 'Línea no encontrada', 404);
+    const l = p.l;
+    let ci = await cicloActual(l.id), ejemplo = false;
+    if (!ci || !ci.operaciones.length) {
+      ejemplo = true;
+      const inicial = Number(l.limite) || 0, meta = inicial * (Number(req.body && req.body.umbral_pct) || Number(l.umbral_pct) || 80) / 100;
+      const [cs] = await pool.query(
+        `SELECT c.num_op, c.id_financiera, c.saldo_precio monto, cl.rut, cl.nombre_completo cliente
+           FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+          WHERE UPPER(c.financiera)=UPPER(?) AND c.saldo_precio > 0 AND c.fecha_otorgado IS NOT NULL
+          ORDER BY c.fecha_otorgado DESC, c.id DESC LIMIT 60`, [l.financiera]);
+      let acum = 0; const ops = [];
+      for (const c of cs) { if (acum >= meta) break; acum += Number(c.monto); ops.push({ ...c, monto: Number(c.monto) }); }
+      let a2 = 0;
+      ci = { fecha_abono: fc.hoyISO(), saldo_inicial: inicial, compensado: acum, saldo_actual: inicial - acum,
+        consumo_pct: inicial ? Math.round(acum / inicial * 1000) / 10 : 0,
+        operaciones: ops.map(o => { a2 += o.monto; return { ...o, pct: Math.round(o.monto / inicial * 1000) / 10, pct_acum: Math.round(a2 / inicial * 1000) / 10 }; }) };
+    }
+    const plant = require('../../../../shared/plantillas-correo');
+    const t = await plant.obtener('linea_reposicion_cupo');
+    if (!t) return fail(res, 'La plantilla linea_reposicion_cupo no existe en Correos del Sistema', 400);
+    const { datos, tabla } = correoReposicion(l, ci);
+    const { envolverHTML } = require('../../../../shared/mailer');
+    const cuerpo = plant.render(t.cuerpo, datos);
+    ok(res, {
+      para: EMAILS(l.correo_para), cc: [...new Set([...EMAILS(l.correo_cc), ...EMAILS(t.cc)])], asunto: plant.render(t.asunto, datos),
+      html: envolverHTML(plant.aHTML(cuerpo) + `<div style="margin:18px 0">${tabla}</div>`).replace(/cid:aflogobs/g, '/img/logo-bs-mail.png'),
+      adjunto: null, activa: !!t.activo, ejemplo_op: ejemplo ? 'ejemplo con las últimas OP de Unidad (no hay ciclo real aún)' : `ciclo real del abono del ${fmtD(ci.fecha_abono)}`,
     });
   } catch (e) { fail(res, e.message); }
 };

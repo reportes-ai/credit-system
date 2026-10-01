@@ -372,6 +372,29 @@ Les agradecemos confirmar su conformidad dentro de {DIAS} días hábiles bancari
     variables: '{ACREEDOR} {CERTIFICADO} {OP} {OP_FINANCIERA} {CLIENTE} {SALDO_ANTERIOR} {SALDO_PRECIO} {COMPENSADO} {EXCESO} {SALDO_NUEVO} {DISPONIBLE} {USO} {DIAS} {RESPONDER_A} {LINK}',
   },
   {
+    codigo: 'linea_reposicion_cupo',
+    ambito: 'Tesorería',
+    nombre: 'Línea de crédito: Solicitud de reposición de cupo → a la FINANCIERA',
+    descripcion: 'Sale sola a la casilla de la financiera (Tesorería → Línea de Crédito Unidad → Parámetros) cuando las operaciones compensadas desde el último abono alcanzan el umbral de reposición (80%), una vez por abono; también se manda a mano desde la Cartola. Después de este texto va la tabla fija: saldo inicial con su fecha y cada operación con ID UCA, RUT, cliente, monto, % del saldo y % acumulado.',
+    asunto: 'Solicitud de reposición de cupo — Línea de Crédito AutoFácil ({USO} utilizado)',
+    cuerpo: `Estimados {ACREEDOR}:
+
+Conforme a la letra C/ del numeral Tres.Uno del Contrato de Apertura de Línea de Crédito, les informamos que se ha utilizado el {USO} del saldo de la línea y solicitamos la reposición del cupo.
+
+Saldo inicial: {SALDO_INICIAL} (abono del {FECHA_ABONO})
+Operaciones compensadas: {N_OPERACIONES}, por {TOTAL_COMPENSADO}
+Saldo actual: {SALDO_ACTUAL}
+Monto a reponer: {MONTO_REPOSICION}
+
+Les agradecemos transferir el monto a reponer a la cuenta de AutoFácil indicada en la Solicitud de Desembolso y confirmarlo escribiendo a {RESPONDER_A}.
+
+Detalle de las operaciones:`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'La casilla de la financiera y la copia configuradas en Tesorería → Línea de Crédito Unidad → Parámetros',
+    variables: '{ACREEDOR} {USO} {SALDO_INICIAL} {FECHA_ABONO} {N_OPERACIONES} {TOTAL_COMPENSADO} {SALDO_ACTUAL} {MONTO_REPOSICION} {RESPONDER_A}',
+  },
+  {
     codigo: 'cliente_comprobante_cuota',
     ambito: 'Cobranza',
     nombre: 'Comprobante de pago de cuotas → al CLIENTE',
