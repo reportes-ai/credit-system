@@ -272,7 +272,8 @@ async function datosCertificado(l, m) {
     FECHA_CONTRATO: fmtD(fc.isoDeBD(l.contrato_fecha)), DIAS: Number(l.dias_respuesta) || 2 };
   return {
     // Los textos se congelan ya resueltos: cambiar el parámetro no altera certificados emitidos.
-    texto_intro: renderTexto(l.cert_texto_intro || TEXTO_INTRO_DEF, vars),
+    // Sin fecha de contrato en Parámetros no se imprime "con fecha —": se omite la frase.
+    texto_intro: renderTexto(vars.FECHA_CONTRATO === '—' ? String(l.cert_texto_intro || TEXTO_INTRO_DEF).replace(/ con fecha \{FECHA_CONTRATO\}/g, '') : (l.cert_texto_intro || TEXTO_INTRO_DEF), vars),
     texto_cierre: renderTexto(l.cert_texto_cierre || TEXTO_CIERRE_DEF, vars),
     numero: m.cert_numero, numero_txt: `CSI-${String(m.cert_numero).padStart(4, '0')}`,
     fecha_emision: fc.isoDeBD(m.created_at) || fc.hoyISO(),
