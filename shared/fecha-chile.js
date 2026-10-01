@@ -171,6 +171,17 @@ function medianocheChileISO(iso) {
   _medianocheCL.set(iso, v);
   return v;
 }
+/* Fecha y HORA de pared de un DATETIME/TIMESTAMP leído de la base → 'YYYY-MM-DD HH:MM:SS'. Mismo principio que
+   isoDeBD: se deshace el offset con que mysql2 lo interpretó, y vuelve la hora tal cual se guardó. */
+function fechaHoraDeBD(d) {
+  if (!(d instanceof Date) || isNaN(d)) return null;
+  let off = '-04:00';
+  try { off = require('./config/database').offsetBD() || off; } catch (_) {}
+  const m = /^([+-])(\d{2}):(\d{2})$/.exec(off);
+  const ms = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : -4 * 3600000;
+  const x = new Date(d.getTime() + ms), p = n => String(n).padStart(2, '0');   // campos UTC a propósito: ya se le sumó el offset
+  return `${x.getUTCFullYear()}-${p(x.getUTCMonth() + 1)}-${p(x.getUTCDate())} ${p(x.getUTCHours())}:${p(x.getUTCMinutes())}:${p(x.getUTCSeconds())}`;
+}
 function jsonFechaBD(key, value) {
   const o = this && this[key];
   if (!(o instanceof Date) || isNaN(o)) return value;
@@ -182,4 +193,4 @@ function jsonFechaBD(key, value) {
   return medianocheChileISO(isoDeBD(o));
 }
 
-module.exports = { TZ, isoDe, isoDeBD, isoFlex, jsonFechaBD, medianocheChileISO, mesDe, hoyISO, mesActualISO, desdeISO, sumarDias, sumarMeses, primerDiaMes, finDelDia };
+module.exports = { TZ, isoDe, isoDeBD, fechaHoraDeBD, isoFlex, jsonFechaBD, medianocheChileISO, mesDe, hoyISO, mesActualISO, desdeISO, sumarDias, sumarMeses, primerDiaMes, finDelDia };

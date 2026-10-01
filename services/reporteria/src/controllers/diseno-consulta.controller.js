@@ -234,8 +234,16 @@ exports.ejecutar = async (req, res) => {
     /* Columnas DECIMAL (montos, y todo SUM/AVG): mysql2 las entrega como TEXTO y en el Excel quedaban como celdas
        de texto que no suman. El navegador no puede distinguirlas de un código (N° de operación, RUT), así que se le
        dice cuáles son. Tipos MySQL: 0 = DECIMAL, 246 = NEWDECIMAL. Las filas no cambian (01-10-2026). */
-    const numericas = (fields || []).filter(f => [0, 246].includes(f.columnType != null ? f.columnType : f.type)).map(f => f.name);
-    ok(res, { sql, rows, numericas, n: rows.length, ms: Date.now() - t0 });
+    const tipoDe = f => (f.columnType != null ? f.columnType : f.type);
+    const numericas = (fields || []).filter(f => [0, 246].includes(tipoDe(f))).map(f => f.name);
+    /* Fechas: salían como instante UTC ("2026-06-01T04:00:00.000Z") en la pantalla y en el Excel. Van como texto de
+       calendario — 'AAAA-MM-DD' las DATE (tipos 10 y 14) y 'AAAA-MM-DD HH:MM:SS' las DATETIME/TIMESTAMP (12 y 7) — y
+       `fechas` dice qué columna es cuál, para que la página las muestre dd-mm-aaaa y el Excel las escriba como fecha. */
+    const { isoDeBD, fechaHoraDeBD } = require('../../../../shared/fecha-chile');
+    const fechas = {};
+    for (const f of (fields || [])) { const t = tipoDe(f); if (t === 10 || t === 14) fechas[f.name] = 'D'; else if (t === 12 || t === 7) fechas[f.name] = 'DT'; }
+    for (const [col, t] of Object.entries(fechas)) for (const r of rows) if (r[col] instanceof Date) r[col] = t === 'D' ? isoDeBD(r[col]) : fechaHoraDeBD(r[col]);
+    ok(res, { sql, rows, numericas, fechas, n: rows.length, ms: Date.now() - t0 });
   } catch (e) { fail(res, e.message, 400); }
 };
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 — Excel: montos, sumas y promedios salen como número (01-10-2026). v1.2 — latido de sesión (30-09-2026). v1.1 — breadcrumb Inicio › Reportería › Diseño de Consulta -->
+<!-- v1.4 — las fechas se ven dd-mm-aaaa en pantalla y van como fecha al Excel (antes: instante UTC). v1.3 — Excel: montos, sumas y promedios salen como número (01-10-2026). v1.2 — latido de sesión (30-09-2026). v1.1 — breadcrumb Inicio › Reportería › Diseño de Consulta -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -114,6 +114,7 @@
 <script src="/js/auth-guard.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/xlsx.full.min.js"></script>
+<script src="/js/xlsx-es-cl.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 const H = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
@@ -264,6 +265,12 @@ function toggleTotales() {
 
 /* ── ejecutar / SQL / exportar ── */
 function modelo() { return { ...M, limit: +$('limit').value }; }
+/* Las columnas de fecha (RES.fechas) llegan 'AAAA-MM-DD' o 'AAAA-MM-DD HH:MM:SS' y se muestran dd-mm-aaaa [HH:MM] */
+function celda(c, v) {
+  if (v == null) return '';
+  const m = RES.fechas && RES.fechas[c] && /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}:\d{2}))?/.exec(String(v));
+  return m ? `${m[3]}-${m[2]}-${m[1]}${m[4] ? ' ' + m[4] : ''}` : v;
+}
 async function ejecutar() {
   const r = await fetch('/api/diseno-consulta/ejecutar', { method: 'POST', headers: H, body: JSON.stringify(modelo()) });
   const j = await r.json();
@@ -271,7 +278,7 @@ async function ejecutar() {
   RES = j.data;
   const cols = RES.rows.length ? Object.keys(RES.rows[0]) : [];
   $('rt').innerHTML = `<thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>` +
-    RES.rows.map(r2 => `<tr>${cols.map(c => `<td>${r2[c] ?? ''}</td>`).join('')}</tr>`).join('') + '</tbody>';
+    RES.rows.map(r2 => `<tr>${cols.map(c => `<td>${celda(c, r2[c])}</td>`).join('')}</tr>`).join('') + '</tbody>';
   $('resWrap').style.display = 'block';
   $('btnXls').style.display = '';
   $('info').textContent = `${RES.n.toLocaleString('es-CL')} filas · ${RES.ms} ms`;
@@ -287,7 +294,7 @@ function exportar() {
   // Los DECIMAL (montos, sumas, promedios) llegan como texto: el servidor dice cuáles son y van al Excel como número
   const num = RES.numericas || [];
   const filas = !num.length ? RES.rows : RES.rows.map(r => { const o = { ...r }; for (const c of num) if (o[c] != null && o[c] !== '' && !isNaN(o[c])) o[c] = Number(o[c]); return o; });
-  const ws = XLSX.utils.json_to_sheet(filas);
+  const ws = AF_XLSX.fechasEnHoja(XLSX.utils.json_to_sheet(filas), RES.fechas);   // fechas de verdad: se ordenan y filtran en Excel
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'consulta');
   XLSX.writeFile(wb, 'consulta.xlsx');

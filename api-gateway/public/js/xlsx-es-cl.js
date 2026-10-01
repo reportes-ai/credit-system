@@ -13,6 +13,10 @@
    convierten esos textos en números (miles con punto en Excel). La primera fila es el encabezado; las
    columnas cuyo encabezado se pase en `texto` se dejan como texto (N° de documento, cuenta contable).
    Uso:  const wb = AF_XLSX.libroDeFilas(filas, 'Auxiliar', ['N° Doc', 'Cta Gasto']);
+
+   FECHAS (01-10-2026): `fechasEnHoja(ws, { 'Fecha Otorgado': 'D', 'Creado': 'DT' })` convierte las celdas de texto
+   'AAAA-MM-DD' ('D') o 'AAAA-MM-DD HH:MM[:SS]' ('DT') de esas columnas en fechas de Excel (se pueden ordenar y
+   filtrar), con formato dd-mm-aaaa. Se escribe el número de serie directo: sin objetos Date, sin zona horaria.
    ═══════════════════════════════════════════════════════════════ */
 window.AF_XLSX = (function () {
   /* "1.234,50" → { v: 1234.5, z: '#,##0.00' } · "12,5%" → { v: 0.125, z: '0.0%' } · lo demás → null */
@@ -79,6 +83,32 @@ window.AF_XLSX = (function () {
     XLSX.utils.book_append_sheet(wb, hojaDeFilas(filas, texto), String(nombreHoja || 'Datos').replace(/[\\\/?*\[\]:]/g, ' ').slice(0, 31) || 'Datos');
     return wb;
   }
-  return { numeroEsCL, convertirCeldas, hojaDeTabla, libroDeTabla, numeroDeBD, hojaDeFilas, libroDeFilas };
+  /* 'AAAA-MM-DD[ HH:MM[:SS]]' → número de serie de Excel (días desde el 30-12-1899); otra cosa → null */
+  function serialExcel(txt) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(String(txt == null ? '' : txt));
+    if (!m) return null;
+    const y = +m[1], mo = +m[2], d = +m[3], ms = Date.UTC(y, mo - 1, d);
+    const x = new Date(ms);
+    if (y < 1900 || x.getUTCFullYear() !== y || x.getUTCMonth() !== mo - 1 || x.getUTCDate() !== d) return null;   // 0000-00-00, 2026-02-31
+    return ms / 86400000 + 25569 + ((+m[4] || 0) * 3600 + (+m[5] || 0) * 60 + (+m[6] || 0)) / 86400;
+  }
+  function fechasEnHoja(ws, mapa) {
+    if (!ws || !ws['!ref'] || !mapa) return ws;
+    const r = XLSX.utils.decode_range(ws['!ref']);
+    for (let C = r.s.c; C <= r.e.c; C++) {
+      const h = ws[XLSX.utils.encode_cell({ r: r.s.r, c: C })];
+      const tipo = h && mapa[String(h.v)];
+      if (!tipo) continue;
+      for (let R = r.s.r + 1; R <= r.e.r; R++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+        if (!cell || cell.t !== 's') continue;
+        const n = serialExcel(cell.v);
+        if (n == null) continue;
+        cell.t = 'n'; cell.v = n; cell.z = tipo === 'DT' ? 'dd-mm-yyyy hh:mm' : 'dd-mm-yyyy'; delete cell.w;
+      }
+    }
+    return ws;
+  }
+  return { numeroEsCL, convertirCeldas, hojaDeTabla, libroDeTabla, numeroDeBD, hojaDeFilas, libroDeFilas, serialExcel, fechasEnHoja };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = window.AF_XLSX;   // pruebas en Node
