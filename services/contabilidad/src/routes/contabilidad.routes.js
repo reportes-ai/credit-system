@@ -285,6 +285,8 @@ router.post('/provisiones/:id/liberar', verifyToken, requireFunc('ctb_provisione
     const [[p]] = await pool.query("SELECT concepto, origen_id, num_op FROM ctb_provisiones WHERE id=? AND estado='CONSTITUIDA'", [req.params.id]);
     if (!p || !prov.LIBERAR[p.concepto]) return res.status(404).json({ success: false, data: null, error: 'Provisión no encontrada o ya liberada' });
     const r = await prov.liberarFilaPorId(req.params.id, 'MANUAL', null, quien);
+    // Si no se liberó, se dice: antes respondía success y la auditoría anotaba "$0" como si hubiera pasado
+    if (!r || r.error || r.skip) return res.status(409).json({ success: false, data: null, error: 'No se liberó: ' + ((r && (r.error || r.skip)) || 'sin resultado') });
     require('../../../../shared/audit').auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'provisiones', entidad_id: req.params.id,
       detalle: `Liberación manual provisión ${p.concepto} OP ${p.num_op || p.origen_id}: $${r.monto || 0} — motivo: ${String(req.body?.motivo || '').slice(0, 200) || 'sin motivo'}` });
     res.json({ success: true, data: r, error: null });

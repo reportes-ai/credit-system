@@ -7,6 +7,12 @@
      "1.234.567" → 1234567 · "-3.500" → -3500 · "$ 12.345" → 12345 · "1.234,50" → 1234.5 · "12,5%" → 0.125 (formato %)
    Lo que no es un número es-CL (RUT, fechas, texto) se deja como texto. Requiere /js/xlsx.full.min.js.
    Uso:  const wb = AF_XLSX.libroDeTabla(tablaEl, 'Nombre hoja');  XLSX.writeFile(wb, 'archivo.xlsx');
+
+   FILAS ARMADAS EN JS (01-10-2026): los DECIMAL de la base llegan como TEXTO ("850000", "1234.50") y
+   `aoa_to_sheet` los escribía como celdas de texto: en Excel no suman. `hojaDeFilas` / `libroDeFilas`
+   convierten esos textos en números (miles con punto en Excel). La primera fila es el encabezado; las
+   columnas cuyo encabezado se pase en `texto` se dejan como texto (N° de documento, cuenta contable).
+   Uso:  const wb = AF_XLSX.libroDeFilas(filas, 'Auxiliar', ['N° Doc', 'Cta Gasto']);
    ═══════════════════════════════════════════════════════════════ */
 window.AF_XLSX = (function () {
   /* "1.234,50" → { v: 1234.5, z: '#,##0.00' } · "12,5%" → { v: 0.125, z: '0.0%' } · lo demás → null */
@@ -44,6 +50,35 @@ window.AF_XLSX = (function () {
     XLSX.utils.book_append_sheet(wb, hojaDeTabla(tabla, opts), String(nombreHoja || 'Datos').replace(/[\\\/?*\[\]:]/g, ' ').slice(0, 31) || 'Datos');
     return wb;
   }
-  return { numeroEsCL, convertirCeldas, hojaDeTabla, libroDeTabla };
+  /* "1234.50" | "-850000" | 1234.5 → número con formato; "007", "2026-09", RUT, texto → null (se deja igual).
+     Sin ceros a la izquierda (son códigos) y hasta 15 dígitos (más allá Excel pierde precisión). */
+  function numeroDeBD(v) {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    if (typeof v !== 'string' || !/^-?(0|[1-9]\d{0,14})(\.\d+)?$/.test(v)) return null;
+    const n = Number(v); return Number.isFinite(n) ? n : null;
+  }
+  function hojaDeFilas(filas, texto) {
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    if (!ws['!ref']) return ws;
+    const noTocar = new Set((texto || []).map(t => String(t)));
+    const r = XLSX.utils.decode_range(ws['!ref']);
+    const esTexto = [];
+    for (let C = r.s.c; C <= r.e.c; C++) { const h = ws[XLSX.utils.encode_cell({ r: r.s.r, c: C })]; esTexto[C] = !!(h && noTocar.has(String(h.v))); }
+    for (let R = r.s.r + 1; R <= r.e.r; R++) for (let C = r.s.c; C <= r.e.c; C++) {
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (!cell) continue;
+      if (esTexto[C]) { if (cell.t === 'n') { cell.t = 's'; cell.v = String(cell.v); delete cell.w; } continue; }
+      const n = numeroDeBD(cell.v);
+      if (n == null) continue;
+      cell.t = 'n'; cell.v = n; cell.z = Number.isInteger(n) ? '#,##0' : '#,##0.00'; delete cell.w;
+    }
+    return ws;
+  }
+  function libroDeFilas(filas, nombreHoja, texto) {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, hojaDeFilas(filas, texto), String(nombreHoja || 'Datos').replace(/[\\\/?*\[\]:]/g, ' ').slice(0, 31) || 'Datos');
+    return wb;
+  }
+  return { numeroEsCL, convertirCeldas, hojaDeTabla, libroDeTabla, numeroDeBD, hojaDeFilas, libroDeFilas };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = window.AF_XLSX;   // pruebas en Node

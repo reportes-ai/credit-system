@@ -537,6 +537,7 @@ const getAll = async (req, res) => {
       numero_credito:     'CAST(COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)) AS UNSIGNED)',
       rut_cliente:        'cl.rut',
       nombre_cliente:     'cl.nombre_completo',
+      ejecutivo:          'ob.ejecutivo',
       financiera:         'ob.financiera',
       id_financiera:      'ob.id_financiera',
       fecha_otorgamiento: 'ob.fecha_otorgado',

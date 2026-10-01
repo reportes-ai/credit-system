@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedor Tickets TI — AutoFácil</title>
-  <!-- v1.3 — Equipo TI paramétrico: lista de quienes atienden (Pato 29-09) -->
+  <!-- v1.4 — estar en el Equipo TI permite atender (bandeja, responder, cambiar estado) sin el permiso aparte; lista sin activos cae a la regla general (01-10) · v1.3 — Equipo TI paramétrico: lista de quienes atienden (Pato 29-09) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -49,9 +49,9 @@
     <label class="chk"><input type="checkbox" id="cNuevo"> Enviar <b>correo al crear</b> un ticket (al equipo TI)</label>
     <label class="chk"><input type="checkbox" id="cEscalM"> Enviar <b>correo al escalar</b> un ticket vencido</label>
     <label class="chk"><input type="checkbox" id="cCierre"> Enviar <b>correo al solicitante</b> cuando se resuelve/cierra</label>
-    <div class="fld" style="margin-top:14px"><label>Equipo TI: quiénes atienden los tickets (reciben la alerta y el correo)</label>
+    <div class="fld" style="margin-top:14px"><label>Equipo TI: quiénes atienden los tickets (reciben la alerta y el correo, ven la bandeja y pueden responder y cambiar el estado)</label>
       <div id="cAtienden" style="display:flex;flex-wrap:wrap;gap:6px 16px;max-height:220px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:.84rem">Cargando…</div>
-      <p style="font-size:.78rem;color:#64748b;margin:6px 0 0">Si no marcas a nadie, avisa a todo perfil Administrador y a los perfiles con el permiso "atender tickets TI".</p></div>
+      <p style="font-size:.78rem;color:#64748b;margin:6px 0 0">Si no marcas a nadie (o todos los marcados quedan inactivos), avisa a todo perfil Administrador y a los perfiles con el permiso "atender tickets TI". Quien tiene ese permiso también puede atender aunque no esté marcado.</p></div>
     <div style="text-align:right;margin-top:10px"><button class="btn-navy" onclick="guardarConfig()"><i class="bi bi-check-lg"></i> Guardar</button></div>
   </div>
 
@@ -60,7 +60,7 @@
     <ul>
       <li><b>Motivos</b> → la lista de motivos que el usuario elige al crear un ticket en <a href="/soporte/tickets-ti/">Soporte › Tickets TI</a>; el <b>SLA</b> de cada motivo define cuándo un ticket sin respuesta se escala.</li>
       <li><b>Escalamiento</b> → reescala y avisa al equipo TI los tickets que superan su SLA sin primera respuesta.</li>
-      <li><b>Equipo TI</b> → a quién llega la campanita y el correo de cada ticket nuevo, mensaje del solicitante y escalamiento (<a href="/soporte/tickets-ti/">Tickets TI</a>).</li>
+      <li><b>Equipo TI</b> → a quién llega la campanita y el correo de cada ticket nuevo, mensaje del solicitante y escalamiento, y quién ve la bandeja y puede responder como TI y cambiar el estado (<a href="/soporte/tickets-ti/">Tickets TI</a>).</li>
       <li><b>Correos automáticos</b> → al crear (a TI), al escalar (a TI) y al cerrar (al solicitante). Respetan el <a href="/mantenedores/mantencion-sistema/">Modo Desarrollo</a> (redirige correos de prueba).</li>
     </ul>
   </div>

@@ -12,7 +12,8 @@ router.get('/tickets',          verifyToken, requireFunc('tickets_ti'), ctrl.lis
 router.post('/tickets',         verifyToken, requireFunc('tickets_ti'), ctrl.crear);
 router.get('/tickets/:id',      verifyToken, requireFunc('tickets_ti'), ctrl.obtener);
 router.post('/tickets/:id/mensajes', verifyToken, requireFunc('tickets_ti'), ctrl.comentar);
-router.put('/tickets/:id/estado',    verifyToken, requireFunc('ti_atender'), ctrl.cambiarEstado);
+// El controller exige ser TI (Equipo TI del mantenedor o permiso ti_atender): una sola regla, la de esTI().
+router.put('/tickets/:id/estado',    verifyToken, requireFunc('tickets_ti'), ctrl.cambiarEstado);
 
 // Mantenedor
 router.get('/admin/motivos',    verifyToken, requireFunc('tickets_ti_mant'), ctrl.motivosAdmin);

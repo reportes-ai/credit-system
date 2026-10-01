@@ -423,8 +423,9 @@ async function liberarDealerPorNumOp(num_op, motivo, fechaISO, usuario, contra =
 async function liberarFilaPorId(idFila, motivo, fechaISO, usuario, contra = null) {
   const [[p]] = await pool.query("SELECT * FROM ctb_provisiones WHERE id=? AND estado='CONSTITUIDA'", [idFila]);
   if (!p) return { skip: 'sin provisión constituida' };
-  if (p.concepto === 'PARQUE') return liberarParque(p.origen_id, motivo, fechaISO, usuario, contra);
-  if (p.concepto === 'ARRIENDO') return p.origen_tipo === 'CREDITO' ? liberarParque(p.origen_id, motivo, fechaISO, usuario, contra) : _liberarFilaOtros(p, motivo, fechaISO, usuario, contra);
+  // Por fila = SOLO esa fila (01-10-2026): liberar a mano el arriendo de una OP liberaba también su comisión de parque (y al revés)
+  if (p.concepto === 'PARQUE') return liberarParque(p.origen_id, motivo, fechaISO, usuario, contra, 'PARQUE');
+  if (p.concepto === 'ARRIENDO') return p.origen_tipo === 'CREDITO' ? liberarParque(p.origen_id, motivo, fechaISO, usuario, contra, 'ARRIENDO') : _liberarFilaOtros(p, motivo, fechaISO, usuario, contra);
   if (p.concepto === 'EJECUTIVO') return _liberarFilaEjecutivo(p, motivo, fechaISO, usuario, contra);
   if (p.concepto === 'JEFE') return _liberarFilaJefe(p, motivo, fechaISO, usuario, contra);
   if (p.concepto === 'SUELDOS') return liberarSueldos(p.mes, motivo, fechaISO, usuario, contra);
@@ -529,10 +530,12 @@ async function constituirParque(idCredito, usuario = 'Motor provisiones') {
 }
 
 /* Libera (reversa íntegra) las provisiones PARQUE (comisión) y ARRIENDO (arriendo) de un crédito, cada una con su
-   asiento. motivo: APROBACION | ANULACION | MANUAL. Devuelve la primera liberada (compatibilidad) y cuántas fueron. */
-async function liberarParque(idCredito, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null) {
+   asiento. motivo: APROBACION | ANULACION | MANUAL. Devuelve la primera liberada (compatibilidad) y cuántas fueron.
+   soloConcepto ('PARQUE' | 'ARRIENDO'): libera únicamente esa fila — la liberación manual por fila. */
+async function liberarParque(idCredito, motivo = 'MANUAL', fechaISO = null, usuario = 'Motor provisiones', contra = null, soloConcepto = null) {
   try {
-    const [filas] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto IN ('PARQUE','ARRIENDO') AND origen_tipo='CREDITO' AND origen_id=? AND estado='CONSTITUIDA' ORDER BY FIELD(concepto,'PARQUE','ARRIENDO')", [idCredito]);
+    const conceptos = ['PARQUE', 'ARRIENDO'].includes(soloConcepto) ? [soloConcepto] : ['PARQUE', 'ARRIENDO'];
+    const [filas] = await pool.query("SELECT * FROM ctb_provisiones WHERE concepto IN (?) AND origen_tipo='CREDITO' AND origen_id=? AND estado='CONSTITUIDA' ORDER BY FIELD(concepto,'PARQUE','ARRIENDO')", [conceptos, idCredito]);
     if (!filas.length) return { skip: 'sin provisión constituida' };
     const fecha = await fechaContable(fechaISO || hoyISO());
     let primero = null, n = 0;

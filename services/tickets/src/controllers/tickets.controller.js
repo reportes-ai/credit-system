@@ -43,9 +43,11 @@ require('../../../../shared/migrate').enFila('tickets', async () => {
     await pool.query('INSERT IGNORE INTO ti_config (id) VALUES (1)');
     /* Equipo TI paramétrico (Pato, 29-09-2026): el primer ticket avisó a los dos perfiles Administrador
        y a todo perfil con ti_atender (Director incluido: dos correos externos). Ahora la lista de quienes
-       atienden vive aquí; si está vacía cae a la regla antigua. */
-    await pool.query('ALTER TABLE ti_config ADD COLUMN atienden_ids VARCHAR(500) NULL').catch(() => {});
-    await pool.query("UPDATE ti_config SET atienden_ids='1,60004' WHERE id=1 AND atienden_ids IS NULL");
+       atienden vive aquí; si está vacía cae a la regla antigua.
+       La siembra corre UNA vez, al nacer la columna (01-10-2026): antes se repetía en cada arranque y, si el
+       Administrador vaciaba la lista a propósito, el reinicio siguiente se la volvía a llenar. */
+    const nueva = await pool.query('ALTER TABLE ti_config ADD COLUMN atienden_ids VARCHAR(500) NULL').then(() => true).catch(() => false);
+    if (nueva) await pool.query("UPDATE ti_config SET atienden_ids='1,60004' WHERE id=1 AND atienden_ids IS NULL");
   } catch (e) { console.error('[ti_config migration]', e.message); }
 
   try {
@@ -124,16 +126,23 @@ const nombreDe = u => `${u?.nombre || ''} ${u?.apellido || ''}`.trim() || u?.ema
 const PRIOS = ['BAJA', 'MEDIA', 'ALTA'];
 const ESTADOS = ['ABIERTO', 'EN_PROCESO', 'RESUELTO', 'CERRADO'];
 
+const idsEquipo = cfg => String((cfg && cfg.atienden_ids) || '').split(',').map(x => parseInt(x)).filter(x => x > 0);
+/* Atiende quien está en el Equipo TI del mantenedor O tiene el permiso ti_atender (01-10-2026): antes solo valía
+   el permiso, así que a alguien de la lista le llegaba el aviso y al abrir el ticket recibía 403. */
 async function esTI(id_usuario) {
-  try { const { tieneFunc } = require('../../../../shared/middleware/permisos'); return await tieneFunc(id_usuario, 'ti_atender'); }
+  try {
+    if (id_usuario && idsEquipo(await getConfig()).includes(Number(id_usuario))) return true;
+    const { tieneFunc } = require('../../../../shared/middleware/permisos'); return await tieneFunc(id_usuario, 'ti_atender');
+  }
   catch { return false; }
 }
 async function poolTI() {
-  const cfg = await getConfig();
-  const ids = String(cfg.atienden_ids || '').split(',').map(x => parseInt(x)).filter(x => x > 0);
+  const ids = idsEquipo(await getConfig());
   if (ids.length) {
     const [r] = await pool.query("SELECT id_usuario, email, CONCAT(COALESCE(nombre,''),' ',COALESCE(apellido,'')) nombre FROM usuarios WHERE id_usuario IN (?) AND estado='activo'", [ids]);
-    return r;
+    if (r.length) return r;
+    // Toda la lista quedó inactiva: no se avisa "a nadie" en silencio, se cae a la regla antigua
+    console.warn('[tickets] el Equipo TI del mantenedor no tiene usuarios activos; se avisa a Administradores y ti_atender');
   }
   const [rows] = await pool.query(
     `SELECT u.id_usuario, u.email, CONCAT(COALESCE(u.nombre,''),' ',COALESCE(u.apellido,'')) nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
@@ -292,9 +301,11 @@ async function tickEscalar() {
     if (vencidos.length) {
       const cfg = await getConfig();
       const pool_ti = await poolTI();
+      const ids = pool_ti.map(x => x.id_usuario).filter(Boolean);
+      // Sin nadie a quien avisar el ticket NO se marca escalado: quedaría "escalado" sin que nadie lo supiera
+      if (!ids.length) { console.error(`[tickets SLA] ${vencidos.length} ticket(s) vencido(s) y no hay a quién avisar (Equipo TI vacío o inactivo)`); return; }
       for (const t of vencidos) {
         await pool.query('UPDATE ti_tickets SET escalado=1 WHERE id=?', [t.id]);
-        const ids = pool_ti.map(x => x.id_usuario).filter(Boolean);
         if (ids.length) notificar(ids, { tipo: 'TICKET_TI', titulo: '⏰ Ticket sin respuesta (escalado)', mensaje: `${t.codigo} — ${t.asunto} superó su SLA sin respuesta`, href: '/soporte/tickets-ti/?id=' + t.id, prioridad: 'alta', sonar: 1, son_tipo: 'alarma' });
         if (cfg.correo_escal) { const to = pool_ti.map(x => x.email).filter(Boolean); if (to.length) enviarCorreo({ to, subject: `⏰ Ticket escalado ${t.codigo} — sin respuesta`, html: `<p>El ticket <b>${t.codigo}</b> — ${t.asunto} — superó su SLA de primera respuesta sin ser atendido. Prioridad ${t.prioridad}.</p>` }).catch(() => {}); }
         console.log(`[tickets SLA] ${t.codigo} escalado`);
@@ -303,7 +314,7 @@ async function tickEscalar() {
   } catch (e) { console.error('[tickets tickEscalar]', e.message); }
   finally { _esc = false; }
 }
-programar('tickets-escalar', tickEscalar, 30 * 60 * 1000);
-setTimeout(tickEscalar, 25 * 1000);
+// La vuelta del arranque también pasa por programar(): el setTimeout suelto corría aunque MOTORES=off (host de contingencia)
+programar('tickets-escalar', tickEscalar, 30 * 60 * 1000, { arranqueMs: 25 * 1000 });
 
 module.exports = { motivos, crear, listar, obtener, comentar, cambiarEstado, pendientes, motivosAdmin, guardarMotivo, eliminarMotivo, getConfig: getConfigEp, setConfig, tickEscalar };
