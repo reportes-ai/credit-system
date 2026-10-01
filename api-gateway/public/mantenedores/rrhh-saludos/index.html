@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saludos y Certificados RRHH — Mantenedores</title>
-  <!-- v1.8 — card Avisos de prelación de descuentos (plantillas a la Caja y al trabajador). v1.7 — los datos de la empresa del finiquito pasan a Datos de la Empresa; certificado con {empresa} {rut_empresa}. v1.6 — Finiquito: el firmante se elige en cada finiquito; el representante del mantenedor es respaldo. v1.5 — card Finiquito: texto legal completo (encabezado, cláusulas 1ª-6ª, pie), datos de la empresa y anexo de cálculo. v1.4 navbar migrada al componente topnav -->
+  <!-- v1.9 — Finiquito: declaración de pensión de alimentos (con y sin retención judicial) y listas de la base de las indemnizaciones (art. 172). v1.8 — card Avisos de prelación de descuentos (plantillas a la Caja y al trabajador). v1.7 — los datos de la empresa del finiquito pasan a Datos de la Empresa; certificado con {empresa} {rut_empresa}. v1.6 — Finiquito: el firmante se elige en cada finiquito; el representante del mantenedor es respaldo. v1.5 — card Finiquito: texto legal completo (encabezado, cláusulas 1ª-6ª, pie), datos de la empresa y anexo de cálculo. v1.4 navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -83,17 +83,23 @@
 
   <div class="card-box">
     <h5><i class="bi bi-file-earmark-text"></i> Finiquito de contrato de trabajo (texto legal)</h5>
-    <p style="font-size:.78rem;color:#64748b;margin:0 0 12px">Contenido mínimo: identificación de las partes, fechas y causal (art. 159/160/161 CT), detalle de lo pagado, constancia de cotizaciones pagadas (art. 162 inc. 5°), declaración de nada adeudar, reserva de derechos y ratificación ante ministro de fe (art. 177). Variables: {ciudad} {fecha} {empresa} {rut_empresa} {representante} {rut_representante_txt} {domicilio} {trabajador} {rut} {cargo} {fecha_ingreso} {fecha_termino} {causal_articulo} {causal_glosa} {total} {total_letras} {reserva}. Admite HTML (&lt;b&gt;). Una cláusula vacía no se imprime.</p>
+    <p style="font-size:.78rem;color:#64748b;margin:0 0 12px">Contenido mínimo: identificación de las partes, fechas y causal (art. 159/160/161 CT), detalle de lo pagado, constancia de cotizaciones pagadas (art. 162 inc. 5°), declaración de nada adeudar, reserva de derechos y ratificación ante ministro de fe (art. 177). Variables: {ciudad} {fecha} {empresa} {rut_empresa} {representante} {rut_representante_txt} {domicilio} {trabajador} {rut} {cargo} {fecha_ingreso} {fecha_termino} {causal_articulo} {causal_glosa} {total} {total_letras} {reserva}. Admite HTML (&lt;b&gt;). Una cláusula vacía no se imprime. La declaración de pensión de alimentos tiene además {rit} {tribunal_txt} {retencion} {retencion_txt}.</p>
     <div class="hint" style="margin:0 0 12px">La <b>razón social, el RUT, la ciudad, el domicilio y el representante legal</b> salen de <a href="/mantenedores/empresa/">Datos de la Empresa</a> (fuente única). El <b>firmante</b> se elige en cada finiquito entre los gerentes activos (por defecto el Gerente General); el representante de aquí solo se usa si no se elige ninguno.</div>
     <div class="fld"><label>Encabezado (comparecencia)</label><textarea id="finiq_encabezado" rows="3"></textarea></div>
     <div class="fld"><label>PRIMERO — servicios y causal</label><textarea id="finiq_c1" rows="2"></textarea></div>
     <div class="fld"><label>SEGUNDO — pago (después va la tabla de conceptos)</label><textarea id="finiq_c2" rows="2"></textarea></div>
     <div class="fld"><label>TERCERO — cotizaciones pagadas (art. 162 inc. 5°)</label><textarea id="finiq_c3" rows="2"></textarea></div>
     <div class="fld"><label>CUARTO — declaración de nada adeudar y renuncia de acciones</label><textarea id="finiq_c4" rows="3"></textarea></div>
+    <div class="fld"><label>Pensión de alimentos — trabajador SIN retención judicial (va entre el CUARTO y el QUINTO; art. 13 Ley 14.908)</label><textarea id="finiq_alim_no" rows="2"></textarea></div>
+    <div class="fld"><label>Pensión de alimentos — trabajador CON retención judicial ({rit} {tribunal_txt} y {retencion_txt}: lo retenido de las indemnizaciones)</label><textarea id="finiq_alim_si" rows="2"></textarea></div>
     <div class="fld"><label>QUINTO — reserva de derechos ({reserva} se escribe en cada finiquito)</label><textarea id="finiq_c5" rows="1"></textarea></div>
     <div class="fld"><label>SEXTO — ratificación ante ministro de fe (art. 177)</label><textarea id="finiq_c6" rows="2"></textarea></div>
     <div class="fld"><label>Pie (bajo las firmas)</label><input id="finiq_pie"></div>
     <div class="switch-row"><input type="checkbox" id="finiq_anexo" class="form-check-input"> Imprimir hoja adicional "Anexo — detalle del cálculo" (fuente de la base, meses, topes, años, feriado, préstamos)</div>
+    <h5 style="margin-top:18px"><i class="bi bi-calculator"></i> Base de las indemnizaciones (art. 172 del Código del Trabajo)</h5>
+    <p style="font-size:.78rem;color:#64748b;margin:0 0 12px">La "última remuneración mensual" es el promedio de los últimos 3 meses completos: <b>imponible + colación y movilización habituales − horas extraordinarias y pagos esporádicos</b> (Dirección del Trabajo, dictamen 75/8 de 1999). Las dos listas van separadas por coma y se comparan por "contiene" (AGUINALDO cubre «Aguinaldo Fiestas Patrias»), sobre los conceptos de <a href="/recursos-humanos/remuneraciones/adicionales/">Adicionales de Remuneración</a>. La base del <b>feriado</b> proporcional no cambia con esto.</p>
+    <div class="fld"><label>Conceptos imponibles que NO entran en la base (horas extras, aguinaldos y otros pagos esporádicos o anuales)</label><input id="finiq_base_excluye" placeholder="HORAS EXTRAS,AGUINALDO,BONO NAVIDAD,BONO VACACIONES"></div>
+    <div class="fld"><label>Conceptos NO imponibles habituales que SÍ entran, además de la colación y la movilización de la ficha (ej. ASIGNACION CELULAR)</label><input id="finiq_base_no_imp" placeholder="(vacío = solo colación y movilización)"></div>
   </div>
 
   <div class="card-box">
@@ -115,6 +121,8 @@
       <li><b>Avisos de prelación de descuentos</b> → texto .txt que descarga el botón <b>Aviso a la Caja / al trabajador</b> en <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a> cuando una cuota no cabe en la liquidación por el orden legal (legales → pensión → Caja → empresa; topes en <a href="/mantenedores/remuneraciones/">Indicadores de Remuneraciones</a>). Cada descarga queda auditada.</li>
       <li><b>Cuerpo/cierre del certificado</b> → texto del PDF con QR verificable en <a href="/verificar/">/verificar</a> (fecha de ingreso y cargo se editan en <a href="/usuarios/">Usuarios</a>).</li>
       <li><b>Texto del finiquito y anexo de cálculo</b> (los datos de la empresa viven en <a href="/mantenedores/empresa/">Datos de la Empresa</a>) → documento que imprimen <b>Vista previa</b> e <b>Imprimir y cerrar</b> en <a href="/recursos-humanos/contratos/">Contratos → Finiquitos</a> (los montos salen del motor: base según liquidaciones o Libro de Remuneraciones AVSOFT, topes de <code>rh_config</code>; la causal, de <code>rh_finiquito_causales</code>). Un finiquito ya cerrado no cambia aunque se edite el texto después.</li>
+      <li><b>Declaración de pensión de alimentos</b> → párrafo que el finiquito imprime entre el CUARTO y el QUINTO: una versión si el trabajador no tiene retención judicial y otra si la tiene (la causa sale de <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a>; lo retenido de las indemnizaciones lo calcula <a href="/recursos-humanos/contratos/">Contratos → Finiquitos</a>).</li>
+      <li><b>Base de las indemnizaciones (listas)</b> → la base con que <a href="/recursos-humanos/contratos/">Contratos → Finiquitos</a> calcula la indemnización por años de servicio y la sustitutiva del aviso previo, y la <b>provisión mensual de indemnización</b> en <a href="/contabilidad/provisiones/">Contabilidad → Provisiones</a> (usan el mismo motor). Un concepto agregado a la lista de excluidos baja esa base; uno agregado a la de no imponibles habituales la sube.</li>
     </ul>
   </div>
 </div>
@@ -127,7 +135,8 @@
   const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
   const CAMPOS=['cumple_popup_activo','cumple_musica','cumple_campana_activo','finiq_anexo'];
   const TEXTOS=['cumple_titulo','cumple_linea1','cumple_linea2','cumple_aviso_titulo','cumple_aviso_msg','cumple_aviso_tarde','cumple_dias_tope','cumple_midia_dias','cumple_banner_dur','cumple_banner_sonido','cert_min_meses','cert_cooldown_dias','cert_cuerpo','cert_cierre',
-    'finiq_encabezado','finiq_c1','finiq_c2','finiq_c3','finiq_c4','finiq_c5','finiq_c6','finiq_pie','aviso_prelacion_caja','aviso_prelacion_empresa'];
+    'finiq_encabezado','finiq_c1','finiq_c2','finiq_c3','finiq_c4','finiq_c5','finiq_c6','finiq_pie','aviso_prelacion_caja','aviso_prelacion_empresa',
+    'finiq_alim_no','finiq_alim_si','finiq_base_excluye','finiq_base_no_imp'];
   async function cargar(){
     const j=await(await fetch('/api/rrhh/config',{headers:H})).json(); const c=j.data||{};
     CAMPOS.forEach(k=>{ const el=document.getElementById(k); if(el) el.checked=c[k]==='1'; });

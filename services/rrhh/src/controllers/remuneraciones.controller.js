@@ -196,8 +196,13 @@ require('../../../../shared/migrate').enFila('rrhh-adicionales-he', async () => 
   } catch (e) { if (e.errno !== 1060) console.error('[adic valor_unitario]', e.message); }
   try {
     await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES
-      ('he_jornada_semanal', '44'), ('he_recargo_pct', '50')`);
+      ('he_jornada_semanal', '42'), ('he_recargo_pct', '50')`);
   } catch (e) { console.error('[adic config he]', e.message); }
+});
+/* Ley 21.561: 44 h desde el 26-04-2024, 42 h desde el 26-04-2026 y 40 h desde el 26-04-2028. El parámetro nació en 44
+   (17-08-2026) cuando ya regían las 42: se corrige UNA vez, y solo si nadie lo cambió a mano (01-10-2026). */
+require('../../../../shared/migrate').migrar('rrhh-he-jornada-42-v1', async () => {
+  await pool.query("UPDATE rh_config SET valor='42' WHERE clave='he_jornada_semanal' AND valor='44'");
 });
 
 /* Parámetros de la hora extra, con los valores legales por defecto si no están. */
@@ -803,6 +808,17 @@ const cuotaEnMes = (d, m, tc) => {
   return Number(d.valor_cuota);
 };
 const tcDelMes = mes => TC.tiposCambio(TC.fechaDeMes(mes));
+/* Valor en PESOS de la cuota de un descuento para un mes, sin mirar si el plan ya terminó (cuotaEnMes sí lo mira).
+   Lo usa el finiquito: la pensión de alimentos "del mes siguiente al término" (art. 13 Ley 14.908), que puede estar
+   pactada en UTM o UF. */
+async function valorCuotaCLP(d, mes) {
+  const mon = String(d.moneda || 'CLP').toUpperCase();
+  if (mon !== 'CLP' && d.valor_cuota_origen != null) {
+    const tc = await tcDelMes(mes).catch(() => null);
+    if (tc && tc[mon]) return TC.aCLP(d.valor_cuota_origen, tc[mon]);
+  }
+  return Number(d.valor_cuota) || 0;
+}
 
 const getDescuentos = async (req, res) => {
   try {
@@ -1255,8 +1271,9 @@ function calcLiquidacion(inp, ind) {
        1. legales (AFP, salud, AFC, impuesto) → queda el líquido legal
        2. pensión de alimentos / retención judicial, hasta rem_tope_pension_pct (50%) de la base
           (rem_tope_pension_base: LIQUIDO = líquido legal, TOTAL = remuneración total)
-       3. Caja de Compensación
-       4. préstamos de la empresa y demás voluntarios
+       3. crédito social de la Caja de Compensación — descuento obligatorio: NO entra en el 45% del
+          art. 58 (DT ORD. 262/4 y 3741/36 de 2012, 558 de 2021); solo lo limita el líquido disponible
+       4. préstamos de la empresa y demás voluntarios, que en conjunto no pasan del 45%
      Lo que no cabe en el líquido NO se descuenta (o se descuenta parcial) y queda en
      descuentos_omitidos con el motivo: RRHH informa a la Caja ("sin capacidad de descuento")
      o reprograma el préstamo. Priorizar la Caja o la empresa sobre la pensión hace al
@@ -1274,7 +1291,8 @@ function calcLiquidacion(inp, ind) {
     const liquidoLegal = Math.max(0, totalHaberes - legales);
     const basePension = String(ind.rem_tope_pension_base || 'LIQUIDO').toUpperCase() === 'TOTAL' ? totalHaberes : liquidoLegal;
     const topePension = Number(ind.rem_tope_pension_pct) > 0 ? R(basePension * Number(ind.rem_tope_pension_pct) / 100) : Infinity;
-    // Los voluntarios (Caja, empresa, APV…) además no pueden sumar más del 45% de la remuneración total (art. 58 CT)
+    // Los voluntarios (empresa, APV, varios…) además no pueden sumar más del 45% de la remuneración total (art. 58 CT);
+    // el crédito social de la Caja es obligatorio y queda fuera de esa suma
     const topeVol = Number(ind.rem_tope_dcto_total_pct) > 0 ? R(totalHaberes * Number(ind.rem_tope_dcto_total_pct) / 100) : Infinity;
     let disponible = liquidoLegal, pensionAcum = 0, volAcum = 0;
     detalle = []; otrosDescAplicado = 0;
@@ -1286,6 +1304,8 @@ function calcLiquidacion(inp, ind) {
         const margen = Math.max(0, topePension - pensionAcum);
         if (cabe > margen) { cabe = margen; motivo = `tope ${ind.rem_tope_pension_pct}% de la ${basePension === totalHaberes ? 'remuneración total' : 'remuneración líquida'} para pensión / retención judicial (Ley 14.908)`; }
         pensionAcum += cabe;
+      } else if (i.cat === 'CAJA') {
+        // obligatorio: sin tope del 45%; si no cabe entero es solo porque el líquido no alcanza (motivo de más abajo)
       } else {
         const margen = Math.max(0, topeVol - volAcum);
         if (cabe > margen) { cabe = margen; motivo = `tope ${ind.rem_tope_dcto_total_pct}% de la remuneración total para la suma de descuentos voluntarios (art. 58 CT)`; }
@@ -1308,7 +1328,9 @@ function calcLiquidacion(inp, ind) {
   // Ley SANNA (21.063): 0,03% de cargo del empleador sobre la renta imponible topada; se paga junto a la mutual
   const aporteSanna = R(baseCotiz * (ind.rem_sanna_pct || 0) / 100);
   return {
-    dias, sueldo_base: sueldo, comisiones, bono_jefe: bonoJefe, feriado_variable: feriadoVar, feriado_var_dias: inp.feriado_var_dias || 0, otros_imponibles: otrosImp, gratificacion,
+    dias, sueldo_base: sueldo, comisiones,
+    semana_corrida: Math.min(comisiones, R(inp.semana_corrida)),   // INFORMATIVO: parte de `comisiones` que es semana corrida (LRE cód 2104); no se suma aparte
+    bono_jefe: bonoJefe, feriado_variable: feriadoVar, feriado_var_dias: inp.feriado_var_dias || 0, otros_imponibles: otrosImp, gratificacion,
     total_imponible: imponible, base_cotizacion: baseCotiz,
     tope_gratificacion: topeGrat, tope_imponible: topeImp, topes_prorrateados: prorrateo < 1,   // trazabilidad del prorrateo
     colacion, movilizacion, otros_no_imponibles: otrosNoImp,
@@ -1462,14 +1484,21 @@ async function comisionesDelMes(mes) {
     const { montosNomina } = require('../../../comisiones/src/controllers/nomina.controller');
     const nom = await montosNomina(mesAnteriorDe(mes));
     // (el Bono del Jefe Comercial NO va aquí: es un haber aparte, bono_jefe — Pato 28-09-2026)
-    if (nom) return nom.montos;
+    // .sc (no enumerable): la parte de cada monto que es semana corrida — informativa, para el LRE (cód 2104)
+    if (nom) { Object.defineProperty(nom.montos, 'sc', { value: nom.semana_corrida || {}, enumerable: false }); return nom.montos; }
     const { calcularMes } = require('../../../comisiones/src/controllers/comisiones.controller');
     const filas = await calcularMes(mesAnteriorDe(mes));   // mes vencido
     const porNombre = {};
     // Comision NETA de reversas: la liquidacion muestra solo la comision a pagar.
     // El detalle de que operaciones se revirtieron vive en Revision de Comisiones,
     // no en la liquidacion de sueldo.
-    for (const f of filas) porNombre[String(f.ejecutivo || '').toUpperCase().trim()] = R(f.con_semana_corrida || f.incentivo_final);
+    const sc = {};
+    for (const f of filas) {
+      const k = String(f.ejecutivo || '').toUpperCase().trim();
+      porNombre[k] = R(f.con_semana_corrida || f.incentivo_final);
+      if (f.con_semana_corrida) sc[k] = Math.max(0, R(f.con_semana_corrida) - R(f.incentivo_final));
+    }
+    Object.defineProperty(porNombre, 'sc', { value: sc, enumerable: false });
     return porNombre;
   } catch (e) { console.error('[remuneraciones comisiones]', e.message); return {}; }
 }
@@ -1542,6 +1571,7 @@ const getMes = async (req, res) => {
         dias: diasTrabajadosMes(mes, e.fecha_ingreso, lics[e.id_usuario], e.fecha_baja),
         colacion: e.colacion, movilizacion: e.movilizacion,
         comisiones: comis[String(e.nombre_corto).trim()] || 0,
+        semana_corrida: (comis.sc && comis.sc[String(e.nombre_corto).trim()]) || 0,
         bono_jefe: bonosJefe[String(e.nombre_corto).trim()] || 0,   // Bono Jefe Comercial (total variable del BSC, mes vencido): línea aparte de las comisiones (Pato, 28-09-2026)
         feriado_variable: ferVar[e.id_usuario]?.monto || 0,
         feriado_var_dias: ferVar[e.id_usuario]?.dias || 0,
@@ -1600,6 +1630,7 @@ const guardar = async (req, res) => {
         dias: diasTrabajadosMes(mes, emp.fecha_ingreso, lics[emp.id_usuario], emp.fecha_baja),
         colacion: emp.colacion, movilizacion: emp.movilizacion,
         comisiones: comis[String(emp.nombre_corto).trim()] || 0,
+        semana_corrida: (comis.sc && comis.sc[String(emp.nombre_corto).trim()]) || 0,
         bono_jefe: bonosJefe[String(emp.nombre_corto).trim()] || 0,
         feriado_variable: ferVar[emp.id_usuario]?.monto || 0,
         feriado_var_dias: ferVar[emp.id_usuario]?.dias || 0,
@@ -1852,6 +1883,7 @@ async function ordenesPagoJudiciales(mes, req) {
   const out = [];
   for (const d of jud) {
     const monto = retenido.has(Number(d.id)) ? retenido.get(Number(d.id)) : null;
+    if (monto == null && cuotaEnMes(d, mes, null) == null) continue;   // plan terminado (ej. última cuota fijada por un finiquito): no es una omisión
     if (monto == null) { console.warn(`[ODP judicial] descuento ${d.id} sin línea en las liquidaciones de ${mes}: no se emite orden`); continue; }
     if (!(monto > 0)) { console.warn(`[ODP judicial] ${d.trabajador}: la prelación dejó la retención en cero en ${mes} — hay que informarlo al tribunal`); continue; }
     const concepto = `Retención judicial ${d.jud_rit ? 'RIT ' + d.jud_rit : d.subtipo} — ${d.trabajador} — remuneraciones ${mes}`;
@@ -1893,7 +1925,7 @@ async function ordenesPagoJudiciales(mes, req) {
    (jud_aviso_at): un correo repetido a un tribunal es peor que ninguno. */
 async function onOdpPagadaJudicial(idOrdenPago) {
   const [[o]] = await pool.query(
-    `SELECT o.id, o.numero, o.monto, o.destino, o.metodo_pago, o.jud_aviso_at,
+    `SELECT o.id, o.numero, o.monto, o.destino, o.metodo_pago, o.jud_aviso_at, o.concepto,
             DATE_FORMAT(o.fecha_pago,'%d-%m-%Y') pagada,
             d.jud_rit, d.jud_tribunal, d.jud_tribunal_email, d.ben_nombre, d.ben_rut, d.id_usuario,
             TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) trabajador, u.rut rut_trabajador
@@ -1908,13 +1940,23 @@ async function onOdpPagadaJudicial(idOrdenPago) {
   const emp = await require('../../../../shared/empresa').datosEmpresa().catch(() => null);
   const $ = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
   const fila = (k, v) => `<tr><td style="padding:4px 12px;color:#475569">${k}</td><td style="padding:4px 12px"><b>${v}</b></td></tr>`;
+  /* Orden nacida de un FINIQUITO (retención sobre las indemnizaciones, art. 13 Ley 14.908): el mismo correo da cuenta
+     al tribunal del término de la relación laboral, que la ley exige informar dentro de 10 días hábiles. */
+  const esFiniquito = /^finiquito/i.test(o.concepto || '');
+  let fqT = null;
+  if (esFiniquito) {
+    const [[f]] = await pool.query("SELECT DATE_FORMAT(fecha_termino,'%d-%m-%Y') termino, causal, causal_glosa FROM rh_finiquitos WHERE id_usuario=? ORDER BY id DESC LIMIT 1", [o.id_usuario]).catch(() => [[null]]);
+    fqT = f || null;
+  }
   const html = `
     <p>Señor(a) Juez:</p>
     <p>En cumplimiento de lo resuelto en la causa <b>RIT ${o.jud_rit || 's/n'}</b>${o.jud_tribunal ? ' del ' + o.jud_tribunal : ''},
        ${emp && emp.razon_social ? emp.razon_social : 'AutoFácil SpA'}${emp && emp.rut ? ' (RUT ' + emp.rut + ')' : ''}
-       informa el pago de la pensión alimenticia retenida:</p>
+       ${esFiniquito
+          ? `informa el <b>término de la relación laboral</b> con el alimentante${fqT && fqT.termino ? ' el ' + fqT.termino : ''} y el pago de la suma retenida de las indemnizaciones de su finiquito, conforme al artículo 13 de la Ley N° 14.908:`
+          : 'informa el pago de la pensión alimenticia retenida:'}</p>
     <table style="border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0">
-      ${fila('RIT', o.jud_rit || 's/n')}
+      ${fila('RIT', o.jud_rit || 's/n')}${fqT && fqT.termino ? fila('Término de la relación laboral', fqT.termino + (fqT.causal ? ` — art. ${fqT.causal}${fqT.causal_glosa ? ' (' + fqT.causal_glosa + ')' : ''}` : '')) : ''}
       ${fila('Alimentante', `${o.trabajador || ''}${o.rut_trabajador ? ' — RUT ' + o.rut_trabajador : ''}`)}
       ${fila('Alimentario(a)', `${o.ben_nombre || ''}${o.ben_rut ? ' — RUT ' + o.ben_rut : ''}`)}
       ${fila('Monto depositado', $(o.monto))}
@@ -1924,7 +1966,8 @@ async function onOdpPagadaJudicial(idOrdenPago) {
       ${fila('N° de orden de pago', o.numero || '')}
     </table>
     <p style="font-size:12px;color:#64748b">El comprobante bancario queda a disposición del Tribunal; puede solicitarse respondiendo este correo.</p>`;
-  const r = await enviarCorreo({ to: o.jud_tribunal_email, subject: `RIT ${o.jud_rit || 's/n'} — Informa pago de pensión alimenticia retenida · ${o.pagada || ''}`, html: envolverHTML ? envolverHTML(html) : html });
+  const r = await enviarCorreo({ to: o.jud_tribunal_email, subject: esFiniquito ? `RIT ${o.jud_rit || 's/n'} — Informa término de la relación laboral y pago de la retención sobre el finiquito · ${o.pagada || ''}`
+                                                                       : `RIT ${o.jud_rit || 's/n'} — Informa pago de pensión alimenticia retenida · ${o.pagada || ''}`, html: envolverHTML ? envolverHTML(html) : html });
   if (!r || r.ok === false) { console.error(`[aviso tribunal] ODP ${o.numero}: ${r && r.error}`); return null; }
   await pool.query('UPDATE ordenes_pago SET jud_aviso_at=NOW() WHERE id=?', [o.id]);
   console.log(`[aviso tribunal] ODP ${o.numero} — RIT ${o.jud_rit}: informado a ${o.jud_tribunal_email}`);
@@ -2172,12 +2215,28 @@ const resolverPropuesta = async (req, res) => {
 const getIndicadores = async (req, res) => {
   try {
     const mes = new Date().toISOString().slice(0, 7);
-    ok(res, await indicadores(mes));
+    const he = await paramsHE();   // jornada legal general y recargo de la hora extra (rh_config he_*)
+    ok(res, { ...(await indicadores(mes)), he_jornada_semanal: he.jornadaSemanal, he_recargo_pct: he.recargoPct });
   } catch (e) { fail(res, 'Error interno del servidor'); }
 };
 const putIndicadores = async (req, res) => {
   try {
     const b = req.body || {};
+    /* Jornada legal general y recargo de la hora extra (motor shared/horas-extras.js). Se validan ANTES de escribir
+       nada: una jornada mayor a la legal abarata la hora y un recargo bajo el 50% incumple el art. 32 CT. */
+    const he = {};
+    if ('he_jornada_semanal' in b && b.he_jornada_semanal !== '') {
+      const v = parseFloat(b.he_jornada_semanal);
+      if (!(v >= 1 && v <= 45)) return fail(res, 'La jornada semanal general debe estar entre 1 y 45 horas', 400);
+      he.he_jornada_semanal = v;
+    }
+    if ('he_recargo_pct' in b && b.he_recargo_pct !== '') {
+      const v = parseFloat(b.he_recargo_pct);
+      if (!(v >= 50 && v <= 300)) return fail(res, 'El recargo de la hora extraordinaria no puede ser menor al 50% legal (art. 32 CT)', 400);
+      he.he_recargo_pct = v;
+    }
+    for (const [k, v] of Object.entries(he))
+      await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(v)]);
     // Config rem_* permitidas
     const PERM = ['rem_tope_imponible_uf', 'rem_tope_afc_uf', 'rem_afc_trabajador_pct', 'rem_salud_pct', 'rem_imm', 'rem_grat_tope_imm',
                   'rem_sis_pct', 'rem_afc_emp_pct', 'rem_afc_emp_pfijo_pct', 'rem_mutual_pct',
@@ -2800,6 +2859,7 @@ async function haberesProyectados(idUsuario, mesPedido) {
     dias: diasTrabajadosMes(mes, emp.fecha_ingreso, lics[emp.id_usuario], emp.fecha_baja),
     colacion: emp.colacion, movilizacion: emp.movilizacion,
     comisiones: comis[String(emp.nombre_corto).trim()] || 0,
+    semana_corrida: (comis.sc && comis.sc[String(emp.nombre_corto).trim()]) || 0,
         bono_jefe: bonosJefe[String(emp.nombre_corto).trim()] || 0,
     feriado_variable: ferVar[emp.id_usuario]?.monto || 0,
     feriado_var_dias: ferVar[emp.id_usuario]?.dias || 0,
@@ -2872,4 +2932,4 @@ const avisoPrelacion = async (req, res) => {
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores, getCatalogo, proporcionalConceptoAdic, editarAdicional, asignacionFicha,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   permanenteAdicional, crearConceptoAdic, crearConceptoDesc, getComisionesMes, proximaLiquidacion, haberesProyectados, prelacionDescuentos, avisoPrelacion,
-  getDescuentos, crearDescuento, editarDescuento, anularDescuento, ordenesPagoJudiciales, proveedorBeneficiario, onOdpPagadaJudicial, onOdpPagadaRemuneraciones, RE_ODP_SUELDOS, nominaBancoDatos, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
+  getDescuentos, crearDescuento, editarDescuento, anularDescuento, ordenesPagoJudiciales, proveedorBeneficiario, valorCuotaCLP, onOdpPagadaJudicial, onOdpPagadaRemuneraciones, RE_ODP_SUELDOS, nominaBancoDatos, importarNominaCaja, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };

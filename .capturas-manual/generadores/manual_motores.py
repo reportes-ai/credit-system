@@ -225,7 +225,7 @@ def construir():
           'El valor de la hora extra con la fórmula de la Dirección del Trabajo. La base es el SUELDO '
           'BASE pactado — no el total imponible: bonos y comisiones no forman parte de la jornada '
           'ordinaria salvo pacto expreso. La jornada semanal NO está fija en el código porque la ley '
-          'la sigue bajando (44 h hoy, 42 en 2027, 40 en 2028). Los trabajadores art. 22 (excluidos '
+          'la sigue bajando (44 h desde 2024, 42 h desde el 26-04-2026, 40 h desde el 26-04-2028). Los trabajadores art. 22 (excluidos '
           'de jornada) no generan horas extra: el motor responde "no aplica" con su motivo, nunca un '
           '0 silencioso.',
           'hora ordinaria = sueldo base × 7 ÷ (30 × jornada semanal).\n'

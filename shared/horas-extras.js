@@ -13,9 +13,11 @@
    El 7/30 convierte el sueldo mensual a semanal (una semana de cada treinta
    días), y dividir por la jornada semanal da la hora. Con la jornada de 45 h y
    50% de recargo, eso da el factor clásico **0,0077778** del sueldo base; con
-   las 44 h vigentes desde abril de 2026 (Ley 21.561) da 0,0079545. Por eso la
-   jornada NO se escribe fija en el código: la ley la sigue bajando (42 h en
-   2027, 40 h en 2028) y ese día esto se cambia en el mantenedor, no acá.
+   44 h, 0,0079545; con las **42 h vigentes desde el 26-04-2026**, 0,0083333; y
+   con 40 h, 0,0087500. Calendario de la Ley 21.561: 44 h desde el 26-04-2024,
+   42 h desde el 26-04-2026 y 40 h desde el 26-04-2028. Por eso la jornada NO se
+   escribe fija en el código: ese día se cambia en el mantenedor (Indicadores de
+   Remuneraciones → Jornada y horas extraordinarias), no acá.
 
    QUÉ ENTRA EN LA BASE: el **sueldo base** pactado, no el total imponible. Los
    bonos, comisiones y gratificación no forman parte del sueldo convenido para
@@ -29,7 +31,7 @@
    "esta persona no corresponde".
    ───────────────────────────────────────────────────────────────────────────── */
 
-const JORNADA_SEMANAL_DEFAULT = 44;   // Ley 21.561, vigente desde el 26-04-2026
+const JORNADA_SEMANAL_DEFAULT = 42;   // Ley 21.561: 42 h desde el 26-04-2026 (40 h desde el 26-04-2028)
 const RECARGO_PCT_DEFAULT     = 50;   // Art. 32 CT: mínimo legal
 
 /**

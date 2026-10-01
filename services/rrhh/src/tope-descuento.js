@@ -3,13 +3,20 @@
    Paramétricos en Mantenedores → Indicadores de Remuneraciones → "Topes legales de descuentos"
    (rh_config), sembrados con la norma vigente (Pato, 24-09-2026):
      rem_tope_dcto_otros_pct     15  art. 58 CT: otros pagos acordados por escrito (anticipos,
-                                     préstamos, Caja, descuentos varios…): 15% de la remuneración
+                                     préstamos, descuentos varios…): 15% de la remuneración
      rem_tope_dcto_vivienda_pct  30  art. 58 CT: vivienda, educación y ahorro (APV): 30%
      rem_tope_dcto_total_pct     45  art. 58 CT: la SUMA de todos los descuentos voluntarios: 45%
+                                     (sin los judiciales ni el crédito social de la Caja)
      rem_tope_pension_pct        50  Ley 14.908 art. 7: pensión de alimentos y retenciones
                                      judiciales: hasta 50% de los ingresos; NO entran en el 45%
      rem_dcto_judiciales         lista de conceptos que son judiciales (separados por coma)
      rem_dcto_vivienda           lista de conceptos que son vivienda/educación/ahorro
+     rem_dcto_caja               lista de conceptos que son crédito social de la Caja de Compensación:
+                                 descuento OBLIGATORIO (inciso 1° del art. 58 CT y Ley 18.833), igual que las
+                                 cotizaciones. La Dirección del Trabajo lo deja fuera del 45% y del 15%
+                                 (ORD. 4565/94 de 2011, 262/4 y 3741/36 de 2012, 558 de 2021). Hasta el
+                                 01-10-2026 se contaba dentro de ambos: una cuota de la Caja recortada
+                                 "por tope" era un error nuestro.
    Base: total haberes de la liquidación POR EMITIR (proyectada con el motor de liquidaciones);
    si no se puede, la última EMITIDA; si no hay, sueldo base de la ficha.
    Sin referencia no se valida (RRHH decide). Lo usan Solicitudes (paso RRHH) y el registro
@@ -28,9 +35,9 @@ async function topes() {
            judiciales: lista(c.rem_dcto_judiciales), viviendaLista: lista(c.rem_dcto_vivienda), caja: lista(c.rem_dcto_caja) };
 }
 
-/* JUDICIAL (pensión / tribunal: tope propio, fuera del 45%, 2° en la prelación) · CAJA (Caja de
-   Compensación: 3° en la prelación, tope 15%) · VIVIENDA (30%) · OTROS (15%). La prelación de la
-   liquidación (calcLiquidacion) usa esta misma clasificación: un solo criterio. */
+/* JUDICIAL (pensión / tribunal: tope propio, fuera del 45%, 2° en la prelación) · CAJA (crédito social
+   de la Caja de Compensación: obligatorio, sin tope del art. 58, 3° en la prelación) · VIVIENDA (30%) ·
+   OTROS (15%). La prelación de la liquidación (calcLiquidacion) usa esta misma clasificación: un solo criterio. */
 function categoriaDe(tipo, subtipo, T) {
   const s = String(subtipo || '').toUpperCase();
   if (T.judiciales.some(j => s.includes(j))) return 'JUDICIAL';
@@ -75,6 +82,9 @@ async function validarTope({ idUsuario, valorCuota, tipo, subtipo, excluirId }) 
       `La cuota de ${$(valorCuota)} supera el tope legal del ${T.pension}% de los ingresos para pensión de alimentos / retención judicial (Ley 14.908 art. 7): máximo ${$(tope)}.`);
     return;
   }
+  // Crédito social de la Caja: descuento obligatorio, sin tope del art. 58 (ver cabecera). El único límite es el
+  // líquido que queda tras los legales y la pensión, y ese lo aplica la prelación de la liquidación.
+  if (cat === 'CAJA') return;
   const pctInd = cat === 'VIVIENDA' ? T.vivienda : T.otros;
   if (pctInd) {
     const tope = Math.round(base * pctInd / 100);
@@ -82,14 +92,15 @@ async function validarTope({ idUsuario, valorCuota, tipo, subtipo, excluirId }) 
       `La cuota de ${$(valorCuota)} supera el tope legal del ${pctInd}% de la remuneración (art. 58 CT${cat === 'VIVIENDA' ? ', vivienda/educación/ahorro' : ''}): máximo ${$(tope)} — sube el número de cuotas o baja el monto.`);
   }
   if (!T.total) return;
-  // Suma de lo que ya se descuenta este mes (voluntarios vigentes, sin los judiciales) + la cuota nueva
+  // Suma de lo que ya se descuenta este mes (voluntarios vigentes, sin los judiciales ni la Caja) + la cuota nueva
   const mes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7);
   const [vig] = await pool.query(
     `SELECT id, tipo, subtipo, valor_cuota, cuotas, mes_inicio FROM rh_descuentos WHERE id_usuario=? AND estado='VIGENTE'`, [idUsuario]);
   let suma = 0;
   for (const d of vig) {
     if (excluirId && d.id === excluirId) continue;
-    if (categoriaDe(d.tipo, d.subtipo, T) === 'JUDICIAL') continue;
+    const c = categoriaDe(d.tipo, d.subtipo, T);
+    if (c === 'JUDICIAL' || c === 'CAJA') continue;
     const k = difMeses(String(d.mes_inicio || mes), mes);
     if (Number(d.cuotas) > 0 && k >= Number(d.cuotas)) continue;   // ya terminó
     suma += Number(d.valor_cuota) || 0;

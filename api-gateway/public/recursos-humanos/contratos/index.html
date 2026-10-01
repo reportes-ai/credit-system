@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.11 — anexo variable: domicilio del empleador desde Datos de la Empresa (ya no fijo en el código). v3.10 — ciudad y país de Datos de la Empresa en contrato y anexo. v3.9 — contrato, anexo y finiquito con razón social, RUT, ciudad y domicilio desde Datos de la Empresa. v3.8 — la ODP y el asiento del finiquito se generan al CERRAR, no al guardar. v3.7 — base según doctrina DT verificada: promedio de lo PERCIBIDO en 3 meses completos (ORD. 5424/250, 495/2016, 77/2025) y feriado SIN gratificación mensual (dictamen 836/046). v3.6 — feriado proporcional: hábiles proyectados en el calendario (inhábiles reales, no ×1,4), saldo con 2 decimales. v3.5 — base del finiquito por DEVENGO (3 meses completos, art. 71): el anexo dice de dónde sale la comisión de cada mes. v3.4 — Anexo del finiquito: apertura del imponible de cada mes (sueldo, comisiones, semana corrida, gratificación, otros) cuando el auxiliar AVSOFT la trae. v3.3 — Finiquito: el documento y el anexo son hojas carta separadas (pantalla y PDF). v3.2 — Finiquito: selector "Firma por el Empleador" (gerentes activos, por defecto el Gerente General), va al detalle y al documento. v3.1 — Finiquito: botones Recalcular / Vista previa / Imprimir y cerrar (queda inmutable), "Abrir" desde la lista, texto legal paramétrico (Saludos y Certificados RRHH → Finiquito), reserva de derechos, monto en letras (rrhh-core) y anexo "cómo se calculó" (fuente de la base y meses). v3.0 — anexo variable: el factor de cada indicador aplica SOLO sobre la Comisión Base de las ops con ese seguro (cláusulas 5ª, 6ª y ejemplo 8ª), calidad sobre la base total · v2.9 — onboarding: dialog dlgVer que faltaba (Plantilla de tareas no abría), botones + Onboarding / + Offboarding separados · v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
+<!-- v3.12 — finiquito: la base de las indemnizaciones es la del art. 172 (con colación y movilización, sin horas extras ni aguinaldos) y se retiene la pensión de alimentos de las indemnizaciones (art. 13 Ley 14.908), con su fila, su declaración y su anexo. v3.11 — anexo variable: domicilio del empleador desde Datos de la Empresa (ya no fijo en el código). v3.10 — ciudad y país de Datos de la Empresa en contrato y anexo. v3.9 — contrato, anexo y finiquito con razón social, RUT, ciudad y domicilio desde Datos de la Empresa. v3.8 — la ODP y el asiento del finiquito se generan al CERRAR, no al guardar. v3.7 — base según doctrina DT verificada: promedio de lo PERCIBIDO en 3 meses completos (ORD. 5424/250, 495/2016, 77/2025) y feriado SIN gratificación mensual (dictamen 836/046). v3.6 — feriado proporcional: hábiles proyectados en el calendario (inhábiles reales, no ×1,4), saldo con 2 decimales. v3.5 — base del finiquito por DEVENGO (3 meses completos, art. 71): el anexo dice de dónde sale la comisión de cada mes. v3.4 — Anexo del finiquito: apertura del imponible de cada mes (sueldo, comisiones, semana corrida, gratificación, otros) cuando el auxiliar AVSOFT la trae. v3.3 — Finiquito: el documento y el anexo son hojas carta separadas (pantalla y PDF). v3.2 — Finiquito: selector "Firma por el Empleador" (gerentes activos, por defecto el Gerente General), va al detalle y al documento. v3.1 — Finiquito: botones Recalcular / Vista previa / Imprimir y cerrar (queda inmutable), "Abrir" desde la lista, texto legal paramétrico (Saludos y Certificados RRHH → Finiquito), reserva de derechos, monto en letras (rrhh-core) y anexo "cómo se calculó" (fuente de la base y meses). v3.0 — anexo variable: el factor de cada indicador aplica SOLO sobre la Comisión Base de las ops con ese seguro (cláusulas 5ª, 6ª y ejemplo 8ª), calidad sobre la base total · v2.9 — onboarding: dialog dlgVer que faltaba (Plantilla de tareas no abría), botones + Onboarding / + Offboarding separados · v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -361,7 +361,7 @@ async function fqCalcular(){
   const otrosPrev = $('fqOtros') ? fqVal('fqOtros') : (FQ_ROW ? (fqDet(FQ_ROW).otros_haberes||0) : 0);
   FQ_CALC = j.data;
   fqPintar(j.data, { indemnizacion_anos:j.data.indemnizacion_anos, mes_aviso:j.data.mes_aviso, vac_monto:j.data.vac_monto,
-    otros_haberes:otrosPrev, descuentos:j.data.descuentos_prestamos||0, reserva:reservaPrev }, j.data.avisos);
+    otros_haberes:otrosPrev, descuentos:j.data.descuentos_prestamos||0, retencion_judicial:j.data.retencion_judicial||0, reserva:reservaPrev }, j.data.avisos);
 }
 /* Abrir uno guardado (no cerrado): muestra lo guardado tal cual; Recalcular vuelve al motor */
 function fqAbrir(id){
@@ -378,7 +378,10 @@ function fqAbrir(id){
     d, [`Finiquito #${f.id} guardado (v${f.version||1}). Puedes recalcular, ver la vista previa o imprimir y cerrar.`]);
   $('pFiniq').scrollIntoView({behavior:'smooth'});
 }
+/* Retención judicial sobre las indemnizaciones: la fila solo existe si el trabajador tiene una causa vigente */
+const fqRetVal = () => $('fqRet') ? fqVal('fqRet') : 0;
 function fqPintar(d, v, avisos){
+  const conRet = !!(d.tiene_retencion_judicial || (d.retenciones_judiciales||[]).length || v.retencion_judicial);
   const fila = (lbl, id, val, nota) => `<tr><td>${lbl}${nota?`<br><span style="color:#94a3b8;font-size:.74rem">${nota}</span>`:''}</td>
     <td style="text-align:right"><input id="${id}" inputmode="numeric" value="${CLP(val)}" style="width:160px;text-align:right;border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 10px;font-weight:700" oninput="fqFmt(this);fqTotal()"></td></tr>`;
   $('fqResultado').innerHTML = `
@@ -390,7 +393,8 @@ function fqPintar(d, v, avisos){
       ${fila(`Feriado proporcional (${d.vac_dias_habiles||0} hábiles = ${d.vac_dias_corridos||0} corridos${d.vac_hasta?', hasta el '+String(d.vac_hasta).split('-').reverse().join('-'):''})`, 'fqVac', v.vac_monto||0)}
       ${fila('Otros haberes (bonos pendientes, comisiones del mes, etc.)', 'fqOtros', v.otros_haberes||0)}
       ${fila('Descuentos (anticipos, préstamos pendientes)', 'fqDesc', v.descuentos||0, 'se resta — precargado desde los convenios vigentes')}
-      <tr><td style="font-weight:800">TOTAL FINIQUITO</td><td style="text-align:right;font-weight:800;font-size:1.1rem" id="fqTotalCell"></td></tr>
+      ${conRet?fila('Retención judicial por pensión de alimentos'+((d.retenciones_judiciales||[]).map(r=>r.rit?' · RIT '+esc(r.rit):'').join('')), 'fqRet', v.retencion_judicial||0, 'se resta y se deposita al alimentario (art. 13 Ley 14.908): del aviso previo, la pensión del mes siguiente; de los años de servicio, el % que la pensión es de la base'):''}
+      <tr><td style="font-weight:800">${conRet?'TOTAL A PAGAR AL TRABAJADOR':'TOTAL FINIQUITO'}</td><td style="text-align:right;font-weight:800;font-size:1.1rem" id="fqTotalCell"></td></tr>
     </table>
     <div class="fld" style="max-width:640px;margin-top:10px"><label>Reserva de derechos (cláusula QUINTA)</label>
       <input id="fqReserva" value="${esc(v.reserva||'Sin reserva de derechos.')}" placeholder="Sin reserva de derechos."></div>
@@ -406,7 +410,7 @@ function fqBotones(){
   $('fqPie').innerHTML = b.join('');
 }
 function fqTotal(){
-  $('fqTotalCell').textContent = CLP(fqVal('fqIA')+fqVal('fqMA')+fqVal('fqVac')+fqVal('fqOtros')-fqVal('fqDesc'));
+  $('fqTotalCell').textContent = CLP(fqVal('fqIA')+fqVal('fqMA')+fqVal('fqVac')+fqVal('fqOtros')-fqVal('fqDesc')-fqRetVal());
 }
 /* detalle que se guarda: montos editados + foto del cálculo (para el anexo "cómo se calculó") */
 function fqDetalle(){
@@ -417,6 +421,10 @@ function fqDetalle(){
     indemnizacion_anos:v('fqIA'), mes_aviso:v('fqMA'), vac_monto:v('fqVac'),
     vac_dias_habiles:d.vac_dias_habiles, vac_dias_corridos:d.vac_dias_corridos,
     otros_haberes:v('fqOtros'), descuentos:v('fqDesc'), prestamos_detalle:d.prestamos_detalle||[],
+    // retención judicial (art. 13 Ley 14.908): monto final (editable) + la foto de cómo se calculó, causa por causa.
+    // jud_revisado: el cálculo ya miraba si había causa — solo entonces el documento imprime la declaración de alimentos
+    retencion_judicial:fqRetVal(), retenciones_judiciales:d.retenciones_judiciales||[], tiene_retencion_judicial:!!d.tiene_retencion_judicial,
+    aviso_tribunal_hasta:d.aviso_tribunal_hasta||null, jud_revisado:('tiene_retencion_judicial' in d),
     reserva:($('fqReserva')?.value||'').trim()||'Sin reserva de derechos.', firmante:fqFirmante(), calc:d };
 }
 function fqFirmante(){
@@ -448,7 +456,7 @@ async function fqGuardar(silencioso){
 function fqActual(){
   if (FQ_ROW && !FQ_CALC) return FQ_ROW;
   const b = fqBody();
-  return { ...(FQ_ROW||{}), ...b, id:FQ_ID, total: fqVal('fqIA')+fqVal('fqMA')+fqVal('fqVac')+fqVal('fqOtros')-fqVal('fqDesc') };
+  return { ...(FQ_ROW||{}), ...b, id:FQ_ID, total: fqVal('fqIA')+fqVal('fqMA')+fqVal('fqVac')+fqVal('fqOtros')-fqVal('fqDesc')-fqRetVal() };
 }
 function fqVistaPrevia(){
   if (!FQ_CALC && !FQ_ROW) return alert('Calcula primero');
@@ -466,7 +474,11 @@ async function fqImprimirCerrar(){
   if (!(await fqGuardar(true))) return;
   const j = await (await fetch('/api/rrhh/finiquitos/'+FQ_ID+'/cerrar',{method:'POST',headers:HJ,body:'{}'})).json();
   if (!j.success) return alert(j.error);
-  if (j.data && j.data.odp) alert('Finiquito CERRADO. Se generó la orden de pago '+j.data.odp+' y el asiento contable: Tesorería la paga tras la ratificación.');
+  const jud = (j.data && j.data.odp_judicial) || [];
+  const txtJud = jud.map(x => x.numero
+    ? `\nRetención judicial ${x.rit||''}: orden de pago ${x.numero} por ${CLP(x.monto)} al alimentario${x.existente?' (ya existía)':''}. Al marcarla pagada se informa al tribunal.`
+    : `\n⚠ Retención judicial ${x.rit||''} por ${CLP(x.monto)}: NO se emitió la orden de pago (${x.falta_cuenta?'faltan los datos de la cuenta del beneficiario en Descuentos':(x.error||'no hay causa asociada')}). Hay que pagarla e informar al tribunal a mano.`).join('');
+  if (j.data && (j.data.odp || jud.length)) alert((j.data.odp ? 'Finiquito CERRADO. Se generó la orden de pago '+j.data.odp+' y el asiento contable: Tesorería la paga tras la ratificación.' : 'Finiquito CERRADO.')+txtJud);
   await fqRecargarLista();
   const id = FQ_ID; FQ_ID = null; FQ_ROW = null; FQ_CALC = null; $('fqResultado').innerHTML = '';
   imprimirFiniquito(id);
@@ -487,6 +499,14 @@ function finiquitoHTML(f, d, opts){
     fecha_ingreso:f.fecha_ingreso?fmtF(f.fecha_ingreso):'—', fecha_termino:fmtF(f.fecha_termino),
     causal_articulo:esc(f.causal), causal_glosa:esc(f.causal_glosa||''),
     total:CLP(total), total_letras:window.AF_RRHH.numeroALetras(total), reserva:esc(d.reserva||'Sin reserva de derechos.') };
+  // Retención judicial por pensión de alimentos (art. 13 Ley 14.908): fila en la tabla y declaración entre el CUARTO y el QUINTO
+  const retJ = Number(d.retencion_judicial)||0, rets = d.retenciones_judiciales||[];
+  const ritTxt = rets.map(r=>r.rit?'RIT '+esc(r.rit):'').filter(Boolean).join(', ');
+  vars.rit = ritTxt || 'respectiva'; vars.tribunal_txt = rets.length===1 && rets[0].tribunal ? ` del ${esc(rets[0].tribunal)}` : '';
+  vars.retencion = CLP(retJ);
+  vars.retencion_txt = retJ>0
+    ? `En cumplimiento del artículo 13 de la Ley N° 14.908, el Empleador retiene de las indemnizaciones de este finiquito la suma de ${CLP(retJ)} (${window.AF_RRHH.numeroALetras(retJ)} pesos) y la deposita directamente al alimentario, dando cuenta de ello y del término de la relación laboral al tribunal.`
+    : 'Este finiquito no contiene indemnizaciones sobre las cuales corresponda practicar retención; el Empleador da cuenta al tribunal del término de la relación laboral.';
   const li = (lbl,m)=> m ? `<tr><td style="padding:4px 0">${lbl}</td><td style="text-align:right">${CLP(m)}</td></tr>` : '';
   const tabla = `<table style="width:100%;max-width:520px;margin:0 auto 14px;font-size:13.5px">
       ${li('Indemnización por años de servicio ('+(d.anos||0)+' años)', d.indemnizacion_anos)}
@@ -494,13 +514,15 @@ function finiquitoHTML(f, d, opts){
       ${li('Feriado proporcional ('+(d.vac_dias_corridos||0)+' días corridos)', d.vac_monto)}
       ${li('Otros haberes', d.otros_haberes)}
       ${d.descuentos?`<tr><td style="padding:4px 0">Descuentos (anticipos y préstamos pendientes)</td><td style="text-align:right">−${CLP(d.descuentos)}</td></tr>`:''}
-      <tr style="border-top:2px solid #333"><td style="padding:6px 0;font-weight:800">TOTAL</td><td style="text-align:right;font-weight:800">${CLP(total)}</td></tr>
+      ${retJ?`<tr><td style="padding:4px 0">Retención judicial por pensión de alimentos${ritTxt?' ('+ritTxt+')':''}, que se deposita al alimentario</td><td style="text-align:right">−${CLP(retJ)}</td></tr>`:''}
+      <tr style="border-top:2px solid #333"><td style="padding:6px 0;font-weight:800">${retJ?'TOTAL A PAGAR AL TRABAJADOR':'TOTAL'}</td><td style="text-align:right;font-weight:800">${CLP(total)}</td></tr>
     </table>`;
   const p = k => T[k] ? `<p>${fqTpl(T[k], vars)}</p>` : '';
+  const alim = d.jud_revisado ? p(d.tiene_retencion_judicial ? 'finiq_alim_si' : 'finiq_alim_no') : '';   // finiquitos anteriores al 01-10-2026: sin declaración
   const marca = opts.borrador ? `<div style="text-align:center;color:#b91c1c;font-weight:800;letter-spacing:2px;border:2px dashed #b91c1c;padding:4px;margin-bottom:12px">VISTA PREVIA — BORRADOR (no cerrado)</div>` : '';
   let html = `<div class="fq-hoja">${cabecera}${marca}
     <div style="text-align:center;font-weight:800;font-size:17px;margin-bottom:22px">FINIQUITO DE CONTRATO DE TRABAJO</div>
-    ${p('finiq_encabezado')}${p('finiq_c1')}${p('finiq_c2')}${tabla}${p('finiq_c3')}${p('finiq_c4')}${p('finiq_c5')}${p('finiq_c6')}
+    ${p('finiq_encabezado')}${p('finiq_c1')}${p('finiq_c2')}${tabla}${p('finiq_c3')}${p('finiq_c4')}${alim}${p('finiq_c5')}${p('finiq_c6')}
     <div style="display:flex;justify-content:space-between;margin-top:80px;text-align:center;font-size:13px">
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">EMPLEADOR<br>${vars.empresa}${(d.firmante||T.finiq_representante)?`<br><span style="font-size:11.5px">p.p. ${vars.representante}${vars.cargo_representante?'<br>'+vars.cargo_representante:''}</span>`:''}</div>
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">TRABAJADOR<br>${vars.trabajador}<br><span style="font-size:11.5px">${vars.rut}</span></div>
@@ -512,7 +534,8 @@ function finiquitoHTML(f, d, opts){
 }
 /* Hoja adicional: cómo se calculó (fuente de la base, meses, topes, años, feriado, préstamos) */
 function fqAnexoHTML(f, d, vars){
-  const fuente = { MOTOR:'promedio de lo percibido en los últimos 3 meses completos trabajados (art. 71 CT; ORD. DT 5424/250, 495/2016 y 77/2025), según las liquidaciones emitidas por el sistema', AVSOFT:'promedio de lo percibido en los últimos 3 meses completos trabajados (art. 71 CT; ORD. DT 5424/250, 495/2016 y 77/2025), según el Libro de Remuneraciones (AVSOFT)', ESTIMADA:'estimación: sueldo base × 1,25 (no hay liquidaciones registradas)' }[d.base_fuente] || 'según liquidaciones';
+  const fuente = { MOTOR:'promedio de lo percibido en los últimos 3 meses completos trabajados (art. 71 CT; ORD. DT 5424/250, 495/2016 y 77/2025), según las liquidaciones emitidas por el sistema', AVSOFT:'promedio de lo percibido en los últimos 3 meses completos trabajados (art. 71 CT; ORD. DT 5424/250, 495/2016 y 77/2025), según el Libro de Remuneraciones (AVSOFT)', ESTIMADA:'estimación: sueldo base × 1,25 + colación y movilización de la ficha (no hay liquidaciones registradas)' }[d.base_fuente] || 'según liquidaciones';
+  const con172 = (d.base_meses||[]).some(m=>m.base_172!=null);   // finiquitos calculados desde el 01-10-2026
   const meses = (d.base_meses||[]).slice().sort((a,b)=>a.mes<b.mes?-1:1);
   const mesTxt = m => { const [y,mm]=String(m).split('-'); return ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][Number(mm)-1]+'-'+y; };
   const tr = (a,b) => `<tr><td style="padding:3px 0">${a}</td><td style="text-align:right;white-space:nowrap">${b}</td></tr>`;
@@ -521,14 +544,17 @@ function fqAnexoHTML(f, d, vars){
   return `<div class="fq-hoja">${cabecera}
     <div style="text-align:center;font-weight:800;font-size:15px;margin-bottom:6px">ANEXO — DETALLE DEL CÁLCULO DEL FINIQUITO</div>
     <div style="text-align:center;font-size:12.5px;color:#555;margin-bottom:14px">${vars.trabajador} · ${vars.rut} · término ${vars.fecha_termino}</div>
-    ${sec('1. Base de remuneración', (meses.some(m=>m.con_apertura) ? fqAperturaHTML(meses) : (meses.length?meses.map(m=>tr('Imponible '+mesTxt(m.mes), CLP(m.imponible))).join(''):'')) + tr('<i>'+fuente+'</i>','') + tr('<b>Base (promedio)</b>','<b>'+CLP(d.base||0)+'</b>')
+    ${sec('1. Base de remuneración', (meses.some(m=>m.con_apertura) ? fqAperturaHTML(meses) : (meses.length?meses.map(m=>tr('Imponible '+mesTxt(m.mes)+(m.excluidos?` − ${CLP(m.excluidos)} horas extras y aguinaldos`:'')+(m.no_imponibles?` + ${CLP(m.no_imponibles)} colación y movilización`:''), CLP(m.base_172!=null?m.base_172:m.imponible))).join(''):'')) + tr('<i>'+fuente+'</i>','')
+      + (con172?tr('<i>Indemnizaciones: "última remuneración mensual" del art. 172 CT (DT, dictamen 75/8 de 1999) — incluye colación y movilización habituales; no incluye horas extraordinarias ni aguinaldos</i>',''):'')
+      + tr('<b>Base (promedio)</b>','<b>'+CLP(d.base||0)+'</b>')
       + (d.tope_uf?tr(`Tope legal ${d.tope_uf_n||90} UF × UF ${CLP(Math.round(d.uf||0))}`, CLP(d.tope_uf)) + tr('Base topada (art. 172)', CLP(d.base_topada||d.base||0)):''))}
     ${sec('2. Indemnización por años de servicio', tr('Años de servicio', anosCalc) + (d.causal_indemniza?tr(`${d.anos||0} × ${CLP(d.base_topada||d.base||0)}`, CLP(d.indemnizacion_anos||0)):tr('<i>No corresponde por la causal (art. '+vars.causal_articulo+')</i>', CLP(d.indemnizacion_anos||0))))}
     ${sec('3. Indemnización sustitutiva del aviso previo', d.causal_mes_aviso ? (d.avisado?tr('<i>Avisado con 30 días de anticipación: no corresponde</i>', CLP(d.mes_aviso||0)):tr('1 remuneración (base topada)', CLP(d.mes_aviso||0))) : tr('<i>No corresponde por la causal</i>', CLP(d.mes_aviso||0)))}
     ${sec('4. Feriado proporcional (art. 73)', tr('Saldo de vacaciones a la fecha de término', (d.vac_dias_habiles||0)+' días hábiles') + tr(`+ ${d.vac_inhabiles!=null?d.vac_inhabiles:'—'} inhábiles (sábados, domingos y festivos) proyectados desde el día siguiente al término${d.vac_hasta?' hasta el '+String(d.vac_hasta).split('-').reverse().join('-'):''}`, (d.vac_dias_corridos||0)+' días corridos') + (d.base_feriado!=null && d.base_feriado!==d.base ? tr('Base del feriado: promedio sin gratificación mensual (dictamen DT 836/046)', CLP(d.base_feriado)) : '') + tr(`${d.vac_dias_corridos||0} × ${CLP(d.base_feriado!=null?d.base_feriado:(d.base||0))} / 30`, CLP(d.vac_monto||0)))}
     ${d.otros_haberes?sec('5. Otros haberes', tr('Ingresado por RRHH', CLP(d.otros_haberes))):''}
     ${sec('6. Descuentos', ((d.prestamos_detalle||[]).map(p=>tr(`${p.tipo} #${p.id} — ${p.cuotas_pendientes} cuota/s pendiente/s`, CLP(p.saldo))).join('')) + tr('<b>Total descuentos</b>','<b>−'+CLP(d.descuentos||0)+'</b>'))}
-    ${sec('TOTAL FINIQUITO', tr('<b>Haberes − descuentos</b>','<b>'+CLP(Number(f.total)||0)+'</b>'))}
+    ${(d.retenciones_judiciales||[]).length?sec('7. Retención judicial por pensión de alimentos (art. 13 Ley 14.908)', d.retenciones_judiciales.map(r=>tr(`<b>${r.rit?'RIT '+esc(r.rit):'Causa'}${r.tribunal?' · '+esc(r.tribunal):''}</b>${r.beneficiario?' — '+esc(r.beneficiario):''}: pensión mensual`, CLP(r.pension_mensual||0)) + tr('Del aviso previo: la pensión del mes siguiente al término', CLP(r.ret_aviso||0)) + tr(`De los años de servicio: ${String(r.pct||0).replace('.',',')}% (pensión ÷ base ${CLP(d.base||0)})`, CLP(r.ret_anos||0))).join('') + tr('<b>Total retenido — se deposita al alimentario</b>','<b>−'+CLP(d.retencion_judicial||0)+'</b>') + (d.aviso_tribunal_hasta?tr('<i>Plazo para informar al tribunal el término de la relación laboral: '+String(d.aviso_tribunal_hasta).split('-').reverse().join('-')+' (10 días hábiles)</i>',''):'')):''}
+    ${sec(d.retencion_judicial?'TOTAL A PAGAR AL TRABAJADOR':'TOTAL FINIQUITO', tr('<b>Haberes − descuentos'+(d.retencion_judicial?' − retención judicial':'')+'</b>','<b>'+CLP(Number(f.total)||0)+'</b>'))}
     <p style="font-size:11px;color:#777;margin-top:24px">Anexo informativo generado por el Business Suite: no forma parte del finiquito ratificado. Base y topes según el mantenedor de RRHH vigente al cierre.</p></div>`;
 }
 /* Apertura del imponible de cada mes (sueldo, comisiones, semana corrida, gratificación, otros) — Pato 14-09-2026 */
@@ -540,6 +566,9 @@ function fqAperturaHTML(meses){
     <tr style="border-bottom:1px solid #999"><th style="text-align:left;padding:2px 0">Concepto</th>${meses.map(m=>`<th ${td}>${mesTxt(m.mes)}</th>`).join('')}</tr>
     ${filas.filter(([,k])=>meses.some(m=>m[k])).map(([l,k])=>`<tr><td style="padding:2px 0">${l}</td>${meses.map(m=>`<td ${td}>${m[k]?CLP(m[k]):'—'}</td>`).join('')}</tr>`).join('')}
     <tr style="border-top:1px solid #999"><td style="padding:2px 0"><b>Total imponible</b></td>${meses.map(m=>`<td ${td}><b>${CLP(m.imponible)}</b></td>`).join('')}</tr>
+    ${meses.some(m=>m.excluidos)?`<tr><td style="padding:2px 0">− Horas extras y aguinaldos (no entran en la base de las indemnizaciones)</td>${meses.map(m=>`<td ${td}>${m.excluidos?'−'+CLP(m.excluidos):'—'}</td>`).join('')}</tr>`:''}
+    ${meses.some(m=>m.no_imponibles)?`<tr><td style="padding:2px 0">+ Colación y movilización habituales</td>${meses.map(m=>`<td ${td}>${m.no_imponibles?CLP(m.no_imponibles):'—'}</td>`).join('')}</tr>`:''}
+    ${meses.some(m=>m.base_172!=null)?`<tr style="border-top:1px solid #999"><td style="padding:2px 0"><b>Remuneración para indemnizaciones (art. 172)</b></td>${meses.map(m=>`<td ${td}><b>${CLP(m.base_172!=null?m.base_172:m.imponible)}</b></td>`).join('')}</tr>`:''}
     <tr><td colspan="${meses.length+1}" style="padding:4px 0 0;font-size:10.5px;color:#666">Comisiones, semana corrida y bonos según lo pagado en cada mes (mes vencido). Las comisiones devengadas que aún no se pagaron a la fecha del término se liquidan aparte (ORD. DT 77/2025).</td></tr>
   </table></td></tr>`;
 }

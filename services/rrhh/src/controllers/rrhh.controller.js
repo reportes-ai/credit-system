@@ -568,6 +568,8 @@ const setConfigApi = async (req, res) => {
     const PERMITIDAS = ['cert_min_meses', 'cert_cooldown_dias', 'cert_cuerpo', 'cert_cierre', 'cumple_popup_activo', 'cumple_campana_activo', 'cumple_musica', 'cumple_titulo', 'cumple_linea1', 'cumple_linea2', 'cumple_aviso_titulo', 'cumple_aviso_msg', 'cumple_aviso_tarde', 'cumple_dias_tope', 'cumple_midia_dias', 'cumple_banner_dur', 'cumple_banner_sonido',
       // Texto del finiquito (mantenedor Saludos y Certificados RRHH → card Finiquito)
       'finiq_encabezado', 'finiq_c1', 'finiq_c2', 'finiq_c3', 'finiq_c4', 'finiq_c5', 'finiq_c6', 'finiq_pie', 'finiq_anexo',
+      // Declaración de pensión de alimentos (art. 13 Ley 14.908) y listas de la base de las indemnizaciones (art. 172 CT)
+      'finiq_alim_no', 'finiq_alim_si', 'finiq_base_excluye', 'finiq_base_no_imp',
       // Avisos de prelación de descuentos (24-09-2026): a la Caja / al trabajador cuando la cuota no cabe en la liquidación
       'aviso_prelacion_caja', 'aviso_prelacion_empresa'];
     for (const [k, v] of Object.entries(b)) {

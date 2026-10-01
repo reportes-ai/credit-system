@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LRE — Libro de Remuneraciones Electrónico — AutoFácil</title>
-  <!-- v1.0 — CSV oficial DT (Manual LRE): headers = códigos de concepto, separador ';', rutempleador_aaaamm.csv -->
+  <!-- v1.1 — cada concepto en su código (2102, 2104, 2108, 2110, 3110, 3186, 3188, 3156), jornada/pensionado/vacaciones/término desde la ficha y el finiquito, nombre del código al pasar el mouse y avisos de cuadratura. v1.0 — CSV oficial DT (Manual LRE): headers = códigos de concepto, separador ';', rutempleador_aaaamm.csv -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -37,6 +37,7 @@
     <button class="btn btn-sm btn-success" id="btnCsv" onclick="descargar()" disabled><i class="bi bi-download me-1"></i>Descargar CSV para la DT</button>
   </div>
 
+  <div id="avisos" style="display:none;background:#fef2f2;border-left:4px solid #dc2626;border-radius:8px;padding:10px 14px;font-size:.8rem;margin-bottom:14px"></div>
   <div class="panel" style="max-height:65vh"><table id="tabla">
     <thead id="thead"></thead><tbody id="tbody"><tr><td class="text-muted p-3">Elige un mes</td></tr></tbody>
   </table></div>
@@ -45,7 +46,8 @@
     <b><i class="bi bi-exclamation-triangle me-1"></i>Antes de subir a la DT:</b>
     <ul class="mb-0 mt-1">
       <li><b>Fuente MOTOR</b> = liquidaciones emitidas en el Suite (desglose completo por concepto). <b>Fuente AVSOFT</b> = auxiliar importado, referencial: el desglose fino de haberes (gratificación vs bonos) no viene en el export, así que el resto imponible va en el código 2113 — para declarar oficialmente esos meses usa el LRE de AVSOFT.</li>
-      <li>Supuestos parametrizados por defecto: región 13 / comuna Las Condes (13114), jornada ordinaria Art. 22 (101), CCAF Los Andes, Mutual CCHC, AFC afiliado. Si algún trabajador difiere, corrige la celda en el CSV antes de subir.</li>
+      <li>Cada concepto va en su código (pasa el mouse por la columna para ver el nombre): horas extras 2102, semana corrida 2104, remuneración variable de vacaciones 2108, aguinaldo 2110; crédito social de la Caja 3110, pensión de alimentos 3186, anticipos y préstamos 3188, APV 3156. La <b>jornada</b> (101 ordinaria · 201 parcial · 701 exenta art. 22) sale de <a href="/recursos-humanos/jornada/">Jornada Laboral</a>, el <b>pensionado</b> de la ficha, los <b>días de vacaciones</b> de las vacaciones aprobadas y el <b>término de contrato</b> con su causal del finiquito.</li>
+      <li>Supuestos fijos: región 13 / comuna Las Condes (13114), CCAF Los Andes, Mutual CCHC. Si algún trabajador difiere, corrige la celda en el CSV antes de subir.</li>
       <li>Compara el primer archivo contra el último LRE subido por AVSOFT (como hicimos con el F29) antes de usarlo oficialmente.</li>
     </ul>
   </div>
@@ -64,12 +66,15 @@ async function cargar(){
   const r = await fetch('/api/contabilidad/lre?mes='+fMes.value,{headers:H});
   const j = await r.json();
   if (!j.success){ D=null; btnCsv.disabled=true; lblFuente.innerHTML='';
-    thead.innerHTML=''; tbody.innerHTML=`<tr><td class="text-muted p-3">${esc(j.error)}</td></tr>`; return; }
+    avisos.style.display='none'; thead.innerHTML=''; tbody.innerHTML=`<tr><td class="text-muted p-3">${esc(j.error)}</td></tr>`; return; }
   D = j.data; btnCsv.disabled = false;
   lblFuente.innerHTML = D.fuente==='MOTOR'
     ? '<span class="pill" style="background:#dcfce7;color:#15803d">FUENTE: MOTOR PROPIO (liquidaciones emitidas)</span>'
     : '<span class="pill" style="background:#fef3c7;color:#92400e">FUENTE: AVSOFT importado — referencial</span>';
-  thead.innerHTML = '<tr><th>Trabajador</th>' + D.columnas.map(c=>`<th>${c}</th>`).join('') + '</tr>';
+  const T = D.titulos || {}, av = D.avisos || [];
+  avisos.style.display = av.length ? '' : 'none';
+  avisos.innerHTML = av.length ? '<b><i class="bi bi-exclamation-octagon me-1"></i>Revisar antes de subir:</b><br>' + av.map(a=>'• '+esc(a)).join('<br>') : '';
+  thead.innerHTML = '<tr><th>Trabajador</th>' + D.columnas.map(c=>`<th title="${esc(T[c]||'')}">${c}</th>`).join('') + '</tr>';
   tbody.innerHTML = D.filas.map(f=>`<tr><td>${esc(f._nombre||'')}</td>` +
     D.columnas.map(c=>`<td>${esc(f[c] ?? '')}</td>`).join('') + '</tr>').join('');
 }

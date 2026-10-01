@@ -303,14 +303,19 @@ exports.getContratos = async (req, res) => {
 
 /* ─────────────────────────────────────────────────────────────────────────────
    FINIQUITOS (anti-Buk #3) — cálculo sobre los motores existentes:
-   · Base = última remuneración imponible (promedio 3 últimas EMITIDAS si hay
-     variables), topada a 90 UF (art. 172 CT) — la propuesta es de fórmula y
-     RRHH la puede ajustar antes de guardar (filosofía campos forzados).
+   · Base = "última remuneración mensual" del art. 172 CT (promedio de los 3 últimos
+     meses completos): imponible + colación y movilización habituales − horas extras
+     y aguinaldos (motor único base-remuneracion.js), topada a 90 UF — la propuesta es
+     de fórmula y RRHH la puede ajustar antes de guardar (filosofía campos forzados).
    · Indemnización años de servicio: 1 mes por año, fracción ≥6 meses = 1 año,
      tope paramétrico (default 11) — solo si la causal la lleva.
    · Mes de aviso: si la causal lo lleva y NO se avisó con 30 días.
    · Feriado proporcional: devengado − usado (misma matemática del módulo
-     Vacaciones), en días corridos (hábiles × 1,4), valor día = base/30.
+     Vacaciones); los hábiles se proyectan en el calendario desde el día siguiente
+     al término (sábados, domingos y festivos incluidos), valor día = base del feriado/30.
+   · Retención judicial por pensión de alimentos (art. 13 Ley 14.908): del aviso previo,
+     la pensión del mes siguiente; de los años de servicio, el % que la pensión es del
+     ingreso mensual. Se deposita al alimentario con su propia orden de pago.
    ───────────────────────────────────────────────────────────────────────────── */
 const { getUF } = require('../../../../shared/uf');
 
@@ -367,10 +372,60 @@ require('../../../../shared/migrate').enFila('rrhh-finiquitos', async () => {
     ['finiq_c6', '<b>SEXTO.</b> El presente finiquito se firma y ratifica ante ministro de fe, de conformidad con el artículo 177 del Código del Trabajo, en dos ejemplares del mismo tenor y fecha, quedando uno en poder de cada parte.'],
     ['finiq_pie', 'Ratificado ante ministro de fe: ______________________________ Fecha: ____/____/________'],
     ['finiq_anexo', '1'],
+    /* Declaración sobre pensión de alimentos (art. 13 Ley 14.908, Ley 21.389): va entre el CUARTO y el QUINTO.
+       Variables propias: {rit} {tribunal_txt} {retencion} {retencion_txt}. Vacía = no se imprime. */
+    ['finiq_alim_no', '<b>Pensión de alimentos.</b> El Empleador declara que, a esta fecha, no ha sido notificado de resolución judicial alguna que le ordene retener pensiones de alimentos de las remuneraciones o indemnizaciones del Trabajador (artículo 13 de la Ley N° 14.908).'],
+    ['finiq_alim_si', '<b>Pensión de alimentos.</b> El Empleador declara que se encuentra notificado de la retención judicial por pensión de alimentos decretada respecto del Trabajador en la causa {rit}{tribunal_txt}. {retencion_txt}'],
+    /* Base de las indemnizaciones (art. 172 CT) — listas separadas por coma, se comparan por "contiene":
+       conceptos imponibles que NO entran (horas extras y lo esporádico) y no imponibles habituales que SÍ entran
+       además de la colación y la movilización de la ficha. Motor: services/rrhh/src/base-remuneracion.js */
+    ['finiq_base_excluye', 'HORAS EXTRAS,AGUINALDO,BONO NAVIDAD,BONO VACACIONES'],
+    ['finiq_base_no_imp', ''],
   ];
   for (const [k, v] of T) await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES (?,?)`, [k, v]);
   console.log('[rrhh-finiquitos] listo');
 });
+
+/* Descuentos vigentes del trabajador, separados: retenciones judiciales (pensión de alimentos / orden de tribunal)
+   y todo lo demás. Una sola clasificación: la de tope-descuento.js (lista paramétrica rem_dcto_judiciales). */
+async function judicialesDe(idU) {
+  const TD = require('../tope-descuento'); const T = await TD.topes();
+  const [rows] = await pool.query(`SELECT * FROM rh_descuentos WHERE id_usuario=? AND estado='VIGENTE'`, [idU]);
+  const esJ = d => TD.categoriaDe(d.tipo, d.subtipo, T) === 'JUDICIAL';
+  return { jud: rows.filter(esJ), otros: rows.filter(d => !esJ(d)) };
+}
+const difMesFq = (a, b) => (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + (Number(b.slice(5, 7)) - Number(a.slice(5, 7)));
+/* La retención judicial NO se anula con el finiquito: la pensión del mes del término todavía se retiene en la última
+   liquidación. Queda con su última cuota en ese mes (un PERMANENTE con cuotas > 0 termina solo) y lo que corresponde a
+   las indemnizaciones lo retiene el finiquito. mesAnterior: mes de término que tenía el finiquito antes de recalcular. */
+async function toparJudiciales(req, jud, fechaT, idFiniq, mesAnterior) {
+  const mesFin = String(fechaT).slice(0, 7);
+  for (const d of jud) {
+    const cap = difMesFq(String(d.mes_inicio), mesFin) + 1;
+    if (cap <= 0) {   // partía después del término: nunca alcanzó a descontarse
+      await pool.query(`UPDATE rh_descuentos SET estado='ANULADO', anulado_por=?, anulado_at=NOW() WHERE id=? AND estado='VIGENTE'`, [`Finiquito #${idFiniq}`, d.id]);
+      continue;
+    }
+    const act = Number(d.cuotas) || 0;
+    const capPrevio = mesAnterior ? difMesFq(String(d.mes_inicio), mesAnterior) + 1 : null;
+    if (act === 0 || act > cap || (capPrevio != null && act === capPrevio && act !== cap)) {
+      await pool.query('UPDATE rh_descuentos SET cuotas=? WHERE id=?', [cap, d.id]);
+      auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_descuentos', entidad_id: d.id,
+        detalle: `Retención judicial ${d.jud_rit ? 'RIT ' + d.jud_rit : (d.subtipo || '')}: última cuota en ${mesFin} por el finiquito #${idFiniq} (no se anula: la pensión del mes del término se retiene en la última liquidación)` });
+    }
+  }
+}
+/* Art. 13 Ley 14.908: el empleador debe dar cuenta al tribunal del término de la relación laboral dentro de 10 días
+   hábiles. Queda como tarea del offboarding, con su fecha límite, una por causa. */
+async function tareaAvisoTribunal(idProceso, jud, fechaT) {
+  if (!idProceso || !jud.length) return;
+  const limite = require('../../../../shared/feriados').proximosDiasHabiles(String(fechaT).slice(0, 10), 10).pop() || null;
+  for (const d of jud) {
+    const tarea = `Informar al tribunal el término de la relación laboral — ${d.jud_rit ? 'RIT ' + d.jud_rit : (d.subtipo || 'retención judicial')}${d.jud_tribunal ? ' · ' + d.jud_tribunal : ''} (art. 13 Ley 14.908: 10 días hábiles)`.slice(0, 250);
+    const [[ya]] = await pool.query('SELECT id FROM rh_onb_items WHERE id_proceso=? AND tarea=?', [idProceso, tarea]);
+    if (!ya) await pool.query('INSERT INTO rh_onb_items (id_proceso, orden, tarea, responsable, fecha_limite) VALUES (?,?,?,?,?)', [idProceso, 0, tarea, 'RRHH', limite]);
+  }
+}
 
 exports.finiquitoColaboradores = async (req, res) => {
   try {
@@ -426,7 +481,12 @@ exports.finiquitoCalcular = async (req, res) => {
     const mesesTxt = bd.meses.map(m => m.split('-').reverse().join('-')).join(', ');
     if (bd.fuente === 'MOTOR') avisos.push(`Base = promedio de las últimas ${bd.meses.length} liquidaciones emitidas (${mesesTxt}).`);
     else if (bd.fuente === 'AVSOFT') avisos.push(`Base = promedio del imponible de ${mesesTxt} según el Libro de Remuneraciones de AVSOFT (Contabilidad › Auxiliares › Remuneraciones); incluye comisiones.`);
-    else avisos.push('Sin liquidaciones emitidas ni Libro de Remuneraciones cargado: base estimada = sueldo base + 25% de gratificación. Revísala y ajústala.');
+    else avisos.push('Sin liquidaciones emitidas ni Libro de Remuneraciones cargado: base estimada = sueldo base + 25% de gratificación + colación y movilización de la ficha. Revísala y ajústala.');
+    // Art. 172: la base ya no es el imponible a secas (01-10-2026) — entra lo habitual no imponible, sale lo esporádico
+    const sumBD = k => (bd.detalle || []).reduce((s, x) => s + (Number(x[k]) || 0), 0), nBD = (bd.detalle || []).length;
+    const noImpProm = nBD ? Math.round(sumBD('no_imponibles') / nBD) : (Number(bd.no_imponibles) || 0);
+    if (noImpProm > 0) avisos.push(`La base de las indemnizaciones incluye ${CLP(noImpProm)} de colación y movilización habituales (art. 172 CT).`);
+    if (sumBD('excluidos') > 0) avisos.push(`Se dejaron fuera de la base ${CLP(sumBD('excluidos'))} de horas extras y aguinaldos pagados en esos meses (art. 172 CT)${bd.fuente === 'AVSOFT' ? ' — según lo registrado en Adicionales de Remuneración: el libro de AVSOFT no los separa' : ''}.`);
     const [[cfgA]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_tope_anos'");
     const [[cfgU]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_tope_uf'");
     const topeAnos = parseInt(cfgA?.valor) || 11, topeUFn = parseFloat(cfgU?.valor) || 90;
@@ -479,9 +539,45 @@ exports.finiquitoCalcular = async (req, res) => {
     if (saldoPrestamos > 0)
       avisos.push(`Tiene ${prestamosDetalle.length} anticipo/préstamo vigente con saldo pendiente de ${CLP(saldoPrestamos)} (${prestamosDetalle.map(p => p.tipo + ' #' + p.id + ': ' + CLP(p.saldo)).join(', ')}) — precargado en Descuentos según el convenio firmado.`);
 
+    /* RETENCIÓN JUDICIAL POR PENSIÓN DE ALIMENTOS (art. 13 Ley 14.908, modificado por la Ley 21.389; 01-10-2026).
+       Al término de la relación laboral el empleador debe retener, para pagarlo al alimentario:
+         · de la indemnización sustitutiva del aviso previo: la pensión del mes siguiente al término;
+         · de la indemnización por años de servicio: el porcentaje que la pensión representa en el ingreso mensual.
+       Y dar cuenta al tribunal del término dentro de 10 días hábiles. No hacerlo: multa del doble de lo que debió
+       retenerse y responsabilidad solidaria. La propuesta es de fórmula (ingreso mensual = la base sin topar);
+       RRHH la puede ajustar antes de guardar. */
+    const retenciones = []; let avisoTribunalHasta = null, tieneJudicial = false;
+    try {
+      const { jud } = await judicialesDe(idU);
+      tieneJudicial = jud.length > 0;
+      if (jud.length) {
+        const rem = require('./remuneraciones.controller');
+        const [yT, mT] = fechaT.split('-').map(Number);
+        const mesSigT = `${mT === 12 ? yT + 1 : yT}-${String(mT === 12 ? 1 : mT + 1).padStart(2, '0')}`;
+        avisoTribunalHasta = require('../../../../shared/feriados').proximosDiasHabiles(fechaT, 10).pop() || null;
+        let restoAviso = mesAviso, restoAnos = indemAnos;
+        for (const d of jud) {
+          const pension = Math.round(await rem.valorCuotaCLP(d, mesSigT));
+          // Motor puro (lo anclan las pruebas): shared/finiquito-base.js → retencionAlimentos
+          const rt = require('../../../../shared/finiquito-base').retencionAlimentos({ pension, base, mesAviso, indemAnos, topeAviso: restoAviso, topeAnos: restoAnos });
+          restoAviso -= rt.ret_aviso; restoAnos -= rt.ret_anos;
+          retenciones.push({ id_descuento: d.id, rit: d.jud_rit || null, tribunal: d.jud_tribunal || null, beneficiario: d.ben_nombre || null,
+            pension_mensual: pension, pct: rt.pct, ret_aviso: rt.ret_aviso, ret_anos: rt.ret_anos, total: rt.total,
+            con_cuenta: !!(d.ben_rut && d.ben_numero_cuenta) });
+        }
+        const fT = s => String(s || '').split('-').reverse().join('-');
+        for (const x of retenciones) avisos.push(x.total > 0
+          ? `Retención judicial ${x.rit ? 'RIT ' + x.rit : ''}: se retienen ${CLP(x.total)} para el alimentario — ${CLP(x.ret_aviso)} del aviso previo (pensión del mes siguiente: ${CLP(x.pension_mensual)}) y ${CLP(x.ret_anos)} de los años de servicio (${String(x.pct).replace('.', ',')}% = pensión ÷ base) — art. 13 Ley 14.908.${x.con_cuenta ? '' : ' Faltan los datos de la cuenta del beneficiario en Descuentos: sin ellos no se emite la orden de pago.'}`
+          : `Tiene retención judicial ${x.rit ? 'RIT ' + x.rit : ''} (pensión ${CLP(x.pension_mensual)}): este finiquito no lleva indemnizaciones sobre las que retener; la pensión del mes del término se retiene en su última liquidación.`);
+        avisos.push(`Hay que informar al tribunal el término de la relación laboral a más tardar el ${fT(avisoTribunalHasta)} (10 días hábiles, art. 13 Ley 14.908): queda como tarea en el offboarding.`);
+      }
+    } catch (e) { console.error('[finiquito retención judicial]', e.message); avisos.push('No se pudo calcular la retención judicial por pensión de alimentos: revísala a mano antes de cerrar (art. 13 Ley 14.908).'); }
+    const retencionJudicial = retenciones.reduce((s, x) => s + x.total, 0);
+
     ok(res, {
       descuentos_prestamos: saldoPrestamos, prestamos_detalle: prestamosDetalle,
-      colaborador: u, causal: cau, uf, base, base_topada: baseTopada, base_feriado: baseFeriado,
+      retencion_judicial: retencionJudicial, retenciones_judiciales: retenciones, tiene_retencion_judicial: tieneJudicial, aviso_tribunal_hasta: avisoTribunalHasta,
+      colaborador: u, causal: cau, uf, base, base_topada: baseTopada, base_feriado: baseFeriado, base_imponible: bd.base_imponible,
       // Trazabilidad para el anexo "cómo se calculó" del documento impreso
       base_fuente: bd.fuente, base_meses: bd.detalle || [], sueldo_base: Number(u.sueldo_base) || 0,
       tope_anos: topeAnos, tope_uf_n: topeUFn, tope_uf: topeUF, avisado,
@@ -500,8 +596,9 @@ exports.finiquitoGuardar = async (req, res) => {
     const idU = parseInt(b.id_usuario);
     if (!idU || !b.fecha_termino || !b.causal) return fail(res, 'Faltan datos', 400);
     const detalle = b.detalle || {};
+    // total = lo que recibe el TRABAJADOR: la retención judicial sobre las indemnizaciones se deposita al alimentario
     const total = ['indemnizacion_anos', 'mes_aviso', 'vac_monto', 'otros_haberes'].reduce((s, k) => s + (parseInt(detalle[k]) || 0), 0)
-      - (parseInt(detalle.descuentos) || 0);
+      - (parseInt(detalle.descuentos) || 0) - (parseInt(detalle.retencion_judicial) || 0);
     const [r] = await pool.query(
       `INSERT INTO rh_finiquitos (id_usuario, trabajador, rut, cargo, fecha_ingreso, fecha_termino, causal, causal_glosa, detalle, total, creado_por)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
@@ -513,16 +610,24 @@ exports.finiquitoGuardar = async (req, res) => {
     // Asiento y ODP: recién al CERRAR (Pato, 15-09-2026) — mientras se discute el monto no
     // debe existir una orden de pago viva ni un comprobante contable. Ver efectosDeCierre().
     // Offboarding automático desde la fecha de término
-    try { await crearProceso({ tipo: 'OFFBOARDING', persona: b.trabajador, rut: b.rut, id_usuario: idU,
+    let idProceso = null;
+    try { idProceso = await crearProceso({ tipo: 'OFFBOARDING', persona: b.trabajador, rut: b.rut, id_usuario: idU,
       id_ref: r.insertId, fecha_base: b.fecha_termino, creado_por: req.usuario.id_usuario }); } catch (e) { console.error('[offb auto]', e.message); }
     // Baja de sus créditos internos: el saldo pendiente de anticipos/préstamos ya vino
     // descontado en el finiquito → las cuotas futuras se anulan para no seguir cobrando
     try {
-      const [rd] = await pool.query(
-        `UPDATE rh_descuentos SET estado='ANULADO', anulado_por=?, anulado_at=NOW()
-          WHERE id_usuario=? AND estado='VIGENTE'`, [`Finiquito #${r.insertId}`, idU]);
-      if (rd.affectedRows) auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_descuentos', entidad_id: idU,
-        detalle: `${rd.affectedRows} descuento(s) interno(s) dado(s) de baja por finiquito #${r.insertId} (saldo cobrado en el finiquito)` });
+      // Las retenciones judiciales NO se anulan (antes se iban con todo lo demás y la pensión del mes del término
+      // quedaba sin retener en la última liquidación): quedan con su última cuota en ese mes. Ver toparJudiciales().
+      const { jud, otros } = await judicialesDe(idU);
+      if (otros.length) {
+        const [rd] = await pool.query(
+          `UPDATE rh_descuentos SET estado='ANULADO', anulado_por=?, anulado_at=NOW()
+            WHERE id IN (?) AND estado='VIGENTE'`, [`Finiquito #${r.insertId}`, otros.map(d => d.id)]);
+        if (rd.affectedRows) auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_descuentos', entidad_id: idU,
+          detalle: `${rd.affectedRows} descuento(s) interno(s) dado(s) de baja por finiquito #${r.insertId} (saldo cobrado en el finiquito)` });
+      }
+      await toparJudiciales(req, jud, b.fecha_termino, r.insertId);
+      await tareaAvisoTribunal(idProceso, jud, b.fecha_termino);
     } catch (e) { console.error('[finiquito baja descuentos]', e.message); }
     // La fecha de término del finiquito MANDA sobre la fecha de baja del usuario (fuente única):
     // si lo dieron de baja a mano antes con otra fecha, el libro contaba días de más (Fernando:
@@ -561,8 +666,9 @@ exports.finiquitoActualizar = async (req, res) => {
     if (fq.cerrado_at) return fail(res, 'El finiquito está CERRADO: no se puede recalcular ni editar.', 409);
     if (!b.fecha_termino || !b.causal) return fail(res, 'Faltan datos', 400);
     const detalle = b.detalle || {};
+    // total = lo que recibe el TRABAJADOR: la retención judicial sobre las indemnizaciones se deposita al alimentario
     const total = ['indemnizacion_anos', 'mes_aviso', 'vac_monto', 'otros_haberes'].reduce((s, k) => s + (parseInt(detalle[k]) || 0), 0)
-      - (parseInt(detalle.descuentos) || 0);
+      - (parseInt(detalle.descuentos) || 0) - (parseInt(detalle.retencion_judicial) || 0);
     await pool.query(
       `UPDATE rh_finiquitos SET fecha_termino=?, causal=?, causal_glosa=?, detalle=?, total=?, version=version+1, updated_at=NOW() WHERE id=?`,
       [b.fecha_termino, String(b.causal).slice(0, 20), String(b.causal_glosa || '').slice(0, 200), JSON.stringify(detalle), total, id]);
@@ -572,6 +678,13 @@ exports.finiquitoActualizar = async (req, res) => {
       if (rf.affectedRows) auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: String(fq.id_usuario),
         detalle: `Fecha de baja fijada al ${b.fecha_termino} por el finiquito #${id} recalculado` });
     } catch (e) { console.error('[finiquito upd fecha_baja]', e.message); }
+    // La última cuota de la retención judicial sigue al mes de término nuevo, y la tarea de aviso al tribunal a su plazo
+    try {
+      const { jud } = await judicialesDe(fq.id_usuario);
+      await toparJudiciales(req, jud, b.fecha_termino, id, String(require('../../../../shared/fecha-chile').isoFlex(fq.fecha_termino) || '').slice(0, 7) || null);
+      const [[proc]] = await pool.query(`SELECT id FROM rh_onb_procesos WHERE tipo='OFFBOARDING' AND id_ref=?`, [id]);
+      await tareaAvisoTribunal(proc && proc.id, jud, b.fecha_termino);
+    } catch (e) { console.error('[finiquito upd retención judicial]', e.message); }
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_finiquito', entidad_id: id,
       detalle: `Finiquito ${fq.trabajador} recalculado: ${CLP(Number(fq.total))} → ${CLP(total)} (v${(fq.version || 1) + 1})` });
     let odp = null, aviso = null;
@@ -586,10 +699,10 @@ exports.finiquitoActualizar = async (req, res) => {
       try {
         const [rc] = await pool.query(`UPDATE ctb_comprobantes SET estado='ANULADO', anulado_por=?, anulado_motivo=? WHERE origen='FINIQUITO_EMITIDO' AND origen_ref LIKE ? AND estado='CONTABILIZADO'`,
           [String(req.usuario?.nombre || req.usuario?.id_usuario || 'sistema'), `Finiquito #${id} recalculado (nuevo total ${CLP(total)})`, `FINIQ-${id}%`]);
-        if (rc.affectedRows && total > 0) await require('../../../contabilidad/src/motor-asientos').contabilizar({
+        if (rc.affectedRows && total + (parseInt(detalle.retencion_judicial) || 0) > 0) await require('../../../contabilidad/src/motor-asientos').contabilizar({
           evento: 'FINIQUITO_EMITIDO', fecha: b.fecha_termino,
           glosa: `Finiquito ${fq.trabajador} (art. ${b.causal}) v${(fq.version || 1) + 1}`, ref: `FINIQ-${id}-v${(fq.version || 1) + 1}`,
-          montos: { total },
+          montos: { total: total + (parseInt(detalle.retencion_judicial) || 0) },   // gasto completo: lo del trabajador + lo retenido para el alimentario
         });
       } catch (e) { console.error('[finiquito upd asiento]', e.message); }
     }
@@ -600,16 +713,23 @@ exports.finiquitoActualizar = async (req, res) => {
 /* Efectos de PAGO del finiquito, al CERRAR (Pato, 15-09-2026): asiento FINIQUITO_EMITIDO
    (gasto → Finiquitos por Pagar) y ODP con correlativo central + campana a Tesorería.
    Idempotente: si el finiquito venía del flujo anterior (ODP/asiento creados al guardar)
-   no se duplican. Devuelve el número de la ODP. */
+   no se duplican. Devuelve { odp, judiciales }.
+   RETENCIÓN JUDICIAL (art. 13 Ley 14.908, 01-10-2026): lo retenido de las indemnizaciones no es plata del
+   trabajador, se deposita al alimentario. El GASTO del finiquito es el total completo (lo que recibe el trabajador
+   + lo retenido) y queda en Finiquitos por Pagar; se paga con dos órdenes y las dos lo rebajan (FINIQUITO_PAGADO:
+   el concepto de ambas parte con "Finiquito"). */
 async function efectosDeCierre(req, fq, nombreUsuario) {
   const total = Number(fq.total) || 0, id = fq.id;
-  if (!(total > 0)) return null;
+  let det = {}; try { det = typeof fq.detalle === 'string' ? JSON.parse(fq.detalle) : (fq.detalle || {}); } catch (_) {}
+  const retTotal = Math.max(0, parseInt(det.retencion_judicial) || 0);
+  const out = { odp: null, judiciales: [] };
+  if (!(total + retTotal > 0)) return out;
   try {
     const [[ya]] = await pool.query(`SELECT 1 x FROM ctb_comprobantes WHERE origen='FINIQUITO_EMITIDO' AND origen_ref LIKE ? AND estado='CONTABILIZADO' LIMIT 1`, [`FINIQ-${id}%`]);
     if (!ya) await require('../../../contabilidad/src/motor-asientos').contabilizar({
       evento: 'FINIQUITO_EMITIDO', fecha: fq.fecha_termino,
       glosa: `Finiquito ${fq.trabajador} (art. ${fq.causal})`, ref: `FINIQ-${id}`,
-      montos: { total },
+      montos: { total: total + retTotal },
     });
   } catch (e) { console.error('[finiquito asiento]', e.message); }
   /* La provisión de indemnización que se venía acumulando mes a mes se libera acá: el gasto real
@@ -620,47 +740,111 @@ async function efectosDeCierre(req, fq, nombreUsuario) {
       `Finiquito #${id} cerrado al ${String(fq.fecha_termino || '').split('-').reverse().join('-')}`);
     if (r && r.liberadas) console.log(`[finiquito] provisión IAS liberada: ${r.liberadas} cuota(s) por $${r.monto}`);
   } catch (e) { console.error('[finiquito provisión IAS]', e.message); }
-  let odp = null;
+  const tesoreria = async () => (await pool.query(
+    `SELECT DISTINCT u.id_usuario FROM usuarios u
+      JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+      JOIN funcionalidades f2 ON f2.id_funcionalidad=pp.id_funcionalidad
+     WHERE f2.codigo IN ('ordenes_pago_pagar','ordenes_pago_emitir') AND u.estado='activo'`))[0].map(x => x.id_usuario);
   try {
     const [[existe]] = await pool.query(`SELECT numero FROM ordenes_pago WHERE categoria='REMUNERACIONES' AND observaciones LIKE ? ORDER BY id DESC LIMIT 1`, [`%finiquito #${id}.%`]);
-    if (existe) return existe.numero || null;
-    const concepto = `Finiquito — ${fq.trabajador} (art. ${fq.causal})`;
-    const [ro] = await pool.query(`INSERT INTO ordenes_pago (proveedor_nombre, proveedor_rut, concepto, categoria, monto, fecha_emision, estado, id_usuario, usuario_nombre, observaciones)
-      VALUES (?,?,?,?,?,CURDATE(),'EMITIDA',?,?,?)`,
-      [fq.trabajador, fq.rut || null, concepto, 'REMUNERACIONES', total, req.usuario.id_usuario, nombreUsuario,
-       `Generada automáticamente al cerrar el finiquito #${id}. Pagar tras la ratificación (art. 177 CT).`]);
-    try {
-      const num = (await require('../../../../shared/ordenes-pago').emitirCorrelativo({ origen: 'GENERAL', origen_id: ro.insertId,
-        concepto, monto: total, id_usuario: req.usuario.id_usuario, usuario_nombre: nombreUsuario }))?.numero || null;
-      if (num) { await pool.query(`UPDATE ordenes_pago SET numero=? WHERE id=?`, [num, ro.insertId]); odp = num; }
-    } catch (e) { console.error('[finiquito correlativo ODP]', e.message); }
-    const [tes] = await pool.query(
-      `SELECT DISTINCT u.id_usuario FROM usuarios u
-        JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
-        JOIN funcionalidades f2 ON f2.id_funcionalidad=pp.id_funcionalidad
-       WHERE f2.codigo IN ('ordenes_pago_pagar','ordenes_pago_emitir') AND u.estado='activo'`);
-    if (tes.length) notificar(tes.map(x => x.id_usuario), {
-      tipo: 'TESORERIA', prioridad: 'alta', sonar: true,
-      titulo: `ODP ${odp || ''} por pagar: finiquito de ${fq.trabajador}`,
-      mensaje: `${CLP(total)} — pagar tras la ratificación y marcar la ODP pagada`,
-      href: '/ordenes-pago/', clave: `finiq_odp_${id}` });
+    if (existe) out.odp = existe.numero || null;
+    else if (total > 0) {
+      const concepto = `Finiquito — ${fq.trabajador} (art. ${fq.causal})`;
+      const [ro] = await pool.query(`INSERT INTO ordenes_pago (proveedor_nombre, proveedor_rut, concepto, categoria, monto, fecha_emision, estado, id_usuario, usuario_nombre, observaciones)
+        VALUES (?,?,?,?,?,CURDATE(),'EMITIDA',?,?,?)`,
+        [fq.trabajador, fq.rut || null, concepto, 'REMUNERACIONES', total, req.usuario.id_usuario, nombreUsuario,
+         `Generada automáticamente al cerrar el finiquito #${id}. Pagar tras la ratificación (art. 177 CT).`]);
+      try {
+        const num = (await require('../../../../shared/ordenes-pago').emitirCorrelativo({ origen: 'GENERAL', origen_id: ro.insertId,
+          concepto, monto: total, id_usuario: req.usuario.id_usuario, usuario_nombre: nombreUsuario }))?.numero || null;
+        if (num) { await pool.query(`UPDATE ordenes_pago SET numero=? WHERE id=?`, [num, ro.insertId]); out.odp = num; }
+      } catch (e) { console.error('[finiquito correlativo ODP]', e.message); }
+      const tes = await tesoreria();
+      if (tes.length) notificar(tes, {
+        tipo: 'TESORERIA', prioridad: 'alta', sonar: true,
+        titulo: `ODP ${out.odp || ''} por pagar: finiquito de ${fq.trabajador}`,
+        mensaje: `${CLP(total)} — pagar tras la ratificación y marcar la ODP pagada`,
+        href: '/ordenes-pago/', clave: `finiq_odp_${id}` });
+    }
   } catch (e) { console.error('[finiquito ODP]', e.message); }
-  return odp;
+  if (retTotal > 0) {
+    try {
+      out.judiciales = await odpRetencionFiniquito(req, fq, det, retTotal, nombreUsuario);
+      const emitidas = out.judiciales.filter(x => x.numero && !x.existente);
+      const tes = emitidas.length ? await tesoreria() : [];
+      if (tes.length) notificar(tes, {
+        tipo: 'TESORERIA', prioridad: 'alta', sonar: true,
+        titulo: `ODP ${emitidas.map(x => x.numero).join(', ')} por pagar: retención judicial del finiquito de ${fq.trabajador}`,
+        mensaje: `${CLP(emitidas.reduce((s, x) => s + x.monto, 0))} al alimentario — pagar junto con el finiquito; al marcarla pagada se informa al tribunal`,
+        href: '/ordenes-pago/', clave: `finiq_odp_jud_${id}` });
+    } catch (e) { console.error('[finiquito ODP retención judicial]', e.message); out.judiciales = [{ error: e.message, monto: retTotal }]; }
+  }
+  return out;
+}
+
+/* Orden de pago al ALIMENTARIO por lo retenido de las indemnizaciones del finiquito — una por causa. Mismo camino que la
+   retención mensual (ordenesPagoJudiciales): beneficiario como proveedor, id_descuento_judicial en la orden para que al
+   marcarla PAGADA el aviso al tribunal salga solo. Si RRHH ajustó el total a mano, se reparte en la proporción calculada
+   y la última causa absorbe el redondeo. Idempotente por concepto. */
+async function odpRetencionFiniquito(req, fq, det, retTotal, nombreUsuario) {
+  const out = [];
+  const rets = (Array.isArray(det.retenciones_judiciales) ? det.retenciones_judiciales : []).filter(x => x && x.id_descuento);
+  if (!rets.length) return [{ sin_causa: true, monto: retTotal }];
+  const suma = rets.reduce((s, x) => s + (Number(x.total) || 0), 0);
+  const rem = require('./remuneraciones.controller');
+  const { calcularDoc } = require('../../../ordenes-pago/src/controllers/ordenes-pago.controller');
+  const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
+  let resto = retTotal;
+  for (let i = 0; i < rets.length; i++) {
+    const x = rets[i];
+    const monto = i === rets.length - 1 ? resto : Math.min(resto, suma > 0 ? Math.round(retTotal * (Number(x.total) || 0) / suma) : 0);
+    resto -= monto;
+    if (!(monto > 0)) continue;
+    const [[d]] = await pool.query('SELECT * FROM rh_descuentos WHERE id=?', [x.id_descuento]);
+    const rit = d && d.jud_rit ? 'RIT ' + d.jud_rit : (x.rit ? 'RIT ' + x.rit : 's/RIT');
+    if (!d || !d.ben_rut || !d.ben_numero_cuenta) { out.push({ rit, monto, falta_cuenta: true }); continue; }
+    const concepto = `Finiquito — retención judicial ${rit} — ${fq.trabajador}`;
+    const [[ya]] = await pool.query("SELECT numero FROM ordenes_pago WHERE concepto=? AND estado<>'ANULADA' LIMIT 1", [concepto]);
+    if (ya) { out.push({ numero: ya.numero, rit, monto, existente: true }); continue; }
+    const prov = await rem.proveedorBeneficiario(d, nombreUsuario);
+    if (!prov) { out.push({ rit, monto, falta_cuenta: true }); continue; }
+    const m = await calcularDoc('Nota de Cobro', 'BRUTO', monto);   // sin impuesto: es un traspaso de lo retenido
+    const destino = [d.ben_tipo_cuenta || 'Cuenta de ahorro', d.ben_numero_cuenta].join(' ') + (d.ben_banco ? ' · ' + d.ben_banco : '');
+    const obs = `Generada automáticamente al cerrar el finiquito #${fq.id} (retención sobre las indemnizaciones, art. 13 Ley 14.908).\n` +
+      `PAGAR JUNTO CON EL FINIQUITO.\n` +
+      `Causa: ${rit}${d.jud_tribunal ? ' · ' + d.jud_tribunal : ''}\n` +
+      `Alimentante: ${fq.trabajador} (${fq.rut || '—'}) — término de la relación laboral el ${String(fq.fecha_termino || '').split('-').reverse().join('-')}\n` +
+      `Beneficiario: ${d.ben_nombre} (${d.ben_rut}) — ${destino}\n` +
+      `Retenido: ${CLP(monto)} (aviso previo ${CLP(Number(x.ret_aviso) || 0)} · años de servicio ${CLP(Number(x.ret_anos) || 0)})\n` +
+      (d.jud_tribunal_email ? `Al marcarla pagada se informa a ${d.jud_tribunal_email} el pago y el término de la relación laboral, citando el RIT.` : 'Sin correo de tribunal registrado: informar el pago y el término a mano.');
+    const [r] = await pool.query(
+      `INSERT INTO ordenes_pago (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento, tratamiento,
+          monto_bruto, monto_neto, impuesto_pct, impuesto_monto, monto, destino, fecha_emision, fecha_documento, metodo_pago, estado, observaciones, id_usuario, usuario_nombre)
+       VALUES (?,?,?,?,?,?,?, ?,?,?,?,?,?,CURDATE(),CURDATE(),'Transferencia','EMITIDA',?,?,?)`,
+      [prov.id, d.ben_nombre, d.ben_rut, concepto, 'REMUNERACIONES', 'Nota de Cobro', m.clase, m.bruto, m.neto, m.pct, m.imp, m.aPagar,
+       destino, obs, req.usuario.id_usuario, nombreUsuario || 'Sistema']);
+    const { numero } = await emitirCorrelativo({ origen: 'GENERAL', origen_id: r.insertId, concepto, monto: m.aPagar, id_usuario: req.usuario.id_usuario, usuario_nombre: nombreUsuario || 'Sistema' });
+    await pool.query('UPDATE ordenes_pago SET numero=?, id_descuento_judicial=? WHERE id=?', [numero, d.id, r.insertId]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'orden_pago', entidad_id: String(r.insertId),
+      detalle: `ODP ${numero} de retención judicial ${rit} a ${d.ben_nombre} por ${CLP(monto)} (retenido de las indemnizaciones del finiquito #${fq.id} de ${fq.trabajador})` });
+    out.push({ numero, rit, monto, beneficiario: d.ben_nombre });
+  }
+  return out;
 }
 
 /* POST /finiquitos/:id/cerrar — "Imprimir y cerrar": queda inmutable (no se recalcula ni edita) */
 exports.finiquitoCerrar = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [[fq]] = await pool.query(`SELECT id, id_usuario, trabajador, rut, DATE_FORMAT(fecha_termino,'%Y-%m-%d') fecha_termino, causal, total, cerrado_at FROM rh_finiquitos WHERE id=?`, [id]);
+    const [[fq]] = await pool.query(`SELECT id, id_usuario, trabajador, rut, DATE_FORMAT(fecha_termino,'%Y-%m-%d') fecha_termino, causal, total, detalle, cerrado_at FROM rh_finiquitos WHERE id=?`, [id]);
     if (!fq) return fail(res, 'Finiquito no existe', 404);
     if (fq.cerrado_at) return ok(res, { id, ya_cerrado: true });
     const [[ap]] = await pool.query(`SELECT CONCAT_WS(' ', nombre, apellido) nombre FROM usuarios WHERE id_usuario=?`, [req.usuario.id_usuario]);
     await pool.query(`UPDATE rh_finiquitos SET cerrado_at=NOW(), cerrado_por=? WHERE id=?`, [ap?.nombre || String(req.usuario.id_usuario), id]);
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_finiquito', entidad_id: id,
       detalle: `Finiquito ${fq.trabajador} CERRADO (impreso) por ${CLP(Number(fq.total))} — ya no se recalcula` });
-    const odp = await efectosDeCierre(req, fq, ap?.nombre || '');
-    ok(res, { id, cerrado: true, odp });
+    const ef = await efectosDeCierre(req, fq, ap?.nombre || '');
+    ok(res, { id, cerrado: true, odp: ef.odp, odp_judicial: ef.judiciales });
   } catch (e) { fail(res, e.message); }
 };
 

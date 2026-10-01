@@ -8,7 +8,7 @@
    exactamente. */
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { valorHoraExtra, montoHorasExtras } = require('../shared/horas-extras');
+const { valorHoraExtra, montoHorasExtras, JORNADA_SEMANAL_DEFAULT } = require('../shared/horas-extras');
 
 test('reproduce el factor 0,0077778 de la tabla (45 h, recargo 50%)', () => {
   const v = valorHoraExtra({ sueldoBase: 1000000, jornadaSemanal: 45, recargoPct: 50 });
@@ -16,7 +16,18 @@ test('reproduce el factor 0,0077778 de la tabla (45 h, recargo 50%)', () => {
   assert.equal(v.valor_hora_extra, 7778);   // $1.000.000 × 0,0077778
 });
 
-test('la jornada vigente (44 h) encarece la hora respecto de 45 h', () => {
+test('jornada legal vigente: 42 h desde el 26-04-2026 (factor 0,0083333), y es la que rige por defecto', () => {
+  // Ley 21.561: 44 h (26-04-2024) → 42 h (26-04-2026) → 40 h (26-04-2028). El default tiene que ser la vigente:
+  // con 44 la hora extra de quien no tiene jornada propia en su ficha salía un 4,5% más barata.
+  const v42 = valorHoraExtra({ sueldoBase: 1000000, jornadaSemanal: 42, recargoPct: 50 });
+  assert.equal(v42.factor.toFixed(7), '0.0083333');
+  assert.equal(v42.valor_hora_extra, 8333);
+  assert.equal(JORNADA_SEMANAL_DEFAULT, 42);
+  assert.equal(valorHoraExtra({ sueldoBase: 1000000 }).valor_hora_extra, 8333);
+  assert.equal(valorHoraExtra({ sueldoBase: 1000000, jornadaSemanal: 40 }).factor.toFixed(7), '0.0087500');
+});
+
+test('menos jornada encarece la hora (44 h respecto de 45 h)', () => {
   // Menos horas por el mismo sueldo = cada hora vale más. Si esto se invirtiera,
   // la reducción de jornada estaría pagándose al revés.
   const v44 = valorHoraExtra({ sueldoBase: 1000000, jornadaSemanal: 44 });

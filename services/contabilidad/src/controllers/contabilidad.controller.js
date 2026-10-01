@@ -2216,13 +2216,33 @@ const lreFecha = f => { const s = isoF(f); return s ? s.split('-').reverse().joi
 // isoFlex (shared/fecha-chile): una DATE de la base no se lee con getDate()/getTimezoneOffset() — se corría un día con fechas del otro horario (barrido 30-09-2026)
 const isoF = f => f == null ? null : require('../../../../shared/fecha-chile').isoFlex(f);
 
-// Orden de columnas del archivo (solo los conceptos que la empresa usa + obligatorios)
+/* Orden de columnas del archivo (solo los conceptos que la empresa usa + obligatorios), en el orden del Suplemento
+   del LRE de la DT. Desde el 01-10-2026 cada concepto va en SU código: antes las horas extras y los aguinaldos caían
+   en 2113, la semana corrida dentro de las comisiones, la remuneración variable de vacaciones (art. 71) en ninguna
+   columna — la fila no cuadraba con el total imponible — y todos los descuentos en 3183. */
 const LRE_COLS = ['1101','1102','1103','1104','1105','1106','1170','1146','1107','1108','1109','1141','1142','1143','1151','1110','1152',
-  '1115','1116','1118','1155','1157','1131',
-  '2101','2103','2106','2113','2301','2302','2306',
-  '3141','3143','3144','3151','3161','3183',
+  '1115','1116','1117','1118','1155','1157','1131',
+  '2101','2102','2103','2104','2106','2108','2110','2113',
+  '2301','2302','2303','2305','2306',
+  '3141','3143','3144','3151','3156','3161','3110','3183','3185','3186','3188',
   '4151','4152','4155',
   '5201','5210','5220','5230','5240','5301','5361','5341','5302','5410','5501','5564'];
+// Nombre de cada código (Suplemento LRE): la pantalla lo muestra al pasar el mouse por la columna
+const LRE_TITULOS = { 1101: 'RUT trabajador', 1102: 'Fecha inicio contrato', 1103: 'Fecha término de contrato', 1104: 'Causal de término', 1105: 'Región', 1106: 'Comuna',
+  1170: 'Tipo de impuesto a la renta', 1146: 'Técnico extranjero exento', 1107: 'Tipo de jornada (101 ordinaria · 201 parcial · 701 exenta art. 22)', 1108: 'Discapacidad / invalidez',
+  1109: 'Pensionado por vejez', 1141: 'AFP', 1142: 'IPS', 1143: 'Fonasa / Isapre', 1151: 'AFC', 1110: 'CCAF', 1152: 'Organismo Ley 16.744',
+  1115: 'Días trabajados', 1116: 'Días de licencia médica', 1117: 'Días de vacaciones (hábiles)', 1118: 'Subsidio trabajador joven', 1155: 'APV individual', 1157: 'APV colectivo', 1131: 'Indemnización a todo evento',
+  2101: 'Sueldo', 2102: 'Sobresueldo (horas extras)', 2103: 'Comisiones', 2104: 'Semana corrida', 2106: 'Gratificación', 2108: 'Remuneración variable pagada en vacaciones (art. 71)',
+  2110: 'Aguinaldo', 2113: 'Bonos u otras remuneraciones variables', 2301: 'Colación', 2302: 'Movilización', 2303: 'Viáticos', 2305: 'Desgaste de herramientas (celular)', 2306: 'Gastos por causa del trabajo',
+  3141: 'Cotización AFP', 3143: 'Salud 7%', 3144: 'Salud voluntaria (adicional Isapre)', 3151: 'AFC trabajador', 3156: 'APV individual modalidad B', 3161: 'Impuesto único',
+  3110: 'Crédito social CCAF', 3183: 'Otros descuentos solicitados por el trabajador', 3185: 'Otros descuentos (art. 58)', 3186: 'Pensiones de alimentos', 3188: 'Anticipos y préstamos',
+  4151: 'AFC empleador', 4152: 'Mutual + Ley SANNA', 4155: 'SIS', 5201: 'Total haberes', 5210: 'Total imponibles y tributables', 5220: 'Total imponibles no tributables',
+  5230: 'Total no imponibles', 5240: 'Total no imponibles tributables', 5301: 'Total descuentos', 5361: 'Total impuestos', 5341: 'Total cotizaciones del trabajador', 5302: 'Total otros descuentos',
+  5410: 'Total aportes empleador', 5501: 'Total líquido', 5564: 'Total indemnizaciones tributables' };
+// Causal de término (cód 1104, tabla del Suplemento) por artículo de rh_finiquito_causales. El art. 160 genérico no
+// tiene código: la DT pide el número (160 N°1 a N°7) → queda vacío y la pantalla lo avisa.
+const LRE_CAUSAL = { '159-1': 3, '159-2': 4, '159-3': 5, '159-4': 6, '159-5': 7, '159-6': 8, '161-1': 18, '161-2': 19 };
+const lreNorm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 
 exports.getLRE = async (req, res) => {
   try {
@@ -2250,39 +2270,100 @@ exports.getLRE = async (req, res) => {
 
     // Fuente 1: liquidaciones EMITIDAS del motor propio
     const [liqs] = await pool.query(
-      `SELECT l.*, u.rut urut, u.fecha_ingreso, f.afp fafp, f.salud fsalud, f.tipo_contrato
+      `SELECT l.*, u.rut urut, u.fecha_ingreso, DATE_FORMAT(u.fecha_baja,'%Y-%m-%d') ufecha_baja, f.afp fafp, f.salud fsalud, f.tipo_contrato,
+              f.jornada_art22, f.jornada_especial_hrs
          FROM rh_liquidaciones l JOIN usuarios u ON u.id_usuario=l.id_usuario
          LEFT JOIN rh_fichas f ON f.id_usuario=l.id_usuario
         WHERE l.mes=? AND l.estado='EMITIDA'`, [mes]);
     let fuente, filas;
+    const avisos = [];
     if (liqs.length) {
       fuente = 'MOTOR';
+      // Días HÁBILES de vacaciones gozados en el mes (cód 1117) y término de contrato (cód 1103 / 1104)
+      const ids = liqs.map(l => l.id_usuario);
+      const [yy, mm] = mes.split('-').map(Number), finMes = `${mes}-${String(new Date(yy, mm, 0).getDate()).padStart(2, '0')}`;
+      const FER = require('../../../../shared/feriados');
+      const [vacs] = await pool.query(
+        `SELECT id_usuario, fecha_desde, fecha_hasta FROM rh_vacaciones WHERE estado='APROBADA' AND id_usuario IN (?) AND fecha_desde <= ? AND fecha_hasta >= ?`, [ids, finMes, ini]).catch(() => [[]]);
+      const vacDias = {};
+      for (const v of vacs) {
+        const d0 = isoF(v.fecha_desde) > ini ? isoF(v.fecha_desde) : ini, h0 = isoF(v.fecha_hasta) < finMes ? isoF(v.fecha_hasta) : finMes;
+        if (h0 >= d0) vacDias[v.id_usuario] = (vacDias[v.id_usuario] || 0) + FER.diasHabilesEntre(d0, h0);
+      }
+      const [fins] = await pool.query(`SELECT id_usuario, DATE_FORMAT(fecha_termino,'%Y-%m-%d') termino, causal FROM rh_finiquitos WHERE id_usuario IN (?) ORDER BY id`, [ids]).catch(() => [[]]);
+      const finDe = {}; fins.forEach(x => { finDe[x.id_usuario] = x; });
+      const n = v => Number(v) || 0;
       filas = liqs.map(l => {
         let d = {}; try { d = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) {}
         const rut = nRut(l.rut || l.urut);
-        const cotiz = (d.desc_afp || 0) + (d.desc_salud || 0) + (d.desc_salud_adicional || 0) + (d.desc_afc || 0);
-        const noImp = (d.colacion || 0) + (d.movilizacion || 0) + (d.otros_no_imponibles || 0);
+        // ── Haberes: cada adicional a su código (el snapshot guarda nombre, monto bruto e imponibilidad de cada uno) ──
+        const ads = Array.isArray(d.adicionales) ? d.adicionales : [];
+        const sumAd = (imp, re) => ads.filter(a => !!a.imponible === imp && re.test(lreNorm(a.nombre))).reduce((s, a) => s + n(a.monto), 0);
+        const otrosImpAd = n(d.otros_imponibles);
+        const he = Math.min(sumAd(true, /HORAS? EXTRA/), otrosImpAd);                       // 2102 sobresueldo
+        const agui = Math.min(sumAd(true, /AGUINALDO|BONO NAVIDAD/), otrosImpAd - he);      // 2110 aguinaldo
+        const bonos = otrosImpAd - he - agui + n(d.bono_jefe);                               // 2113 (lleva el Bono Jefe Comercial, haber propio desde el 28-09-2026)
+        const sc = Math.min(n(d.semana_corrida), n(d.comisiones));                           // 2104: parte de las comisiones que es semana corrida
+        const otrosNoImp = n(d.otros_no_imponibles);
+        const viat = Math.min(sumAd(false, /VIATICO/), otrosNoImp);                          // 2303
+        const herr = Math.min(sumAd(false, /CELULAR|TELEFONO|HERRAMIENTA/), otrosNoImp - viat);   // 2305
+        const colAd = Math.min(sumAd(false, /COLACION/), otrosNoImp - viat - herr);
+        const movAd = Math.min(sumAd(false, /MOVILIZACION/), otrosNoImp - viat - herr - colAd);
+        const gastos = otrosNoImp - viat - herr - colAd - movAd;                             // 2306: lo que no calza en otro código
+        const noImp = n(d.colacion) + n(d.movilizacion) + otrosNoImp;
+        // ── Descuentos: Caja, pensión de alimentos, anticipos/préstamos y APV tienen código propio ──
+        const det = Array.isArray(d.descuentos_detalle) ? d.descuentos_detalle : [];
+        const catDe = x => x.categoria || (/CAJA/.test(lreNorm(x.subtipo)) ? 'CAJA' : /TRIBUNAL|ALIMENTOS/.test(lreNorm(x.subtipo)) ? 'JUDICIAL' : '');
+        let dCaja = 0, dJud = 0, dAnt = 0, dApv = 0, dArt58 = 0, dSolic = 0;
+        for (const x of det) {
+          const mto = n(x.monto), cat = catDe(x);
+          if (cat === 'CAJA') dCaja += mto;
+          else if (cat === 'JUDICIAL') dJud += mto;
+          else if (x.tipo === 'ANTICIPO' || x.tipo === 'PRESTAMO') dAnt += mto;
+          else if (/\bAPV\b/.test(lreNorm(x.subtipo))) dApv += mto;
+          else if (x.tipo === 'PAGO_EXCESO') dArt58 += mto;
+          else dSolic += mto;
+        }
+        // snapshot sin detalle (emitidos antes del 14-09-2026) o que no suma: el resto queda en "otros solicitados"
+        dSolic = Math.max(0, dSolic + n(d.otros_descuentos) - (dCaja + dJud + dAnt + dApv + dArt58 + dSolic));
+        const cotiz = n(d.desc_afp) + n(d.desc_salud) + n(d.desc_salud_adicional) + n(d.desc_afc) + dApv;   // 5341 incluye el APV (3156)
         // 4152 del LRE = mutual (Ley 16.744) + Ley SANNA (la DT las declara juntas)
-        const mutualSanna = (d.aporte_mutual || 0) + (d.aporte_sanna || 0);
-        const aportes = (d.aporte_afc_emp || 0) + mutualSanna + (d.aporte_sis || 0);
-        return {
-          '1101': rut, '1102': lreFecha(l.fecha_ingreso), '1105': 13, '1106': 13114, '1170': 1, '1146': 0, '1107': 101,
-          '1108': 0, '1109': 0, '1141': afpCod(d.afp || l.fafp), '1142': 0, '1143': salCod(d.salud || l.fsalud),
-          '1151': 1, '1110': 1, '1152': 2,
-          '1115': d.dias ?? 30, '1116': licDias[rut] || '', '1118': 0, '1155': 0, '1157': 0, '1131': 0,
-          // 2113 (bonos u otras remuneraciones variables) lleva también el Bono Jefe Comercial: desde el 28-09-2026 es
-          // un haber propio del snapshot (bono_jefe), ya no viene dentro de comisiones — sin esto 5210 no cuadraba con la fila
-          '2101': d.sueldo_base || 0, '2103': d.comisiones || '', '2106': d.gratificacion || '', '2113': ((Number(d.otros_imponibles) || 0) + (Number(d.bono_jefe) || 0)) || '',
-          '2301': d.colacion || '', '2302': d.movilizacion || '', '2306': d.otros_no_imponibles || '',
+        const mutualSanna = n(d.aporte_mutual) + n(d.aporte_sanna);
+        const aportes = n(d.aporte_afc_emp) + mutualSanna + n(d.aporte_sis);
+        // ── Identificación: jornada, pensionado y término salen de la ficha y del finiquito (antes iban fijos) ──
+        const pensionado = n(d.pensionado) === 1 || d.pensionado === true;
+        const jornada = n(l.jornada_art22) ? 701 : (n(l.jornada_especial_hrs) > 0 && n(l.jornada_especial_hrs) <= 30 ? 201 : 101);
+        const fin = finDe[l.id_usuario], termino = (fin && fin.termino) || l.ufecha_baja || '';
+        const enMes = !!termino && termino.slice(0, 7) === mes;
+        const causal = enMes && fin ? (LRE_CAUSAL[fin.causal] ?? '') : '';
+        if (enMes && causal === '') avisos.push(`${l.nombre}: término de contrato el ${termino.split('-').reverse().join('-')} sin código de causal (1104) — ${fin ? `art. ${fin.causal}: la DT pide el número de la causal` : 'no tiene finiquito guardado'}. Complétalo en el CSV.`);
+        const fila = {
+          '1101': rut, '1102': lreFecha(l.fecha_ingreso), '1103': enMes ? termino.split('-').reverse().join('/') : '', '1104': causal,
+          '1105': 13, '1106': 13114, '1170': 1, '1146': 0, '1107': jornada,
+          '1108': 0, '1109': pensionado ? 1 : 0, '1141': afpCod(d.afp || l.fafp), '1142': 0, '1143': salCod(d.salud || l.fsalud),
+          '1151': pensionado ? 0 : 1, '1110': 1, '1152': 2,
+          '1115': d.dias ?? 30, '1116': licDias[rut] || '', '1117': vacDias[l.id_usuario] || '', '1118': 0, '1155': dApv > 0 ? 1 : 0, '1157': 0, '1131': 0,
+          '2101': n(d.sueldo_base), '2102': he || '', '2103': (n(d.comisiones) - sc) || '', '2104': sc || '', '2106': d.gratificacion || '',
+          '2108': n(d.feriado_variable) || '', '2110': agui || '', '2113': bonos || '',
+          '2301': (n(d.colacion) + colAd) || '', '2302': (n(d.movilizacion) + movAd) || '', '2303': viat || '', '2305': herr || '', '2306': gastos || '',
           '3141': d.desc_afp || 0, '3143': d.desc_salud || 0, '3144': d.desc_salud_adicional || '',
-          '3151': d.desc_afc || '', '3161': d.impuesto || 0, '3183': d.otros_descuentos || '',
+          '3151': d.desc_afc || '', '3156': dApv || '', '3161': d.impuesto || 0,
+          '3110': dCaja || '', '3183': dSolic || '', '3185': dArt58 || '', '3186': dJud || '', '3188': dAnt || '',
           '4151': d.aporte_afc_emp || '', '4152': mutualSanna, '4155': d.aporte_sis || 0,
           '5201': d.total_haberes || 0, '5210': d.total_imponible || 0, '5220': 0, '5230': noImp, '5240': 0,
           '5301': d.total_descuentos || 0, '5361': d.impuesto || 0, '5341': cotiz,
-          '5302': Math.max(0, (d.total_descuentos || 0) - (d.impuesto || 0) - cotiz),
+          '5302': Math.max(0, n(d.total_descuentos) - n(d.impuesto) - cotiz),
           '5410': aportes, '5501': d.liquido || 0, '5564': 0,
           _nombre: l.nombre,
         };
+        // Cuadratura de la fila: cada grupo de códigos tiene que sumar su total (la DT rechaza el archivo si no)
+        const suma = cods => cods.reduce((s, c) => s + n(fila[c]), 0);
+        const chk = [['haberes imponibles (21xx)', ['2101', '2102', '2103', '2104', '2106', '2108', '2110', '2113'], '5210'],
+                     ['haberes no imponibles (23xx)', ['2301', '2302', '2303', '2305', '2306'], '5230'],
+                     ['descuentos (31xx)', ['3141', '3143', '3144', '3151', '3156', '3161', '3110', '3183', '3185', '3186', '3188'], '5301']];
+        for (const [que, cods, tot] of chk) if (Math.abs(suma(cods) - n(fila[tot])) > 1)
+          avisos.push(`${l.nombre}: los ${que} suman ${suma(cods).toLocaleString('es-CL')} y el total ${tot} dice ${n(fila[tot]).toLocaleString('es-CL')} — revisa la liquidación antes de subir.`);
+        return fila;
       });
     } else {
       // Fuente 2: auxiliar AVSOFT (referencial: sin desglose fino de haberes)
@@ -2318,7 +2399,7 @@ exports.getLRE = async (req, res) => {
       });
     }
     const E = await require('../../../../shared/empresa').datosEmpresa();   // RUT de la empresa: fuente única
-    ok(res, { mes, fuente, columnas: LRE_COLS, filas, empresa: { razon_social: E.razon_social, rut: E.rut_formateado }, archivo: `${E.rut}_${mes.replace('-', '')}.csv` });
+    ok(res, { mes, fuente, columnas: LRE_COLS, titulos: LRE_TITULOS, avisos, filas, empresa: { razon_social: E.razon_social, rut: E.rut_formateado }, archivo: `${E.rut}_${mes.replace('-', '')}.csv` });
   } catch (e) { console.error('[ctb lre]', e.message); fail(res, e.message); }
 };
 

@@ -37,3 +37,25 @@ liquidaciones ya validadas al peso contra AVSOFT):
 
 Las decisiones tomadas distinto al documento (mes de ingreso en 30avos, semana corrida mensual,
 salud deducible completa en el impuesto) quedan registradas arriba y no son brechas.
+
+## Segundo documento: «Normativa Remuneraciones DT Chile» (01-10-2026)
+
+Referencia: `docs/referencias/Normativa-Remuneraciones-DT-Chile.docx` (informe técnico-jurídico entregado por
+Pato el 01-10-2026). Va más allá del cálculo de la liquidación: jornada, descuentos, finiquito, LRE. Los
+puntos dudosos se verificaron en la Dirección del Trabajo antes de tocar nada.
+
+| # | Punto del documento | Suite | Estado |
+|---|---|---|---|
+| A | Ley 21.561: 44 h (26-04-2024) → **42 h (26-04-2026)** → 40 h (26-04-2028); factor de la hora extra con 42 h = 0,0083333 | El parámetro `he_jornada_semanal` estaba en 44 (y lo decían el comentario del motor y la pantalla Jornada). Corregido a 42 por la migración `rrhh-he-jornada-42-v1`; default del motor 42; editable en Indicadores de Remuneraciones → Jornada y horas extraordinarias. La jornada de la ficha (40 h pactadas o especial) sigue mandando. | ✅ corregido |
+| B | Art. 172: la base de las indemnizaciones incluye colación y movilización habituales; excluye horas extras, asignación familiar y bonos esporádicos (aguinaldos) | La base era el promedio del imponible a secas. Ahora `base` = imponible − excluidos + no imponibles habituales (`shared/finiquito-base.js`, listas `finiq_base_excluye` / `finiq_base_no_imp`). Verificado en la DT (dictamen 75/8 de 1999). `base_feriado` no cambia. | ✅ corregido |
+| C | Ley 21.389 / art. 13 Ley 14.908: retener la pensión de alimentos de las indemnizaciones del finiquito y avisar al tribunal en 10 días hábiles | El finiquito solo descontaba anticipos y préstamos y además anulaba la retención judicial. Ahora: retención propuesta (pensión del mes siguiente sobre el aviso previo; % pensión ÷ ingreso sobre los años de servicio), línea y declaración en el documento, orden de pago al alimentario al cerrar, tarea de aviso al tribunal en el offboarding y aviso del término en el correo de pago. | ✅ corregido |
+| D | Crédito social CCAF: descuento legal obligatorio | El motor lo contaba dentro del 15% (al registrar) y del 45% (en la prelación). La DT lo deja fuera de ambos (ORD. 4565/94 de 2011, 262/4 y 3741/36 de 2012, 558 de 2021). Corregido en `tope-descuento.js` y `calcLiquidacion`. | ✅ corregido |
+| E | LRE: catálogo de códigos por concepto (haberes 2xxx, descuentos 31xx, identificación 11xx) | El archivo mandaba horas extras y aguinaldos a 2113, la semana corrida dentro de 2103, todos los descuentos a 3183, no informaba el feriado variable (2108) —la fila no cuadraba— y llevaba fijos jornada, pensionado y término. Ahora cada concepto va en su código del Suplemento LRE y la pantalla avisa si una fila no cuadra. | ✅ corregido |
+| F | Tope del 45% "sobre todos los descuentos, incluidos impuestos y CCAF" | **El documento se equivoca**: la DT lo aplica solo a los descuentos facultativos de los incisos 2° y 3° del art. 58 (ORD. 558 de 2021). El motor lo aplica así. | ✅ sin cambio |
+| G | Feriado proporcional valorizado con "sueldo base diario" | Simplificación del documento. Rige lo verificado el 15-09-2026: sueldo + promedio de variables, sin gratificación mensual. | ✅ sin cambio |
+| H | Semana corrida semana a semana | Factor mensual por decisión de Pato (07-09-2026). | ✅ decidido |
+| I | Gratificación art. 50 proporcional en licencias; topes art. 58 (15/30/45); APV régimen B; anticipos; reserva de derechos; tope 90 UF y 11 años | Ya estaba. | ✅ |
+| J | Art. 22 restrictivo; colación y movilización "razonables" y sin pago durante el feriado; horas extras compensadas con descanso (1 : 1,5, máx. 5 días/año) | Hay 3 contratos con art. 22 y movilizaciones de hasta $250.000; colación y movilización se pagan completas en vacaciones (legal, más favorable); la compensación con descanso no existe en el sistema. | ⚪ decisión de Pato (PENDIENTES 4.16) |
+
+Quedó abierto en PENDIENTES 4.16: asignación de celular en la base del art. 172, aviso automático al tribunal
+cuando no hay orden de pago, texto de la declaración de alimentos (validar con abogado), causal art. 160 en el LRE.

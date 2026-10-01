@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jornada Laboral — AutoFácil</title>
-  <!-- v1.9 — botón PDF por persona: imprime solo su calendario con nombre de archivo "calendario turnos <nombre> — AutoFácil" -->
+  <!-- v1.10 — la jornada normal de quien no tiene 40 hrs sale de la jornada legal general del mantenedor (42 hrs desde el 26-04-2026; decía 44 fijo). v1.9 — botón PDF por persona: imprime solo su calendario con nombre de archivo "calendario turnos <nombre> — AutoFácil" -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -99,8 +99,8 @@
   </div>
   <div class="foot"><i class="bi bi-diagram-3"></i> <b>Qué afecta esta página:</b>
     <b>Art. 22</b> → en <a href="/recursos-humanos/asistencia/">Asistencia (Workera)</a> el colaborador queda EXENTO: los días sin marca no cuentan como posibles faltas ·
-    <b>40 hrs</b> → define la jornada normal informativa (40 hrs semanales / 8 hrs diarias L-V; el resto 44 hrs / 8 hrs 48 min según la gradualidad vigente de la Ley 21.561) ·
-    <b>Especial</b> → jornada parcial o pactada: las horas semanales digitadas mandan sobre 40/44 ·
+    <b>40 hrs</b> → define la jornada normal informativa (40 hrs semanales / 8 hrs diarias L-V; el resto usa la <b>jornada legal general</b> de <a href="/mantenedores/remuneraciones/">Indicadores de Remuneraciones</a>: 42 hrs desde el 26-04-2026 y 40 hrs desde el 26-04-2028, Ley 21.561). Esa misma jornada es el divisor de la hora extra en <a href="/recursos-humanos/remuneraciones/adicionales/">Adicionales</a> ·
+    <b>Especial</b> → jornada parcial o pactada: las horas semanales digitadas mandan sobre las 40 y sobre la general ·
     <b>Externo</b> → presta servicios sin sujeción a horario: en Asistencia queda EXTERNO y no genera faltas ·
     <b>Horarios y Turnos</b> → horario fijo (entrada/salida) de cada colaborador o marca "por turnos" (el turno se define en la pestaña Turnos); referencia para atrasos en <a href="/recursos-humanos/asistencia/">Asistencia</a> cuando Workera no tiene turno asignado ·
     <b>Turnos</b> → turnos rotativos paramétricos (<code>rh_turnos</code>): cada turno define N semanas con horario por día; a cada colaborador "por turnos" se le asigna el turno y el lunes en que le parte la Semana 1 del ciclo ·
@@ -113,14 +113,14 @@
 <script>
 const H={Authorization:'Bearer '+sessionStorage.getItem('token'),'Content-Type':'application/json'};
 const $=id=>document.getElementById(id);
-let D=[];
+let D=[], JG=42;   // JG: jornada legal general (viene de la API: rh_config he_jornada_semanal)
 const hrsFmt=h=>{ const m=Math.round(Number(h)/5*60); return `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')} diarias`; };
 function debeMarcar(c){ return !(+c.art22||+c.externo); }
 function jornadaTxt(c){
   if(+c.externo) return 'sin horario';
   if(+c.art22) return '—';
   if(c.especial_hrs!=null&&c.especial_hrs!=='') return `${Number(c.especial_hrs).toLocaleString('es-CL')} hrs/sem · ${hrsFmt(c.especial_hrs)}`;
-  return c.h40?'40 hrs/sem · 8:00 diarias':'44 hrs/sem · 8:48 diarias';
+  return c.h40?'40 hrs/sem · 8:00 diarias':`${Number(JG).toLocaleString('es-CL')} hrs/sem · ${hrsFmt(JG)}`;
 }
 function marcarTxt(c){
   if(+c.externo) return '<span class="pill p-mut">NO — EXTERNO</span>';
@@ -395,7 +395,7 @@ async function cambiaHrs(i,val){
     const [r,rt]=await Promise.all([fetch('/api/rrhh/jornada',{headers:H}),fetch('/api/rrhh/turnos',{headers:H})]);
     const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
     const jt=await rt.json(); TURNOS=jt.success?jt.data:[];
-    D=j.data; pinta(); pintaTurnos();
+    D=j.data; if(Number(j.jornada_general)>0) JG=Number(j.jornada_general); pinta(); pintaTurnos();
   }catch(e){ $('tb').innerHTML=`<tr><td colspan="7" class="empty">⚠️ ${e.message}</td></tr>`; }
 })();
 </script>

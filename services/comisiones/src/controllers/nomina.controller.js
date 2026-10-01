@@ -246,9 +246,11 @@ const destinatarios = async (req, res) => {
 async function montosNomina(mes) {
   const vig = await nominaVigente(mes).catch(() => null);
   if (!vig) return null;
-  const m = {};
-  vig.detalle.forEach(d => { m[String(d.ejecutivo).toUpperCase().trim()] = R(d.monto_pagar); });
-  return { version: vig.version, generada_por: vig.generada_por, created_at: vig.created_at, montos: m };
+  const m = {}, sc = {};
+  vig.detalle.forEach(d => { const k = String(d.ejecutivo).toUpperCase().trim(); m[k] = R(d.monto_pagar);
+    // parte de lo que se paga que es semana corrida (art. 45): el LRE la declara aparte de la comisión (cód 2104)
+    sc[k] = Math.max(0, Math.min(R(d.monto_pagar), R(d.con_semana_corrida) - R(d.incentivo_final))); });
+  return { version: vig.version, generada_por: vig.generada_por, created_at: vig.created_at, montos: m, semana_corrida: sc };
 }
 
 module.exports = { getNomina, generar, reenviar, destinatarios, montosNomina, nominaVigente };

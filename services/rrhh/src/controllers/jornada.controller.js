@@ -76,7 +76,10 @@ exports.listar = async (req, res) => {
               COALESCE(unm.por_turnos, 0) por_turnos, unm.horario_dias dias,
               unm.turno_id, DATE_FORMAT(unm.turno_semana_inicio,'%Y-%m-%d') turno_semana_inicio
          FROM ${UNIV} WHERE ${WU} ORDER BY nombre`);
-    res.json({ success: true, error: null, data: rows });
+    // Jornada legal general (Indicadores de Remuneraciones → he_jornada_semanal): la de quien no tiene 40 h ni jornada especial
+    const [[jg]] = await pool.query("SELECT valor FROM rh_config WHERE clave='he_jornada_semanal'").catch(() => [[null]]);
+    const jornadaGeneral = parseFloat(jg && jg.valor) > 0 ? parseFloat(jg.valor) : require('../../../../shared/horas-extras').JORNADA_SEMANAL_DEFAULT;
+    res.json({ success: true, error: null, data: rows, jornada_general: jornadaGeneral });
   } catch (e) { console.error('[rrhh jornada]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
