@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.7 — Cartola: N° de certificado clicable con el PDF en ventana emergente y check con la fecha de envío; cada solicitud de reposición enviada es una fila con su fecha y el correo tal como salió (01-10-2026). v1.6 — vista previa del correo más ancha (correo de reposición a 760 px) (01-10-2026). v1.5 — solicitud de reposición de cupo: correo automático a Unidad al compensarse el umbral (80%) del último abono, con saldo inicial y operaciones (ID UCA, RUT, cliente, monto, % del saldo); envío manual desde la Cartola y vista previa en Parámetros (01-10-2026). v1.4 — el correo del certificado ya no lleva la línea "Verificación del documento" (el QR va en el PDF) (01-10-2026). v1.3 — la vista previa del correo muestra el logo (01-10-2026). v1.2 — vista previa del certificado (PDF con marca de agua) y del correo con los parámetros en pantalla; el certificado se emite al otorgar (gatillo) y el barrido queda cada 1 hora (01-10-2026). v1.1 — Línea de Crédito Unidad: pestaña Cartola (abonos manuales, cargos por cada certificado emitido con saldo corrido, detalle del certificado enviado) y pestaña Parámetros (línea, texto del certificado, destinatarios y CC) (01-10-2026). v1.0 — cuenta corriente de la línea rotativa y Certificado de Saldo Insoluto automático por cada OP compensada -->
+<!-- v1.8 — Documentos del acuerdo: cargar, ver y reemplazar los documentos firmados (contrato, anexos 1-3, convenio y otros), con historial de versiones; se quita el botón Actualizar (01-10-2026). v1.7 — Cartola: N° de certificado clicable con el PDF en ventana emergente y check con la fecha de envío; cada solicitud de reposición enviada es una fila con su fecha y el correo tal como salió (01-10-2026). v1.6 — vista previa del correo más ancha (correo de reposición a 760 px) (01-10-2026). v1.5 — solicitud de reposición de cupo: correo automático a Unidad al compensarse el umbral (80%) del último abono, con saldo inicial y operaciones (ID UCA, RUT, cliente, monto, % del saldo); envío manual desde la Cartola y vista previa en Parámetros (01-10-2026). v1.4 — el correo del certificado ya no lleva la línea "Verificación del documento" (el QR va en el PDF) (01-10-2026). v1.3 — la vista previa del correo muestra el logo (01-10-2026). v1.2 — vista previa del certificado (PDF con marca de agua) y del correo con los parámetros en pantalla; el certificado se emite al otorgar (gatillo) y el barrido queda cada 1 hora (01-10-2026). v1.1 — Línea de Crédito Unidad: pestaña Cartola (abonos manuales, cargos por cada certificado emitido con saldo corrido, detalle del certificado enviado) y pestaña Parámetros (línea, texto del certificado, destinatarios y CC) (01-10-2026). v1.0 — cuenta corriente de la línea rotativa y Certificado de Saldo Insoluto automático por cada OP compensada -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -88,7 +88,7 @@
       <p id="subtitulo">Cartola de la línea rotativa: los abonos se registran a mano y cada Certificado de Saldo Insoluto que el sistema emite por una operación compensada se descuenta solo.</p>
     </div>
     <div class="der">
-      <button class="btnx btn-blanco" onclick="cargar()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+      <button class="btnx btn-blanco" onclick="abrirDocs()" title="Contrato, anexos y convenio firmados"><i class="bi bi-folder2-open"></i> Documentos del acuerdo</button>
       <span class="gest"><button class="btnx btn-blanco" onclick="procesar()" title="Revisa ahora si hay operaciones nuevas por compensar (se hace solo al otorgar, y un barrido cada hora)"><i class="bi bi-lightning-charge"></i> Procesar ahora</button></span>
     </div>
   </div>
@@ -188,6 +188,7 @@
       <li><b>Para, CC y envío automático</b> → a quién sale cada certificado con el PDF adjunto (plantilla <code>linea_certificado_saldo</code> en <a href="/mantenedores/correos-programados/">Correos del Sistema</a>). El detalle de cada envío (fecha, destinatarios, respuesta) se ve en la Cartola.</li>
       <li><b>Umbral de reposición + envío automático de la solicitud</b> → cuando las operaciones compensadas desde el último abono llegan a ese % del saldo inicial, sale a Unidad (una vez por abono) la solicitud de reposición con el detalle de las operaciones (plantilla <code>linea_reposicion_cupo</code> en <a href="/mantenedores/correos-programados/">Correos del Sistema</a>). La fecha del envío queda en el abono de la Cartola.</li>
       <li><b>Cartola</b> → el N° de cada certificado abre el PDF en una ventana, con su estado y el check de la fecha de envío; cada solicitud de reposición enviada queda como fila con su fecha y el correo tal como salió.</li>
+      <li><b>Documentos del acuerdo</b> → contrato, anexos 1 a 3, convenio y otros documentos firmados, guardados en el almacén de documentos. Reemplazar uno deja el anterior en el historial (nunca se borra un firmado).</li>
       <li><b>Vista previa</b> → arma el certificado (PDF con marca de agua) y el correo con lo que está en pantalla, sin grabar ni enviar.</li>
       <li><b>Texto del certificado y firmante</b> → aparecen en el PDF y quedan congelados en el folio de <a href="/verificar/">Verificación de documentos</a>; los datos de AutoFácil salen de <a href="/mantenedores/datos-empresa/">Datos de la Empresa</a>.</li>
       <li><b>Contabilidad</b> → el abono (<code>LINEA_GIRO</code>), cada certificado (<code>LINEA_COMPENSACION</code>) y el pago de capital (<code>LINEA_PAGO</code>) generan su asiento con las reglas de <a href="/contabilidad/reglas/">Reglas de Centralización</a>. Al marcar FONDOS RECIBIDOS en Post Venta solo entra al banco el exceso no compensado. Objetar un certificado o anular un abono anula su asiento si el mes está abierto.</li>
@@ -242,6 +243,21 @@
     <button class="btnx btn-azul" onclick="dlgPdf.close()">Cerrar</button>
   </div>
 </dialog>
+
+<dialog id="dlgDocs" style="width:min(900px,96vw)">
+  <div class="dlg-head"><i class="bi bi-folder2-open"></i> Documentos firmados del acuerdo</div>
+  <div class="dlg-body">
+    <div class="nota" style="margin-bottom:10px">Al reemplazar un documento el anterior no se borra: queda en el historial con la fecha y quién lo reemplazó.</div>
+    <table><thead><tr><th>Documento</th><th>Archivo vigente</th><th>Firmado</th><th>Cargado</th><th></th></tr></thead><tbody id="tbDocs"></tbody></table>
+    <div style="margin-top:12px"><label class="sw" style="font-size:.76rem"><input type="checkbox" id="docHist" onchange="pintarDocs()"> Ver versiones reemplazadas</label></div>
+    <div id="docHistBox"></div>
+  </div>
+  <div class="dlg-foot">
+    <span class="gest"><button class="btnx btn-gris" onclick="subirDoc('OTRO')"><i class="bi bi-plus-lg"></i> Agregar otro documento</button></span>
+    <button class="btnx btn-azul" onclick="dlgDocs.close()">Cerrar</button>
+  </div>
+</dialog>
+<input type="file" id="docFile" accept=".pdf,.doc,.docx,image/png,image/jpeg,image/webp" style="display:none">
 
 <div id="toast"></div>
 
@@ -483,6 +499,70 @@ async function anular(id){
   const j = await api('POST', `/api/linea-credito/movimiento/${id}/anular`, { motivo });
   if (j && j.success) { toast('Movimiento anulado'); cargar(); } else toast((j && j.error) || 'No se pudo anular');
 }
+
+/* ── Documentos del acuerdo ── */
+let DOCS = { tipos:{}, documentos:[] }, DOC_TIPO = null;
+const dlgDocs = document.getElementById('dlgDocs');
+dlgDocs.addEventListener('close', () => { if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(TABS[TAB]); });
+async function abrirDocs(){
+  await cargarDocs();
+  dlgDocs.showModal();
+  if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA('Documentos del acuerdo');
+}
+async function cargarDocs(){
+  const j = await api('GET', `/api/linea-credito/${L.id}/documentos`);
+  if (!j || !j.success) { toast((j && j.error) || 'No se pudieron cargar los documentos'); return; }
+  DOCS = j.data; pintarDocs();
+}
+const kb = n => n ? (n >= 1048576 ? (n/1048576).toLocaleString('es-CL',{maximumFractionDigits:1}) + ' MB' : Math.round(n/1024) + ' KB') : '';
+function filaDoc(titulo, d, tipo){
+  const ver = d ? `<button class="icon-btn" title="Ver" onclick="verDoc(${d.id})"><i class="bi bi-eye"></i></button>` : '';
+  const sub = GEST && tipo ? `<button class="btnx ${d ? 'btn-gris' : 'btn-azul'}" style="padding:5px 10px;font-size:.72rem" onclick="subirDoc('${tipo}')"><i class="bi bi-${d ? 'arrow-repeat' : 'upload'}"></i> ${d ? 'Reemplazar' : 'Cargar'}</button>` : '';
+  return `<tr><td><b>${esc(titulo)}</b>${d && d.nota ? `<div style="font-size:.66rem;color:#94a3b8">${esc(d.nota)}</div>` : ''}</td>
+    <td>${d ? `<span class="lnk" onclick="verDoc(${d.id})">${esc(d.nombre_archivo)}</span> <span style="font-size:.66rem;color:#94a3b8">${kb(d.doc_bytes)}</span>` : '<span style="color:#d97706;font-size:.74rem">Sin cargar</span>'}</td>
+    <td>${d && d.fecha_firma ? fd(d.fecha_firma) : '—'}</td>
+    <td style="font-size:.72rem">${d ? fdt(d.created_at) + '<br>' + esc(d.subido_por || '') : ''}</td>
+    <td style="white-space:nowrap;text-align:right">${ver}${sub}</td></tr>`;
+}
+function pintarDocs(){
+  const vig = DOCS.documentos.filter(d => d.vigente);
+  const filas = Object.keys(DOCS.tipos).filter(t => t !== 'OTRO').map(t => filaDoc(DOCS.tipos[t], vig.find(d => d.tipo === t), t));
+  vig.filter(d => d.tipo === 'OTRO').forEach(d => filas.push(filaDoc(d.titulo || 'Otro documento', d, null)));
+  document.getElementById('tbDocs').innerHTML = filas.join('');
+  const hist = DOCS.documentos.filter(d => !d.vigente);
+  document.getElementById('docHistBox').innerHTML = !document.getElementById('docHist').checked ? '' :
+    (hist.length ? `<table style="margin-top:6px"><thead><tr><th>Documento</th><th>Archivo</th><th>Cargado</th><th>Reemplazado</th><th></th></tr></thead><tbody>` +
+      hist.map(d => `<tr class="nulo"><td>${esc(d.titulo || DOCS.tipos[d.tipo] || d.tipo)}</td><td>${esc(d.nombre_archivo)}</td><td style="font-size:.72rem">${fdt(d.created_at)} · ${esc(d.subido_por || '')}</td>
+        <td style="font-size:.72rem">${fdt(d.reemplazado_at)} · ${esc(d.reemplazado_por || '')}</td><td><button class="icon-btn" title="Ver" onclick="verDoc(${d.id})"><i class="bi bi-eye"></i></button></td></tr>`).join('') + '</tbody></table>'
+      : '<div class="vacio">No hay versiones reemplazadas.</div>');
+}
+async function verDoc(id){
+  const r = await fetch(`/api/linea-credito/documento/${id}`, { headers:{ Authorization:'Bearer '+token } });
+  if (chk401(r)) return;
+  if (!r.ok) { const j = await r.json().catch(() => null); toast((j && j.error) || 'No se pudo abrir el documento'); return; }
+  window.open(URL.createObjectURL(await r.blob()), '_blank');
+}
+function subirDoc(tipo){
+  DOC_TIPO = tipo;
+  const inp = document.getElementById('docFile'); inp.value = ''; inp.click();
+}
+document.getElementById('docFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  if (f.size > 10 * 1024 * 1024) { toast('El archivo supera los 10 MB'); return; }
+  const tipo = DOC_TIPO, ya = DOCS.documentos.find(d => d.vigente && d.tipo === tipo && tipo !== 'OTRO');
+  let titulo = '';
+  if (tipo === 'OTRO') { titulo = prompt('¿Qué documento es? (ej: Modificación del contrato, Prórroga, Poder)'); if (titulo === null) return; if (!titulo.trim()) { toast('Indica qué documento es'); return; } }
+  if (ya && !confirm(`Vas a reemplazar "${ya.nombre_archivo}" por "${f.name}". El anterior queda en el historial. ¿Seguir?`)) return;
+  const fecha = prompt('Fecha de firma (dd-mm-aaaa), opcional:', '');
+  if (fecha === null) return;
+  let fecha_firma = null;
+  if (fecha.trim()) { const m = fecha.trim().match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/); if (!m) { toast('Fecha inválida: usa dd-mm-aaaa'); return; } fecha_firma = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
+  const data = await new Promise((ok, ko) => { const rd = new FileReader(); rd.onload = () => ok(String(rd.result).split(',')[1]); rd.onerror = ko; rd.readAsDataURL(f); });
+  toast('Subiendo…');
+  const j = await api('POST', `/api/linea-credito/${L.id}/documentos`, { tipo, titulo, nombre_archivo: f.name, mime: f.type || 'application/pdf', data, fecha_firma });
+  if (j && j.success) { toast(j.data.reemplazados ? '✓ Documento reemplazado' : '✓ Documento cargado'); cargarDocs(); }
+  else toast((j && j.error) || 'No se pudo subir');
+});
 
 /* ── Parámetros ── */
 function pintarParam(){

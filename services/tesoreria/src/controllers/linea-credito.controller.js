@@ -117,6 +117,30 @@ require('../../../../shared/migrate').enFila('linea-credito', async () => {
     // Cada solicitud de reposición enviada queda como fila SOLICITUD en la Cartola (no mueve saldo), con el
     // correo tal como salió, para verlo después (Pato, 01-10-2026).
     await pool.query('ALTER TABLE linea_credito_movs ADD COLUMN IF NOT EXISTS correo_html MEDIUMTEXT NULL');
+    /* Documentos firmados del acuerdo (Pato, 01-10-2026). El archivo va al bucket (shared/almacen-docs.js);
+       `archivo` solo se llena si el host no tiene bucket. Reemplazar NO borra: la versión anterior queda
+       con vigente=0 y quién/cuándo la reemplazó — un contrato firmado nunca se pierde. */
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS linea_credito_docs (
+        id                INT AUTO_INCREMENT PRIMARY KEY,
+        id_linea          INT          NOT NULL,
+        tipo              VARCHAR(20)  NOT NULL,
+        titulo            VARCHAR(150) NULL,
+        nombre_archivo    VARCHAR(255) NOT NULL,
+        mime              VARCHAR(120) NULL,
+        archivo           LONGBLOB     NULL,
+        doc_storage       VARCHAR(10)  NOT NULL DEFAULT 'db',
+        doc_ruta          VARCHAR(500) NULL,
+        doc_bytes         BIGINT       NULL,
+        fecha_firma       DATE         NULL,
+        nota              VARCHAR(300) NULL,
+        vigente           TINYINT(1)   NOT NULL DEFAULT 1,
+        reemplazado_at    DATETIME     NULL,
+        reemplazado_por   VARCHAR(150) NULL,
+        subido_por        VARCHAR(150) NULL,
+        created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_linea (id_linea, tipo, vigente)
+      )`);
 
     // Card en Tesorería + permisos (anti-hardcode: módulos y cards salen de la BD)
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Tesorería' OR ruta LIKE '/tesoreria%' LIMIT 1");
@@ -811,6 +835,74 @@ exports.correoSolicitud = async (req, res) => {
     const [[m]] = await pool.query("SELECT id, glosa, enviado_at, enviado_a, correo_html, monto, usuario FROM linea_credito_movs WHERE id=? AND tipo='SOLICITUD'", [parseInt(req.params.idMov)]);
     if (!m) return fail(res, 'Solicitud no encontrada', 404);
     ok(res, m);
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Documentos firmados del acuerdo ──────────────────────────────────────
+   Uno vigente por tipo (OTRO admite varios). Cargar sobre un tipo que ya tiene documento = reemplazar. */
+const TIPOS_DOC = {
+  CONTRATO: 'Contrato de Apertura de Línea de Crédito',
+  ANEXO_1:  'Anexo 1 — Solicitud de Desembolso',
+  ANEXO_2:  'Anexo 2 — Pagaré',
+  ANEXO_3:  'Anexo 3 — Notificaciones',
+  CONVENIO: 'Convenio Comercial',
+  OTRO:     'Otro documento (modificación, prórroga, poder…)',
+};
+const MIME_DOC = /^(application\/pdf|image\/(png|jpe?g|webp)|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|application\/msword)$/;
+const MAX_DOC = 10 * 1024 * 1024;
+
+exports.documentos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, tipo, titulo, nombre_archivo, mime, doc_bytes, DATE_FORMAT(fecha_firma,'%Y-%m-%d') fecha_firma, nota, vigente,
+              reemplazado_at, reemplazado_por, subido_por, created_at
+         FROM linea_credito_docs WHERE id_linea=? ORDER BY vigente DESC, id DESC`, [parseInt(req.params.id)]);
+    ok(res, { tipos: TIPOS_DOC, documentos: rows });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.subirDocumento = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id); const b = req.body || {};
+    const tipo = norm(b.tipo).toUpperCase();
+    if (!TIPOS_DOC[tipo]) return fail(res, 'Tipo de documento inválido', 400);
+    const nombre = norm(b.nombre_archivo).slice(0, 255);
+    if (!nombre) return fail(res, 'Falta el nombre del archivo', 400);
+    const mime = norm(b.mime).toLowerCase();
+    if (!MIME_DOC.test(mime)) return fail(res, 'Formato no permitido: sube PDF, Word o imagen', 400);
+    if (!b.data) return fail(res, 'Falta el archivo', 400);
+    const buffer = Buffer.from(String(b.data), 'base64');
+    if (!buffer.length) return fail(res, 'El archivo está vacío', 400);
+    if (buffer.length > MAX_DOC) return fail(res, 'El archivo supera los 10 MB', 400);
+    if (b.fecha_firma && !ISO.test(String(b.fecha_firma))) return fail(res, 'Fecha de firma inválida', 400);
+    const titulo = tipo === 'OTRO' ? (norm(b.titulo).slice(0, 150) || null) : null;
+    if (tipo === 'OTRO' && !titulo) return fail(res, 'Indica qué documento es', 400);
+    const [[l]] = await pool.query('SELECT id FROM linea_credito WHERE id=?', [id]);
+    if (!l) return fail(res, 'Línea no encontrada', 404);
+    const col = await require('../../../../shared/almacen-docs').colocar({ ambito: 'linea-credito', clave: `${id}-${tipo}`, buffer, mime, nombre });
+    const [r] = await pool.query(
+      `INSERT INTO linea_credito_docs (id_linea, tipo, titulo, nombre_archivo, mime, archivo, doc_storage, doc_ruta, doc_bytes, fecha_firma, nota, subido_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [id, tipo, titulo, nombre, mime, col.blob, col.storage, col.ruta, col.bytes, b.fecha_firma || null, norm(b.nota).slice(0, 300) || null, quien(req)]);
+    // Reemplazo: el anterior del mismo tipo deja de ser vigente (se conserva; nunca se borra un firmado)
+    let reemplazo = 0;
+    if (tipo !== 'OTRO') {
+      const [u] = await pool.query(
+        'UPDATE linea_credito_docs SET vigente=0, reemplazado_at=NOW(), reemplazado_por=? WHERE id_linea=? AND tipo=? AND vigente=1 AND id<>?',
+        [quien(req), id, tipo, r.insertId]);
+      reemplazo = u.affectedRows;
+    }
+    auditar({ req, accion: reemplazo ? 'EDITAR' : 'CREAR', modulo: 'linea-credito', entidad: 'documento', entidad_id: String(r.insertId),
+      detalle: `${reemplazo ? 'Reemplazó' : 'Cargó'} ${titulo || TIPOS_DOC[tipo]}: ${nombre} (${Math.round(buffer.length / 1024)} KB)${b.fecha_firma ? ', firmado el ' + b.fecha_firma : ''}` });
+    ok(res, { id: r.insertId, reemplazados: reemplazo });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.verDocumento = async (req, res) => {
+  try {
+    const [[d]] = await pool.query('SELECT nombre_archivo, mime, archivo, doc_ruta FROM linea_credito_docs WHERE id=?', [parseInt(req.params.idDoc)]);
+    if (!d) return fail(res, 'Documento no encontrado', 404);
+    await require('../../../../shared/almacen-docs').servir(res, { ruta: d.doc_ruta, blob: d.archivo, nombre: d.nombre_archivo, mime: d.mime });
   } catch (e) { fail(res, e.message); }
 };
 
