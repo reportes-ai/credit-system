@@ -8,8 +8,10 @@
    columna `mes` (mes contable). Siete operaciones cursadas el 03/04-09 quedaron con
    mes agosto (la carga Trinidad trae el MES de ingreso y al otorgar la carta no se
    movía el mes) y agosto pasó de 104 a 111 DESPUÉS del cierre. Se corrigió en cada
-   escritor de `fecha_otorgado` (SET_MES_SQL), pero un escritor nuevo puede olvidarlo:
+   escritor de `fecha_otorgado` (alinearMes), pero un escritor nuevo puede olvidarlo:
    este vigía es la red de seguridad, para que la próxima vez se corrija sola y avise.
+   (Hasta el 01-10-2026 el arreglo era un fragmento dentro del mismo SET que en TiDB no
+   funcionaba, y este vigía corrigió 26 ops en 24 días. Si vuelve a corregir, es un bug.)
 
    Qué hace:
    - Mes destino ABIERTO → corrige (`mes` = mes de la fecha), audita y avisa por correo.
@@ -71,7 +73,7 @@ async function revisar() {
       html: `<p><b>Créditos otorgados cuyo mes contable no coincidía con su fecha de curse</b> (regla vigente desde ${corte}).</p>
         ${corregidas.length ? `<p>Corregidas automáticamente (mes abierto):</p><ul>${li(corregidas)}</ul>` : ''}
         ${bloqueadas.length ? `<p style="color:#b91c1c"><b>Sin tocar — apuntan a un mes cerrado, decide una persona:</b></p><ul>${li(bloqueadas)}</ul>` : ''}
-        <p style="color:#888;font-size:12px">Si esto se repite, algún proceso escribe fecha_otorgado sin SET_MES_SQL (shared/mes-atribucion.js).
+        <p style="color:#888;font-size:12px">Si esto se repite, algún proceso escribe fecha_otorgado sin llamar después a alinearMes (shared/mes-atribucion.js).
         Dashboard, cartolas y ranking cuentan por el mes contable; comisiones por la fecha de curse.</p>`,
     });
   } catch (_) { /* la alerta nunca debe causar otro error */ }

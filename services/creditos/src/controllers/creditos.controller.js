@@ -1,7 +1,7 @@
 const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
 // Motor único de mes de atribución: al editar la fecha de curse, `mes` la sigue (desde el corte).
-const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
+const { alinearMes } = require('../../../../shared/mes-atribucion');
 require('../migrations/fix-financieras');   // migración one-time de datos (financiera/estado/automotora) — guard propio
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 const { esFechaFutura, hoyChileDMY } = require('../../../../shared/utils/fecha-futura');
@@ -716,7 +716,6 @@ const update = async (req, res) => {
             chasis               = ?,
             financiera           = ?,
             fecha_otorgado       = ?,
-            ${SET_MES_SQL(await mesCorte())},
             fecha_primera_cuota  = ?,
             valor_vehiculo       = ?,
             pie                  = ?,
@@ -767,6 +766,8 @@ const update = async (req, res) => {
         id_financiera || null,
         req.params.id,
       ]);
+      // Desde el corte el mes contable sigue a la fecha de curse (sentencia aparte: shared/mes-atribucion)
+      await alinearMes('id = ?', [req.params.id]);
 
       audit.registrar({
         id_credito: req.params.id, req,

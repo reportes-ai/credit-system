@@ -214,9 +214,13 @@ correos programados y cobranza.
   nuevo. Sin esto el pool quedaba MEZCLADO (conexiones viejas -04:00, nuevas -03:00) y toda fecha leída
   corría una hora: el vigía de relojes mandó 15 correos el 06-09-2026. Las conexiones SIEMPRE hacen
   `SET time_zone` con el mismo offset con que mysql2 interpreta, nunca con el "vivo".
-- **Mes contable sigue a la fecha de curse** (`shared/mes-atribucion-core.js` → `SET_MES_SQL`, 07-09-2026):
+- **Mes contable sigue a la fecha de curse** (`shared/mes-atribucion.js` → `alinearMes()`, 07-09-2026):
   dashboard, cartolas y ranking cuentan por `creditos.mes`; comisiones por `fecha_otorgado`. Desde el corte
-  (ago-26) TODO UPDATE que escriba `fecha_otorgado` lleva `SET_MES_SQL(corte)` DESPUÉS de esa columna.
+  (ago-26) TODO UPDATE que escriba `fecha_otorgado` o `mes` llama DESPUÉS a `alinearMes(where, args)`,
+  en sentencia aparte. **Nunca dentro del mismo SET**: TiDB evalúa cada expresión con el valor ANTERIOR de
+  la fila (MySQL de izquierda a derecha), y el fragmento que había hasta el 01-10-2026 dejó la op 26091585
+  otorgada en octubre con mes septiembre. Vale para cualquier UPDATE: una expresión del SET no puede
+  depender de otra columna asignada en la misma sentencia.
   Sin eso, 7 ops cursadas en septiembre quedaron en agosto y el mes cerrado pasó de 104 a 111. Red de
   seguridad: `shared/vigia-mes-atribucion.js` (horario: corrige en mes abierto, solo avisa en cerrado) y el
   chequeo `MES_ATRIBUCION` del Cierre de Mes.

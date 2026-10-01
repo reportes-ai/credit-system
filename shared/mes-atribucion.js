@@ -16,7 +16,7 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('./config/database');
 
-const { MES_SQL, SET_MES_SQL, DEFAULT_CORTE } = require('./mes-atribucion-core');   // parte pura, sin pool
+const { MES_SQL, ALINEAR_MES_SQL, DEFAULT_CORTE } = require('./mes-atribucion-core');   // parte pura, sin pool
 
 require('./migrate').enFila('mes-atribucion', async () => {
   try {
@@ -40,4 +40,21 @@ async function mesCorte() {
   return _cache;
 }
 
-module.exports = { mesCorte, MES_SQL, SET_MES_SQL, DEFAULT_CORTE };
+/**
+ * Deja `mes` = mes de la fecha de curse (desde el corte) en las filas que calzan con
+ * `where`. TODO UPDATE que escriba `fecha_otorgado` o `mes` lo llama justo DESPUÉS, con la
+ * misma condición: en sentencia aparte porque TiDB no ve dentro del mismo SET el valor
+ * recién escrito (ver ALINEAR_MES_SQL). No lanza: si falla queda en el log y el vigía de
+ * mes de atribución lo recoge en la hora — el mes nunca bota la operación que lo llamó.
+ * @param {string} where condición SQL sobre creditos (sin alias), con sus `?`
+ * @param {Array}  args  valores de esos `?`
+ * @returns {Promise<number>} filas cuyo mes cambió
+ */
+async function alinearMes(where, args = []) {
+  try {
+    const [r] = await pool.query(ALINEAR_MES_SQL(where), [...args, (await mesCorte()) + '-01']);
+    return r.affectedRows || 0;
+  } catch (e) { console.error('[mes-atribucion alinearMes]', e.message); return 0; }
+}
+
+module.exports = { mesCorte, MES_SQL, alinearMes, DEFAULT_CORTE };

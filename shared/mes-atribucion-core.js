@@ -21,17 +21,28 @@ function MES_SQL(mesEvaluado, corte, alias = 'c') {
 }
 
 /**
- * Fragmento para un SET que ESCRIBE `mes` coherente con `fecha_otorgado`: desde el
- * corte, el mes contable de una op cursada es el mes de su fecha de curse; antes del
- * corte `mes` se respeta tal cual (ajustes históricos). Va DESPUÉS de `fecha_otorgado`
- * en el SET: MySQL evalúa de izquierda a derecha y así ve la fecha ya definitiva.
- * Nació el 07-09-2026: 7 ops cursadas el 03/04-09 quedaron con mes agosto (el dashboard
- * y las cartolas cuentan por `mes`) y agosto pasó de 104 a 111 después del cierre.
- * @param {string} corte 'YYYY-MM' (de mesCorte())
+ * Sentencia que deja `mes` coherente con `fecha_otorgado`: desde el corte, el mes
+ * contable de una op cursada es el mes de su fecha de curse; antes del corte `mes` se
+ * respeta tal cual (ajustes históricos). Nació el 07-09-2026: 7 ops cursadas el 03/04-09
+ * quedaron con mes agosto (el dashboard y las cartolas cuentan por `mes`) y agosto pasó
+ * de 104 a 111 después del cierre.
+ *
+ * Es una sentencia APARTE, que se ejecuta DESPUÉS del UPDATE que escribe la fecha
+ * (alinearMes() en mes-atribucion.js). Hasta el 01-10-2026 era un fragmento dentro del
+ * mismo SET (`fecha_otorgado = …, mes = CASE WHEN fecha_otorgado …`) que confiaba en que
+ * el motor evalúa el SET de izquierda a derecha. MySQL lo hace; **TiDB no**: cada
+ * expresión ve el valor ANTERIOR de la fila. En producción el mes quedaba calculado con
+ * la fecha vieja (vacía al otorgar una carta) y el crédito salía del dashboard hasta que
+ * el vigía lo corregía (26 veces en 24 días; op 26091585). Peor: con `mes = ?` en el
+ * mismo SET, el `ELSE mes` devolvía el mes viejo y la edición manual se perdía callada.
+ * En una sentencia aparte no hay orden que adivinar: sirve igual en TiDB y en MySQL.
+ * @param {string} where condición de las filas recién escritas (con sus `?`)
+ * @returns {string} UPDATE con un `?` final para el corte ('YYYY-MM-01')
  */
-function SET_MES_SQL(corte) {
-  return `mes = CASE WHEN fecha_otorgado IS NOT NULL AND fecha_otorgado >= '${corte}-01'
-                     THEN DATE_FORMAT(fecha_otorgado, '%Y-%m-01') ELSE mes END`;
+function ALINEAR_MES_SQL(where) {
+  return `UPDATE creditos SET mes = DATE_FORMAT(fecha_otorgado, '%Y-%m-01'), updated_at = NOW()
+           WHERE (${where}) AND fecha_otorgado IS NOT NULL AND fecha_otorgado >= ?
+             AND (mes IS NULL OR DATE_FORMAT(mes, '%Y-%m') <> DATE_FORMAT(fecha_otorgado, '%Y-%m'))`;
 }
 
-module.exports = { MES_SQL, SET_MES_SQL, DEFAULT_CORTE };
+module.exports = { MES_SQL, ALINEAR_MES_SQL, DEFAULT_CORTE };

@@ -7,7 +7,7 @@ const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerra
 // Motor único de etapa: escribir la etapa toca SIEMPRE las tres columnas.
 const { SET_ETAPA_SQL, SET_ESTADO_SQL, valoresEtapa } = require('../../../../shared/etapa-credito');
 // Motor único de mes de atribución: `mes` sigue a la fecha de curse desde el corte.
-const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
+const { alinearMes } = require('../../../../shared/mes-atribucion');
 // Motor único de numeración (num_op y numero_credito).
 const { numeroCreditoCarta } = require('../../../../shared/num-op');
 
@@ -367,8 +367,6 @@ const update = async (req, res) => {
       // (motor único: shared/etapa-credito.js).
       SET_ESTADO_SQL,
       'fecha_otorgado=?',
-      // Después de fecha_otorgado: desde el corte, `mes` = mes de la fecha de curse (07-09-2026)
-      SET_MES_SQL(await mesCorte()),
       'producto=?',
       'marca=?','modelo=?','anio=?','tasacion=?','permiso_circulacion=?',
       'valor_vehiculo=?','pie=?',
@@ -410,6 +408,8 @@ const update = async (req, res) => {
     ];
 
     await pool.query(`UPDATE creditos SET ${sets.join(',')} WHERE id=?`, vals);
+    // Desde el corte, `mes` = mes de la fecha de curse (07-09-2026); en sentencia aparte (shared/mes-atribucion)
+    await alinearMes('id = ?', [id]);
 
     // Auto-calcular ingresos y comisiones al actualizar
     if (['OTORGADO','APROBADO'].includes((b.estado_credito||'').toUpperCase())) {

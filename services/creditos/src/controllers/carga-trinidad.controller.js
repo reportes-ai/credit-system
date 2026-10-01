@@ -9,7 +9,7 @@ const { esFechaFutura, hoyChile } = require('../../../../shared/utils/fecha-futu
 // Motor único de etapa: al sincronizar desde Trinidad, `estado` acompaña a las otras dos.
 const { SET_ESTADO_SQL } = require('../../../../shared/etapa-credito');
 // Motor único de mes de atribución: `mes` sigue a la fecha de curse desde el corte (07-09-2026).
-const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
+const { alinearMes } = require('../../../../shared/mes-atribucion');
 
 /* ── Migraciones ────────────────────────────────────────────────── */
 require('../../../../shared/migrate').enFila('carga-trinidad', async () => {
@@ -488,7 +488,7 @@ function esArchivoCanal(buffer) {
    pisan cuando difieren (meses abiertos). El plazo sigue fill-only (derivado,
    ±1 ambiguo). Match por num_op o id_financiera. */
 async function aplicarCanal(mapaCanal, log) {
-  const corteMes = await mesCorte();
+  const alinearIds = [];   // créditos a los que se les escribió la fecha de curse: su mes se alinea al final
   const ids = Object.keys(mapaCanal).map(Number);
   const idsSet = new Set(ids);
   let complementados = 0, sinMatch = 0, omitidosCerrado = 0, erroresSQL = 0; let primerError = null;
@@ -561,7 +561,7 @@ async function aplicarCanal(mapaCanal, log) {
       if (!cerrado && esCursadoCanal && f.fecha_curse &&
           String(r.estado_credito || '').toUpperCase() === 'OTORGADO' && r.fo !== f.fecha_curse) {
         sets.push('fecha_otorgado = ?'); vals.push(f.fecha_curse);
-        sets.push(SET_MES_SQL(corteMes));   // el mes contable sigue a la fecha de curse (desde el corte)
+        alinearIds.push(r.id);   // el mes contable sigue a la fecha de curse (desde el corte): alinearMes al final
       }
       if (cerrado && !sets.length) { omitidosCerrado++; continue; }
       if (!sets.length) continue;
@@ -572,6 +572,8 @@ async function aplicarCanal(mapaCanal, log) {
     }
     sinMatch += chunk.filter(k => !vistos.has(k)).length;
   }
+  // Mes contable = mes de la fecha de curse, en sentencia aparte (motor único shared/mes-atribucion)
+  if (alinearIds.length) await alinearMes('id IN (?)', [alinearIds]);
   if (complementados) log.push(`📎 Informe Canal: ${complementados} créditos complementados (vehículo/tasa/plazo/cuota/seguros)`);
   if (omitidosCerrado) log.push(`⏭ Informe Canal: ${omitidosCerrado} omitidos por mes cerrado (solo montos)`);
   if (erroresSQL) { log.push(`🔴 Informe Canal: ${erroresSQL} filas con ERROR SQL — ${primerError}`); console.error('[aplicarCanal]', erroresSQL, 'errores;', primerError); }
@@ -658,7 +660,6 @@ exports.importar = async (req, res) => {
   // en vez de esperar el barrido de 6 h (Pato, 29-09-2026). Fire-and-forget: nunca frena la respuesta.
   res.on('finish', () => require('../../../../shared/enlazar-dealer').barrido());
   try {
-    const corteMes = await mesCorte();
     const { solicitudes, canal } = archivosDe(req);
     const nombreArchivo = [solicitudes?.originalname, canal?.originalname].filter(Boolean).join(' + ');
     if (!solicitudes && !canal) return res.json({ success: false, error: 'Archivo requerido' });
@@ -746,6 +747,9 @@ exports.importar = async (req, res) => {
     };
     const cursadosIds        = [];   // num_ops (campo num_op en BD)
     const cursadosIdFinanciera = []; // num_ops Trinidad que están como id_financiera en BD
+    /* Filas escritas por esta carga: al terminar el recorrido se les alinea el mes contable con la
+       fecha de curse (alinearMes, una sentencia por llave y no una por fila). 01-10-2026. */
+    const alinearNumOps = [], alinearIdFin = [];
 
     for (const f of filas) {
       try {
@@ -805,11 +809,10 @@ exports.importar = async (req, res) => {
                id_cliente = COALESCE(id_cliente, ?),
                /* La Fecha Curse del archivo manda si acá no hay fecha o la que hay es
                   ANTERIOR a la creación (prellenada con fin de mes por la regla MES
-                  antigua: las ops del 01-09-2026 quedaron con 31-08). mes va ANTES
-                  porque MySQL evalúa el SET de izquierda a derecha. */
+                  antigua: las ops del 01-09-2026 quedaron con 31-08). El mes contable
+                  se alinea después del recorrido (alinearMes), no en este SET. */
                fecha_otorgado = CASE WHEN ? IS NOT NULL AND (fecha_otorgado IS NULL OR fecha_otorgado < DATE(created_at)) THEN ? ELSE fecha_otorgado END,
                mes            = COALESCE(mes, ?),
-               ${SET_MES_SQL(corteMes)},
                updated_at = NOW()
              WHERE id_financiera = ? AND financiera != 'NO APLICA'`,
             [f.estado_autofin, f.ejecutivo_tri,
@@ -817,6 +820,7 @@ exports.importar = async (req, res) => {
              fechaEq, fechaEq, fechaEq ? fechaEq.slice(0, 7) + '-01' : null, String(f.num_op)]
           );
           actualizados++;
+          alinearIdFin.push(String(f.num_op));
           if (anulaOtorgadaEq && actEq?.id) await pedirAnulacion(actEq.id, f, req, log, anulacionesPedidas);
           // La última información manda: se pisan montos/vehículo/producto (no dealer ni
           // vendedor, no meses cerrados); lo que no se pisa queda en Diferencias para decidir.
@@ -861,7 +865,6 @@ exports.importar = async (req, res) => {
                id_cliente     = COALESCE(id_cliente, ?),
                fecha_otorgado = COALESCE(?, fecha_otorgado),
                mes            = COALESCE(?, mes),
-               ${SET_MES_SQL(corteMes)},
                marca    = COALESCE(?, marca), modelo   = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
@@ -871,6 +874,7 @@ exports.importar = async (req, res) => {
              f.marca, f.modelo, f.vendedor, f.num_op]
           );
           actualizados++;
+          alinearNumOps.push(f.num_op);
           if (anulaOtorgada && actual.id) await pedirAnulacion(actual.id, f, req, log, anulacionesPedidas);
           try {
             if (actual.id && enVentana(actual, f) && !(await isMesCerrado(actual.mes_txt || ''))) {
@@ -914,6 +918,7 @@ exports.importar = async (req, res) => {
             ]
           );
           insertados++;
+          alinearIdFin.push(String(f.num_op));   // nace con el MES del export: si viene cursada, su mes es el de la fecha de curse
           detallesIns.push({ num_op: numOpAF, id_financiera: f.num_op, datos: f });
           log.push(`➕ Insertado  OP ${numOpAF} (ID fin. ${f.num_op}) → ${f.estado_autofin} / ${f.estado_credito}`);
           // La recalculación posterior la ubica por id_financiera (num_op ya es el nuestro)
@@ -924,6 +929,12 @@ exports.importar = async (req, res) => {
         log.push(`✗ Error ${f.num_op}: ${rowErr.message}`);
       }
     }
+
+    /* Mes contable = mes de la fecha de curse (desde el corte; motor único shared/mes-atribucion). Va en
+       sentencia aparte y ANTES del recálculo: dentro del mismo SET, TiDB calculaba el mes con la fecha
+       anterior y la op cursada quedaba en el mes de ingreso hasta que pasaba el vigía (01-10-2026). */
+    if (alinearNumOps.length) await alinearMes('num_op IN (?)', [alinearNumOps]);
+    if (alinearIdFin.length)  await alinearMes("id_financiera IN (?) AND financiera != 'NO APLICA'", [alinearIdFin]);
 
     // ── Complemento desde Informe Canal AFA (seguros/GPS/tipo vehículo/RUT) ──
     let resCanal = null;

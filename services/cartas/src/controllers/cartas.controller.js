@@ -9,7 +9,7 @@ const { marcarForzadosCalculo, recalcularPorOps } = require('../../../creditos/s
 // Motor único de etapa: otorgar escribe las TRES columnas de una sola vez.
 const { SET_ETAPA_SQL, valoresEtapa } = require('../../../../shared/etapa-credito');
 // Motor único de mes de atribución: al otorgar, `mes` sigue a la fecha de curse (desde el corte).
-const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
+const { alinearMes } = require('../../../../shared/mes-atribucion');
 const pdf = require('pdf-parse');
 
 /* numero_credito (YYMM###) — motor único en shared/num-op.js. La versión
@@ -1003,14 +1003,10 @@ const otorgar = async (req, res) => {
                      creación del crédito: la carga Trinidad prellenaba fin de mes (MES del
                      export) en ops aún no cursadas y la op quedaba atribuida al mes anterior
                      (26090047, 05-09-2026: cursó en septiembre y caía en agosto). */
-                  /* mes va ANTES: MySQL evalúa el SET de izquierda a derecha y el segundo
-                     CASE vería la fecha_otorgado ya reemplazada. */
+                  /* El mes contable NO va en este SET: lo alinea alinearMes() más abajo, en
+                     sentencia aparte (TiDB no ve acá la fecha recién escrita, 01-10-2026). */
                   fecha_otorgado=CASE WHEN fecha_otorgado IS NULL OR fecha_otorgado < DATE(created_at)
                                       THEN CURDATE() ELSE fecha_otorgado END,
-                  /* mes DESPUÉS de fecha_otorgado: desde el corte, mes = mes de la fecha de
-                     curse definitiva (motor único shared/mes-atribucion). Con el CASE
-                     anterior una fecha prellenada válida dejaba el mes viejo (07-09-2026). */
-                  ${SET_MES_SQL(await mesCorte())},
                   comdea_real = CASE WHEN ? > 0 AND (COALESCE(comdea_real,0) <= 0 OR ? < comdea_real) THEN ? ELSE comdea_real END,
                   /* EJECUTIVO: manda la CARTA (Pato, 23-09-2026). La carga Trinidad trae el
                      ejecutivo que tenga DealerNet, y un ejecutivo nuevo (Manuel Basoalto,
@@ -1059,6 +1055,10 @@ const otorgar = async (req, res) => {
                '/creditos/', `otorgar-sin-efecto:${ca.op_carta}`]);
           } catch (_) {}
         });
+        /* Desde el corte el mes contable = mes de la fecha de curse (motor único shared/mes-atribucion).
+           Antes del recálculo de más abajo. Op 26091585 (01-10-2026): otorgada en octubre, quedó en
+           septiembre y fuera del dashboard hasta que el vigía la corrigió una hora después. */
+        await alinearMes(`(${cond.join(' OR ')})`, args);
         // El crédito de la carta nace sin num_op → correlativo AutoFácil (motor único).
         try {
           const [[sinOp]] = await pool.query(

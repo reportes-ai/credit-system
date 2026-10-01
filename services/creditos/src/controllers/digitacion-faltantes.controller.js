@@ -403,11 +403,11 @@ exports.guardar = async (req, res) => {
     const usuario = ((req.usuario.nombre||'') + ' ' + (req.usuario.apellido||'')).trim() || req.usuario.email || '';
     if (sets.length) {
       vals.push(id);
-      /* Desde el corte el mes contable SIGUE a la fecha de curse (motor único shared/mes-atribucion); va al
-         final del SET. 14-09-2026: 9 ops cursadas el 11/12-09 quedaron en agosto al completarlas por esta cola
+      await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at=NOW() WHERE id=?`, vals);
+      /* Desde el corte el mes contable SIGUE a la fecha de curse (motor único shared/mes-atribucion), en
+         sentencia aparte. 14-09-2026: 9 ops cursadas el 11/12-09 quedaron en agosto al completarlas por esta cola
          (el formulario traía el mes corrido un mes) y el vigía las devolvió a septiembre. */
-      const { mesCorte, SET_MES_SQL } = require('../../../../shared/mes-atribucion');
-      await pool.query(`UPDATE creditos SET ${sets.join(', ')}, ${SET_MES_SQL(await mesCorte())}, updated_at=NOW() WHERE id=?`, vals);
+      await require('../../../../shared/mes-atribucion').alinearMes('id = ?', [id]);
       for (const c of cambios) {
         pool.query(`INSERT INTO creditos_edicion_log (id_credito, num_op, usuario, campo, valor_antes, valor_despues)
                     VALUES (?, ?, ?, ?, ?, ?)`,
