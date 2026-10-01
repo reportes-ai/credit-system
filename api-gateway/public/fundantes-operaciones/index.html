@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Fundantes — Operaciones</title>
-  <!-- v1.2 — columna Envio (1er/2do/3er envio) junto a Fecha Otorgado; 2+ resalta en naranjo · v1.1 — pill SIN LIMITACION en la lista y en el visor de revision -->
+  <!-- v1.3 — columna Enviado (fecha y hora del envío a validación y hace cuánto espera) · v1.2 — columna Envio (1er/2do/3er envio) junto a Fecha Otorgado; 2+ resalta en naranjo · v1.1 — pill SIN LIMITACION en la lista y en el visor de revision -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; --amber:#b45309; }
@@ -171,6 +171,11 @@ if (!token || !yo) location.href = '/login.html';
 const API = (p, o = {}) => fetch(p, { headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, ...o });
 const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const opNum = v => String(v == null ? '' : v).replace(/\./g,'');
+// Cuándo se envió a validación y hace cuánto espera (fecha y hora de Chile)
+const enviadoLbl = f => { if (!f) return '—'; const d = new Date(f); if (isNaN(d)) return '—';
+  const min = Math.max(0, Math.round((Date.now() - d) / 60000));
+  const hace = min < 60 ? min + ' min' : min < 1440 ? Math.floor(min / 60) + ' h' : Math.floor(min / 1440) + ' d ' + Math.floor(min % 1440 / 60) + ' h';
+  return d.toLocaleString('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '') + `<br><small style="color:${min >= 1440 ? '#b45309' : '#64748b'};font-weight:600">hace ${hace}</small>`; };
 const fmtF = f => { if (!f) return '—'; try { return new Date(f).toLocaleDateString('es-CL',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}); } catch { return '—'; } };
 function toast(m, ok){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',4000); }
 const diasCls = d => d<=7?'d0':d<=15?'d1':d<=30?'d2':'d3';
@@ -301,6 +306,7 @@ function pintar(){
       <td>${esc(r.id_financiera||'—')}</td>
       <td>${fmtF(r.fecha_otorgado)}</td>
       <td>${envioLbl(r.envios)}</td>
+      <td>${enviadoLbl(r.fecha_envio)}</td>
       <td><span class="dias-pill ${diasCls(r.dias)}">${r.dias} d</span></td>
       <td>${subidos} doc${subidos===1?'':'s'}${r.sin_limitacion ? ' <span style="display:inline-flex;align-items:center;gap:4px;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;border-radius:20px;padding:2px 9px;font-size:.68rem;font-weight:800;margin-left:5px"><i class="bi bi-slash-circle"></i>SIN LIMITACIÓN</span>' : ''}</td>
       <td><button class="btn-rev" onclick="abrirRev(${r.id_credito})"><i class="bi bi-eye"></i> Revisar</button></td>
@@ -308,7 +314,7 @@ function pintar(){
   }).join('');
   wrap.innerHTML = `<table class="grid"><thead><tr>
     <th>Ejecutivo Comercial</th><th>N° Op</th><th>Financiera</th><th>ID Financiera</th>
-    <th>Fecha Otorgado</th><th>Envío</th><th>Días</th><th>Docs</th><th></th></tr></thead><tbody>${body}</tbody></table>`;
+    <th>Fecha Otorgado</th><th>Envío</th><th>Enviado</th><th>Días</th><th>Docs</th><th></th></tr></thead><tbody>${body}</tbody></table>`;
 }
 
 /* ── Visor live ── */
