@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — Línea de Crédito Unidad: pestaña Cartola (abonos manuales, cargos por cada certificado emitido con saldo corrido, detalle del certificado enviado) y pestaña Parámetros (línea, texto del certificado, destinatarios y CC) (01-10-2026). v1.0 — cuenta corriente de la línea rotativa y Certificado de Saldo Insoluto automático por cada OP compensada -->
+<!-- v1.2 — vista previa del certificado (PDF con marca de agua) y del correo con los parámetros en pantalla; el certificado se emite al otorgar (gatillo) y el barrido queda cada 1 hora (01-10-2026). v1.1 — Línea de Crédito Unidad: pestaña Cartola (abonos manuales, cargos por cada certificado emitido con saldo corrido, detalle del certificado enviado) y pestaña Parámetros (línea, texto del certificado, destinatarios y CC) (01-10-2026). v1.0 — cuenta corriente de la línea rotativa y Certificado de Saldo Insoluto automático por cada OP compensada -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -87,7 +87,7 @@
     </div>
     <div class="der">
       <button class="btnx btn-blanco" onclick="cargar()"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
-      <span class="gest"><button class="btnx btn-blanco" onclick="procesar()" title="Revisa ahora si hay operaciones nuevas por compensar (el motor lo hace solo cada 30 minutos)"><i class="bi bi-lightning-charge"></i> Procesar ahora</button></span>
+      <span class="gest"><button class="btnx btn-blanco" onclick="procesar()" title="Revisa ahora si hay operaciones nuevas por compensar (se hace solo al otorgar, y un barrido cada hora)"><i class="bi bi-lightning-charge"></i> Procesar ahora</button></span>
     </div>
   </div>
 
@@ -157,6 +157,16 @@
       </div>
     </div>
 
+    <div class="panel">
+      <h5><i class="bi bi-eye"></i> Vista previa
+        <span style="margin-left:auto;font-weight:500;font-size:.72rem;color:#64748b">Con los parámetros que están en pantalla, aunque no estén guardados. No se graba ni se envía nada.</span></h5>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btnx btn-gris" onclick="previewCert()"><i class="bi bi-file-earmark-pdf"></i> Vista previa del certificado</button>
+        <button class="btnx btn-gris" onclick="previewMail()"><i class="bi bi-envelope-open"></i> Vista previa del correo</button>
+      </div>
+      <div class="nota" style="margin-top:6px">Usa como ejemplo el último certificado emitido o, si aún no hay, la última operación de Unidad otorgada (con un saldo de ejemplo del 60% de la línea).</div>
+    </div>
+
     <div class="gest" style="display:flex;justify-content:flex-end;gap:8px">
       <button class="btnx btn-gris" onclick="pintarParam()">Descartar cambios</button>
       <button class="btnx btn-azul" onclick="guardarConfig()"><i class="bi bi-check-lg"></i> Guardar parámetros</button>
@@ -166,11 +176,12 @@
   <div class="afecta">
     <h6><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h6>
     <ul>
-      <li><b>Línea activa + Fecha de inicio</b> → el motor (cada 30 minutos y con <i>Procesar ahora</i>) toma las operaciones de Unidad que pasan a OTORGADO desde esa fecha en <a href="/creditos/">Créditos</a>, compensa su saldo de precio contra el saldo de la línea y emite el certificado, que aparece como cargo en la Cartola. Apagada, no hace nada.</li>
+      <li><b>Línea activa + Fecha de inicio</b> → apenas una operación de Unidad pasa a OTORGADO (Cartas Vigentes, carga masiva de cartas o edición del crédito; más un barrido cada hora y <i>Procesar ahora</i> para cualquier otro camino) el sistema toma las otorgadas desde esa fecha en <a href="/creditos/">Créditos</a>, compensa su saldo de precio contra el saldo de la línea y emite el certificado, que aparece como cargo en la Cartola. Apagada, no hace nada.</li>
       <li><b>Saldo de precio</b> → sale de la ficha del crédito con el mismo motor que arma la Orden de Pago al dealer en <a href="/postventa/seguimiento/">Post Venta → Seguimiento</a>. Si el monto está mal, se corrige en la ficha y el certificado objetado se reprocesa.</li>
       <li><b>Monto máximo y umbral de reposición</b> → definen el cupo disponible, la utilización que muestra cada certificado y desde cuándo se puede pedir el giro del cupo repuesto (letra C/ del numeral Tres.Uno del contrato). Un abono mayor al cupo disponible se rechaza.</li>
       <li><b>Días de respuesta</b> → plazo que se le da a Unidad en el certificado y en el correo; pasado ese plazo el certificado aparece "fuera de plazo" (no se acepta solo).</li>
       <li><b>Para, CC y envío automático</b> → a quién sale cada certificado con el PDF adjunto (plantilla <code>linea_certificado_saldo</code> en <a href="/mantenedores/correos-programados/">Correos del Sistema</a>). El detalle de cada envío (fecha, destinatarios, respuesta) se ve en la Cartola.</li>
+      <li><b>Vista previa</b> → arma el certificado (PDF con marca de agua) y el correo con lo que está en pantalla, sin grabar ni enviar.</li>
       <li><b>Texto del certificado y firmante</b> → aparecen en el PDF y quedan congelados en el folio de <a href="/verificar/">Verificación de documentos</a>; los datos de AutoFácil salen de <a href="/mantenedores/datos-empresa/">Datos de la Empresa</a>.</li>
       <li><b>Contabilidad</b> → el abono (<code>LINEA_GIRO</code>), cada certificado (<code>LINEA_COMPENSACION</code>) y el pago de capital (<code>LINEA_PAGO</code>) generan su asiento con las reglas de <a href="/contabilidad/reglas/">Reglas de Centralización</a>. Al marcar FONDOS RECIBIDOS en Post Venta solo entra al banco el exceso no compensado. Objetar un certificado o anular un abono anula su asiento si el mes está abierto.</li>
     </ul>
@@ -198,6 +209,19 @@
   <div class="dlg-head"><i class="bi bi-file-earmark-check"></i> <span id="dTitulo">Certificado</span></div>
   <div class="dlg-body" id="dBody"></div>
   <div class="dlg-foot" id="dFoot"></div>
+</dialog>
+
+<dialog id="dlgMail" style="width:min(820px,95vw)">
+  <div class="dlg-head"><i class="bi bi-envelope-open"></i> Vista previa del correo</div>
+  <div class="dlg-body">
+    <div class="det" id="mailHead"></div>
+    <iframe id="mailFrame" style="width:100%;height:440px;border:1.5px solid #e2e8f0;border-radius:10px;margin-top:12px;background:#fff"></iframe>
+  </div>
+  <div class="dlg-foot">
+    <a class="btnx btn-gris" href="/mantenedores/correos-programados/" target="_blank" style="text-decoration:none"><i class="bi bi-pencil"></i> Editar asunto y cuerpo</a>
+    <button class="btnx btn-gris" onclick="previewCert()"><i class="bi bi-paperclip"></i> Ver adjunto</button>
+    <button class="btnx btn-azul" onclick="dlgMail.close()">Cerrar</button>
+  </div>
 </dialog>
 
 <div id="toast"></div>
@@ -411,6 +435,32 @@ function restaurarTextos(){
   if (!confirm('¿Volver al texto por defecto en los dos párrafos? (se aplica al guardar)')) return;
   document.getElementById('cIntro').value = L.texto_intro_def; document.getElementById('cCierre').value = L.texto_cierre_def;
 }
+function formParam(){
+  const g = id => document.getElementById(id).value.trim();
+  return { nombre:g('cNombre'), acreedor_nombre:g('cAcr'), acreedor_rut:g('cAcrRut'), limite:g('cLimite'), umbral_pct:g('cUmbral'),
+    dias_respuesta:g('cDias'), contrato_fecha:g('cContrato'), fecha_inicio:g('cInicio'), fecha_vencimiento:g('cVenc'),
+    correo_para:g('cPara'), correo_cc:g('cCc'), firmante_nombre:g('cFirmante'), firmante_cargo:g('cCargo'),
+    cert_texto_intro:g('cIntro'), cert_texto_cierre:g('cCierre') };
+}
+async function previewCert(){
+  const r = await fetch(`/api/linea-credito/${L.id}/preview/certificado`, { method:'POST', headers:H, body: JSON.stringify(formParam()) });
+  if (chk401(r)) return;
+  if (!r.ok) { const j = await r.json().catch(() => null); toast((j && j.error) || 'No se pudo armar la vista previa'); return; }
+  window.open(URL.createObjectURL(await r.blob()), '_blank');
+}
+async function previewMail(){
+  const j = await api('POST', `/api/linea-credito/${L.id}/preview/correo`, formParam());
+  if (!j || !j.success) { toast((j && j.error) || 'No se pudo armar la vista previa'); return; }
+  const d = j.data, fila = (k, v) => `<div class="k">${k}</div><div class="v">${v}</div>`;
+  document.getElementById('mailHead').innerHTML =
+    fila('Para', esc(d.para.join(', ') || '— sin casilla —')) + fila('CC', esc(d.cc.join(', ') || '—')) +
+    fila('Asunto', esc(d.asunto)) + fila('Adjunto', `<i class="bi bi-paperclip"></i> ${esc(d.adjunto)}`) +
+    fila('Ejemplo', `OP ${esc(d.ejemplo_op)}`) +
+    (d.activa ? '' : fila('Ojo', '<span style="color:#b91c1c">La plantilla está desactivada en Correos del Sistema: no se enviaría</span>'));
+  document.getElementById('mailFrame').srcdoc = d.html;
+  dlgMail.showModal();
+  if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA('Vista previa del correo');
+}
 async function guardarConfig(){
   const g = id => document.getElementById(id).value.trim();
   const body = { nombre:g('cNombre'), acreedor_nombre:g('cAcr'), acreedor_rut:g('cAcrRut'), limite:g('cLimite'), umbral_pct:g('cUmbral'),
@@ -424,7 +474,9 @@ async function guardarConfig(){
 
 /* ── Abono / pago de capital ── */
 const dlgMov = document.getElementById('dlgMov'), dlgCert = document.getElementById('dlgCert');
+const dlgMail = document.getElementById('dlgMail');
 dlgCert.addEventListener('close', () => { if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(TABS[TAB]); });
+dlgMail.addEventListener('close', () => { if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(TABS[TAB]); });
 async function abrirMov(tipo){
   MTIPO = tipo;
   if (!CTAS.length) { try { const j = await api('GET','/api/cuentas-bancarias'); CTAS = (j && j.data || []).filter(c => c.activo !== 0 && String(c.moneda||'CLP').toUpperCase() === 'CLP'); } catch(e){} }

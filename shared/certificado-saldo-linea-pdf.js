@@ -17,7 +17,7 @@ const fmtD = s => { if (!s) return '—'; const [y, m, d] = String(s).slice(0, 1
 
 /* generarCertificadoSaldoLineaPDF({ d, codigo, host }) → Promise<Buffer>
    d = snapshot (ver linea-credito.controller → datosCertificado) */
-function generarCertificadoSaldoLineaPDF({ d = {}, codigo, host }) {
+function generarCertificadoSaldoLineaPDF({ d = {}, codigo, host, preview = false }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'LETTER', margins: { top: 54, left: 70, right: 70, bottom: 54 } });
     const chunks = [];
@@ -28,6 +28,12 @@ function generarCertificadoSaldoLineaPDF({ d = {}, codigo, host }) {
     const deu = d.deudor || {}, acr = d.acreedor || {}, op = d.operacion || {}, li = d.linea || {};
 
     doc.rect(0, 0, doc.page.width, 6).fill(AZUL);
+    if (preview) {   // marca de agua: la vista previa de Parámetros nunca puede pasar por un certificado real
+      doc.save().rotate(-35, { origin: [doc.page.width / 2, doc.page.height / 2] });
+      doc.fillColor('#dc2626').opacity(0.12).font('Helvetica-Bold').fontSize(78)
+        .text('VISTA PREVIA', 0, doc.page.height / 2 - 40, { width: doc.page.width, align: 'center' });
+      doc.restore().opacity(1);
+    }
     try {
       const logo = require('path').join(__dirname, '..', 'api-gateway', 'public', 'img', 'logo.png');
       if (require('fs').existsSync(logo)) doc.image(logo, X, 26, { height: 26 });

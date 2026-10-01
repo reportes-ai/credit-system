@@ -365,16 +365,13 @@ Monto compensado: {COMPENSADO}
 Saldo insoluto de la línea: {SALDO_NUEVO}
 Cupo disponible, aceptado este certificado: {DISPONIBLE} (utilización {USO})
 
-Les agradecemos confirmar su conformidad dentro de {DIAS} días hábiles bancarios respondiendo este correo.
+Les agradecemos confirmar su conformidad dentro de {DIAS} días hábiles bancarios, escribiendo a {RESPONDER_A}.
 
-Verificación del documento: {LINK}
-
-Atentamente,
-AutoFácil Crédito Automotriz — Finanzas`,
+Verificación del documento: {LINK}`,
     para_perfiles: '',
     cc: '',
     destinatario: 'La casilla de la financiera y la copia configuradas en Tesorería → Línea de Crédito Unidad → Parámetros',
-    variables: '{ACREEDOR} {CERTIFICADO} {OP} {OP_FINANCIERA} {CLIENTE} {SALDO_ANTERIOR} {SALDO_PRECIO} {COMPENSADO} {EXCESO} {SALDO_NUEVO} {DISPONIBLE} {USO} {DIAS} {LINK}',
+    variables: '{ACREEDOR} {CERTIFICADO} {OP} {OP_FINANCIERA} {CLIENTE} {SALDO_ANTERIOR} {SALDO_PRECIO} {COMPENSADO} {EXCESO} {SALDO_NUEVO} {DISPONIBLE} {USO} {DIAS} {RESPONDER_A} {LINK}',
   },
   {
     codigo: 'cliente_comprobante_cuota',

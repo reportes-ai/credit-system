@@ -840,6 +840,8 @@ const update = async (req, res) => {
 
       // Crédito cursado → marcar carta como otorgada + agregar entrada a cartolas
       if (estado === 'OTORGADO') {
+        // Línea de Crédito Unidad: compensa el saldo de precio y emite el certificado al tiro (no-op si no aplica).
+        require('../../../tesoreria/src/controllers/linea-credito.controller').procesarTrasEvento();
         try {
           // 1. Marcar carta como otorgada
           await pool.query(

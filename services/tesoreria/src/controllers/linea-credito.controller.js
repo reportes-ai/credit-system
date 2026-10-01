@@ -133,6 +133,17 @@ require('../../../../shared/migrate').enFila('linea-credito', async () => {
           await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idF]);
       }
     }
+    /* Parche (01-10-2026): la primera semilla del correo pedía "responder este correo", pero el pie
+       corporativo dice "no respondas" y la casilla no recibe. Solo si el texto sigue siendo el de fábrica. */
+    await pool.query(
+      `UPDATE correos_plantillas SET cuerpo = REPLACE(REPLACE(cuerpo,
+         'dentro de {DIAS} días hábiles bancarios respondiendo este correo.', 'dentro de {DIAS} días hábiles bancarios, escribiendo a {RESPONDER_A}.'),
+         '
+
+Atentamente,
+AutoFácil Crédito Automotriz — Finanzas', ''),
+         variables = REPLACE(variables, '{DIAS} {LINK}', '{DIAS} {RESPONDER_A} {LINK}')
+       WHERE codigo='linea_certificado_saldo' AND cuerpo LIKE '%respondiendo este correo.%'`).catch(() => {});
     console.log('[linea-credito] módulo listo');
   } catch (e) { console.error('[linea-credito migration]', e.message); }
 });
@@ -222,6 +233,17 @@ async function pdfDeMovimiento(idMov) {
 }
 
 /* ── Envío a la casilla de la financiera (plantilla paramétrica) ────────── */
+// Variables del correo (las mismas para el envío real y la vista previa).
+const datosCorreo = (l, d, codigo) => ({
+  ACREEDOR: l.acreedor_nombre, CERTIFICADO: d.numero_txt, OP: d.operacion.num_op, OP_FINANCIERA: d.operacion.id_financiera || '—',
+  CLIENTE: d.operacion.cliente, SALDO_ANTERIOR: fmtCLP(d.saldo_anterior), SALDO_PRECIO: fmtCLP(d.saldo_precio),
+  COMPENSADO: fmtCLP(d.compensado), EXCESO: fmtCLP(d.exceso), SALDO_NUEVO: fmtCLP(d.saldo_nuevo),
+  DISPONIBLE: fmtCLP(d.linea.disponible), USO: `${d.linea.uso_pct.toLocaleString('es-CL')}%`, DIAS: d.dias_respuesta,
+  LINK: `${HOST}/verificar/${codigo}`,
+  // El correo sale desde una casilla que no recibe respuestas: la conformidad va a la copia de AutoFácil.
+  RESPONDER_A: EMAILS(l.correo_cc).join(', ') || 'nuestro equipo de Finanzas',
+});
+
 async function enviarCertificado(idMov, quien) {
   const [[m]] = await pool.query('SELECT * FROM linea_credito_movs WHERE id=? AND tipo=\'COMPENSACION\'', [idMov]);
   if (!m) return { enviado: false, motivo: 'Movimiento no encontrado' };
@@ -235,13 +257,7 @@ async function enviarCertificado(idMov, quien) {
   const plant = require('../../../../shared/plantillas-correo');
   const env = await plant.enviar({
     codigo: 'linea_certificado_saldo', to: para, cc: EMAILS(l.correo_cc),
-    datos: {
-      ACREEDOR: l.acreedor_nombre, CERTIFICADO: d.numero_txt, OP: d.operacion.num_op, OP_FINANCIERA: d.operacion.id_financiera || '—',
-      CLIENTE: d.operacion.cliente, SALDO_ANTERIOR: fmtCLP(d.saldo_anterior), SALDO_PRECIO: fmtCLP(d.saldo_precio),
-      COMPENSADO: fmtCLP(d.compensado), EXCESO: fmtCLP(d.exceso), SALDO_NUEVO: fmtCLP(d.saldo_nuevo),
-      DISPONIBLE: fmtCLP(d.linea.disponible), USO: `${d.linea.uso_pct.toLocaleString('es-CL')}%`, DIAS: d.dias_respuesta,
-      LINK: `${HOST}/verificar/${m.cert_codigo}`,
-    },
+    datos: datosCorreo(l, d, m.cert_codigo),
     adjuntos: [{ filename: pdf.nombre, content: pdf.buf, contentType: 'application/pdf' }],
   });
   if (!env.enviado) return { enviado: false, motivo: env.motivo };
@@ -326,10 +342,19 @@ async function procesarLineas() {
   if (n) console.log(`[linea-credito] ${n} operación(es) procesada(s)`);
   return n;
 }
-programar('linea-credito', procesarLineas, 30 * 60 * 1000, { arranqueMs: 2 * 60 * 1000 });
+/* Gatillo + red de seguridad (Pato, 01-10-2026): otorgar una carta, la carga masiva de cartas y la
+   edición del crédito a OTORGADO llaman a procesarTrasEvento() y el certificado sale segundos después.
+   No hay un único punto donde una OP pasa a OTORGADO (~8 caminos de escritura), así que el reloj de
+   1 hora barre lo que haya entrado por un camino sin gatillo. Nunca duplica: ref_unica por OP. */
+programar('linea-credito', procesarLineas, 60 * 60 * 1000, { arranqueMs: 2 * 60 * 1000 });
+let _eventoPend = null;
 function procesarTrasEvento() {
-  if (!porEvento('linea-credito')) return;
-  setTimeout(() => procesarLineas().catch(e => console.error('[linea-credito evento]', e.message)), 500);
+  if (!porEvento('linea-credito')) return;   // MOTORES=off (host en espera) o staging: igual que el reloj
+  if (_eventoPend) return;                    // ráfaga (carga masiva): una sola corrida
+  _eventoPend = setTimeout(() => {
+    _eventoPend = null;
+    procesarLineas().catch(e => console.error('[linea-credito evento]', e.message));
+  }, 1500);
 }
 
 /* Post Venta → FONDOS RECIBIDOS: la parte compensada no entra al banco (ya la asentó la compensación). */
@@ -538,6 +563,75 @@ exports.procesarAhora = async (req, res) => {
   catch (e) { fail(res, e.message); }
 };
 
+/* ── Vista previa (pestaña Parámetros) ─────────────────────────────────────
+   Arma el certificado y el correo con los parámetros que están en pantalla (aunque no se hayan
+   guardado) y una operación de ejemplo: el último certificado emitido o, si no hay, la última OP
+   de la financiera otorgada. Mismos motores que la emisión real; nada se graba. */
+async function datosPreview(id, b = {}) {
+  const [[base]] = await pool.query('SELECT * FROM linea_credito WHERE id=?', [id]);
+  if (!base) return null;
+  const l = { ...base };
+  for (const k of ['acreedor_nombre', 'acreedor_rut', 'firmante_nombre', 'firmante_cargo', 'correo_para', 'correo_cc', 'nombre'])
+    if (b[k] != null) l[k] = norm(b[k]);
+  if (Number(b.limite) > 0) l.limite = Math.round(Number(b.limite));
+  if (parseInt(b.dias_respuesta) >= 1) l.dias_respuesta = parseInt(b.dias_respuesta);
+  for (const k of ['contrato_fecha', 'fecha_vencimiento']) if (b[k] !== undefined) l[k] = ISO.test(String(b[k] || '')) ? b[k] : null;
+  if (b.cert_texto_intro !== undefined) l.cert_texto_intro = norm(b.cert_texto_intro) || null;
+  if (b.cert_texto_cierre !== undefined) l.cert_texto_cierre = norm(b.cert_texto_cierre) || null;
+  let [[m]] = await pool.query(
+    "SELECT * FROM linea_credito_movs WHERE id_linea=? AND tipo='COMPENSACION' AND cert_numero IS NOT NULL ORDER BY id DESC LIMIT 1", [id]);
+  if (m) m = { ...m, created_at: new Date() };
+  else {
+    const [[c]] = await pool.query(
+      `SELECT c.id, c.num_op, c.financiera, c.saldo_precio, c.fecha_otorgado FROM creditos c
+        WHERE UPPER(c.financiera)=UPPER(?) AND c.saldo_precio > 0 AND c.fecha_otorgado IS NOT NULL
+        ORDER BY c.fecha_otorgado DESC, c.id DESC LIMIT 1`, [l.financiera]);
+    if (!c) return { l, d: null };
+    const { montoSaldoOrden, getFijosAutoFin } = require('../../../postventa/src/controllers/postventa.controller');
+    const sp = Math.round(montoSaldoOrden(c.financiera, c.saldo_precio, await getFijosAutoFin(), false));
+    const ant = Math.round((Number(l.limite) || 0) * 0.6);                 // saldo de ejemplo: 60% de la línea
+    const comp = Math.min(sp, ant);
+    m = { id_credito: c.id, num_op: c.num_op, fecha: c.fecha_otorgado, saldo_anterior: ant, saldo_precio: sp, monto: comp,
+      exceso: sp - comp, saldo_nuevo: ant - comp, created_at: new Date() };
+  }
+  const [[n]] = await pool.query('SELECT COALESCE(MAX(cert_numero),0)+1 sig FROM linea_credito_movs WHERE id_linea=?', [id]);
+  m.cert_numero = n.sig;
+  return { l, d: await datosCertificado(l, m) };
+}
+
+exports.previewPdf = async (req, res) => {
+  try {
+    const p = await datosPreview(parseInt(req.params.id), req.body || {});
+    if (!p) return fail(res, 'Línea no encontrada', 404);
+    if (!p.d) return fail(res, 'No hay ninguna operación de la financiera para armar el ejemplo', 400);
+    const { generarCertificadoSaldoLineaPDF } = require('../../../../shared/certificado-saldo-linea-pdf');
+    const buf = await generarCertificadoSaldoLineaPDF({ d: p.d, codigo: 'VISTA-PREVIA', host: HOST, preview: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="vista-previa-certificado.pdf"');
+    res.send(buf);
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.previewCorreo = async (req, res) => {
+  try {
+    const p = await datosPreview(parseInt(req.params.id), req.body || {});
+    if (!p) return fail(res, 'Línea no encontrada', 404);
+    if (!p.d) return fail(res, 'No hay ninguna operación de la financiera para armar el ejemplo', 400);
+    const plant = require('../../../../shared/plantillas-correo');
+    const t = await plant.obtener('linea_certificado_saldo');
+    if (!t) return fail(res, 'La plantilla linea_certificado_saldo no existe en Correos del Sistema', 400);
+    const datos = datosCorreo(p.l, p.d, 'VISTA-PREVIA');
+    const cuerpo = plant.render(t.cuerpo, datos);
+    const { envolverHTML } = require('../../../../shared/mailer');
+    ok(res, {
+      para: EMAILS(p.l.correo_para), cc: [...new Set([...EMAILS(p.l.correo_cc), ...EMAILS(t.cc)])],
+      asunto: plant.render(t.asunto, datos), html: envolverHTML(plant.aHTML(cuerpo)),
+      adjunto: `${p.d.numero_txt}_OP${p.d.operacion.num_op}.pdf`, activa: !!t.activo, ejemplo_op: p.d.operacion.num_op,
+    });
+  } catch (e) { fail(res, e.message); }
+};
+
 exports.procesarLineas = procesarLineas;
+exports.procesarTrasEvento = procesarTrasEvento;
 exports.compensadoDeOp = compensadoDeOp;
 exports.saldoLinea = saldoLinea;

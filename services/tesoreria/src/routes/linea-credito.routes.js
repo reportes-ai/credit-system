@@ -12,6 +12,8 @@ router.get('/',                             verifyToken, ver, c.resumen);
 router.get('/:id/movimientos',              verifyToken, ver, c.movimientos);
 router.get('/certificado/:idMov/pdf',       verifyToken, ver, c.pdf);
 router.put('/:id/config',                   verifyToken, gestionar, c.guardarConfig);
+router.post('/:id/preview/certificado',      verifyToken, ver, c.previewPdf);
+router.post('/:id/preview/correo',           verifyToken, ver, c.previewCorreo);
 router.post('/:id/giros',                   verifyToken, gestionar, c.registrarGiro);
 router.post('/:id/pagos',                   verifyToken, gestionar, c.registrarPago);
 router.post('/procesar',                    verifyToken, gestionar, c.procesarAhora);

@@ -1101,6 +1101,8 @@ const otorgar = async (req, res) => {
                Después del recálculo, para provisionar el comdea_real definitivo. Fire-and-forget. */
             require('../../../contabilidad/src/provisiones').constituirAlOtorgar(cr2.id, `Carta ${ca.op_carta}`)
               .catch(e => console.error('[carta otorgar→provision]', e.message));
+            // LÍNEA DE CRÉDITO UNIDAD: compensa el saldo de precio y emite el certificado al tiro (Pato 01-10-2026).
+            require('../../../tesoreria/src/controllers/linea-credito.controller').procesarTrasEvento();
           })
           .catch(e => console.error('[carta otorgar→recalculo]', e.message));
         // comdea_real pactado: márcalo forzado para que el recálculo mensual lo respete
@@ -1951,6 +1953,7 @@ const cargaMasivaCartas = async (req, res) => {
       } catch (eRow) { errores.push({ nOp: r.nOp, error: eRow.message }); }
     }
     res.json({ success: true, data: { total: rows.length, creadas, enlazadas, creditosCreados, clientesCreados, omitidas, errores }, error: null });
+    if (creditosCreados) require('../../../tesoreria/src/controllers/linea-credito.controller').procesarTrasEvento();   // Línea de Crédito Unidad
   } catch (e) {
     console.error('[cartas cargaMasiva]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
