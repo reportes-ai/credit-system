@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.5 — solicitud de reposición de cupo: correo automático a Unidad al compensarse el umbral (80%) del último abono, con saldo inicial y operaciones (ID UCA, RUT, cliente, monto, % del saldo); envío manual desde la Cartola y vista previa en Parámetros (01-10-2026). v1.4 — el correo del certificado ya no lleva la línea "Verificación del documento" (el QR va en el PDF) (01-10-2026). v1.3 — la vista previa del correo muestra el logo (01-10-2026). v1.2 — vista previa del certificado (PDF con marca de agua) y del correo con los parámetros en pantalla; el certificado se emite al otorgar (gatillo) y el barrido queda cada 1 hora (01-10-2026). v1.1 — Línea de Crédito Unidad: pestaña Cartola (abonos manuales, cargos por cada certificado emitido con saldo corrido, detalle del certificado enviado) y pestaña Parámetros (línea, texto del certificado, destinatarios y CC) (01-10-2026). v1.0 — cuenta corriente de la línea rotativa y Certificado de Saldo Insoluto automático por cada OP compensada -->
+<!-- v1.6 — vista previa del correo más ancha (correo de reposición a 760 px) (01-10-2026). v1.5 — solicitud de reposición de cupo: correo automático a Unidad al compensarse el umbral (80%) del último abono, con saldo inicial y operaciones (ID UCA, RUT, cliente, monto, % del saldo); envío manual desde la Cartola y vista previa en Parámetros (01-10-2026). v1.4 — el correo del certificado ya no lleva la línea "Verificación del documento" (el QR va en el PDF) (01-10-2026). v1.3 — la vista previa del correo muestra el logo (01-10-2026). v1.2 — vista previa del certificado (PDF con marca de agua) y del correo con los parámetros en pantalla; el certificado se emite al otorgar (gatillo) y el barrido queda cada 1 hora (01-10-2026). v1.1 — Línea de Crédito Unidad: pestaña Cartola (abonos manuales, cargos por cada certificado emitido con saldo corrido, detalle del certificado enviado) y pestaña Parámetros (línea, texto del certificado, destinatarios y CC) (01-10-2026). v1.0 — cuenta corriente de la línea rotativa y Certificado de Saldo Insoluto automático por cada OP compensada -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -215,11 +215,11 @@
   <div class="dlg-foot" id="dFoot"></div>
 </dialog>
 
-<dialog id="dlgMail" style="width:min(820px,95vw)">
+<dialog id="dlgMail" style="width:min(980px,96vw)">
   <div class="dlg-head"><i class="bi bi-envelope-open"></i> Vista previa del correo</div>
   <div class="dlg-body">
     <div class="det" id="mailHead"></div>
-    <iframe id="mailFrame" style="width:100%;height:440px;border:1.5px solid #e2e8f0;border-radius:10px;margin-top:12px;background:#fff"></iframe>
+    <iframe id="mailFrame" style="width:100%;height:60vh;border:1.5px solid #e2e8f0;border-radius:10px;margin-top:12px;background:#fff"></iframe>
   </div>
   <div class="dlg-foot">
     <a class="btnx btn-gris" href="/mantenedores/correos-programados/" target="_blank" style="text-decoration:none"><i class="bi bi-pencil"></i> Editar asunto y cuerpo</a>

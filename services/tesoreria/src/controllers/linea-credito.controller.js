@@ -288,6 +288,7 @@ const datosCorreo = (l, d, codigo) => ({
 const rutPuntos = r => { const m = String(r || '').replace(/\./g, '').match(/^(\d+)-?([\dkK])$/); return m ? m[1].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + m[2].toUpperCase() : (r || '—'); };
 const escH = t => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const pctTxt = n => `${(Number(n) || 0).toLocaleString('es-CL', { maximumFractionDigits: 1 })}%`;
+const ANCHO_REPOSICION = 760;   // la tabla de 6 columnas no cabe en los 540 px del marco corporativo
 function correoReposicion(l, ci) {
   const datos = {
     ACREEDOR: l.acreedor_nombre, FECHA_ABONO: fmtD(ci.fecha_abono), SALDO_INICIAL: fmtCLP(ci.saldo_inicial),
@@ -297,8 +298,9 @@ function correoReposicion(l, ci) {
   };
   const th = 'style="text-align:left;padding:6px 8px;background:#f1f5f9;color:#475569;font-size:11px;text-transform:uppercase;border-bottom:1px solid #e2e8f0"';
   const td = 'style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:12px"';
+  const tdr = 'style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;white-space:nowrap"';
   const tdn = 'style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;text-align:right;white-space:nowrap"';
-  const filas = ci.operaciones.map(o => `<tr><td ${td}>${escH(o.id_financiera || '—')}</td><td ${td}>${escH(rutPuntos(o.rut))}</td><td ${td}>${escH(o.cliente || '—')}</td>` +
+  const filas = ci.operaciones.map(o => `<tr><td ${td}>${escH(o.id_financiera || '—')}</td><td ${tdr}>${escH(rutPuntos(o.rut))}</td><td ${td}>${escH(o.cliente || '—')}</td>` +
     `<td ${tdn}>${fmtCLP(o.monto)}</td><td ${tdn}>${pctTxt(o.pct)}</td><td ${tdn}>${pctTxt(o.pct_acum)}</td></tr>`).join('');
   const tabla = `<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;margin-top:4px">` +
     `<tr><td colspan="6" style="padding:6px 8px;font-size:12px;background:#eff6ff;color:#1e3a8a"><b>Saldo inicial ${fmtD(ci.fecha_abono)}: ${fmtCLP(ci.saldo_inicial)}</b></td></tr>` +
@@ -319,7 +321,7 @@ async function enviarReposicion(l, quien) {
   if (!para.length) return { enviado: false, motivo: 'La línea no tiene casilla de destino configurada' };
   const { datos, tabla } = correoReposicion(l, ci);
   const plant = require('../../../../shared/plantillas-correo');
-  const env = await plant.enviar({ codigo: 'linea_reposicion_cupo', to: para, cc: EMAILS(l.correo_cc), datos, htmlExtra: tabla });
+  const env = await plant.enviar({ codigo: 'linea_reposicion_cupo', to: para, cc: EMAILS(l.correo_cc), datos, htmlExtra: tabla, ancho: ANCHO_REPOSICION });
   if (!env.enviado) return { enviado: false, motivo: env.motivo };
   await pool.query('UPDATE linea_credito_movs SET aviso_reposicion_at=NOW(), aviso_reposicion_a=? WHERE id=?',
     [[...env.to, ...(env.cc || [])].join(', ').slice(0, 400), ci.id_giro]);
@@ -775,7 +777,7 @@ exports.previewReposicion = async (req, res) => {
     const cuerpo = plant.render(t.cuerpo, datos);
     ok(res, {
       para: EMAILS(l.correo_para), cc: [...new Set([...EMAILS(l.correo_cc), ...EMAILS(t.cc)])], asunto: plant.render(t.asunto, datos),
-      html: envolverHTML(plant.aHTML(cuerpo) + `<div style="margin:18px 0">${tabla}</div>`).replace(/cid:aflogobs/g, '/img/logo-bs-mail.png'),
+      html: envolverHTML(plant.aHTML(cuerpo) + `<div style="margin:18px 0">${tabla}</div>`, ANCHO_REPOSICION).replace(/cid:aflogobs/g, '/img/logo-bs-mail.png'),
       adjunto: null, activa: !!t.activo, ejemplo_op: ejemplo ? 'ejemplo con las últimas OP de Unidad (no hay ciclo real aún)' : `ciclo real del abono del ${fmtD(ci.fecha_abono)}`,
     });
   } catch (e) { fail(res, e.message); }

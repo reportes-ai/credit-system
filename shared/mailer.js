@@ -91,12 +91,14 @@ function logoAdjunto() {
 const SIN_LINK_DIRECCION = html => String(html || '').replace(
   /((?:Av\.|Avda\.|Avenida|Calle|Pasaje|Camino|Ruta)\s[^<\n]{5,140}?)(?=<br|<\/|\n|$)(?![^<]*<\/a>)/g,
   '<a style="color:inherit;text-decoration:none">$1</a>');
-function envolverHTML(cuerpoHtml) {
+/* `ancho` (px, opcional): correos con tablas anchas (ej. solicitud de reposición de la línea de crédito).
+   Sin él, los 540 px de siempre: ningún otro correo cambia. */
+function envolverHTML(cuerpoHtml, ancho = 540) {
   cuerpoHtml = SIN_LINK_DIRECCION(cuerpoHtml);
   const logo = `cid:${LOGO_CID}`;
   return `
   <div style="background:#eef2f7;padding:26px 12px;font-family:'Segoe UI',Arial,sans-serif">
-    <div style="max-width:540px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(2,32,82,.08)">
+    <div style="max-width:${ancho}px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(2,32,82,.08)">
       <div style="height:6px;background:linear-gradient(90deg,#012d70,#0141A2 55%,#009AFE)"></div>
       <div style="padding:30px 32px;color:#1e293b;font-size:15px;line-height:1.65">
         ${cuerpoHtml}
@@ -104,7 +106,7 @@ function envolverHTML(cuerpoHtml) {
         <img src="${logo}" alt="AutoFácil Business Suite" width="160" style="display:block;height:auto;max-width:160px;margin-top:2px">
       </div>
     </div>
-    <p style="max-width:540px;margin:14px auto 0;text-align:center;color:#94a3b8;font-size:11px;line-height:1.5">
+    <p style="max-width:${ancho}px;margin:14px auto 0;text-align:center;color:#94a3b8;font-size:11px;line-height:1.5">
       Correo automático de AutoFácil Business Suite · por favor no respondas a este mensaje.
     </p>
   </div>`;
