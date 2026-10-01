@@ -11,6 +11,7 @@ const gestionar = requireFunc('linea_credito_gestionar');
 router.get('/',                             verifyToken, ver, c.resumen);
 router.get('/:id/movimientos',              verifyToken, ver, c.movimientos);
 router.get('/certificado/:idMov/pdf',       verifyToken, ver, c.pdf);
+router.get('/solicitud/:idMov/correo',      verifyToken, ver, c.correoSolicitud);
 router.put('/:id/config',                   verifyToken, gestionar, c.guardarConfig);
 router.post('/:id/preview/certificado',      verifyToken, ver, c.previewPdf);
 router.post('/:id/preview/correo',           verifyToken, ver, c.previewCorreo);

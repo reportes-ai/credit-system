@@ -114,6 +114,9 @@ require('../../../../shared/migrate').enFila('linea-credito', async () => {
     await pool.query('ALTER TABLE linea_credito ADD COLUMN IF NOT EXISTS aviso_reposicion_auto TINYINT(1) NOT NULL DEFAULT 1');
     await pool.query('ALTER TABLE linea_credito_movs ADD COLUMN IF NOT EXISTS aviso_reposicion_at DATETIME NULL');
     await pool.query('ALTER TABLE linea_credito_movs ADD COLUMN IF NOT EXISTS aviso_reposicion_a VARCHAR(400) NULL');
+    // Cada solicitud de reposición enviada queda como fila SOLICITUD en la Cartola (no mueve saldo), con el
+    // correo tal como salió, para verlo después (Pato, 01-10-2026).
+    await pool.query('ALTER TABLE linea_credito_movs ADD COLUMN IF NOT EXISTS correo_html MEDIUMTEXT NULL');
 
     // Card en Tesorería + permisos (anti-hardcode: módulos y cards salen de la BD)
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Tesorería' OR ruta LIKE '/tesoreria%' LIMIT 1");
@@ -313,6 +316,19 @@ function correoReposicion(l, ci) {
   return { datos, tabla };
 }
 
+/* El correo de reposición tal como se ve (mismo render que plantillas-correo.enviar). Para la vista previa
+   y para la copia que queda en la Cartola; el logo va por URL porque en pantalla no hay adjunto cid:. */
+async function htmlReposicion(l, ci) {
+  const plant = require('../../../../shared/plantillas-correo');
+  const t = await plant.obtener('linea_reposicion_cupo');
+  if (!t) return null;
+  const { datos, tabla } = correoReposicion(l, ci);
+  const { envolverHTML } = require('../../../../shared/mailer');
+  return { t, asunto: plant.render(t.asunto, datos),
+    html: envolverHTML(plant.aHTML(plant.render(t.cuerpo, datos)) + `<div style="margin:18px 0">${tabla}</div>`, ANCHO_REPOSICION)
+      .replace(/cid:aflogobs/g, '/img/logo-bs-mail.png') };
+}
+
 async function enviarReposicion(l, quien) {
   const ci = await cicloActual(l.id);
   if (!ci) return { enviado: false, motivo: 'No hay un abono registrado: no hay ciclo que reponer' };
@@ -323,8 +339,16 @@ async function enviarReposicion(l, quien) {
   const plant = require('../../../../shared/plantillas-correo');
   const env = await plant.enviar({ codigo: 'linea_reposicion_cupo', to: para, cc: EMAILS(l.correo_cc), datos, htmlExtra: tabla, ancho: ANCHO_REPOSICION });
   if (!env.enviado) return { enviado: false, motivo: env.motivo };
-  await pool.query('UPDATE linea_credito_movs SET aviso_reposicion_at=NOW(), aviso_reposicion_a=? WHERE id=?',
-    [[...env.to, ...(env.cc || [])].join(', ').slice(0, 400), ci.id_giro]);
+  const dest = [...env.to, ...(env.cc || [])].join(', ').slice(0, 400);
+  await pool.query('UPDATE linea_credito_movs SET aviso_reposicion_at=NOW(), aviso_reposicion_a=? WHERE id=?', [dest, ci.id_giro]);
+  // Fila SOLICITUD en la Cartola: monto = lo pedido (informativo, no mueve el saldo) + copia del correo.
+  const copia = await htmlReposicion(l, ci).catch(() => null);
+  await pool.query(
+    `INSERT INTO linea_credito_movs (id_linea, tipo, fecha, monto, saldo_anterior, saldo_nuevo, estado, enviado_at, enviado_a, glosa, correo_html, usuario)
+     VALUES (?, 'SOLICITUD', ?, ?, ?, ?, 'ENVIADO', NOW(), ?, ?, ?, ?)`,
+    [l.id, fc.hoyISO(), ci.compensado, ci.saldo_actual, ci.saldo_actual, dest,
+     `${ci.operaciones.length} operaciones · ${pctTxt(ci.consumo_pct)} del abono del ${fmtD(ci.fecha_abono)} (${fmtCLP(ci.saldo_inicial)})`.slice(0, 300),
+     copia && copia.html, quien || USUARIO_SISTEMA]).catch(e => console.error('[linea-credito solicitud→cartola]', e.message));
   auditar({ accion: 'ENVIAR', modulo: 'linea-credito', entidad: 'solicitud_reposicion', entidad_id: String(ci.id_giro),
     detalle: `Solicitud de reposición (${pctTxt(ci.consumo_pct)} del abono del ${fmtD(ci.fecha_abono)}; ${ci.operaciones.length} OP por ${fmtCLP(ci.compensado)}) a ${env.to.join(', ')} por ${quien || USUARIO_SISTEMA}` });
   return { enviado: true, to: env.to, cc: env.cc, ciclo: ci };
@@ -500,6 +524,7 @@ exports.movimientos = async (req, res) => {
          LEFT JOIN cuentas_bancarias cb ON cb.id_cuenta = m.id_cuenta_bancaria
         WHERE m.id_linea=? ${tipo ? 'AND m.tipo=?' : ''}
         ORDER BY m.id DESC LIMIT 500`, tipo ? [id, tipo] : [id]);
+    for (const r of rows) { r.tiene_correo = !!r.correo_html; delete r.correo_html; }   // el correo se pide aparte
     ok(res, rows);
   } catch (e) { fail(res, e.message); }
 };
@@ -769,17 +794,23 @@ exports.previewReposicion = async (req, res) => {
         consumo_pct: inicial ? Math.round(acum / inicial * 1000) / 10 : 0,
         operaciones: ops.map(o => { a2 += o.monto; return { ...o, pct: Math.round(o.monto / inicial * 1000) / 10, pct_acum: Math.round(a2 / inicial * 1000) / 10 }; }) };
     }
-    const plant = require('../../../../shared/plantillas-correo');
-    const t = await plant.obtener('linea_reposicion_cupo');
-    if (!t) return fail(res, 'La plantilla linea_reposicion_cupo no existe en Correos del Sistema', 400);
-    const { datos, tabla } = correoReposicion(l, ci);
-    const { envolverHTML } = require('../../../../shared/mailer');
-    const cuerpo = plant.render(t.cuerpo, datos);
+    const h = await htmlReposicion(l, ci);
+    if (!h) return fail(res, 'La plantilla linea_reposicion_cupo no existe en Correos del Sistema', 400);
+    const t = h.t;
     ok(res, {
-      para: EMAILS(l.correo_para), cc: [...new Set([...EMAILS(l.correo_cc), ...EMAILS(t.cc)])], asunto: plant.render(t.asunto, datos),
-      html: envolverHTML(plant.aHTML(cuerpo) + `<div style="margin:18px 0">${tabla}</div>`, ANCHO_REPOSICION).replace(/cid:aflogobs/g, '/img/logo-bs-mail.png'),
+      para: EMAILS(l.correo_para), cc: [...new Set([...EMAILS(l.correo_cc), ...EMAILS(t.cc)])], asunto: h.asunto,
+      html: h.html,
       adjunto: null, activa: !!t.activo, ejemplo_op: ejemplo ? 'ejemplo con las últimas OP de Unidad (no hay ciclo real aún)' : `ciclo real del abono del ${fmtD(ci.fecha_abono)}`,
     });
+  } catch (e) { fail(res, e.message); }
+};
+
+// Correo de una solicitud de reposición tal como se envió (popup de la Cartola).
+exports.correoSolicitud = async (req, res) => {
+  try {
+    const [[m]] = await pool.query("SELECT id, glosa, enviado_at, enviado_a, correo_html, monto, usuario FROM linea_credito_movs WHERE id=? AND tipo='SOLICITUD'", [parseInt(req.params.idMov)]);
+    if (!m) return fail(res, 'Solicitud no encontrada', 404);
+    ok(res, m);
   } catch (e) { fail(res, e.message); }
 };
 
