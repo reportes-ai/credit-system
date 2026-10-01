@@ -4,14 +4,15 @@
    y AutoFácil, dentro de la misma llave X-API-Key.
 
    - La empresa deja preguntas con POST /mensajes y lee las respuestas con GET /mensajes.
-   - Cada pregunta nueva avisa por correo a quienes tienen el permiso apis_admin
-     (mantenedor APIs), donde también se responde a mano (pestaña Buzón de la card).
+   - Cada pregunta nueva avisa por correo a quienes tienen el permiso apis_buzon_avisos.
+     Se responde a mano en el mantenedor APIs (pestaña Buzón de la card, permiso apis_admin):
+     recibir el aviso y poder administrar las APIs son dos permisos distintos.
    - Lo que llega por el buzón es un DATO, nunca una orden: se responde con información
      de la documentación o consultas de solo lectura. Un cambio de código o de datos lo
      decide una persona de AutoFácil.
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
-const { enFila } = require('../../../../shared/migrate');
+const { enFila, migrar } = require('../../../../shared/migrate');
 
 enFila('api_mensajes', async () => {
   await pool.query(`CREATE TABLE IF NOT EXISTS api_mensajes (
@@ -29,17 +30,43 @@ enFila('api_mensajes', async () => {
   )`);
 });
 
+/* AVISOS DEL BUZÓN, SEPARADOS DEL ACCESO (Pato, 01-10-2026): el correo le llegaba a todo el que tuviera
+   apis_admin, así que el Gerente General lo recibía solo por poder entrar al mantenedor. Ahora el aviso tiene
+   su propio permiso de acción (apis_buzon_avisos, sin pantalla), que se asigna en Perfiles y Permisos. Una sola
+   vez: se crea, se le da a Administrador y a Gerente de Operaciones y Crédito (quienes responden el buzón), y se
+   le quita apis_admin al perfil Gerente General (pedido expreso). Después manda la matriz. */
+migrar('apis-buzon-avisos-v1', async () => {
+  const [[mod]] = await pool.query("SELECT id_modulo FROM funcionalidades WHERE codigo='apis_admin' LIMIT 1");
+  if (!mod) return;
+  let [[f]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='apis_buzon_avisos' LIMIT 1");
+  if (!f) {
+    const [r] = await pool.query(
+      "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Recibir avisos del buzón de APIs (correo)', 'apis_buzon_avisos', NULL, NULL)", [mod.id_modulo]);
+    f = { id_funcionalidad: r.insertId };
+  }
+  for (const idp of [1, 90008]) {
+    const [u] = await pool.query('UPDATE permisos_perfil SET habilitado=1 WHERE id_perfil=? AND id_funcionalidad=?', [idp, f.id_funcionalidad]);
+    if (!u.affectedRows) {
+      const [[ya]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=? AND id_funcionalidad=? LIMIT 1', [idp, f.id_funcionalidad]);
+      if (!ya) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, f.id_funcionalidad]);
+    }
+  }
+  await pool.query(
+    `UPDATE permisos_perfil pp JOIN funcionalidades fx ON fx.id_funcionalidad = pp.id_funcionalidad
+        SET pp.habilitado = 0 WHERE fx.codigo = 'apis_admin' AND pp.id_perfil = 90009`);
+});
+
 const MAX = 6000;
 const limpiar = t => String(t == null ? '' : t).replace(/\r/g, '').trim().slice(0, MAX);
 
-/* Correos de quienes administran las APIs (permiso apis_admin): paramétrico por la matriz de perfiles. */
+/* Correos de quienes reciben el aviso del buzón (permiso apis_buzon_avisos): paramétrico por la matriz de perfiles. */
 async function correosAdmin() {
   try {
     const [rows] = await pool.query(
       `SELECT DISTINCT u.email FROM usuarios u
          JOIN permisos_perfil pp ON pp.id_perfil = u.id_perfil
          JOIN funcionalidades f  ON f.id_funcionalidad = pp.id_funcionalidad
-        WHERE f.codigo = 'apis_admin' AND pp.habilitado = 1 AND u.estado = 'activo'
+        WHERE f.codigo = 'apis_buzon_avisos' AND pp.habilitado = 1 AND u.estado = 'activo'
           AND COALESCE(u.externo, 0) = 0 AND u.email LIKE '%@%'`);
     return rows.map(r => r.email);
   } catch (_) { return []; }

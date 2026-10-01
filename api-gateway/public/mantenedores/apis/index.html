@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.9 — comisiones-facturas (factura ↔ operaciones + ODP) y provisiones-liberaciones documentados. v2.8 — ordenes-pago: paginación (limite, offset), total y truncado documentados. v2.7 — rentabilidad: campos reales documentados (num_op, ingreso_autofacil, comision_dealer, comision_seguros, total_com_broke, ingreso_bruto). v2.6 — libro-mayor y libro-mayor-completo: campo origen del comprobante documentado. v2.5 — Buzón por API (POST/GET /mensajes con la llave), pestaña Buzón con respuesta, badge sin responder. v2.4 — saldo-proceso-pago: campos sla_base e historico documentados. v2.3 — API Suite Financiera (JM): 8 endpoints de solo lectura, documentados. v2.2 — miga sigue a la API abierta (AF_TOPNAV_HOJA) -->
+<!-- v2.10 — el aviso del buzón tiene permiso propio (apis_buzon_avisos) · v2.9 — comisiones-facturas (factura ↔ operaciones + ODP) y provisiones-liberaciones documentados. v2.8 — ordenes-pago: paginación (limite, offset), total y truncado documentados. v2.7 — rentabilidad: campos reales documentados (num_op, ingreso_autofacil, comision_dealer, comision_seguros, total_com_broke, ingreso_bruto). v2.6 — libro-mayor y libro-mayor-completo: campo origen del comprobante documentado. v2.5 — Buzón por API (POST/GET /mensajes con la llave), pestaña Buzón con respuesta, badge sin responder. v2.4 — saldo-proceso-pago: campos sla_base e historico documentados. v2.3 — API Suite Financiera (JM): 8 endpoints de solo lectura, documentados. v2.2 — miga sigue a la API abierta (AF_TOPNAV_HOJA) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -104,7 +104,7 @@
     <ul>
       <li><b>API Key por empresa</b> → habilita/corta el acceso externo a la API correspondiente (la llave sirve SOLO para la API donde se creó). Desactivar corta el acceso al instante.</li>
       <li><b>Regenerar llave</b> → invalida la anterior (reenviar la nueva a la empresa).</li>
-      <li><b>Buzón</b> (tabla <code>api_mensajes</code>) → preguntas de la empresa y respuestas de AutoFácil dentro de la misma llave; el aviso por correo va a quienes tienen el permiso <code>apis_admin</code> (<a href="/usuarios/">Perfiles y Permisos</a>).</li>
+      <li><b>Buzón</b> (tabla <code>api_mensajes</code>) → preguntas de la empresa y respuestas de AutoFácil dentro de la misma llave; el aviso por correo va a quienes tienen el permiso <code>apis_buzon_avisos</code> ("Recibir avisos del buzón de APIs", se asigna en <a href="/usuarios/">Perfiles y Permisos</a>; es distinto de <code>apis_admin</code>, que da acceso a esta pantalla) (<a href="/usuarios/">Perfiles y Permisos</a>).</li>
       <li><b>Catálogo de APIs</b> (tabla <code>apis_catalogo</code>) → cada fila es una card aquí. API Simulador Rápido usa el motor único del <a href="/simulador-rapido/">Simulador Rápido</a>: cambios en <a href="/mantenedores/tasas/">Tasas</a>, <a href="/mantenedores/parametros/">Parámetros de Crédito</a> y <a href="/mantenedores/factores-seguro/">Factores de Seguros</a> se reflejan al instante en la API.</li>
     </ul>
   </div>
