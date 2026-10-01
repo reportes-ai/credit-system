@@ -265,7 +265,7 @@ async function tick() {
     if (!['Mon','Wed','Fri'].includes(dia) || hora < 8) return;
     const hoy = ahora.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
     // El pool fija time_zone de Chile: DATE(created_at) ya es fecha local
-    const [[u]] = await pool.query("SELECT COUNT(*) n FROM ctb_rcv_sync_log WHERE resultado='OK' AND DATE(created_at)=?", [hoy]);
+    const [[u]] = await pool.query("SELECT COUNT(*) n FROM ctb_rcv_sync_log WHERE resultado='OK' AND DATE(created_at)=? AND mes=?", [hoy, hoy.slice(0, 7)]);
     if (u?.n) return;
     if (await frenado()) return;
     await sincronizar();

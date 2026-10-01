@@ -443,8 +443,7 @@ async function evaluarAlertas() {
   } catch (e) { console.error('[alertas evaluar]', e.message); }
   finally { evaluando = false; }
 }
-setTimeout(evaluarAlertas, 8000);          // primera corrida al arrancar
-programar('alertas', evaluarAlertas, 60000);        // cada 60s
+programar('alertas', evaluarAlertas, 60000, { arranqueMs: 8000 });   // cada 60 s; primera corrida a los 8 s del arranque
 
 /* ── Endpoints CRUD + metadatos ─────────────────────────────────── */
 const getMeta = async (req, res) => {

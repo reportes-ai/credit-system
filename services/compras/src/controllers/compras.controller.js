@@ -1081,8 +1081,7 @@ async function recordatoriosWorkflow() {
     }
   } catch (e) { console.error('[compras recordatorios]', e.message); }
 }
-programar('compras-recordatorios', recordatoriosWorkflow, 30 * 60 * 1000);
-setTimeout(recordatoriosWorkflow, 90 * 1000);   // primera pasada al minuto y medio del boot
+programar('compras-recordatorios', recordatoriosWorkflow, 30 * 60 * 1000, { arranqueMs: 90 * 1000 });   // primera pasada al minuto y medio del boot
 
 /* ── BANDEJA DE REVISIÓN (el módulo del firmante) ─────────────────────────────
    GET /api/compras/revision → órdenes que esperan MI firma + mis decisiones.

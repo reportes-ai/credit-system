@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inteligencia Artificial — AutoFácil</title>
-  <!-- v1.8 — footer: caché de prompts. v1.7 — Uso IA: cards Mes en curso / Mes pasado y Saldo prepago Anthropic (anotado a mano, estimado). v1.6 -->
+  <!-- v1.9 — fecha por defecto del saldo prepago en hora local. v1.8 — footer: caché de prompts. v1.7 — Uso IA: cards Mes en curso / Mes pasado y Saldo prepago Anthropic (anotado a mano, estimado). v1.6 -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#012d70; --blue:#0141A2; --coral:#D97757; }
@@ -413,7 +413,7 @@
           <div class="ucard-sub">${p ? `anotado ${fmtUSD(p.saldo_anotado)} el ${p.fecha.split('-').reverse().join('-')} · gastado desde entonces ${fmtUSD(p.gastado_desde)}` : 'Anota el saldo que muestra la consola de Anthropic'}</div>
           <form class="prepago-form" onsubmit="return guardarPrepago(event)">
             <input type="number" step="0.01" min="0" id="ppSaldo" placeholder="Saldo USD" value="${p ? p.saldo_anotado : ''}" required>
-            <input type="date" id="ppFecha" value="${p ? p.fecha : new Date().toISOString().slice(0,10)}" required>
+            <input type="date" id="ppFecha" value="${p ? p.fecha : new Date().toLocaleDateString('en-CA')}" required>
             <button type="submit" class="btn btn-sm btn-primary">Guardar</button></form></div>`;
       const rowsF = d.por_funcionalidad.length ? d.por_funcionalidad.map(f => `
         <tr><td>${esc(f.nombre)}</td><td class="r">${fmtTok(f.llamadas)}</td><td class="r">${fmtTok(f.tokens_in)}</td><td class="r">${fmtTok(f.tokens_out)}</td><td class="r">${fmtUSD(f.costo)}</td></tr>`).join('')

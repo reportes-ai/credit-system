@@ -193,7 +193,7 @@ router.post('/provisiones/sincronizar', verifyToken, requireFunc('ctb_provisione
     if (!prov.SINCRONIZAR[concepto]) return res.status(400).json({ success: false, data: null, error: 'Concepto desconocido' });
     const r = await prov.SINCRONIZAR[concepto](quien);
     require('../../../../shared/audit').auditar({ req, accion: 'EJECUTAR', modulo: 'contabilidad', entidad: 'provisiones', entidad_id: concepto,
-      detalle: `Sincronización provisiones ${concepto}: ${r.constituidas} constituida(s), ${r.liberadas} liberada(s), ${r.omitidas} omitida(s)` });
+      detalle: `Sincronización provisiones ${concepto}: ${r.constituidas} constituida(s), ${r.liberadas} liberada(s)${r.omitidas != null ? `, ${r.omitidas} omitida(s)` : ''}` });
     res.json({ success: true, data: r, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 });

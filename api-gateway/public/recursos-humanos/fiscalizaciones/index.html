@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fiscalizaciones — AutoFácil</title>
-  <!-- v1.4 — se puede eliminar una carpeta VACÍA; el tipo del archivo se reconoce por su contenido; un solo resumen por tanda de subidas. v1.3 — botón de subida compacto junto al aviso; filtros por mes-año y organismo. v1.2 — ancho completo (sin max-width). v1.1 — colores de la suite (azul) y la carpeta nace de los documentos: la IA pone nombre, organismo y fecha. v1.0 — carpetas de fiscalización con resumen IA; documentos inmutables (se suben, no se borran) -->
+  <!-- v1.5 — fechas de subida/creación en hora local (no el día UTC) · v1.4 — se puede eliminar una carpeta VACÍA; el tipo del archivo se reconoce por su contenido; un solo resumen por tanda de subidas. v1.3 — botón de subida compacto junto al aviso; filtros por mes-año y organismo. v1.2 — ancho completo (sin max-width). v1.1 — colores de la suite (azul) y la carpeta nace de los documentos: la IA pone nombre, organismo y fecha. v1.0 — carpetas de fiscalización con resumen IA; documentos inmutables (se suben, no se borran) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --bg:#f0f4f8; }
@@ -74,7 +74,9 @@
   if(!token||!yo) location.href='/login.html';
   const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
   const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-  const fd=s=>s?String(s).slice(0,10).split('-').reverse().join('-'):'—';
+  /* Un DATETIME llega como instante UTC ("…T01:30:00Z"): cortarlo a 10 daba el día siguiente desde las 20/21 h */
+  const dia=s=>{const t=String(s||'');if(t.length>10&&t.includes('T')){const d=new Date(t);if(!isNaN(d))return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}return t.slice(0,10);};
+  const fd=s=>s?dia(s).split('-').reverse().join('-'):'—';
   const kb=n=>n==null?'':(n>=1048576?(n/1048576).toLocaleString('es-CL',{maximumFractionDigits:1})+' MB':Math.round(n/1024).toLocaleString('es-CL')+' KB');
   const ESTADO={OK:'Listo',GENERANDO:'Generando…',ERROR:'Error',IA_OFF:'IA apagada',SIN_DOCS:'Sin documentos'};
   const PILL=e=>`<span class="pill ${e}">${ESTADO[e]||e}</span>`;
@@ -82,7 +84,7 @@
   let actual=null, poll=null;
 
   let TODAS=[];
-  const ym=f=>String(f.fecha||f.created_at||'').slice(0,7);
+  const ym=f=>dia(f.fecha||f.created_at).slice(0,7);
   const MESES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const fym=s=>s?MESES[+s.slice(5,7)-1]+'-'+s.slice(0,4):'';
   function llenarSel(id,vals,fmt){ const sel=document.getElementById(id), act=sel.value;

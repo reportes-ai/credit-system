@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rentabilidad Créditos — AutoFácil</title>
-  <!-- v1.25 — casos menos rentables: botón Subir respaldo (PDF/imagen al bucket) y Ver respaldo en pantalla · v1.24 — el mes de la operación sale del texto AAAA-MM de la BD (septiembre se mostraba como agosto por el desfase UTC) · v1.23 — Rentabilidad estimada (descuenta com. ejecutivo) en detalle; Comisión Parque sin % fijo; Etapa -->
+  <!-- v1.26 — respaldo: tope 8 MB (el real del servidor) · v1.25 — casos menos rentables: botón Subir respaldo (PDF/imagen al bucket) y Ver respaldo en pantalla · v1.24 — el mes de la operación sale del texto AAAA-MM de la BD (septiembre se mostraba como agosto por el desfase UTC) · v1.23 — Rentabilidad estimada (descuenta com. ejecutivo) en detalle; Comisión Parque sin % fijo; Etapa -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -469,7 +469,7 @@ function subirRespaldo(opKey, idx){
   inp.value = '';
   inp.onchange = async () => {
     const f = inp.files && inp.files[0]; if (!f) return;
-    if (f.size > 12 * 1024 * 1024) { alert('Máximo 12 MB'); return; }
+    if (f.size > 8 * 1024 * 1024) { alert('Máximo 8 MB'); return; }
     const nota = prompt('Nota (quién autorizó la excepción y por qué). Opcional:', '') ;
     if (nota === null) return;
     const data_base64 = await new Promise((ok, ko) => { const rd = new FileReader(); rd.onload = () => ok(rd.result); rd.onerror = ko; rd.readAsDataURL(f); });

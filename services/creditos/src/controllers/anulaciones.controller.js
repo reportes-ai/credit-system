@@ -108,11 +108,12 @@ require('../../../../shared/migrate').enFila('anulaciones-operacion', async () =
        se respeta y queda para regularizar a mano. El sync() de Post Venta ya no resiembra las
        iniciales de operaciones ANULADAS. */
 async function apagarRastroAnulacion(idCredito, motivo, quien) {
+  const fallas = [];   // lo que no se pudo apagar: antes solo iba al log y la carta quedaba viva sin rastro
   await pool.query(
     `UPDATE cartas_aprobacion SET status='ANULADA', anulado_por=?, fecha_anulacion=NOW(),
             motivo_rechazo=CONCAT('Operación anulada: ', ?)
       WHERE id_credito_creado=? AND status IN ('PENDIENTE','APROBADA')`,
-    [quien, motivo, idCredito]).catch(err => console.error('[anulacion cartas]', err.message));
+    [quien, motivo, idCredito]).catch(err => { console.error('[anulacion cartas]', err.message); fallas.push('las cartas vivas de la operación'); });
   const INICIALES = {
     SALDO:    ['FUNDANTES PENDIENTES'],
     COMISION: ['COMISION PENDIENTE', 'COMISION A PAGAR'],
@@ -126,8 +127,9 @@ async function apagarRastroAnulacion(idCredito, motivo, quien) {
         AND NOT EXISTS (SELECT 1 FROM (SELECT id_seguimiento, etapa, track FROM postventa_etapas) x
           WHERE x.id_seguimiento = e.id_seguimiento AND x.track = ? AND x.etapa NOT IN (?))`,
       [idCredito, track, iniciales, track, iniciales])
-      .catch(err => console.error('[anulacion track ' + track + ']', err.message));
+      .catch(err => { console.error('[anulacion track ' + track + ']', err.message); fallas.push('el track ' + track + ' de Post Venta'); });
   }
+  return fallas;
 }
 
 /* ── Anulación pedida por una CARGA (Trinidad, 30-09-2026) ──────────────────
@@ -311,7 +313,8 @@ const resolver = async (req, res) => {
         WHERE id=?`, [...valoresEtapa('ANULADO'), a.motivo, a.id_credito]);
 
     // 2b) Cartas vivas y tracks de Post Venta: motor único apagarRastroAnulacion (también lo usa la regularización)
-    await apagarRastroAnulacion(a.id_credito, a.motivo, nombreUsuario(req));
+    const fallas = await apagarRastroAnulacion(a.id_credito, a.motivo, nombreUsuario(req));
+    if (fallas.length) nota += ` ATENCIÓN: no se pudo anular ${fallas.join(' ni ')} — revisar a mano.`;
 
     await pool.query(
       `UPDATE anulaciones_operacion SET estado='APROBADA', cartola_retirada=?, cartola_nota=?,

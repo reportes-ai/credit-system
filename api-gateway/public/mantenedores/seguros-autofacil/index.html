@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguros AutoFácil (SURA) — AutoFácil</title>
-  <!-- v1.2 — footer: cableado a Simulador y Cartas · v1.1 — markup por tramo en la opción 2 (calibrado contra el desgravamen AutoFin) · v1.0 — mantenedor de los seguros SURA de los créditos AutoFácil: desgravamen y cesantía (póliza, condiciones, tramos por opción, comisiones, markup, simulador de prima) y vehículo (portal SURA Dealers). Semilla cotizaciones 04-09-2026 (28-09-2026) -->
+  <!-- v1.3 — "actualizado" en hora local · v1.2 — footer: cableado a Simulador y Cartas · v1.1 — markup por tramo en la opción 2 (calibrado contra el desgravamen AutoFin) · v1.0 — mantenedor de los seguros SURA de los créditos AutoFácil: desgravamen y cesantía (póliza, condiciones, tramos por opción, comisiones, markup, simulador de prima) y vehículo (portal SURA Dealers). Semilla cotizaciones 04-09-2026 (28-09-2026) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -114,7 +114,7 @@ const fld = (s, k, label, type='text', extra='') => `<div class="fld"><label>${l
 function render(){
   const s = DATA.find(x => x.seguro===ACTUAL); if (!s) return;
   const esVeh = s.seguro==='VEHICULO';
-  let html = `<div class="card-af"><h3><i class="bi bi-file-earmark-text"></i> Póliza y condiciones · <span class="muted">actualizado ${esc(s.updated_at?String(s.updated_at).slice(0,10):'—')} por ${esc(s.updated_by||'—')}</span></h3>
+  let html = `<div class="card-af"><h3><i class="bi bi-file-earmark-text"></i> Póliza y condiciones · <span class="muted">actualizado ${esc(s.updated_at&&!isNaN(new Date(s.updated_at))?new Date(s.updated_at).toLocaleDateString('es-CL'):'—')} por ${esc(s.updated_by||'—')}</span></h3>
     <div class="grid">
       ${fld(s,'nombre','Nombre')}${fld(s,'aseguradora','Aseguradora')}${fld(s,'aseguradora_rut','RUT aseguradora')}${fld(s,'poliza_cmf','Póliza CMF')}
       ${fld(s,'intermediario','Intermediario / corredor')}${fld(s,'intermediario_rut','RUT intermediario')}${fld(s,'fecha_cotizacion','Fecha cotización','date')}${fld(s,'vigencia_desde','Vigencia desde','date')}

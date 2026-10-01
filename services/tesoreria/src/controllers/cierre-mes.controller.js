@@ -612,7 +612,6 @@ async function tickRecordatorios() {
     if (porUsuario.size) console.log(`[cierre-mes] recordatorios enviados a ${porUsuario.size} responsable(s) — cierre ${mes}`);
   } catch (e) { console.error('[cierre-mes tick]', e.message); }
 }
-setTimeout(tickRecordatorios, 2 * 60 * 1000);
-programar('cierre-mes-recordatorios', tickRecordatorios, 30 * 60 * 1000);   // revisa cada 30 min; envía 1 vez al día pasada la hora
+programar('cierre-mes-recordatorios', tickRecordatorios, 30 * 60 * 1000, { arranqueMs: 2 * 60 * 1000 });   // revisa cada 30 min; envía 1 vez al día pasada la hora
 
 module.exports = { getEstado, marcarOk, cerrarMes, getConfig, guardarItem, guardarConfig };

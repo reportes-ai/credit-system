@@ -234,8 +234,7 @@ async function vigilarPlazoFijo() {
     }
   } catch (e) { console.error('[rrhh plazo fijo]', e.message); }
 }
-setTimeout(vigilarPlazoFijo, 150 * 1000);
-require('../../../../shared/scheduler').programar('rrhh-plazo-fijo', vigilarPlazoFijo, 24 * 60 * 60 * 1000);
+require('../../../../shared/scheduler').programar('rrhh-plazo-fijo', vigilarPlazoFijo, 24 * 60 * 60 * 1000, { arranqueMs: 150 * 1000 });
 
 /* ── Campos de la ficha ─────────────────────────────────────────────────────── */
 const CAMPOS_CONTACTO = ['direccion', 'comuna', 'ciudad', 'email_personal', 'telefono_personal',

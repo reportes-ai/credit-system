@@ -189,5 +189,4 @@ async function alegarVencidas() {
       href: '/recursos-humanos/compliance/', clave });
   } catch (e) { console.error('[alegato compliance]', e.message); }
 }
-setTimeout(alegarVencidas, 200 * 1000);
-programar('compliance-vencidas', alegarVencidas, 24 * 60 * 60 * 1000);
+programar('compliance-vencidas', alegarVencidas, 24 * 60 * 60 * 1000, { arranqueMs: 200 * 1000 });

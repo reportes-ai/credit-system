@@ -1936,7 +1936,7 @@ const MESES_TXT = ['', 'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'J
 const mesPalabras = m => `${MESES_TXT[Number(String(m).slice(5, 7))] || ''} ${String(m).slice(0, 4)}`;
 
 async function enviarLiquidacionesCorreo(mes, idOdp = null) {
-  const cap = t => { const s = String(t || ''); return s.charAt(0).toUpperCase() + s.slice(1); };   // "Septiembre 2026"
+  const cap = t => { const s = String(t || '').toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); };   // "Septiembre 2026"
   const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
   // Solo las que aún no se enviaron (correo_enviado_at): el hook de la ODP puede correr más de una vez.
   // Con idOdp, solo las que ESA orden paga (más las sin vínculo, emitidas antes de que existiera).

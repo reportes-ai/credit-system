@@ -1691,7 +1691,7 @@ const upsert = async (req, res) => {
          aprobadas a la vez: además de prestarse a confusión, el motor de cartolas
          generaba UNA COMISIÓN POR CARTA — 9 operaciones quedaron con comisión
          duplicada por $4.499.700. La carta vigente es siempre la última. */
-      anularCartasPrevias(r.insertId, c.id_financiera, req).catch(() => {});
+      anularCartasPrevias(r.insertId, c.opOrigen, req).catch(e => console.error('[anular cartas previas]', e.message));   // el ID de la financiera viaja como opOrigen (01-10-2026: se pasaba c.id_financiera = undefined y nunca anulaba)
       sellarCodigo(r.insertId);
       persistirPrimasCarta(r.insertId, c);
       /* Carta nueva ya ENLAZADA a un crédito de carga masiva: sincronizar igual

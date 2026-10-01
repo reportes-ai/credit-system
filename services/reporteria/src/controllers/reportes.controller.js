@@ -311,17 +311,24 @@ exports.respaldoSubir = async (req, res) => {
     if (!numOp) return fail(res, 'Falta el N° de operación', 400);
     const buf = _b64(b.data_base64);
     if (!buf.length) return fail(res, 'Archivo requerido', 400);
-    if (buf.length > 12 * 1024 * 1024) return fail(res, 'Máximo 12 MB por archivo', 413);
+    // El servidor acepta cuerpos de 12 MB y el archivo viaja en base64 (+33%): el tope real por archivo es 8 MB
+    if (buf.length > 8 * 1024 * 1024) return fail(res, 'Máximo 8 MB por archivo', 413);
     const mime = String(b.mime || 'application/pdf').slice(0, 100);
     if (!/^(application\/pdf|image\/(png|jpe?g|webp|gif))$/i.test(mime)) return fail(res, 'Solo PDF o imagen (PNG, JPG, WEBP)', 400);
     const nombre = String(b.nombre || 'respaldo.pdf').slice(0, 200);
     const d = await almacen.colocar({ ambito: 'rentabilidad', clave: numOp, buffer: buf, mime, nombre });
     const u = req.usuario || {};
-    const [r] = await pool.query(
-      `INSERT INTO rentabilidad_respaldos (num_op, mes, nombre, mime, tamano, nota, data, doc_storage, doc_ruta, doc_bytes, subido_por, id_subido_por)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [numOp, /^\d{4}-\d{2}$/.test(String(b.mes || '')) ? b.mes : null, nombre, mime, buf.length, String(b.nota || '').slice(0, 300) || null,
-       d.blob, d.storage, d.ruta, d.bytes, [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || null, u.id_usuario || null]);
+    let r;
+    try {
+      [r] = await pool.query(
+        `INSERT INTO rentabilidad_respaldos (num_op, mes, nombre, mime, tamano, nota, data, doc_storage, doc_ruta, doc_bytes, subido_por, id_subido_por)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [numOp, /^\d{4}-\d{2}$/.test(String(b.mes || '')) ? b.mes : null, nombre, mime, buf.length, String(b.nota || '').slice(0, 300) || null,
+         d.blob, d.storage, d.ruta, d.bytes, [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email || null, u.id_usuario || null]);
+    } catch (e) {
+      if (d.ruta) await almacen.borrar(d.ruta).catch(() => {});   // el archivo ya subió al bucket: sin fila quedaría huérfano
+      throw e;
+    }
     try { require('../../../../shared/audit').auditar({ req, accion: 'CREAR', modulo: 'reporteria', entidad: 'rentabilidad_respaldo', entidad_id: r.insertId, detalle: `Respaldo de excepción de rentabilidad OP ${numOp}: ${nombre}` }); } catch (_) {}
     ok(res, { id: r.insertId });
   } catch (e) { console.error('[rentabilidad respaldoSubir]', e.message); fail(res, 'Error interno del servidor'); }

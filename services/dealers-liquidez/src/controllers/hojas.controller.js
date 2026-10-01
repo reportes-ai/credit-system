@@ -349,8 +349,7 @@ async function tickSLA() {
   } catch (e) { console.error('[liquidez tickSLA]', e.message); }
   finally { _slaCorriendo = false; }
 }
-programar('liquidez-sla', tickSLA, 30 * 60 * 1000);
-setTimeout(tickSLA, 20 * 1000); // un primer chequeo al arrancar
+programar('liquidez-sla', tickSLA, 30 * 60 * 1000, { arranqueMs: 20 * 1000 }); // un primer chequeo al arrancar
 
 /* ── Paso 3: emisión de Órdenes de Pago y abono al pagarse ─────────────────── */
 const fmtPesos = n => '$' + new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 }).format(Math.round(Number(n) || 0));

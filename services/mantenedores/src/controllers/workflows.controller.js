@@ -386,8 +386,7 @@ async function escalar() {
     }
   } catch (e) { console.error('[workflows escalar]', e.message); }
 }
-programar('workflows-escalar', escalar, 30 * 60 * 1000);
-setTimeout(escalar, 2 * 60 * 1000);
+programar('workflows-escalar', escalar, 30 * 60 * 1000, { arranqueMs: 2 * 60 * 1000 });
 
 /* ── API del mantenedor ── */
 const getAll = async (req, res) => {

@@ -325,5 +325,4 @@ async function recordarPendientes() {
       href: '/recursos-humanos/encuestas/', clave });
   } catch (e) { console.error('[recordatorio encuestas]', e.message); }
 }
-setTimeout(recordarPendientes, 240 * 1000);
-programar('rrhh-encuestas-recordar', recordarPendientes, 24 * 60 * 60 * 1000);
+programar('rrhh-encuestas-recordar', recordarPendientes, 24 * 60 * 60 * 1000, { arranqueMs: 240 * 1000 });

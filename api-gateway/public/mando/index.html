@@ -5,7 +5,7 @@
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cuadro de Mando — AutoFácil Business Suite</title>
-<!-- v1.7 — latido de sesión permanente: la TV ya no queda en SIN DATOS cuando el motor de inactividad la cierra a los 60 min (30-09-2026) · v1.6 — Carrera del mes: título en dos líneas y badge del día en una sola fila · v1.5 — Otorgado hoy con N° de ops; ejecutivos que no se han conectado hoy (punto rojo, leyenda y ticker) · v1.4 — T° prom. aprobación carta solo en horas de servicio (Pato 29-09) · v1.3 — sonido de alerta al encenderse el letrero rojo · v1.2 — OPERACIONES OTORGADAS (antes "CURSADAS") · v1.1 — reconexion automatica de la cuenta TV (token_tv en localStorage) -->
+<!-- v1.8 — el ticker "sin conexión hoy" usa la misma regla que la lista · v1.7 — latido de sesión permanente: la TV ya no queda en SIN DATOS cuando el motor de inactividad la cierra a los 60 min (30-09-2026) · v1.6 — Carrera del mes: título en dos líneas y badge del día en una sola fila · v1.5 — Otorgado hoy con N° de ops; ejecutivos que no se han conectado hoy (punto rojo, leyenda y ticker) · v1.4 — T° prom. aprobación carta solo en horas de servicio (Pato 29-09) · v1.3 — sonido de alerta al encenderse el letrero rojo · v1.2 — OPERACIONES OTORGADAS (antes "CURSADAS") · v1.1 — reconexion automatica de la cuenta TV (token_tv en localStorage) -->
 <style>
   :root {
     --bg:#020817; --panel:#050e22; --line:#0a2748; --cyan:#00e5ff; --cyan-dim:#0891b2;
@@ -485,7 +485,7 @@ async function cargar(){
     tk.push(`PAGOS RECIBIDOS HOY <b>${NF(d.hoy.pagos)}</b> por <b>${CLP(d.hoy.monto_pagos)}</b>`);
     tk.push(`GESTIONES DE COBRANZA HOY <b>${NF(d.hoy.gestiones_cobranza)}</b>`);
     if (d.hoy.mensajes_wsp!=null) tk.push(`MENSAJES FACILITO HOY <b>${NF(d.hoy.mensajes_wsp)}</b>`);
-    tk.push(`EJECUTIVOS EN LÍNEA <b>${ej.conectados}/${ej.total}</b>${(ej.lista||[]).some(e=>e.conecto_hoy===false)?` · SIN CONEXIÓN HOY <b>${ej.lista.filter(e=>e.conecto_hoy===false).map(e=>e.nombre.split(' ')[0]).join(', ')}</b>`:''}`);
+    tk.push(`EJECUTIVOS EN LÍNEA <b>${ej.conectados}/${ej.total}</b>${(ej.lista||[]).some(e=>!e.conectado&&e.conecto_hoy===false)?` · SIN CONEXIÓN HOY <b>${ej.lista.filter(e=>!e.conectado&&e.conecto_hoy===false).map(e=>e.nombre.split(' ')[0]).join(', ')}</b>`:''}`);
     if (d.indicadores.uf) tk.push(`UF <b>$${Number(d.indicadores.uf).toLocaleString('es-CL',{minimumFractionDigits:2})}</b>`);
     document.getElementById('ticker').innerHTML = tk.join('<span class="sep">◆</span>') + '<span class="sep">◆</span>';
   } catch(e){

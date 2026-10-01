@@ -127,7 +127,8 @@ function isoDeBD(d) {
   try { off = require('./config/database').offsetBD() || off; } catch (_) {}
   const m = /^([+-])(\d{2}):(\d{2})$/.exec(off);
   const ms = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : -4 * 3600000;
-  return new Date(d.getTime() + ms).toISOString().split("T")[0];   // UTC a propósito: ya se le sumó el offset
+  const x = new Date(d.getTime() + ms);   // se leen los campos UTC a propósito: ya se le sumó el offset
+  return x.getUTCFullYear() + '-' + String(x.getUTCMonth() + 1).padStart(2, '0') + '-' + String(x.getUTCDate()).padStart(2, '0');
 }
 
 /* ── LECTOR MIXTO: para helpers que reciben tanto fechas de la base como fechas armadas en

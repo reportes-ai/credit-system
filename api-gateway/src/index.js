@@ -53,29 +53,34 @@ require('../../shared/enlazar-dealer');                 // cada 6 h: créditos c
 const alertar500 = require('../../shared/alerta-errores');
 /* El correo de error llegaba con "Error interno del servidor" y nada más, porque los controllers
    ya sanitizan antes de responder y la causa real solo iba al console.error (Render). Se recuerda
-   el último console.error del proceso y, si fue hace menos de 3 s, viaja en el correo (29-09-2026:
-   falla de Cartolas › sync que no se pudo diagnosticar desde el mail). */
-let _ultimoConsoleError = { msg: '', at: 0 };
+   el último console.error y viaja en el correo (29-09-2026: falla de Cartolas › sync que no se pudo
+   diagnosticar desde el mail). El recuerdo es POR PETICIÓN (AsyncLocalStorage, 01-10-2026): antes era el
+   último del proceso en 3 s y el correo podía traer como causa el error de otra petición o de un motor. */
+const _alsPeticion = new (require('node:async_hooks').AsyncLocalStorage)();
 {
   const _ce = console.error.bind(console);
   console.error = (...a) => {
-    try { _ultimoConsoleError = { msg: a.map(x => (x && x.stack) ? String(x.stack).split('\n').slice(0, 3).join(' | ') : (x && x.message) || String(x)).join(' ').slice(0, 800), at: Date.now() }; } catch (_) {}
+    try {
+      const st = _alsPeticion.getStore();   // sin petición en curso (motores, arranque) no se recuerda nada
+      if (st) st.err = a.map(x => (x && x.stack) ? String(x.stack).split('\n').slice(0, 3).join(' | ') : (x && x.message) || String(x)).join(' ').slice(0, 800);
+    } catch (_) {}
     _ce(...a);
   };
 }
 app.use((req, res, next) => {
+  const _st = { err: '' };
   const _json = res.json.bind(res);
   res.json = (body) => {
     if (res.statusCode >= 500 && body && body.error) {
-      const causa = (Date.now() - _ultimoConsoleError.at < 3000 && _ultimoConsoleError.msg && !_ultimoConsoleError.msg.includes(String(body.error))) ? _ultimoConsoleError.msg : '';
+      const causa = (_st.err && !_st.err.includes(String(body.error))) ? _st.err : '';
       console.error(`[${res.statusCode}] ${req.method} ${req.originalUrl} →`, body.error);
-      alertar500(req, body.error + (causa ? '\nCausa (último console.error): ' + causa : '')); // correo al admin (throttled), no bloquea la respuesta
+      alertar500(req, body.error + (causa ? '\nCausa (console.error de esta petición): ' + causa : '')); // correo al admin (throttled), no bloquea la respuesta
       if (res.statusCode === 500)
         body = { ...body, error: 'Error interno del servidor. Si persiste, contacta al administrador.' };
     }
     return _json(body);
   };
-  next();
+  _alsPeticion.run(_st, next);
 });
 
 // Los HTML (páginas) nunca se cachean: así un cambio (permisos, gating, etc.) aplica al recargar.

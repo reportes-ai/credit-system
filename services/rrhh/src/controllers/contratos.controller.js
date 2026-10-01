@@ -149,8 +149,7 @@ async function alegarCargosSinDescripcion() {
     });
   } catch (e) { console.error('[alegato cargos]', e.message); }
 }
-setTimeout(alegarCargosSinDescripcion, 120 * 1000);
-programar('rrhh-cargos-sin-descripcion', alegarCargosSinDescripcion, 24 * 60 * 60 * 1000);
+programar('rrhh-cargos-sin-descripcion', alegarCargosSinDescripcion, 24 * 60 * 60 * 1000, { arranqueMs: 120 * 1000 });
 
 /* ── Cargos ─────────────────────────────────────────────────────────────────── */
 exports.getCargos = async (req, res) => {
@@ -848,8 +847,7 @@ async function alegarOnbVencidos() {
     });
   } catch (e) { console.error('[alegato onb]', e.message); }
 }
-setTimeout(alegarOnbVencidos, 160 * 1000);
-programar('rrhh-onboarding-vencidos', alegarOnbVencidos, 24 * 60 * 60 * 1000);
+programar('rrhh-onboarding-vencidos', alegarOnbVencidos, 24 * 60 * 60 * 1000, { arranqueMs: 160 * 1000 });
 
 /* ─── ANEXOS DE CONTRATO (modelos vigentes) ─────────────────────────────────
    Entrega lo necesario para armar un anexo imprimible:

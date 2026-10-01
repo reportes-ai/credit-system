@@ -1967,7 +1967,8 @@ async function datosSaldosAPagar() {
       if (v) {
         const dv = isoD(v.fecha), dh = isoD(hoyCL);
         const addD = (iso, n) => { const x = new Date(iso + 'T12:00:00'); x.setDate(x.getDate() + n); return isoD(x); };
-        r.dias_sla = dv === dh ? 0 : (dh > dv ? FER.diasHabilesEntre(addD(dv, 1), dh) : -FER.diasHabilesEntre(addD(dh, 1), dv));
+        // Ya vencida y hoy es inhábil (venció el viernes, se mira el sábado): 0 hábiles de atraso se leía "vence hoy" → mínimo 1
+        r.dias_sla = dv === dh ? 0 : (dh > dv ? Math.max(1, FER.diasHabilesEntre(addD(dv, 1), dh)) : -FER.diasHabilesEntre(addD(dh, 1), dv));
       } else r.dias_sla = null;
       r.vence_manana = !!(r.fecha_pago_sla && r.fecha_pago_sla === mananaHabil);
     });

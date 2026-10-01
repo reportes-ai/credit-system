@@ -31,7 +31,11 @@ require('../../../../shared/migrate').enFila('ia-config', async () => {
 
 /* GET /api/ia-config → { activa, texto_analizando, texto_analizado, mostrar_logo, funcionalidades[] } */
 const getConfig = async (req, res) => {
-  try { res.json({ success: true, data: await ia.getConfig(), error: null }); }
+  try {
+    // El saldo prepago se ve solo en /uso (permiso mant_ia): esta config la lee el branding de cualquier usuario
+    const { prepago_saldo_usd, prepago_fecha, ...publica } = await ia.getConfig();
+    res.json({ success: true, data: publica, error: null });
+  }
   catch (e) { console.error('[ia-config getConfig]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 

@@ -95,7 +95,7 @@ require('../../../shared/migrate').enFila('ctb-provisiones', async () => {
     creado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
     UNIQUE KEY uq_origen (concepto, origen_tipo, origen_id), INDEX idx_estado (concepto, estado), INDEX idx_mes (mes))`);
   await pool.query('CREATE TABLE IF NOT EXISTS ctb_config (clave VARCHAR(60) PRIMARY KEY, valor VARCHAR(200) NOT NULL)');
-  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09'), ('prov_sueldos_desde','2026-09'), ('prov_otros_desde','2026-09'), ('prov_ias_desde','2026-09'), ('prov_ias_pct','8.33'), ('prov_ingresos_desde','2026-09'), ('prov_interes_desde','2026-09')");
+  await pool.query("INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('prov_dealer_desde','2026-09'), ('prov_parque_desde','2026-09'), ('prov_ejecutivo_desde','2026-09'), ('prov_jefe_desde','2026-09'), ('prov_sueldos_desde','2026-09'), ('prov_otros_desde','2026-09'), ('prov_ias_desde','2026-09'), ('prov_ias_pct','8.33'), ('prov_ingresos_desde','2026-09'), ('prov_interes_desde','2026-09')");
   await pool.query("INSERT IGNORE INTO ctb_cuentas (codigo, nombre, tipo, imputable) VALUES ('2106011','PROVISION COMISIONES DEALER','PASIVO',1), ('2106013','PROVISION COMISIONES PARQUE (DEVENGO)','PASIVO',1), ('2106018','PROVISION ARRIENDOS (DEVENGO)','PASIVO',1), ('2106014','PROVISION COMISIONES EJECUTIVOS (DEVENGO)','PASIVO',1), ('2106015','PROVISION REMUNERACIONES (DEVENGO)','PASIVO',1), ('2106016','PROVISION OTROS GASTOS (DEVENGO)','PASIVO',1), ('2106017','PROVISION BONO JEFE COMERCIAL (DEVENGO)','PASIVO',1), ('2106031','PROVISION INDEMNIZACION POR ANOS DE SERVICIO','PASIVO',1), ('1106015','PRODUCCION COMISION DEVENGADA NO FACTURADA','ACTIVO',1), ('1104125','PROVISION INTERESES DEVENGADOS POR COBRAR','ACTIVO',1)");
   /* Mapeo paramétrico categoría de la ODP / tipo de pago recurrente → cuenta de gasto.
      Es lo que permite provisionar un gasto que en la ODP solo tiene categoría y centro de costo.
@@ -1853,7 +1853,7 @@ async function otrasCuentas(mes) {
   return out.sort((a, b) => (a.grupo === b.grupo ? Math.abs(b.saldo_final) - Math.abs(a.saldo_final) : (a.grupo === 'PROVISION' ? -1 : 1)));
 }
 
-const sincronizarArriendo = async (u) => { const a = await sincronizarParque(u), b = await sincronizarOtros(u); return { constituidas: (a.constituidas || 0) + (b.constituidas || 0), liberadas: (a.liberadas || 0) + (b.liberadas || 0), pendientes: b.pendientes || [] }; };
+const sincronizarArriendo = async (u) => { const a = await sincronizarParque(u), b = await sincronizarOtros(u); return { constituidas: (a.constituidas || 0) + (b.constituidas || 0), liberadas: (a.liberadas || 0) + (b.liberadas || 0), omitidas: a.omitidas || 0, pendientes: b.pendientes || [] }; };
 const SINCRONIZAR = { DEALER: sincronizarDealer, PARQUE: sincronizarParque, ARRIENDO: sincronizarArriendo, EJECUTIVO: sincronizarEjecutivo, JEFE: sincronizarJefe, SUELDOS: sincronizarSueldos, OTROS: sincronizarOtros, IAS: sincronizarIas, INGRESOS: sincronizarIngresos, INTERES: sincronizarInteres };
 const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, ARRIENDO: liberarFilaPorId, EJECUTIVO: liberarEjecutivo, JEFE: liberarJefe, SUELDOS: liberarSueldos, OTROS: liberarOtros, IAS: liberarIas };
 /* Al otorgar: todos los conceptos que nacen con el crédito (fire-and-forget, nunca lanza) */
@@ -1863,6 +1863,7 @@ const LIBERAR = { DEALER: liberarDealer, PARQUE: liberarParque, ARRIENDO: libera
    para agrupar otorgamientos seguidos (carga masiva). Nunca frena ni lanza. */
 let _syncOtorgarTimer = null, _syncOtorgarCorriendo = false, _syncOtorgarPendiente = false;
 function sincronizarTrasOtorgar(usuario) {
+  if (!require('../../../shared/scheduler.js').porEvento('provisiones-tras-otorgar')) return;   // MOTORES=off (host en espera) o staging: igual que el reloj
   _syncOtorgarPendiente = true;
   if (_syncOtorgarTimer) return;
   _syncOtorgarTimer = setTimeout(async () => {
@@ -1887,6 +1888,7 @@ async function constituirAlOtorgar(idCredito, usuario) {
 }
 async function tick() {
   for (const [k, fn] of Object.entries(SINCRONIZAR)) {
+    if (k === 'ARRIENDO') continue;   // es PARQUE + OTROS juntos (para el botón Sincronizar): en la vuelta ya corren los dos por separado
     try { const r = await fn(); if (r.constituidas || r.liberadas) console.log(`[provisiones-${k.toLowerCase()}]`, JSON.stringify(r)); }
     catch (e) { console.error(`[provisiones-${k.toLowerCase()}]`, e.message); }
   }

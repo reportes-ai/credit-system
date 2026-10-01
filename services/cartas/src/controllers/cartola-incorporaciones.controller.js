@@ -247,7 +247,9 @@ const getDesde = async (req, res) => {
 const setDesde = async (req, res) => {
   try {
     const desde = String((req.body || {}).desde || '').trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || isNaN(new Date(desde + 'T12:00:00')))
+    // Fecha de calendario real: new Date('2026-02-31') no es NaN, se corre al 03-03
+    const [dy, dm, dd] = desde.split('-').map(Number), dReal = new Date(Date.UTC(dy || 0, (dm || 1) - 1, dd || 0));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || dReal.getUTCFullYear() !== dy || dReal.getUTCMonth() !== dm - 1 || dReal.getUTCDate() !== dd)
       return res.status(400).json({ success: false, data: null, error: 'Fecha inválida (AAAA-MM-DD)' });
     const antes = await incorporacionDesde();
     await pool.query('INSERT INTO config_sistema (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [CLAVE_DESDE, JSON.stringify(desde)]);

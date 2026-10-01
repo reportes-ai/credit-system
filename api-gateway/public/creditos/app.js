@@ -375,6 +375,7 @@ let _paginaActual = 1;
 const _LIMIT_PAG  = 100;
 let _lastStats = {};
 let _lastTotal  = 0;
+const escCred = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');   // texto de la carga Excel/Trinidad → HTML
 let _sortColCred = '';      // columna de orden (vacío = orden por defecto: mes/id desc)
 let _sortDirCred = 'desc';
 
@@ -632,7 +633,7 @@ function renderConsulta(list) {
           <td class="num-cred">${c.num_op||c.numero_credito||'—'}</td>
           <td class="mono" style="white-space:nowrap">${c.rut_cliente||'—'}</td>
           <td>${c.nombre_cliente||'—'}</td>
-          <td style="font-size:.8rem;white-space:nowrap">${c.ejecutivo||'—'}</td>
+          <td style="font-size:.8rem;white-space:nowrap">${escCred(c.ejecutivo||'—')}</td>
           <td>${finTag(c.financiera)}</td>
           <td class="mono" style="font-size:.78rem;color:#6b7280">${c.id_financiera||'—'}</td>
           <td style="white-space:nowrap;font-size:.78rem;color:#6b7280">${fmtF(c.fecha_otorgamiento||c.created_at)}</td>
@@ -717,7 +718,7 @@ async function abrirDetalle(id) {
           </div>
           <div style="text-align:right">
             <div style="font-size:.7rem;font-weight:700;color:#9ca3af;text-transform:uppercase">Ejecutivo</div>
-            <div style="font-size:.88rem;font-weight:700;color:#374151">${c.ejecutivo||'—'}</div>
+            <div style="font-size:.88rem;font-weight:700;color:#374151">${escCred(c.ejecutivo||'—')}</div>
           </div>
         </div>
       </div>

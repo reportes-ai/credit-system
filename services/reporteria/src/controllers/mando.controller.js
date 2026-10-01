@@ -208,7 +208,11 @@ exports.mando = async (req, res) => {
     // algunas fecha_creacion quedaron +4h (gotcha mysql2) → diff negativo: se corre la creación 4 h atrás.
     const dursOk = durs.map(r => {
       let ini = r.ini; if (Number(r.m) < 0) { const d = new Date(String(r.ini).replace(' ', 'T') + 'Z'); d.setUTCHours(d.getUTCHours() - 4); ini = d.toISOString().slice(0, 19).replace('T', ' '); }
-      return minutosServicio(ini, r.fin, cfgMandoT.dias);
+      const ms = minutosServicio(ini, r.fin, cfgMandoT.dias);
+      // Ingresada Y aprobada fuera del horario (un sábado, o a las 19:30): 0 min de servicio no es "aprobada al instante";
+      // sumarla empujaba el promedio hacia 0. No se mide: queda fuera del promedio (01-10-2026).
+      const real = Number(r.m) < 0 ? Number(r.m) + 240 : Number(r.m);
+      return (ms === 0 && real > 0) ? null : ms;
     }).filter(m => m != null && m >= 0 && m <= 43200); // descarta outliers > 30 días
     const tPromMin = dursOk.length ? Math.round(dursOk.reduce((s, m) => s + m, 0) / dursOk.length) : null;
 

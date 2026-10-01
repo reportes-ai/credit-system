@@ -90,7 +90,6 @@ async function revisar() {
   finally { corriendo = false; }
 }
 
-setTimeout(revisar, 15000);            // primera corrida al arrancar
-programar('aviso-vencimiento-clave', revisar, 60 * 60 * 1000); // cada hora (a lo sumo 1 correo/día por usuario)
+programar('aviso-vencimiento-clave', revisar, 60 * 60 * 1000, { arranqueMs: 15000 }); // cada hora (a lo sumo 1 correo/día por usuario); primera corrida al arrancar
 
 module.exports = { revisar };

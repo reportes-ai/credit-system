@@ -106,12 +106,13 @@ require('../../../../shared/migrate').enFila('trinidad-config', async () => {
   /* "Anulado" no estaba en el mapa y mapEstado lo dejaba en DIGITADO: 6 ops anuladas por
      Autofin (4 con carta otorgada) quedaban vivas como pendientes y el Guardián de
      Consistencia las reclamaba como ventas perdidas (27-09-2026). Si el Administrador
-     ya lo mapeó a mano, se respeta. */
-  await pool.query(
-    `INSERT INTO trinidad_estados (estado_trinidad, estado_autofacil)
-     SELECT 'Anulado', 'ANULADO' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM trinidad_estados WHERE LOWER(estado_trinidad)='anulado')`
-  ).catch(e => console.error('[trinidad-config] seed Anulado', e.message));
+     ya lo mapeó a mano, se respeta. (La siembra va abajo, fuera de este bloque.) */
 });
+/* Una sola vez en la vida del sistema (migrar): antes corría en cada arranque y, si el Administrador borraba
+   el mapeo, el reinicio siguiente lo volvía a sembrar (01-10-2026). */
+require('../../../../shared/migrate').migrar('trinidad-estado-anulado-v1', () => pool.query(
+  `INSERT INTO trinidad_estados (estado_trinidad, estado_autofacil)
+   SELECT 'Anulado', 'ANULADO' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM trinidad_estados WHERE LOWER(estado_trinidad)='anulado')`));
 
 /* ══════════════════ ESTADOS ══════════════════ */
 
