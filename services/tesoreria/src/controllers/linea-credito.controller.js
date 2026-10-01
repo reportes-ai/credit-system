@@ -144,6 +144,12 @@ Atentamente,
 AutoFácil Crédito Automotriz — Finanzas', ''),
          variables = REPLACE(variables, '{DIAS} {LINK}', '{DIAS} {RESPONDER_A} {LINK}')
        WHERE codigo='linea_certificado_saldo' AND cuerpo LIKE '%respondiendo este correo.%'`).catch(() => {});
+    // Sin la línea de verificación en el cuerpo (Pato, 01-10-2026): el folio y el QR ya van en el PDF adjunto.
+    await pool.query(
+      `UPDATE correos_plantillas SET cuerpo = REPLACE(cuerpo, '
+
+Verificación del documento: {LINK}', '')
+       WHERE codigo='linea_certificado_saldo' AND cuerpo LIKE '%Verificación del documento: {LINK}%'`).catch(() => {});
     console.log('[linea-credito] módulo listo');
   } catch (e) { console.error('[linea-credito migration]', e.message); }
 });

@@ -365,9 +365,7 @@ Monto compensado: {COMPENSADO}
 Saldo insoluto de la línea: {SALDO_NUEVO}
 Cupo disponible, aceptado este certificado: {DISPONIBLE} (utilización {USO})
 
-Les agradecemos confirmar su conformidad dentro de {DIAS} días hábiles bancarios, escribiendo a {RESPONDER_A}.
-
-Verificación del documento: {LINK}`,
+Les agradecemos confirmar su conformidad dentro de {DIAS} días hábiles bancarios, escribiendo a {RESPONDER_A}.`,
     para_perfiles: '',
     cc: '',
     destinatario: 'La casilla de la financiera y la copia configuradas en Tesorería → Línea de Crédito Unidad → Parámetros',
