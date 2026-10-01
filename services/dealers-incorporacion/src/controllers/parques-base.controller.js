@@ -19,6 +19,7 @@ const RUT = require('../../../../api-gateway/public/js/rut-core');
 const NOM = require('../../../../api-gateway/public/js/nombres-core');   // empresas en MAYÚSCULAS, personas en Nombre Propio
 const { auditar } = require('../../../../shared/audit');
 const almacen = require('../../../../shared/almacen-docs');
+const { tieneFunc } = require('../../../../shared/middleware/permisos');
 
 /* ── Migración: tabla + card en el módulo Creación/Mantenedor de Dealer ───── */
 require('../../../../shared/migrate').enFila('parques-base', async () => {
@@ -122,6 +123,35 @@ function limpiarFicha(body) {
   return { f };
 }
 
+/* RUT REPETIDO ENTRE PARQUES — requiere la aprobación de un gerente con comentario (Pato, 01-10-2026).
+   Un mismo dueño puede tener dos parques (PLANETCAR y PLANET MAS, AUTOMOTORA FRQ SPA): cada uno
+   lleva su cartola, su orden de pago y su factura, porque el circuito separa por parque y mes,
+   no por RUT. Pero el mismo parque cargado dos veces con otro nombre se ve igual, y el sistema
+   solo comparaba el NOMBRE: por eso un segundo parque con el mismo RUT lo decide Gerencia, viendo
+   cuál parque ya lo usa. Motor único del cruce: lo usan guardar() de acá y la cadena de niveles
+   de la ficha de incorporación (fichas.controller → parquesMismoRut: nivel PARQUE_RUT_REPETIDO y cierre).
+   @returns {Promise<Array<{id:number,nombre:string,activo:number}>>} otros parques con ese RUT */
+async function parquesConRut(rut, exceptoIdParque) {
+  const n = RUT.normalizar(rut);
+  if (!n) return [];
+  const [rows] = await pool.query(
+    `SELECT p.id, p.nombre, p.activo
+       FROM parques_ficha f JOIN parques_comisiones p ON p.id = f.id_parque
+      WHERE REPLACE(UPPER(f.rut),'.','') = ? AND p.id <> ?
+      ORDER BY p.nombre`, [String(n).replace(/\./g, '').toUpperCase(), Number(exceptoIdParque) || 0]);
+  return rows;
+}
+/* Respuesta 409 que la pantalla convierte en una confirmación (mismo patrón que confirmar:'cuota'). */
+function avisoRutRepetido(rut, otros) {
+  const lista = otros.map(o => o.nombre + (o.activo ? '' : ' (inactivo)')).join(', ');
+  return { confirmar: 'rut_parque', rut: RUT.normalizar(rut) || rut, parques: otros,
+    mensaje: `El RUT ${RUT.normalizar(rut) || rut} ya está en la ficha de ${lista}. ` +
+      `Si es OTRO parque del mismo dueño, confirma para continuar: tendrá su propia cartola, orden de pago y factura. ` +
+      `Si es el MISMO parque, no sigas: edita la ficha que ya existe.` };
+}
+exports.parquesConRut = parquesConRut;
+exports.avisoRutRepetido = avisoRutRepetido;
+
 /* GET /parques-base — la base completa: parámetro de cálculo + ficha (si existe). */
 exports.listar = async (_req, res) => {
   try {
@@ -149,12 +179,37 @@ exports.guardar = async (req, res) => {
     const { f, error } = limpiarFicha(req.body || {});
     if (error) return res.status(400).json({ success: false, data: null, error });
 
+    /* RUT que ya usa otro parque — requiere la aprobación de un gerente y un comentario válido de él
+       (Pato, 01-10-2026). Por esta pantalla no hay cadena de niveles, así que el cambio lo guarda el
+       propio gerente (permiso parque_rut_repetido de la matriz, o Administrador) con su comentario; a
+       cualquier otro se le explica y no se guarda. Se exige solo cuando el RUT de ESTA ficha cambia (o es
+       nueva), para no pedirlo en cada edición de dos parques que ya comparten dueño. */
+    let rutCompartido = [], comentarioRut = null;
+    if (f.rut) {
+      const [[act]] = await pool.query('SELECT rut FROM parques_ficha WHERE id_parque=?', [idParque]);
+      if (RUT.normalizar(act && act.rut) !== f.rut) {
+        rutCompartido = await parquesConRut(f.rut, idParque);
+        if (rutCompartido.length) {
+          const aviso = avisoRutRepetido(f.rut, rutCompartido);
+          const esGerencia = (req.usuario || {}).perfil_nombre === 'Administrador' || await tieneFunc(req.usuario.id_usuario, 'parque_rut_repetido');
+          if (!esGerencia)
+            return res.status(403).json({ success: false, data: { parques: rutCompartido },
+              error: `El RUT ${aviso.rut} ya está en la ficha de ${rutCompartido.map(o => o.nombre).join(', ')}. Un segundo parque con el mismo RUT requiere la aprobación de un gerente: pídele que guarde él este RUT con su comentario. Si es el mismo parque, edita la ficha que ya existe.` });
+          comentarioRut = String((req.body && req.body.comentario_rut) || '').trim().slice(0, 500);
+          if (!(comentarioRut.length >= 10 && /\s/.test(comentarioRut)))
+            return res.status(409).json({ success: false, data: { ...aviso, confirmar: 'comentario_rut_parque' },
+              error: `El RUT ${aviso.rut} ya está en la ficha de ${rutCompartido.map(o => o.nombre).join(', ')}. Para aprobar un segundo parque con el mismo RUT escribe tu comentario (mínimo 10 caracteres): por qué es OTRO parque y no el mismo repetido.` });
+        }
+      }
+    }
+
     await pool.query(
       `INSERT INTO parques_ficha (id_parque, ${CAMPOS.join(',')}) VALUES (?${',?'.repeat(CAMPOS.length)})
        ON DUPLICATE KEY UPDATE ${CAMPOS.map(c => `${c}=VALUES(${c})`).join(',')}`,
       [idParque, ...CAMPOS.map(c => f[c])]);
 
-    auditar({ req, accion: 'EDITAR', modulo: 'dealers-incorporacion', entidad: 'parque_ficha', entidad_id: idParque, detalle: `Editó la ficha del parque "${p.nombre}"`, meta: req.body });
+    auditar({ req, accion: 'EDITAR', modulo: 'dealers-incorporacion', entidad: 'parque_ficha', entidad_id: idParque,
+      detalle: `Editó la ficha del parque "${p.nombre}"` + (rutCompartido.length ? ` — aprobó (Gerencia) que comparte el RUT ${f.rut} con ${rutCompartido.map(o => o.nombre).join(', ')}; comentario: «${comentarioRut}»` : ''), meta: req.body });
     res.json({ success: true, data: null, error: null });
   } catch (e) { console.error('[parques-base guardar]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Niveles de Aprobación de Dealer — AutoFácil</title>
-  <!-- v1.3 — navbar migrada al componente topnav · v1.1 — breadcrumb homologado -->
+  <!-- v1.4 — condición nueva: Parque con RUT de otro parque (visto de Gerencia con comentario obligatorio) · v1.3 — navbar migrada al componente topnav · v1.1 — breadcrumb homologado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -73,7 +73,7 @@
     <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
     <ul>
       <li><b>Niveles y orden</b> → definen por qué etapas pasa cada ficha al <a href="/dealers-incorporacion/nuevo.html">enviarla a autorización</a> antes de que el ejecutivo pueda imprimirla y firmarla.</li>
-      <li><b>Condición</b> → <i>Siempre</i> aplica a toda ficha; <i>Comisión sobre la pizarra</i> solo si algún tramo supera la <a href="/mantenedores/parques/">pizarra Parque/Calle</a> (sella "Participación especial aprobada por…"); <i>Depósito modificado</i> solo si cambia banco/cuenta del dealer.</li>
+      <li><b>Condición</b> → <i>Siempre</i> aplica a toda ficha; <i>Comisión sobre la pizarra</i> solo si algún tramo supera la <a href="/mantenedores/parques/">pizarra Parque/Calle</a> (sella "Participación especial aprobada por…"); <i>Depósito modificado</i> solo si cambia banco/cuenta del dealer; <i>Parque con RUT de otro parque</i> solo en fichas de parque cuyo RUT ya está en la ficha de otro parque de <a href="/dealers-incorporacion/parques.html">Creación de Parque</a>: quien autoriza debe dejar un comentario, y sin ese visto la ficha no se puede cerrar (si el nivel se desactiva, al cerrar basta la confirmación del analista).</li>
       <li><b>Permiso</b> → quién puede autorizar/rechazar ese nivel, gobernado por la <a href="/usuarios/">matriz de Perfiles y Permisos</a>.</li>
       <li>El resultado se ve en <a href="/dealers-incorporacion/mantencion.html">Mantención Dealers → Revisión</a> (botón Autorizar por nivel) y en las autorizaciones impresas en la ficha.</li>
     </ul>
@@ -110,7 +110,7 @@ const escH = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&
 
 function toast(m,err){ const t=$('toast'); t.textContent=m; t.className='toast-af'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none',2600); }
 
-const COND_LBL = { SIEMPRE:'Siempre', COMISION_SOBRE_PIZARRA:'Comisión sobre la pizarra', DEPOSITO_MODIFICADO:'Depósito modificado' };
+const COND_LBL = { SIEMPRE:'Siempre', COMISION_SOBRE_PIZARRA:'Comisión sobre la pizarra', DEPOSITO_MODIFICADO:'Depósito modificado', PARQUE_RUT_REPETIDO:'Parque con RUT de otro parque' };
 let NIVELES = [], PERMISOS = [], CONDICIONES = [];
 
 async function cargar(){

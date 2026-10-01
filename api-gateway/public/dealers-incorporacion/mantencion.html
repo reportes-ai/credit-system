@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.27 — Aprobaciones Históricas: encabezados ordenables (Tipo/Concesionario/RUT/Ejecutivo/Comisión/Resultado/Fecha) · v1.26 — al CERRAR una ficha con deposito a tercero, quien cierra valida los poderes adjuntos (confirmacion + candado server-side docs_validados) · v1.25 — boton Portal (demo) en Editar Dealer: abre el portal real en modo demostracion; bloqueado si el dealer ya se registro · v1.24 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js). v1.23 — multi-local: locales con tabla POR local en el modal Editar Dealer (solo lectura) y en la vista de ficha (LOCALES ADICIONALES) · v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
+  <!-- v1.28 — parque con RUT de otro parque: el nivel "Visto de Gerencia" pide al gerente un comentario obligatorio (se ve en la cadena de autorización) y el cierre exige ese visto · v1.27 —Aprobaciones Históricas: encabezados ordenables (Tipo/Concesionario/RUT/Ejecutivo/Comisión/Resultado/Fecha) · v1.26 — al CERRAR una ficha con deposito a tercero, quien cierra valida los poderes adjuntos (confirmacion + candado server-side docs_validados) · v1.25 — boton Portal (demo) en Editar Dealer: abre el portal real en modo demostracion; bloqueado si el dealer ya se registro · v1.24 — lista OFICIAL de bancos (motor unico /js/bancos-cl.js). v1.23 — multi-local: locales con tabla POR local en el modal Editar Dealer (solo lectura) y en la vista de ficha (LOCALES ADICIONALES) · v1.22 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) · v1.20 — permisos de edicion por perfil y por campo (Mantenedores > Dealers > Permisos de edicion): botones Editar/Corregir y campos en gris · v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -461,7 +461,7 @@ async function verFicha(id, revisar, historico){
     // Cadena de autorización: autorizaciones registradas + nivel pendiente
     let cadenaHtml = '';
     if ((Array.isArray(f.autorizaciones) && f.autorizaciones.length) || f.estado==='PEND_AUTORIZACION') {
-      const items = (f.autorizaciones||[]).map(a=>`<div style="margin-top:5px;font-size:.82rem"><i class="bi bi-check2-circle me-1" style="color:#15803d"></i><b>${escH(a.nombre_nivel||'Nivel')}:</b> ${escH(a.usuario_nombre||'—')}${a.perfil?` (${escH(a.perfil)})`:''} · ${fH(a.fecha)}${a.sin_revision?' <span style="color:#b91c1c;font-weight:700">· SIN REVISIÓN DE FICHA</span>':''}</div>`).join('');
+      const items = (f.autorizaciones||[]).map(a=>`<div style="margin-top:5px;font-size:.82rem"><i class="bi bi-check2-circle me-1" style="color:#15803d"></i><b>${escH(a.nombre_nivel||'Nivel')}:</b> ${escH(a.usuario_nombre||'—')}${a.perfil?` (${escH(a.perfil)})`:''} · ${fH(a.fecha)}${a.sin_revision?' <span style="color:#b91c1c;font-weight:700">· SIN REVISIÓN DE FICHA</span>':''}${a.comentario?`<div style="margin:2px 0 0 20px;color:#475569;font-style:italic">«${escH(a.comentario)}»</div>`:''}</div>`).join('');
       const pend = (f.estado==='PEND_AUTORIZACION' && f.nivel_actual_nombre) ? `<div style="margin-top:5px;font-size:.82rem;color:#854d0e"><i class="bi bi-hourglass-split me-1"></i>Pendiente: <b>${escH(f.nivel_actual_nombre)}</b></div>` : '';
       cadenaHtml = `<div style="margin-top:14px;border:1px solid #c7d2fe;background:#eef2ff;border-radius:10px;padding:12px 14px">
         <b style="color:#3730a3;font-size:.82rem"><i class="bi bi-diagram-3 me-1"></i>Cadena de autorización</b>${items||'<div style="font-size:.8rem;color:#94a3b8;margin-top:4px">Sin autorizaciones aún</div>'}${pend}</div>`;
@@ -578,7 +578,20 @@ function verReportesIA(){ if(window.AF_REP_IA) AF_REP_IA.abrir(window._revEnts||
 async function accion(id, path, body, okMsg){
   try {
     const r=await fetch('/api/dealer-incorporacion/fichas/'+id+'/'+path,{method:'POST',headers:H,body:JSON.stringify(body||{})});
-    const j=await r.json(); if(!j.success) throw new Error(j.error);
+    const j=await r.json();
+    // Visto de Gerencia por RUT repetido: el gerente ve qué parque ya usa ese RUT y deja su comentario (obligatorio)
+    if(!j.success && j.data && j.data.confirmar==='comentario_rut_parque' && !(body&&body.comentario)){
+      const c=prompt('⚠️ '+j.error+'\n\nComentario de Gerencia (obligatorio):');
+      if(c==null) return;
+      if(c.trim().length<10 || !/\s/.test(c.trim())){ toast('Comentario demasiado corto: mínimo 10 caracteres y más de una palabra.', true); return; }
+      return accion(id, path, Object.assign({}, body||{}, {comentario:c.trim()}), okMsg);
+    }
+    // Solo si el nivel de Gerencia está apagado en Niveles: quien cierra confirma que es otro parque
+    if(!j.success && j.data && j.data.confirmar==='rut_parque' && !(body&&body.confirmar_rut)){
+      if(!confirm('⚠️ '+j.error+'\n\nAceptar = es otro parque, continuar.')) return;
+      return accion(id, path, Object.assign({}, body||{}, {confirmar_rut:1}), okMsg);
+    }
+    if(!j.success) throw new Error(j.error);
     toast(okMsg); await cargar();
   } catch(e){ toast(e.message,true); }
 }

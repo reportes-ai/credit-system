@@ -192,7 +192,7 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
   } catch (e) { if (e.errno !== 1050) console.error('[dealer_ficha_revisiones migration]', e.message); }
 
   // Cadena de aprobación PARAMÉTRICA: niveles que autorizan la ficha antes de imprimir/firmar.
-  // condicion: SIEMPRE | COMISION_SOBRE_PIZARRA | DEPOSITO_MODIFICADO
+  // condicion: SIEMPRE | COMISION_SOBRE_PIZARRA | DEPOSITO_MODIFICADO | PARQUE_RUT_REPETIDO
   // permiso: código de funcionalidad que habilita autorizar ese nivel (gobernado por la matriz de Perfiles).
   try {
     await pool.query(`
@@ -229,6 +229,9 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
         INDEX idx_ficha (id_ficha)
       )`);
     await pool.query('ALTER TABLE dealer_ficha_autorizaciones ADD COLUMN IF NOT EXISTS sin_revision TINYINT(1) NOT NULL DEFAULT 0');
+    // Comentario de quien autoriza (obligatorio en el visto de Gerencia por RUT repetido) y condición del nivel firmado (01-10-2026)
+    await pool.query('ALTER TABLE dealer_ficha_autorizaciones ADD COLUMN IF NOT EXISTS comentario VARCHAR(500) NULL');
+    await pool.query('ALTER TABLE dealer_ficha_autorizaciones ADD COLUMN IF NOT EXISTS condicion VARCHAR(30) NULL');
     // Quién ENVIÓ la ficha a autorización (29-09-2026): no puede autorizarla él mismo (caso Bryan, Vespucio Norte)
     await pool.query('ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS enviado_por INT NULL');
   } catch (e) { if (e.errno !== 1050) console.error('[dealer_ficha_autorizaciones migration]', e.message); }
@@ -244,6 +247,7 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
       ['Revisar fichas de dealer',      'dealer_ficha_revisar', null,                    null],
       ['Mantener dealers',              'dealer_mantener',    null,                      null],
       ['Aprobar participación especial (Gerencia)', 'dealer_part_especial', null,        null],
+      ['Aprobar parque con RUT de otro parque (Gerencia)', 'parque_rut_repetido', null,  null],
       ['Configurar niveles de aprobación de dealer', 'dealer_aprob_config', '/dealers-incorporacion/niveles.html', 'bi-diagram-3'],
       ['Plan Liquidez (anticipo de comisiones)', 'dealer_plan_liquidez', '/dealers-liquidez/', 'bi-cash-stack'],
     ];
@@ -265,6 +269,7 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
       dealer_ficha_revisar: [1, 6, 90008],
       dealer_mantener:      [1, 6, 90008],
       dealer_part_especial: [1, 90008, 90009],   // visto de Gerencia para comisión sobre la pizarra
+      parque_rut_repetido:  [1, 90008, 90009],   // visto de Gerencia (los mismos del visto de participación especial) para un 2° parque con el mismo RUT
       dealer_aprob_config:  [1],                  // configurar la cadena de niveles (restringible por usuario)
       dealer_plan_liquidez: [1, 90008, 90009],    // anticipo de comisiones a Super Partners — visto de Gerencia (compromiso financiero)
     };
@@ -277,6 +282,18 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
     }
     console.log('[dealers-incorporacion] módulo registrado');
   } catch (e) { console.error('[dealers-incorporacion migration]', e.message); }
+});
+
+/* Nivel "Visto de Gerencia (parque con RUT de otro parque)" — Pato, 01-10-2026: dos parques con el mismo RUT
+   requieren la aprobación de un gerente y un comentario válido de él. Entra a la cadena paramétrica como un nivel
+   más (condición PARQUE_RUT_REPETIDO), al final; una sola vez: después lo gobierna el mantenedor de Niveles. */
+require('../../../../shared/migrate').migrar('dealers-nivel-parque-rut-repetido-v1', async () => {
+  const [[ya]] = await pool.query("SELECT id FROM dealer_aprob_niveles WHERE condicion='PARQUE_RUT_REPETIDO' LIMIT 1");
+  if (ya) return;
+  const [[m]] = await pool.query('SELECT COALESCE(MAX(orden),0) + 1 AS sig FROM dealer_aprob_niveles');
+  await pool.query(
+    `INSERT INTO dealer_aprob_niveles (orden, nombre, condicion, permiso, activo)
+     VALUES (?, 'Visto de Gerencia (parque con RUT de otro parque)', 'PARQUE_RUT_REPETIDO', 'parque_rut_repetido', 1)`, [m.sig]);
 });
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
@@ -362,10 +379,25 @@ async function nivelesActivos() {
   const [rows] = await pool.query('SELECT id, orden, nombre, condicion, permiso FROM dealer_aprob_niveles WHERE activo=1 ORDER BY orden, id');
   return rows;
 }
+/* Ficha de PARQUE cuyo RUT ya está en la ficha de OTRO parque → la lista de esos parques ([] si no aplica).
+   Una ficha que actualiza un parque existente (mismo nombre) con su mismo RUT no cuenta: no crea nada nuevo.
+   El cierre solo reconoce un parque por su NOMBRE, y el 01-10-2026 "PARQUE PLANET MAS" nació al lado de
+   "PARQUE PLANETCAR" con el mismo RUT sin que nadie lo viera. Motor del cruce: parques-base.controller. */
+async function parquesMismoRut(f) {
+  try {
+    if (f.entidad !== 'PARQUE' || !RUT.normalizar(f.rut)) return [];
+    const nomF = String(f.nombre_fantasia || f.nombre_razon || '').trim().toUpperCase();
+    const [[exP]] = await pool.query(
+      'SELECT p.id, pf.rut FROM parques_comisiones p LEFT JOIN parques_ficha pf ON pf.id_parque = p.id WHERE p.nombre=?', [nomF]);
+    if (exP && RUT.normalizar(exP.rut) === RUT.normalizar(f.rut)) return [];
+    return await require('./parques-base.controller').parquesConRut(f.rut, exP && exP.id);
+  } catch (e) { console.error('[parquesMismoRut]', e.message); return []; }
+}
 // ¿Aplica este nivel a esta ficha, según su condición?
 async function nivelAplica(niv, f) {
   if (niv.condicion === 'COMISION_SOBRE_PIZARRA') return await esEspecial(f);
   if (niv.condicion === 'DEPOSITO_MODIFICADO')    return await depositoCambioVsDealer(f);
+  if (niv.condicion === 'PARQUE_RUT_REPETIDO')    return (await parquesMismoRut(f)).length > 0;
   return true;   // SIEMPRE (o condición desconocida → fail-safe: exige autorización)
 }
 // Niveles aplicables a la ficha, en orden.
@@ -631,7 +663,7 @@ const obtener = async (req, res) => {
       return res.status(403).json({ success: false, data: null, error: 'Sin acceso a esta ficha' });
     // Autorizaciones registradas (para la letra chica) + nombre del nivel actual pendiente.
     const [autoriz] = await pool.query(
-      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha, sin_revision FROM dealer_ficha_autorizaciones WHERE id_ficha=? ORDER BY orden, id', [req.params.id]);
+      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha, sin_revision, comentario FROM dealer_ficha_autorizaciones WHERE id_ficha=? ORDER BY orden, id', [req.params.id]);
     f.autorizaciones = autoriz;
     if (f.estado === 'PEND_AUTORIZACION') {
       const [[niv]] = await pool.query('SELECT nombre FROM dealer_aprob_niveles WHERE orden=? AND activo=1 ORDER BY id LIMIT 1', [f.nivel_actual]);
@@ -653,7 +685,7 @@ const fichaPorDealer = async (req, res) => {
       [req.params.idDealer]);
     if (!f) return res.json({ success: true, data: null, error: null });
     const [autoriz] = await pool.query(
-      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha, sin_revision FROM dealer_ficha_autorizaciones WHERE id_ficha = ? ORDER BY orden, id', [f.id]);
+      'SELECT orden, nombre_nivel, usuario_nombre, perfil, fecha, sin_revision, comentario FROM dealer_ficha_autorizaciones WHERE id_ficha = ? ORDER BY orden, id', [f.id]);
     f.autorizaciones = autoriz;
     res.json({ success: true, data: f, error: null });
   } catch (e) { console.error('[fichas porDealer]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -1056,14 +1088,29 @@ const autorizar = async (req, res) => {
     if (yaFirmo)
       return res.status(403).json({ success: false, data: null, error: `Segregación de funciones: ya autorizaste el nivel ${yaFirmo.orden} de esta ficha, otro nivel lo firma otra persona` });
 
+    /* Visto de Gerencia por RUT repetido: no basta el clic. El gerente ve qué parque ya usa ese RUT y deja un
+       comentario válido (≥10 caracteres, más de una palabra) que queda en la ficha y en la auditoría. Sin
+       comentario responde 409 con los parques, y la pantalla lo pide. */
+    let comentario = null, parquesRut = [];
+    if (niv.condicion === 'PARQUE_RUT_REPETIDO') {
+      parquesRut = await parquesMismoRut(f);
+      comentario = norm(req.body && req.body.comentario).slice(0, 500);
+      if (!comentarioOK(comentario)) {
+        const lista = parquesRut.map(o => o.nombre + (o.activo ? '' : ' (inactivo)')).join(', ') || 'otro parque';
+        const mensaje = `El RUT ${RUT.normalizar(f.rut) || f.rut} de esta ficha ya está en la ficha de ${lista}. ` +
+          `Autorizar un segundo parque con el mismo RUT requiere tu comentario (mínimo 10 caracteres): por qué es OTRO parque y no el mismo repetido.`;
+        return res.status(409).json({ success: false, data: { confirmar: 'comentario_rut_parque', parques: parquesRut, mensaje }, error: mensaje });
+      }
+    }
+
     const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
     // ¿Revisó la ficha (abrió "Revisar") antes de autorizar? Si no → "Aprobado sin revisión de ficha".
     const [[rev]] = await pool.query('SELECT 1 ok FROM dealer_ficha_revisiones WHERE id_ficha=? AND id_usuario=? LIMIT 1', [f.id, req.usuario.id_usuario]);
     const sinRevision = rev ? 0 : 1;
     const sinRevTxt = sinRevision ? ` · ⚠ APROBADO SIN REVISIÓN DE FICHA por ${nombre}` : '';
     await pool.query(
-      'INSERT INTO dealer_ficha_autorizaciones (id_ficha, orden, nombre_nivel, permiso, usuario_id, usuario_nombre, perfil, sin_revision) VALUES (?,?,?,?,?,?,?,?)',
-      [f.id, niv.orden, niv.nombre, niv.permiso, req.usuario.id_usuario, nombre, req.usuario.perfil_nombre || null, sinRevision]);
+      'INSERT INTO dealer_ficha_autorizaciones (id_ficha, orden, nombre_nivel, permiso, usuario_id, usuario_nombre, perfil, sin_revision, comentario, condicion) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [f.id, niv.orden, niv.nombre, niv.permiso, req.usuario.id_usuario, nombre, req.usuario.perfil_nombre || null, sinRevision, comentario, niv.condicion || null]);
     // Si este nivel es el de participación especial, sella "aprobada por XXXX".
     if (niv.condicion === 'COMISION_SOBRE_PIZARRA')
       await pool.query('UPDATE dealer_fichas SET part_especial=1, part_especial_por=?, part_especial_por_id=?, part_especial_fecha=NOW() WHERE id=?',
@@ -1086,7 +1133,8 @@ const autorizar = async (req, res) => {
         href: '/dealers-incorporacion/mantencion.html?tab=mias' });
     }
     auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
-      detalle: `Autorizó el nivel "${niv.nombre}" de la ficha de ${f.nombre_razon || f.rut || ''}` + (sinRevision ? ' (SIN revisión de ficha)' : ''), rut: f.rut });
+      detalle: `Autorizó el nivel "${niv.nombre}" de la ficha de ${f.nombre_razon || f.rut || ''}` + (sinRevision ? ' (SIN revisión de ficha)' : '') +
+        (comentario ? ` — comparte RUT con ${parquesRut.map(o => o.nombre).join(', ') || 'otro parque'}; comentario: «${comentario}»` : ''), rut: f.rut });
     res.json({ success: true, data: { estado: next ? 'PEND_AUTORIZACION' : 'AUTORIZADA', siguiente: next ? next.nombre : null, sin_revision: !!sinRevision }, error: null });
   } catch (e) { console.error('[fichas autorizar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -1390,6 +1438,28 @@ const cerrar = async (req, res) => {
 
     // ENTIDAD PARQUE: mismo circuito, distinto final — se crea el parque, no un dealer.
     if (f.entidad === 'PARQUE') {
+      /* RUT que ya usa OTRO parque (parquesMismoRut): un segundo parque con el mismo RUT es legítimo (dos
+         parques del mismo dueño) pero lo decide Gerencia. El cierre exige que la ficha traiga el visto de
+         Gerencia con su comentario (nivel PARQUE_RUT_REPETIDO de la cadena). Sin él no se crea nada: la ficha
+         vuelve a pasar por los niveles. Si el Administrador apagó ese nivel en el mantenedor, queda la red
+         mínima: quien cierra ve cuál parque usa el RUT y confirma. */
+      const rutCompartido = await parquesMismoRut(f);
+      let vistoRut = null;
+      if (rutCompartido.length) {
+        const lista = rutCompartido.map(o => o.nombre + (o.activo ? '' : ' (inactivo)')).join(', ');
+        const [[nivRut]] = await pool.query("SELECT id, nombre FROM dealer_aprob_niveles WHERE condicion='PARQUE_RUT_REPETIDO' AND activo=1 LIMIT 1");
+        if (nivRut) {
+          [[vistoRut]] = await pool.query(
+            "SELECT usuario_nombre, comentario FROM dealer_ficha_autorizaciones WHERE id_ficha=? AND condicion='PARQUE_RUT_REPETIDO' AND comentario IS NOT NULL ORDER BY id DESC LIMIT 1", [f.id]);
+          if (!vistoRut)
+            return res.status(409).json({ success: false, data: { confirmar: null, parques: rutCompartido },
+              error: `El RUT ${RUT.normalizar(f.rut)} ya está en la ficha de ${lista}. Un segundo parque con el mismo RUT requiere el "${nivRut.nombre}" con comentario, y esta ficha no lo tiene. ` +
+                `Recházala en el cierre para que el ejecutivo la reenvíe con "Enviar" y pase por Gerencia; si es el mismo parque, se edita la ficha que ya existe.` });
+        } else if (!(req.body && req.body.confirmar_rut)) {
+          const aviso = require('./parques-base.controller').avisoRutRepetido(f.rut, rutCompartido);
+          return res.status(409).json({ success: false, data: aviso, error: aviso.mensaje });
+        }
+      }
       const { idParque, nombre: nomParque, esMod: parqueMod } = await finalizarParque(f);
       const quien = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
       await pool.query(
@@ -1401,7 +1471,10 @@ const cerrar = async (req, res) => {
         mensaje: `Tu ficha de ${nomParque} fue aprobada — el parque ${parqueMod ? 'fue actualizado' : 'ya está'} en el sistema. Su arriendo y comisión se fijan en Arriendos y Comisiones Parque y Calle.`,
         href: '/dealers-incorporacion/parques.html' });
       auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
-        detalle: `Cerró la ficha de PARQUE ${nomParque} → parque #${idParque}${parqueMod ? ' (actualización)' : ''}`, rut: f.rut, meta: { id_parque: idParque, modificacion: parqueMod } });
+        detalle: `Cerró la ficha de PARQUE ${nomParque} → parque #${idParque}${parqueMod ? ' (actualización)' : ''}` +
+          (rutCompartido.length ? ` — comparte el RUT con ${rutCompartido.map(o => o.nombre).join(', ')}` +
+            (vistoRut ? `, con visto de Gerencia de ${vistoRut.usuario_nombre}: «${vistoRut.comentario}»` : ' (confirmado por quien cierra)') : ''),
+        rut: f.rut, meta: { id_parque: idParque, modificacion: parqueMod, rut_compartido_con: rutCompartido.map(o => o.id) } });
       return res.json({ success: true, data: { estado: 'APROBADA', id_parque: idParque, modificacion: parqueMod, entidad: 'PARQUE' }, error: null });
     }
 
@@ -1600,7 +1673,7 @@ const dealerBuscar = async (req, res) => {
 };
 
 /* ── Niveles de aprobación — mantenedor paramétrico (gated dealer_aprob_config) ── */
-const CONDICIONES = ['SIEMPRE', 'COMISION_SOBRE_PIZARRA', 'DEPOSITO_MODIFICADO'];
+const CONDICIONES = ['SIEMPRE', 'COMISION_SOBRE_PIZARRA', 'DEPOSITO_MODIFICADO', 'PARQUE_RUT_REPETIDO'];
 const nivelesListar = async (req, res) => {
   try {
     const [niveles] = await pool.query('SELECT id, orden, nombre, condicion, permiso, activo FROM dealer_aprob_niveles ORDER BY orden, id');

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Creación de Parque — AutoFácil</title>
-  <!-- v1.4 — navbar migrada al componente topnav -->
+  <!-- v1.5 — RUT que ya está en otro parque: solo lo guarda un gerente, con comentario obligatorio · v1.4 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -349,8 +349,15 @@
     for (const [campo, rotulo] of [['rut','RUT del parque'], ['rut_cuenta','RUT de la cuenta']]) {
       if (body[campo] && window.AF_RUT && !AF_RUT.normalizar(body[campo])) { err.textContent = `El ${rotulo} no es válido`; return; }
     }
-    const r = await fetch('/api/dealer-incorporacion/parques-base/' + EDIT, { method: 'PUT', headers: HJ, body: JSON.stringify(body) });
-    const j = await r.json();
+    let r = await fetch('/api/dealer-incorporacion/parques-base/' + EDIT, { method: 'PUT', headers: HJ, body: JSON.stringify(body) });
+    let j = await r.json();
+    // RUT que ya usa otro parque: lo aprueba un gerente con su comentario (a quien no es gerente el servidor le explica y no guarda)
+    if (!j.success && j.data && j.data.confirmar === 'comentario_rut_parque') {
+      const c = prompt('⚠️ ' + j.error + '\n\nComentario de Gerencia (obligatorio):');
+      if (c == null) { err.textContent = 'No se guardó: el RUT ya está en otro parque.'; return; }
+      r = await fetch('/api/dealer-incorporacion/parques-base/' + EDIT, { method: 'PUT', headers: HJ, body: JSON.stringify({ ...body, comentario_rut: c.trim() }) });
+      j = await r.json();
+    }
     if (!j.success) { err.textContent = j.error || 'Error al guardar'; return; }
     document.getElementById('dlg').close();
     cargar();
