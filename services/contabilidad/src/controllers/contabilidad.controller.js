@@ -3321,17 +3321,38 @@ exports.rcvPendientes = async (req, res) => {
     const [aux] = await pool.query('SELECT rut, tipo_doc, num_doc FROM ctb_compras_aux WHERE num_doc IN (?)', [folios]);
     const yaEsta = new Set(aux.map(a => `${rutNorm(a.rut)}|${a.tipo_doc}|${a.num_doc}`));
 
-    // Cuenta propuesta: la más usada históricamente por ese proveedor (desempate: la más reciente)
+    // Cuenta propuesta: la más usada históricamente por ese proveedor (desempate: la más reciente).
+    // Nunca una cuenta del disponible (1101: caja y bancos): un banco no es cuenta de gasto, y el
+    // historial de AVSOFT trae documentos cargados directo al banco que se proponían solos (Pato, 02-10-2026).
     const ruts = [...new Set(sii.map(d => d.rut_proveedor))];
     const [hist] = await pool.query(
       `SELECT rut, cuenta_gasto, COUNT(*) n, MAX(fecha_doc) ult
-         FROM ctb_compras_aux WHERE cuenta_gasto IS NOT NULL AND cuenta_gasto<>'' AND rut IN (?)
+         FROM ctb_compras_aux WHERE cuenta_gasto IS NOT NULL AND cuenta_gasto<>'' AND cuenta_gasto NOT LIKE '1101%' AND rut IN (?)
         GROUP BY rut, cuenta_gasto`, [ruts]);
     const porRut = {};
     for (const h of hist) {
       const k = rutNorm(h.rut), a = porRut[k];
       if (!a || h.n > a.n || (h.n === a.n && String(h.ult) > String(a.ult))) porRut[k] = h;
     }
+
+    /* Concepto de la Orden de Pago: el SII no dice QUÉ se compró, la ODP sí. Si hay una ODP viva con el
+       mismo RUT y folio es la de ese documento (exacta); si solo calza el proveedor se muestra la última
+       como pista. Solo informa a quien elige la cuenta: la ODP no guarda cuenta contable. */
+    const odpPorRut = {};
+    try {
+      const [odps] = await pool.query(
+        `SELECT numero, proveedor_rut, concepto, categoria, numero_documento
+           FROM ordenes_pago WHERE COALESCE(estado,'') <> 'ANULADA' AND proveedor_rut IS NOT NULL AND proveedor_rut <> ''
+          ORDER BY id DESC LIMIT 5000`);
+      const rutsSii = new Set(ruts.map(rutNorm));
+      for (const o of odps) { const k = rutNorm(o.proveedor_rut); if (rutsSii.has(k)) (odpPorRut[k] = odpPorRut[k] || []).push(o); }
+    } catch (_) { /* sin módulo de ODP: se sigue sin la pista */ }
+    const odpDe = d => {
+      const l = odpPorRut[rutNorm(d.rut_proveedor)]; if (!l) return null;
+      const ex = l.find(o => String(o.numero_documento || '').replace(/\D/g, '') === String(d.folio));
+      const o = ex || l[0];   // l viene de la más nueva a la más antigua
+      return { numero: o.numero, concepto: o.concepto, categoria: o.categoria, numero_documento: o.numero_documento, exacta: !!ex };
+    };
 
     let ya = 0;
     const docs = [];
@@ -3347,6 +3368,7 @@ exports.rcvPendientes = async (req, res) => {
         iva: Number(d.iva_recuperable || 0), iva_no_rec: Number(d.iva_no_recuperable || 0),
         otros_impuestos: Number(d.otros_impuestos || 0) + Number(d.imp_sin_derecho || 0), total: Number(d.monto_total || 0),
         cuenta_sugerida: sug?.cuenta_gasto || null, veces_cuenta: sug?.n || 0,
+        odp: odpDe(d),
         nota_credito: Number(d.tipo_dte) === 61,
       });
     }
