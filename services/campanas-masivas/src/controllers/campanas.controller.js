@@ -889,9 +889,9 @@ exports.analizarIA = async (req, res) => {
   try {
     const [[c]] = await pool.query('SELECT * FROM campanas_masivas WHERE id=?', [req.params.id]);
     if (!c) return fail(res, 'Campaña no existe', 404);
-    const [prods] = await pool.query('SELECT codigo FROM dealernet_productos WHERE activo=1');
+    const { asegurarInformes, productosPorDefecto } = require('../../../clientes/src/controllers/dealernet-ws.controller');
+    const prods = await productosPorDefecto();   // sin restringidos, uno por grupo excluyente
     if (!prods.length) return fail(res, 'DealerNet sin productos activos', 400);
-    const { asegurarInformes } = require('../../../clientes/src/controllers/dealernet-ws.controller');
     const [pend] = await pool.query(`
       SELECT id, rut FROM campanas_destinatarios
       WHERE id_campana=? AND riesgo_ia IS NULL AND rut IS NOT NULL LIMIT 15`, [c.id]);

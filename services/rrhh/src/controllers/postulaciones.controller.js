@@ -610,9 +610,9 @@ async function pedirDealernet(idPostulante, usuario) {
   const [[p]] = await pool.query('SELECT id, rut FROM rh_postulantes WHERE id=?', [idPostulante]);
   if (!p) return { error: 'Postulante no encontrado' };
   if (!p.rut) return { error: 'El postulante no registró RUT — pídeselo antes de consultar' };
-  const [prods] = await pool.query('SELECT codigo FROM dealernet_productos WHERE activo=1 ORDER BY orden');
-  if (!prods.length) return { error: 'No hay productos DealerNet activos (mantenedor DealerNet)' };
   const dw = require('../../../clientes/src/controllers/dealernet-ws.controller');
+  const prods = await dw.productosPorDefecto();   // sin restringidos, uno por grupo excluyente
+  if (!prods.length) return { error: 'No hay productos DealerNet activos (mantenedor DealerNet)' };
   const out = await dw.asegurarInformes({ rut: p.rut, productos: prods.map(x => String(x.codigo)), usuario });
   const resumen = { items: (out.items || []).map(i => ({ codigo: i.codigo, nombre: i.nombre, disponible: i.disponible,
     severidad: i.severidad, grave: i.grave, nota: i.nota, fecha: i.fecha })), error: out.error || null };

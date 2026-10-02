@@ -51,7 +51,8 @@ async function guardarPreaprobacion(d) {
 async function informesEIA(rut, POL) {
   const out = { informes: [], peorSeveridad: null, ia_informe_id: null, ia_nivel_riesgo: null, error: null };
   try {
-    let [prods] = await pool.query('SELECT codigo FROM dealernet_productos WHERE activo=1');
+    // sin restringidos, uno por grupo excluyente (motor único del catálogo DealerNet)
+    let prods = await require('../services/clientes/src/controllers/dealernet-ws.controller').productosPorDefecto();
     if (POL.informes_codigos) {
       const set = new Set(POL.informes_codigos.split(',').map(s => s.trim()));
       const filtrados = prods.filter(p => set.has(String(p.codigo)));

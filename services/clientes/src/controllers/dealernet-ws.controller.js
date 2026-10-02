@@ -351,6 +351,76 @@ require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
   } catch (e) { console.error('[dealernet-ficha-sets migration]', e.message); }
 });
 
+/* ── Productos RESTRINGIDOS y GRUPOS EXCLUYENTES (Pato, 02-10-2026) ───────────
+   Tema de costos: hay informes caros (Comportamiento Extendido) que solo ciertos
+   usuarios pueden PEDIR, y que reemplazan a otro (Comportamiento Vigente): quien
+   pide uno no pide el otro en la misma consulta.
+   - restringido=1 → solo lo solicita quien tenga el permiso de acción
+     dealernet_restringidos (por perfil o por usuario, en Perfiles y Permisos).
+     VER el informe en el repositorio sigue abierto a todos: lo que se cuida es el gasto.
+   - grupo_excluyente=N (>0) → de los productos con el mismo número se pide uno solo.
+   Ambos se editan en el mantenedor Productos DealerNet. */
+require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
+  try {
+    for (const c of ['restringido TINYINT(1) NOT NULL DEFAULT 0', 'grupo_excluyente INT NOT NULL DEFAULT 0']) {
+      try { await pool.query(`ALTER TABLE dealernet_productos ADD COLUMN ${c}`); }
+      catch (e) { if (e.errno !== 1060) throw e; }
+    }
+    const [[base]] = await pool.query("SELECT id_modulo, grupo FROM funcionalidades WHERE codigo='dealernet_consultar' LIMIT 1");
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='dealernet_restringidos' LIMIT 1");
+    if (base && !ex) {
+      const [r] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono, grupo) VALUES (?, 'Solicitar informes DealerNet restringidos', 'dealernet_restringidos', NULL, 'bi-lock', ?)",
+        [base.id_modulo, base.grupo || null]);
+      await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [r.insertId]);
+    }
+    console.log('[dealernet-ws] productos restringidos y grupos excluyentes listos');
+  } catch (e) { console.error('[dealernet-restringidos migration]', e.message); }
+});
+/* Una sola vez: Comportamiento Extendido (110) queda activo pero restringido, y en el
+   mismo grupo excluyente que Comportamiento Vigente (16). Después manda el mantenedor. */
+require('../../../../shared/migrate').migrar('dealernet-extendido-restringido-v1', async () => {
+  await pool.query("UPDATE dealernet_productos SET grupo_excluyente=1 WHERE codigo IN ('16','110')");
+  await pool.query("UPDATE dealernet_productos SET restringido=1, activo=1 WHERE codigo='110'");
+});
+
+/* MOTOR ÚNICO de qué productos se piden.
+   - productosPorDefecto(): lo que se pide cuando nadie eligió (consulta sin lista, campañas,
+     pre-aprobación, postulantes): activos, NUNCA restringidos, uno por grupo excluyente
+     (el primero según el orden del catálogo).
+   - validarSeleccion(): lo que eligió una persona — un restringido exige el permiso y dos
+     del mismo grupo no van juntos. Devuelve { status, error } o null. */
+async function productosPorDefecto() {
+  const [rows] = await pool.query(
+    'SELECT codigo, nombre, grupo_excluyente FROM dealernet_productos WHERE activo=1 AND restringido=0 ORDER BY orden, codigo');
+  const vistos = new Set();
+  return rows.filter(r => {
+    const g = Number(r.grupo_excluyente) || 0;
+    if (!g) return true;
+    if (vistos.has(g)) return false;
+    vistos.add(g); return true;
+  });
+}
+async function validarSeleccion(usuario, productos) {
+  if (!productos || !productos.length) return null;
+  const [rows] = await pool.query(
+    'SELECT codigo, nombre, restringido, grupo_excluyente FROM dealernet_productos WHERE codigo IN (?) ORDER BY orden, codigo', [productos]);
+  const restr = rows.filter(r => Number(r.restringido) === 1);
+  if (restr.length) {
+    const { tieneFunc } = require('../../../../shared/middleware/permisos');
+    const puede = usuario && usuario.id_usuario ? await tieneFunc(usuario.id_usuario, 'dealernet_restringidos') : false;
+    if (!puede) return { status: 403, error: `${restr.map(r => r.nombre).join(', ')}: informe restringido, no tienes permiso para solicitarlo` };
+  }
+  const porGrupo = {};
+  for (const r of rows) {
+    const g = Number(r.grupo_excluyente) || 0;
+    if (!g) continue;
+    if (porGrupo[g]) return { status: 400, error: `${porGrupo[g]} y ${r.nombre} son excluyentes: elige solo uno de los dos` };
+    porGrupo[g] = r.nombre;
+  }
+  return null;
+}
+
 /* ── Utilidades RUT ──────────────────────────────────────────────────────── */
 function splitRut(rut) {
   const clean = String(rut || '').replace(/[.\s]/g, '').toUpperCase();
@@ -490,7 +560,13 @@ const addProducto = async (req, res) => {
 };
 const updateProducto = async (req, res) => {
   try {
-    const { nombre, activo, ficha_empresa, ficha_socio } = req.body || {};
+    const { nombre, activo, ficha_empresa, ficha_socio, restringido, grupo_excluyente } = req.body || {};
+    if (restringido !== undefined) await pool.query('UPDATE dealernet_productos SET restringido=? WHERE id=?', [restringido ? 1 : 0, req.params.id]);
+    if (grupo_excluyente !== undefined) {
+      const g = parseInt(grupo_excluyente, 10) || 0;
+      if (g < 0 || g > 99) return res.status(400).json({ success: false, data: null, error: 'Grupo excluyente inválido (0 a 99)' });
+      await pool.query('UPDATE dealernet_productos SET grupo_excluyente=? WHERE id=?', [g, req.params.id]);
+    }
     if (nombre !== undefined) await pool.query('UPDATE dealernet_productos SET nombre=? WHERE id=?', [String(nombre).trim(), req.params.id]);
     if (activo !== undefined) await pool.query('UPDATE dealernet_productos SET activo=? WHERE id=?', [activo ? 1 : 0, req.params.id]);
     if (ficha_empresa !== undefined) await pool.query('UPDATE dealernet_productos SET ficha_empresa=? WHERE id=?', [ficha_empresa ? 1 : 0, req.params.id]);
@@ -537,10 +613,8 @@ const consultar = async (req, res) => {
 
     // Productos: los indicados, o los activos del mantenedor.
     let productos = Array.isArray(req.body?.productos) ? req.body.productos.map(String) : null;
-    if (!productos || !productos.length) {
-      const [act] = await pool.query("SELECT codigo FROM dealernet_productos WHERE activo=1 ORDER BY orden");
-      productos = act.map(r => r.codigo);
-    }
+    if (!productos || !productos.length) productos = (await productosPorDefecto()).map(r => r.codigo);
+    else { const inv = await validarSeleccion(req.usuario, productos); if (inv) return res.status(inv.status).json({ success: false, data: null, error: inv.error }); }
     productos = soloProductosDelTipo(num, productos);
     if (!productos.length) return res.status(400).json({ success: false, data: null,
       error: esRutEmpresa(num) ? 'El Boletín de Deudores de Pensión de Alimentos no aplica a personas jurídicas' : 'No hay productos activos para consultar' });
@@ -745,10 +819,8 @@ const verificarRepositorio = async (req, res) => {
     const { num, dv } = splitRut(req.body?.rut || '');
     if (!num || !dv) return res.status(400).json({ success: false, data: null, error: 'RUT inválido' });
     let productos = Array.isArray(req.body?.productos) ? req.body.productos.map(String) : [];
-    if (!productos.length) {
-      const [act] = await pool.query("SELECT codigo FROM dealernet_productos WHERE activo=1 ORDER BY orden");
-      productos = act.map(r => r.codigo);
-    }
+    if (!productos.length) productos = (await productosPorDefecto()).map(r => r.codigo);
+    else { const inv = await validarSeleccion(req.usuario, productos); if (inv) return res.status(inv.status).json({ success: false, data: null, error: inv.error }); }
     productos = soloProductosDelTipo(num, productos);   // empresa: sin Deudores de Alimentos
     const cfg = await getConfig();
     const [prods] = await pool.query('SELECT codigo, nombre FROM dealernet_productos');
@@ -777,10 +849,8 @@ const solicitarInformes = async (req, res) => {
     const { num, dv } = splitRut(req.body?.rut || '');
     if (!num || !dv) return res.status(400).json({ success: false, data: null, error: 'RUT inválido' });
     let productos = Array.isArray(req.body?.productos) ? req.body.productos.map(String) : [];
-    if (!productos.length) {
-      const [act] = await pool.query("SELECT codigo FROM dealernet_productos WHERE activo=1 ORDER BY orden");
-      productos = act.map(r => r.codigo);
-    }
+    if (!productos.length) productos = (await productosPorDefecto()).map(r => r.codigo);
+    else { const inv = await validarSeleccion(req.usuario, productos); if (inv) return res.status(inv.status).json({ success: false, data: null, error: inv.error }); }
     productos = soloProductosDelTipo(num, productos);   // empresa: sin Deudores de Alimentos
     if (!productos.length) return res.status(400).json({ success: false, data: null,
       error: esRutEmpresa(num) ? 'El Boletín de Deudores de Pensión de Alimentos no aplica a personas jurídicas' : 'No hay productos activos para solicitar' });
@@ -948,8 +1018,11 @@ async function asegurarInformes({ rut, productos, usuario }) {
 // Productos activos para poblar la selección (gratis, permiso de la página).
 const productosActivos = async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT codigo, nombre FROM dealernet_productos WHERE activo=1 ORDER BY orden");
-    res.json({ success: true, data: rows, error: null });
+    const [rows] = await pool.query("SELECT codigo, nombre, restringido, grupo_excluyente FROM dealernet_productos WHERE activo=1 ORDER BY orden, codigo");
+    // Los restringidos solo se le ofrecen a quien tiene el permiso (el resto ni los ve en la selección).
+    const { tieneFunc } = require('../../../../shared/middleware/permisos');
+    const puede = rows.some(r => Number(r.restringido) === 1) && await tieneFunc(req.usuario.id_usuario, 'dealernet_restringidos');
+    res.json({ success: true, data: rows.filter(r => Number(r.restringido) !== 1 || puede), error: null });
   } catch (e) { errSrv(res, e, 'productosActivos'); }
 };
 
@@ -1512,6 +1585,6 @@ const renderFallback = async (req, res) => {
   res.json({ success: true, data: null, error: null });
 };
 
-module.exports = { getProductos, fichaInformes, asegurarInformes, analizarInforme, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
+module.exports = { getProductos, fichaInformes, asegurarInformes, productosPorDefecto, analizarInforme, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
   verificarRepositorio, solicitarInformes, productosActivos, historicos, verInforme, descargarPdf, getConfigEndpoint, updateConfigEndpoint,
   clasificarRut, auditoria, alertas, getCostos, updateCostos, facturacion, guardarFacturacion, historialFacturacion, repositorio, renderFallback };

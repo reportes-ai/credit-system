@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v3.7 — facturacion del mes en curso: la tarjeta dice "Consumo a hoy" con el proyectado al cierre debajo, y la tabla de planes muestra las dos columnas (a hoy / proyectado). v3.6 — decimales en formato chileno en la facturacion. Facturacion prepago: la recomendacion compara lo que COSTARIA el mes con cada plan (max entre el minimo y el consumo a su tarifa; lo no usado no pasa al mes siguiente) y proyecta el mes en curso; antes elegia el plan mas chico que cubriera lo consumido y recomendaba subir a 80 cuando quedarse en 40 era mas barato. v3.5 — Alertas de uso: clic en el encabezado de cualquier columna ordena de mayor a menor y viceversa (fechas y números por su valor real). v3.4 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
+  <!-- v3.8 — seleccion: informes restringidos (solo se ofrecen con permiso) y excluyentes (del mismo grupo se marca uno solo; Marcar todos toma el primero y nunca un restringido). v3.7 — facturacion del mes en curso: la tarjeta dice "Consumo a hoy" con el proyectado al cierre debajo, y la tabla de planes muestra las dos columnas (a hoy / proyectado). v3.6 — decimales en formato chileno en la facturacion. Facturacion prepago: la recomendacion compara lo que COSTARIA el mes con cada plan (max entre el minimo y el consumo a su tarifa; lo no usado no pasa al mes siguiente) y proyecta el mes en curso; antes elegia el plan mas chico que cubriera lo consumido y recomendaba subir a 80 cuando quedarse en 40 era mas barato. v3.5 — Alertas de uso: clic en el encabezado de cualquier columna ordena de mayor a menor y viceversa (fechas y números por su valor real). v3.4 — Auditoria de uso: boton Excel (tabla + auto-consultas, con formatos) y fila "Sistema (automatico)" para informes sin usuario. v2.8 — Auditoria de uso: columna Conversion (creditos ingresados / RUTs unicos). v2.7 — Auditoria de uso: columna Costo total (precio UF del plan x informes, a la UF de hoy) y fila TOTAL. v2.6 — Auditoria de uso: columna RUTs unicos (personas distintas consultadas) junto al nombre. v2.5 — amarre del render: seccion con datos sin formato = nota visible + campanita a Administradores (una vez por seccion) · v2.4 — Boletines de Impagos (vigente/historico) y Procesos Penales en TABLAS (antes volcado crudo del arbol) · v2.3 — cache-bust del motor dealernet-informe.js (?v=) · v2.2 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.0 — la pagina usa el MOTOR UNICO /js/dealernet-informe.js (su copia local divergia: el Boletin CCS salia crudo) · v1.9 — repositorio: nombre del titular cae al informe (Perfil Comercial / Boletín) cuando el RUT no es cliente · aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -282,14 +282,31 @@ async function cargarProductos(){
     if (!j.data.length){ box.innerHTML='<div class="muted">No hay productos activos. Pídele al administrador activarlos en el mantenedor.</div>'; return; }
     box.innerHTML = j.data.map(p => `
       <label class="prod-item">
-        <input type="checkbox" value="${esc(p.codigo)}">
+        <input type="checkbox" value="${esc(p.codigo)}" data-grupo="${Number(p.grupo_excluyente)||0}" data-restr="${Number(p.restringido)||0}" onchange="soloUnoDelGrupo(this)">
         <span style="flex:1">${esc(p.nombre)}</span>
+        ${Number(p.restringido) ? '<span class="cod" style="background:#fef3c7;color:#92400e" title="Informe restringido: lo ves porque tienes el permiso. Reemplaza al otro informe de su grupo.">restringido</span>' : ''}
         <span class="cod">${esc(p.codigo)}</span>
       </label>`).join('');
   } catch(_){ document.getElementById('prods').innerHTML='<div class="muted" style="color:#b91c1c">Error al cargar productos</div>'; }
 }
 function selectedProductos(){ return [...document.querySelectorAll('#prods input:checked')].map(c=>c.value); }
-function marcarTodos(v){ document.querySelectorAll('#prods input[type=checkbox]').forEach(c=>c.checked=v); }
+/* Excluyentes: del mismo grupo se marca uno solo (el servidor también lo rechaza). */
+function soloUnoDelGrupo(el){
+  const g = el.dataset.grupo;
+  if (!el.checked || !g || g === '0') return;
+  document.querySelectorAll('#prods input[data-grupo="'+g+'"]').forEach(c => { if (c !== el) c.checked = false; });
+}
+/* Marcar todos: nunca un restringido (se elige a mano) y uno por grupo excluyente (el primero del catálogo). */
+function marcarTodos(v){
+  const vistos = new Set();
+  document.querySelectorAll('#prods input[type=checkbox]').forEach(c => {
+    if (!v) { c.checked = false; return; }
+    const g = c.dataset.grupo;
+    if (c.dataset.restr === '1') { c.checked = false; return; }
+    if (g && g !== '0') { if (vistos.has(g)) { c.checked = false; return; } vistos.add(g); }
+    c.checked = true;
+  });
+}
 function nombreProd(cod){ const el=document.querySelector('#prods input[value="'+cod+'"]'); return el ? el.closest('.prod-item').querySelector('span').textContent : cod; }
 
 /* ── Históricos ──────────────────────────────────────────────────────────── */

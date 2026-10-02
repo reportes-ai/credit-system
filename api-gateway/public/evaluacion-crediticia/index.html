@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v47.4 — fechas DATE de la BD sin desfase UTC · v47.3 — cache-bust del motor dealernet-informe.js (?v=) · v47.2 — la ocupacion del cliente se recupera sola: ya estaba guardada en cada documento -->
+<!-- v47.5 — solicitar informes: el servidor elige los productos por defecto (sin restringidos, uno por grupo excluyente) · v47.4 — fechas DATE de la BD sin desfase UTC · v47.3 — cache-bust del motor dealernet-informe.js (?v=) · v47.2 — la ocupacion del cliente se recupera sola: ya estaba guardada en cada documento -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -728,10 +728,8 @@
 
   // Solicita informes nuevos a DealerNet (gasta saldo; el backend respeta vigencias)
   async function solicitarInformes(rut){
-    const rp = await fetch('/api/dealernet/informes/productos', { headers: H }).then(r => r.json()).catch(() => ({}));
-    const productos = (rp.success ? rp.data : []).map(p => p.codigo);
-    if (!productos.length) throw new Error('No hay productos DealerNet configurados');
-    const r = await fetch('/api/dealernet/informes/solicitar', { method:'POST', headers:H, body: JSON.stringify({ rut, productos }) });
+    // Sin lista: el servidor pide los activos por defecto (sin restringidos, uno por grupo excluyente).
+    const r = await fetch('/api/dealernet/informes/solicitar', { method:'POST', headers:H, body: JSON.stringify({ rut }) });
     const j = await r.json();
     if (!j.success) throw new Error(j.error || 'DealerNet no respondió');
   }
