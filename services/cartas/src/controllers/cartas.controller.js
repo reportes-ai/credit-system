@@ -2549,6 +2549,18 @@ require('../../../../shared/migrate').migrar('carta-266493152DS-C1-a-aprobacion-
       detalle: 'Carta 266493152DS-C1 vuelve a aprobación: se le cambió la fecha estando vencida y había heredado la aprobación del 25-09 y la marca de otorgada de una operación anulada (OP 26091256). Queda PENDIENTE, sin marca de otorgada.' });
 });
 
+/* Recalcular la OP 26091256 (crédito 5580001; Pato, 02-10-2026): quedó con comisión dealer $135.500 (2,5%)
+   porque se recalculó mientras el dealer N°915 tenía mal el tramo 13-24; ya está en 5% → $271.000. El
+   recálculo programado no corre fuera de horario, así que se dispara acá una vez. No se espera (recalcula
+   el mes completo y tarda minutos): la fila de migraciones no se detiene por esto. */
+require('../../../../shared/migrate').migrar('recalc-op-26091256-v1', async () => {
+  const [[c]] = await pool.query('SELECT comdea_real FROM creditos WHERE id=5580001 AND num_op=26091256');
+  if (!c || Number(c.comdea_real) !== 135500) return;
+  recalcularPorOps([5580001])
+    .then(r => console.log('[cartas] recálculo OP 26091256:', r && r.actualizados, 'ops'))
+    .catch(e => console.error('[cartas] recálculo OP 26091256:', e.message));
+});
+
 /* POST /api/cartas/:id/corregir  { campos:{...}, motivo } */
 const corregirCarta = async (req, res) => {
   try {
