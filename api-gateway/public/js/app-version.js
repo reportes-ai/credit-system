@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v283.36';
+const APP_VERSION = 'v283.37';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -151,7 +151,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* 0b ── Avatar con FOTO real (de Credenciales) en vez de la inicial.
-     La foto propia se cachea en sessionStorage (af_mi_foto: dataURL o '' si no hay). */
+     La foto propia se cachea en sessionStorage (af_mi_foto: dataURL o '' si no hay), amarrada a su dueño
+     (af_mi_foto_uid). Sin eso, al cambiar de usuario en la misma pestaña (otra cuenta, sesión adoptada de
+     otra pestaña) el avatar seguía mostrando la foto del usuario ANTERIOR: la cuenta Admin salía con la
+     foto de Pato (02-10-2026). */
   (function fotoAvatar() {
     const token = sessionStorage.getItem('token');
     if (!token) return;
@@ -166,13 +169,16 @@ document.addEventListener('DOMContentLoaded', () => {
         el.style.padding = '0';
       });
     };
-    const cached = sessionStorage.getItem('af_mi_foto');
+    let uid = '';
+    try { uid = String(JSON.parse(decodeURIComponent(escape(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))).id_usuario || ''); } catch (_) {}
+    if (!uid) { try { uid = String((JSON.parse(sessionStorage.getItem('usuario') || '{}')).id_usuario || ''); } catch (_) {} }
+    const cached = uid && sessionStorage.getItem('af_mi_foto_uid') === uid ? sessionStorage.getItem('af_mi_foto') : null;
     if (cached !== null) { aplicar(cached); setTimeout(() => aplicar(cached), 900); return; }
     fetch('/api/credenciales/mi-foto', { headers: { Authorization: 'Bearer ' + token } })
       .then(r => r.json())
       .then(j => {
         const foto = (j && j.success && j.data && j.data.foto) || '';
-        try { sessionStorage.setItem('af_mi_foto', foto); } catch (_) {}  // fotos muy pesadas: no cachear
+        try { sessionStorage.removeItem('af_mi_foto'); sessionStorage.setItem('af_mi_foto_uid', uid); sessionStorage.setItem('af_mi_foto', foto); } catch (_) {}  // fotos muy pesadas: no cachear
         aplicar(foto);
         setTimeout(() => aplicar(foto), 900);   // re-aplica si la página pisó el avatar con la inicial (setters async)
       }).catch(() => {});
