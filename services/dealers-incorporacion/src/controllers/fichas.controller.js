@@ -192,7 +192,7 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
   } catch (e) { if (e.errno !== 1050) console.error('[dealer_ficha_revisiones migration]', e.message); }
 
   // Cadena de aprobación PARAMÉTRICA: niveles que autorizan la ficha antes de imprimir/firmar.
-  // condicion: SIEMPRE | COMISION_SOBRE_PIZARRA | DEPOSITO_MODIFICADO | PARQUE_RUT_REPETIDO
+  // condicion: SIEMPRE | COMISION_SOBRE_PIZARRA | DEPOSITO_MODIFICADO | PARQUE_RUT_REPETIDO | EXCEPCION_FICHA
   // permiso: código de funcionalidad que habilita autorizar ese nivel (gobernado por la matriz de Perfiles).
   try {
     await pool.query(`
@@ -250,6 +250,7 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
       ['Mantener dealers',              'dealer_mantener',    null,                      null],
       ['Aprobar participación especial (Gerencia)', 'dealer_part_especial', null,        null],
       ['Aprobar parque con RUT de otro parque (Gerencia)', 'parque_rut_repetido', null,  null],
+      ['Aprobar excepciones de ficha: boleta y depósito modificado (Gerencia)', 'dealer_excepcion_gerencia', null, null],
       ['Configurar niveles de aprobación de dealer', 'dealer_aprob_config', '/dealers-incorporacion/niveles.html', 'bi-diagram-3'],
       ['Plan Liquidez (anticipo de comisiones)', 'dealer_plan_liquidez', '/dealers-liquidez/', 'bi-cash-stack'],
     ];
@@ -272,6 +273,7 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
       dealer_mantener:      [1, 6, 90008],
       dealer_part_especial: [1, 90008, 90009],   // visto de Gerencia para comisión sobre la pizarra
       parque_rut_repetido:  [1, 90008, 90009],   // visto de Gerencia (los mismos del visto de participación especial) para un 2° parque con el mismo RUT
+      dealer_excepcion_gerencia: [1, 90008, 90009],   // visto de Gerencia para boleta / depósito modificado (Pato y Leonardo, 02-10-2026)
       dealer_aprob_config:  [1],                  // configurar la cadena de niveles (restringible por usuario)
       dealer_plan_liquidez: [1, 90008, 90009],    // anticipo de comisiones a Super Partners — visto de Gerencia (compromiso financiero)
     };
@@ -296,6 +298,19 @@ require('../../../../shared/migrate').migrar('dealers-nivel-parque-rut-repetido-
   await pool.query(
     `INSERT INTO dealer_aprob_niveles (orden, nombre, condicion, permiso, activo)
      VALUES (?, 'Visto de Gerencia (parque con RUT de otro parque)', 'PARQUE_RUT_REPETIDO', 'parque_rut_repetido', 1)`, [m.sig]);
+});
+
+/* Nivel "Visto de Gerencia (excepciones de la ficha)" — Pato, 02-10-2026: una ficha con BOLETA (o con el depósito
+   modificado) la aprobaba un analista en el nivel 1 sin que ningún gerente viera la excepción, porque el visto de
+   Gerencia solo existía para comisión sobre la pizarra y parque con RUT repetido. Firman Leonardo y Pato (permiso
+   dealer_excepcion_gerencia). Una sola vez, al final de la cadena: después lo gobierna el mantenedor de Niveles. */
+require('../../../../shared/migrate').migrar('dealers-nivel-excepcion-ficha-v1', async () => {
+  const [[ya]] = await pool.query("SELECT id FROM dealer_aprob_niveles WHERE condicion='EXCEPCION_FICHA' LIMIT 1");
+  if (ya) return;
+  const [[m]] = await pool.query('SELECT COALESCE(MAX(orden),0) + 1 AS sig FROM dealer_aprob_niveles');
+  await pool.query(
+    `INSERT INTO dealer_aprob_niveles (orden, nombre, condicion, permiso, activo)
+     VALUES (?, 'Visto de Gerencia (excepciones: boleta, depósito modificado)', 'EXCEPCION_FICHA', 'dealer_excepcion_gerencia', 1)`, [m.sig]);
 });
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
@@ -400,6 +415,7 @@ async function nivelAplica(niv, f) {
   if (niv.condicion === 'COMISION_SOBRE_PIZARRA') return await esEspecial(f);
   if (niv.condicion === 'DEPOSITO_MODIFICADO')    return await depositoCambioVsDealer(f);
   if (niv.condicion === 'PARQUE_RUT_REPETIDO')    return (await parquesMismoRut(f)).length > 0;
+  if (niv.condicion === 'EXCEPCION_FICHA')        return (await excepcionesPorVisar(f)).length > 0;
   return true;   // SIEMPRE (o condición desconocida → fail-safe: exige autorización)
 }
 /* EXCEPCIONES QUE APRUEBA QUIEN FIRMA UN NIVEL — Pato, 01-10-2026: "cuando un gerente apruebe una excepción de un
@@ -412,8 +428,29 @@ async function nivelAplica(niv, f) {
    Vale igual para ficha de dealer nuevo, modificación de dealer y parque: todas pasan por esta cadena.
    @returns {Promise<Array<{tipo:string,label:string,detalle:string}>>} */
 const jsonArr = v => { if (Array.isArray(v)) return v; try { const a = JSON.parse(v || '[]'); return Array.isArray(a) ? a : []; } catch (_) { return []; } };
+/* Excepciones de la ficha que todavía esperan el visto de Gerencia (nivel EXCEPCION_FICHA; Pato, 02-10-2026):
+     · las que declaró el ejecutivo al grabar (hoy: boleta), con su justificación, y
+     · el depósito modificado respecto al dealer vigente,
+   siempre que un gerente no las haya comentado ya en un nivel anterior de la misma ficha (así no se pide una
+   segunda firma de Gerencia por lo mismo). "Comisión modificada" queda fuera: sobre la pizarra la firma el nivel
+   de participación especial, y bajo la pizarra no es una excepción que requiera Gerencia.
+   @returns {Promise<Array<{tipo:string,label:string,detalle:string}>>} */
+async function excepcionesPorVisar(f) {
+  const [prev] = await pool.query('SELECT comentarios_exc FROM dealer_ficha_autorizaciones WHERE id_ficha=? AND comentarios_exc IS NOT NULL', [f.id]);
+  const ya = new Set(prev.flatMap(p => jsonArr(p.comentarios_exc).map(c => c && c.tipo)));
+  const just = Object.fromEntries(jsonArr(f.excepciones_comentarios).map(c => [c && c.tipo, c && c.comentario]));
+  const out = [];
+  for (const e of jsonArr(f.excepciones)) {
+    if (!e || !e.tipo || e.tipo === 'COMISION_MODIFICADA' || ya.has(e.tipo) || out.some(x => x.tipo === e.tipo)) continue;
+    out.push({ tipo: e.tipo, label: e.label || e.tipo, detalle: just[e.tipo] ? `Justificación del ejecutivo: ${just[e.tipo]}` : '' });
+  }
+  if (!ya.has('DEPOSITO_MODIFICADO') && await depositoCambioVsDealer(f))
+    out.push({ tipo: 'DEPOSITO_MODIFICADO', label: 'Depósito modificado respecto al dealer vigente', detalle: [f.banco, f.num_cuenta, f.rut_cuenta].filter(Boolean).join(' · ') });
+  return out;
+}
 async function excepcionesDelNivel(f, niv) {
   if (!niv || !niv.condicion || niv.condicion === 'SIEMPRE') return [];
+  if (niv.condicion === 'EXCEPCION_FICHA') return await excepcionesPorVisar(f);
   const out = [];
   if (niv.condicion === 'COMISION_SOBRE_PIZARRA')
     out.push({ tipo: niv.condicion, label: 'Participación especial: comisión pactada sobre la pizarra', detalle: '' });
@@ -1716,7 +1753,7 @@ const dealerBuscar = async (req, res) => {
 };
 
 /* ── Niveles de aprobación — mantenedor paramétrico (gated dealer_aprob_config) ── */
-const CONDICIONES = ['SIEMPRE', 'COMISION_SOBRE_PIZARRA', 'DEPOSITO_MODIFICADO', 'PARQUE_RUT_REPETIDO'];
+const CONDICIONES = ['SIEMPRE', 'COMISION_SOBRE_PIZARRA', 'DEPOSITO_MODIFICADO', 'PARQUE_RUT_REPETIDO', 'EXCEPCION_FICHA'];
 const nivelesListar = async (req, res) => {
   try {
     const [niveles] = await pool.query('SELECT id, orden, nombre, condicion, permiso, activo FROM dealer_aprob_niveles ORDER BY orden, id');
