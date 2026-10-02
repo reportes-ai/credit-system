@@ -3541,6 +3541,40 @@ require('../../../../shared/migrate').migrar('ctb-correccion-santander-sep26-v1'
   const [u] = await pool.query("UPDATE ctb_compras_aux SET cuenta_gasto='4001040', cuenta_cxp='1101030' WHERE id IN (?)", [docs.map(d => d.id)]);
   if (u.affectedRows !== 29) throw new Error(`auxiliar: se actualizaron ${u.affectedRows} filas de 29`);
 });
+/* PAGO de las otras 30 facturas de Santander de sep-2026 (Pato, 02-10-2026): entraron bien al gasto
+   (4001040) pero contra Facturas por pagar 2026 (2102024), y el banco ya las cobró de la cuenta corriente
+   (cartola: 2.187 el 08-09, 3.649 el 15-09 y 19.006 el 17-09 = 24.842). Faltaba el segundo paso que AVSOFT
+   hacía con un egreso "FACT. POR PAGAR SANTANDER": rebajar el pasivo contra el banco. Un comprobante:
+   Debe 2102024 24.842 / Haber Banco Santander 24.842. Solo actúa si encuentra exactamente esos 30
+   documentos y nadie registró ya un pago a Santander en esa cuenta desde septiembre. */
+require('../../../../shared/migrate').migrar('ctb-pago-santander-sep26-v1', async () => {
+  const REF = 'PAGO-SANTANDER-SEP26';
+  const [[ya]] = await pool.query("SELECT id FROM ctb_comprobantes WHERE origen_ref=? AND estado<>'ANULADO' LIMIT 1", [REF]);
+  if (ya) return;
+  const [docs] = await pool.query(
+    `SELECT a.id, a.total FROM ctb_compras_aux a JOIN ctb_comprobantes c ON c.id = a.id_comprobante
+      WHERE a.mes='2026-09' AND REPLACE(a.rut,'.','')='97036000-K' AND a.cuenta_gasto='4001040' AND a.cuenta_cxp='2102024'
+        AND a.tipo_doc='33' AND c.estado='CONTABILIZADO'`);
+  if (!docs.length) return;
+  const total = docs.reduce((s, d) => s + Number(d.total || 0), 0);
+  if (docs.length !== 30 || total !== 24842)
+    throw new Error(`los documentos no calzan con lo revisado (${docs.length} docs, total ${total}): no se registra el pago`);
+  const [[pag]] = await pool.query(
+    `SELECT COALESCE(SUM(m.debe),0) d FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+      WHERE m.cuenta='2102024' AND REPLACE(m.rut,'.','')='97036000-K' AND c.estado<>'ANULADO' AND c.fecha >= '2026-09-01'`);
+  if (Number(pag.d) > 0) throw new Error(`ya hay $${pag.d} al debe de 2102024 para Santander desde septiembre: revisar a mano`);
+  const rut = '97036000-K', g = 'Pago 30 FC Santander sep-2026 (cargo en cuenta corriente)';
+  const comp = await crearComprobanteDoc({
+    fecha: '2026-09-30',
+    glosa: 'Pago 30 facturas Santander de septiembre 2026: comisiones descontadas de la cuenta corriente',
+    movimientos: [
+      { cuenta: '2102024', debe: 24842, haber: 0, glosa: g, rut },
+      { cuenta: '1101030', debe: 0, haber: 24842, glosa: g, rut },
+    ],
+    origen: 'AJUSTE', origen_ref: REF, usuario: 'Corrección aprobada por Pato (02-10-2026)',
+  });
+  console.log('[ctb] pago Santander sep-26:', comp.numero);
+});
 
 async function rcvAutoImportar(mes, { req } = {}) {
   const out = { mes, ingresados: 0, total: 0, docs: [], errores: [] };
