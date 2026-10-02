@@ -165,6 +165,18 @@ const PESTANAS_DEALERS = [
   ['dealers_potencial_ver',   'Pestaña Potencial Parque/Dealer — ver'],
   ['dealers_potencial_editar','Pestaña Potencial Parque/Dealer — editar posiciones y ventas'],
 ];
+/* Corrección de dato (Pato, 02-10-2026): dealer N°915 VESPUCIO NORTE SPA. La ficha de modificación
+   cerrada el 01-10-2026 traía 2,5% en el tramo 13-24; el acuerdo aprobado por Gerencia el 03-09-2026
+   es 2 / 5 / 8 / 12. Se corrige el tramo a 5% en el dealer y en su local de parque (calle ya estaba en 5%).
+   Solo actúa si el valor sigue en 2,5%. */
+require('../../../../shared/migrate').migrar('dealer-915-com-13-24-a-5-v1', async () => {
+  const [d] = await pool.query('UPDATE dealers SET com_13_24=5.00 WHERE id_dealer=330001 AND numero=915 AND com_13_24=2.50');
+  const [l] = await pool.query("UPDATE dealer_comisiones SET com_13_24=5.00, updated_at=NOW() WHERE id_dealer=330001 AND com_13_24=2.50");
+  if (d.affectedRows || l.affectedRows)
+    auditar({ accion: 'EDITAR', modulo: 'dealers', entidad: 'dealer', entidad_id: 330001, usuario: { nombre: 'Sistema', apellido: '(corrección pedida por Patricio Escobar)' },
+      detalle: `Dealer N°915 VESPUCIO NORTE SPA: comisión tramo 13-24 corregida de 2,5% a 5% (dealer: ${d.affectedRows}, locales: ${l.affectedRows}). La ficha de modificación del 01-10-2026 traía 2,5% por error; el acuerdo aprobado es 2/5/8/12.` });
+});
+
 require('../../../../shared/migrate').migrar('dealers-modulo-propio', async () => {
   // Módulo PROPIO "Dealers": las siete casillas (la del módulo + las seis de
   // pestaña) tienen que quedar juntas bajo su propio título en Perfiles y
@@ -282,6 +294,18 @@ const getDealers = async (req, res) => {
         rows.forEach(r => { r.locales = de[r.id_dealer] || []; });
       }
     } catch (_) { /* tabla aún no creada */ }
+    // Fecha en que se aprobó la comisión vigente: el cierre de la última ficha APROBADA del dealer
+    // (Pato, 02-10-2026: la comisión y el visto de Gerencia se muestran con su fecha).
+    try {
+      const ids = rows.map(r => r.id_dealer);
+      if (ids.length) {
+        const [fa] = await pool.query(
+          `SELECT id_dealer, MAX(fecha_revision) f FROM dealer_fichas
+            WHERE estado='APROBADA' AND COALESCE(entidad,'DEALER')='DEALER' AND id_dealer IN (?) GROUP BY id_dealer`, [ids]);
+        const de = new Map(fa.map(x => [x.id_dealer, x.f]));
+        rows.forEach(r => { r.com_aprobada_fecha = de.get(r.id_dealer) || null; });
+      }
+    } catch (_) { /* sin fichas: sin fecha */ }
     return res.json({ success: true, data: { rows, total, page: parseInt(page) }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
