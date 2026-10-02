@@ -383,6 +383,18 @@ require('../../../../shared/migrate').migrar('dealernet-extendido-restringido-v1
   await pool.query("UPDATE dealernet_productos SET grupo_excluyente=1 WHERE codigo IN ('16','110')");
   await pool.query("UPDATE dealernet_productos SET restringido=1, activo=1 WHERE codigo='110'");
 });
+/* El permiso nació solo para Administrador, y por la regla "solo otorgas lo que tienes"
+   (services/usuarios/src/otorgables.js) el Gerente de Operaciones y Crédito ni lo veía en
+   la matriz para asignarlo. Una vez: se le habilita a ese perfil (Pato, 02-10-2026). */
+require('../../../../shared/migrate').migrar('dealernet-restringidos-gerente-ops-v1', async () => {
+  const [[f]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='dealernet_restringidos' LIMIT 1");
+  if (!f) throw new Error('falta la funcionalidad dealernet_restringidos');
+  const [u] = await pool.query('UPDATE permisos_perfil SET habilitado=1 WHERE id_perfil=90008 AND id_funcionalidad=?', [f.id_funcionalidad]);
+  if (!u.affectedRows) {
+    const [[ya]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=90008 AND id_funcionalidad=? LIMIT 1', [f.id_funcionalidad]);
+    if (!ya) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (90008,?,1)', [f.id_funcionalidad]);
+  }
+});
 
 /* MOTOR ÚNICO de qué productos se piden.
    - productosPorDefecto(): lo que se pide cuando nadie eligió (consulta sin lista, campañas,
