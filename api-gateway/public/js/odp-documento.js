@@ -1,4 +1,4 @@
-/* v1.7 — los RUT salen con puntos y guion (motor unico rut-core) y "Fecha a pagar" muestra el VENCIMIENTO del compromiso: en el saldo precio, el SLA de la categoria del dealer (Socio 72 h habiles, Partner 48, Super Partner 24, desde los fundantes recibidos). v1.6 — isomorfo: module.exports + BASE para el logo (correo ODP parque desde el servidor). v1.5 — tacho junto a cada adjunto cuando la orden lo permite (puede_borrar_adjuntos + hook AF_ODP_QUITAR_ADJUNTO). v1.4 — tabla "Ajuste de cartola" (adicionales/descuentos aprobados con su glosa) en la orden de comisión. v1.3 — montos negativos como "− $x" (retención de boleta que se descuenta). v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
+/* v1.8 — columna RUT más angosta (13%) y Proveedor más ancha (39%) en la orden simple, para que la razón social no se corte. v1.7 — los RUT salen con puntos y guion (motor unico rut-core) y "Fecha a pagar" muestra el VENCIMIENTO del compromiso: en el saldo precio, el SLA de la categoria del dealer (Socio 72 h habiles, Partner 48, Super Partner 24, desde los fundantes recibidos). v1.6 — isomorfo: module.exports + BASE para el logo (correo ODP parque desde el servidor). v1.5 — tacho junto a cada adjunto cuando la orden lo permite (puede_borrar_adjuntos + hook AF_ODP_QUITAR_ADJUNTO). v1.4 — tabla "Ajuste de cartola" (adicionales/descuentos aprobados con su glosa) en la orden de comisión. v1.3 — montos negativos como "− $x" (retención de boleta que se descuenta). v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
    ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    MOTOR ÚNICO del documento "Solicitud de Pago" (Orden de Pago)
 
@@ -90,7 +90,7 @@ function docHTML(o){
   const hayDesg = Array.isArray(o.desglose) && o.desglose.length > 0;
   const tablaDetalle = hayDesg ? `
     <table style="${Stbl}">
-      <colgroup><col style="width:30%"><col style="width:22%"><col style="width:33%"><col style="width:15%"></colgroup>
+      <colgroup><col style="width:39%"><col style="width:13%"><col style="width:33%"><col style="width:15%"></colgroup>
       <thead><tr><th style="${Sth}">Proveedor</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Monto</th></tr></thead>
       <tbody>
         ${o.desglose.map((d,idx)=>`<tr><td style="${Std}">${idx===0?escH(o.proveedor_nombre||''):''}</td><td style="${Std}">${idx===0?escH(fmtRut(o.proveedor_rut)):''}</td><td style="${Std}">${escH(d.label||'')}</td><td style="${Snum}">${fmtMon(d.monto)}</td></tr>`).join('')}
