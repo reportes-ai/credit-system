@@ -1005,7 +1005,14 @@ const otorgar = async (req, res) => {
                      (26090047, 05-09-2026: cursó en septiembre y caía en agosto). */
                   /* El mes contable NO va en este SET: lo alinea alinearMes() más abajo, en
                      sentencia aparte (TiDB no ve acá la fecha recién escrita, 01-10-2026). */
+                  /* …y también HOY si esa fecha es de un otorgamiento que después se ANULÓ: la
+                     anulación no borra la fecha de curse, y al volver a otorgar la operación
+                     quedaba con la fecha vieja y en el mes anterior (OP 26091256: otorgada el
+                     25-09, anulada el 28-09, otorgada de nuevo el 02-10 y contada en septiembre). */
                   fecha_otorgado=CASE WHEN fecha_otorgado IS NULL OR fecha_otorgado < DATE(created_at)
+                                        OR EXISTS (SELECT 1 FROM anulaciones_operacion an
+                                                    WHERE an.id_credito = creditos.id AND an.estado = 'APROBADA'
+                                                      AND DATE(an.resuelto_at) >= creditos.fecha_otorgado)
                                       THEN CURDATE() ELSE fecha_otorgado END,
                   comdea_real = CASE WHEN ? > 0 AND (COALESCE(comdea_real,0) <= 0 OR ? < comdea_real) THEN ? ELSE comdea_real END,
                   /* EJECUTIVO: manda la CARTA (Pato, 23-09-2026). La carga Trinidad trae el
@@ -2559,6 +2566,20 @@ require('../../../../shared/migrate').migrar('recalc-op-26091256-v1', async () =
   recalcularPorOps([5580001])
     .then(r => console.log('[cartas] recálculo OP 26091256:', r && r.actualizados, 'ops'))
     .catch(e => console.error('[cartas] recálculo OP 26091256:', e.message));
+});
+
+/* Fecha de curse de la OP 26091256 (crédito 5580001; Pato, 02-10-2026): se otorgó de nuevo el 02-10
+   —AutoFin la muestra con fecha de curse 02/10/2026— pero conservó la del primer otorgamiento (25-09),
+   anulado el 28-09, y quedó contada en septiembre. Pasa al 02-10-2026 y el mes contable se alinea en
+   sentencia aparte (regla de alinearMes). Solo actúa si sigue OTORGADA con fecha 25-09. */
+require('../../../../shared/migrate').migrar('op-26091256-fecha-curse-02-10-v1', async () => {
+  const [u] = await pool.query(
+    "UPDATE creditos SET fecha_otorgado='2026-10-02', updated_at=NOW() WHERE id=5580001 AND num_op=26091256 AND fecha_otorgado='2026-09-25' AND UPPER(estado_credito)='OTORGADO'");
+  if (!u.affectedRows) return;
+  await alinearMes('id = ?', [5580001]);
+  auditar({ accion: 'EDITAR', modulo: 'creditos', entidad: 'credito', entidad_id: 5580001, usuario: { nombre: 'Sistema', apellido: '(pedido por Patricio Escobar)' },
+    detalle: 'OP 26091256: fecha de curse corregida de 25-09-2026 a 02-10-2026 (el otorgamiento del 25-09 se anuló el 28-09; se otorgó de nuevo el 02-10 y había conservado la fecha vieja). Mes contable alineado a octubre.' });
+  recalcularPorOps([5580001]).catch(e => console.error('[cartas] recálculo OP 26091256 (fecha):', e.message));
 });
 
 /* POST /api/cartas/:id/corregir  { campos:{...}, motivo } */
