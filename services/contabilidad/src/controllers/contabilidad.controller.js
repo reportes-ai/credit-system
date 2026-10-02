@@ -3506,6 +3506,41 @@ require('../../../../shared/migrate').migrar('ctb-rcv-regla-santander-contra-v1'
   if (!c) throw new Error('la cuenta 1101030 no existe o no es imputable');
   await pool.query("UPDATE ctb_rcv_reglas_auto SET cuenta_contra='1101030', updated_at=NOW() WHERE rut='97036000-K' AND (cuenta_contra IS NULL OR cuenta_contra='')");
 });
+/* CORRECCIÓN sep-2026 (aprobada por Pato, 02-10-2026): 29 facturas de Santander (folios 57050555–57050583,
+   $729 c/u, total $21.141) entraron desde el RCV con el BANCO como cuenta de gasto y contra Facturas por
+   pagar Dealer: Debe banco 17.777 + IVA 3.364 / Haber 2102025 21.141. Subía el banco en vez de bajarlo, no
+   registraba gasto y dejaba un pasivo que no existe. Un solo comprobante de ajuste (los 29 originales no se
+   anulan): Debe Gastos Bancarios 17.777 + Debe 2102025 21.141 / Haber Banco 38.918. Neto: gasto 17.777,
+   IVA 3.364 (no se toca), banco −21.141, pasivo en cero. El auxiliar pasa a mostrar el gasto.
+   Solo actúa si encuentra exactamente esos 29 documentos con esos montos; en otra base no hace nada. */
+require('../../../../shared/migrate').migrar('ctb-correccion-santander-sep26-v1', async () => {
+  const REF = 'CORR-SANTANDER-SEP26';
+  const [docs] = await pool.query(
+    `SELECT a.id, a.neto, a.iva, a.total FROM ctb_compras_aux a JOIN ctb_comprobantes c ON c.id = a.id_comprobante
+      WHERE a.mes='2026-09' AND REPLACE(a.rut,'.','')='97036000-K' AND a.cuenta_gasto='1101030' AND a.cuenta_cxp='2102025'
+        AND a.tipo_doc='33' AND c.estado='CONTABILIZADO'`);
+  if (!docs.length) return;
+  const suma = k => docs.reduce((s, d) => s + Number(d[k] || 0), 0);
+  if (docs.length !== 29 || suma('neto') !== 17777 || suma('iva') !== 3364 || suma('total') !== 21141)
+    throw new Error(`los documentos no calzan con lo aprobado (${docs.length} docs, neto ${suma('neto')}, iva ${suma('iva')}, total ${suma('total')}): no se corrige nada`);
+  const [[ya]] = await pool.query("SELECT id FROM ctb_comprobantes WHERE origen_ref=? AND estado<>'ANULADO' LIMIT 1", [REF]);
+  if (!ya) {
+    const rut = '97036000-K', g = 'Corrección 29 FC Santander 57050555-57050583';
+    const comp = await crearComprobanteDoc({
+      fecha: '2026-09-30',
+      glosa: 'Corrección 29 facturas Santander folios 57050555–57050583: gasto bancario cargado por error al banco',
+      movimientos: [
+        { cuenta: '4001040', debe: 17777, haber: 0, glosa: g, rut },
+        { cuenta: '2102025', debe: 21141, haber: 0, glosa: g, rut },
+        { cuenta: '1101030', debe: 0, haber: 38918, glosa: g, rut },
+      ],
+      origen: 'AJUSTE', origen_ref: REF, usuario: 'Corrección aprobada por Pato (02-10-2026)',
+    });
+    console.log('[ctb] corrección Santander sep-26:', comp.numero);
+  }
+  const [u] = await pool.query("UPDATE ctb_compras_aux SET cuenta_gasto='4001040', cuenta_cxp='1101030' WHERE id IN (?)", [docs.map(d => d.id)]);
+  if (u.affectedRows !== 29) throw new Error(`auxiliar: se actualizaron ${u.affectedRows} filas de 29`);
+});
 
 async function rcvAutoImportar(mes, { req } = {}) {
   const out = { mes, ingresados: 0, total: 0, docs: [], errores: [] };
