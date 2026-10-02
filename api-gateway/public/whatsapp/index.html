@@ -6,7 +6,7 @@
   <link rel="apple-touch-icon" href="/whatsapp/apple-touch-icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WhatsApp — AutoFácil</title>
-  <!-- v1.8 — variables de cuota en plantillas de cobranza (N° cuota, dia de vencimiento, monto cuota) · v1.7 — clientes por username/BSUID: bandeja muestra @username cuando no hay telefono -->
+  <!-- v1.9 — el buscador de la bandeja ya no se autocompleta con el correo guardado del navegador (dejaba la lista vacia al abrir una conversacion). v1.8 — variables de cuota en plantillas de cobranza (N° cuota, dia de vencimiento, monto cuota) · v1.7 — clientes por username/BSUID: bandeja muestra @username cuando no hay telefono -->
   <!-- PWA DEDICADA: app propia "AF WhatsApp" (manifest y scope /whatsapp/, distinta del Business Suite) -->
   <link rel="manifest" href="/whatsapp/manifest.json">
   <meta name="theme-color" content="#075E54">
@@ -207,7 +207,7 @@
   <!-- ═══ BANDEJA ═══ -->
   <div id="secBandeja">
     <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-      <input id="fQ" placeholder="Buscar teléfono, nombre o RUT…" style="flex:1;min-width:180px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;font-size:.85rem" onkeydown="if(event.key==='Enter')cargarConvs()">
+      <input id="fQ" type="search" name="wsp-buscar-conv" autocomplete="off" placeholder="Buscar teléfono, nombre o RUT…" style="flex:1;min-width:180px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;font-size:.85rem" onkeydown="if(event.key==='Enter')cargarConvs()">
       <select id="fEstadoConv" onchange="cargarConvs()" style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:.84rem">
         <option value="">Todas</option><option value="BOT">Con el bot</option><option value="DERIVADA">Con agente</option><option value="CERRADA">Cerradas</option>
       </select>
@@ -706,7 +706,10 @@ async function revisarPlantillaIA(){
     o.connect(g).connect(x.destination); o.start(); o.stop(x.currentTime+.4); setTimeout(()=>x.close(),600); } catch(e){} }
 
   async function cargarConvs(){
-    const q = document.getElementById('fQ').value.trim();
+    // El navegador autocompletaba el buscador con el correo guardado del login y la lista quedaba vacía al refrescar.
+    const fq = document.getElementById('fQ');
+    try { if (fq.matches(':-webkit-autofill') || fq.matches(':autofill')) fq.value = ''; } catch (_) {}
+    const q = fq.value.trim();
     const est = document.getElementById('fEstadoConv').value;
     const p = new URLSearchParams(); if(q)p.set('q',q); if(est)p.set('estado',est);
     if (FILTRO==='mias') p.set('mias','1'); else if (FILTRO) p.set('area',FILTRO);
