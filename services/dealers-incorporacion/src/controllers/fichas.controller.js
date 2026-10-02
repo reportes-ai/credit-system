@@ -444,6 +444,10 @@ async function excepcionesPorVisar(f) {
     if (!e || !e.tipo || e.tipo === 'COMISION_MODIFICADA' || ya.has(e.tipo) || out.some(x => x.tipo === e.tipo)) continue;
     out.push({ tipo: e.tipo, label: e.label || e.tipo, detalle: just[e.tipo] ? `Justificación del ejecutivo: ${just[e.tipo]}` : '' });
   }
+  /* Boleta SIEMPRE es excepción (Pato, 02-10-2026): se toma del dato de la ficha, no solo de lo que declaró la
+     pantalla al grabar, para que una ficha con boleta nunca llegue a autorizarse sin el visto de Gerencia. */
+  if (String(f.tipo_documento || '').trim().toUpperCase() === 'BOLETA' && !ya.has('DOC_BOLETA') && !out.some(x => x.tipo === 'DOC_BOLETA'))
+    out.push({ tipo: 'DOC_BOLETA', label: 'Documento tributario: Boleta', detalle: just.DOC_BOLETA ? `Justificación del ejecutivo: ${just.DOC_BOLETA}` : '' });
   if (!ya.has('DEPOSITO_MODIFICADO') && await depositoCambioVsDealer(f))
     out.push({ tipo: 'DEPOSITO_MODIFICADO', label: 'Depósito modificado respecto al dealer vigente', detalle: [f.banco, f.num_cuenta, f.rut_cuenta].filter(Boolean).join(' · ') });
   return out;
