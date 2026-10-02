@@ -3280,7 +3280,9 @@ exports.rcvEstado = async (req, res) => {
     // Diagnóstico del certificado: dice cuál dato falta o falla, sin exponer ninguno.
     let diag = null;
     try { diag = rcv.diagnosticoCert ? rcv.diagnosticoCert() : null; } catch (_) {}
-    ok(res, { configurado: rcv.configurado(), mes, sii, auxiliar: aux, logs, diagnostico: diag });
+    let cuota = null;
+    try { cuota = await rcv.cuota(); } catch (_) {}
+    ok(res, { configurado: rcv.configurado(), mes, sii, auxiliar: aux, logs, diagnostico: diag, cuota });
   } catch (e) { fail(res, e.message); }
 };
 

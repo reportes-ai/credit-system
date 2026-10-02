@@ -273,4 +273,14 @@ async function tick() {
 }
 programar('rcv-sii', tick, 15 * 60 * 1000);        // cada 15 min; corre una vez L-M-V desde las 08:00 Chile
 
-module.exports = { sincronizar, sincronizarMes, configurado, diagnosticoCert };
+/* Cuota del plan de SimpleAPI: 30 consultas por mes calendario en el plan gratis (SIMPLEAPI_CUOTA_MES si
+   se contrata otro). SimpleAPI no informa el saldo, así que se cuenta lo que este sistema pidió en el mes:
+   cada intento registrado en ctb_rcv_sync_log (los fallidos también, por prudencia; el 429 no se registra). */
+const CUOTA_MES = Number(process.env.SIMPLEAPI_CUOTA_MES) || 30;
+async function cuota() {
+  const [[u]] = await pool.query("SELECT COUNT(*) n FROM ctb_rcv_sync_log WHERE created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')");
+  const usadas = Number(u.n) || 0;
+  return { plan: CUOTA_MES, usadas, disponibles: Math.max(CUOTA_MES - usadas, 0) };
+}
+
+module.exports = { sincronizar, sincronizarMes, configurado, diagnosticoCert, cuota };
