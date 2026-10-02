@@ -126,6 +126,11 @@ router.get('/rcv/estado',       verifyToken, requireFunc('ctb_f29', 'ctb_libros_
 router.post('/rcv/sincronizar', verifyToken, requireFunc('ctb_f29', 'ctb_libros_aux'), ctrl.rcvSincronizar);
 router.get('/rcv/pendientes',   verifyToken, requireFunc('ctb_libros_aux'), ctrl.rcvPendientes);
 router.post('/rcv/importar',    verifyToken, requireFunc('ctb_libros_aux'), ctrl.rcvImportar);
+// Reglas de ingreso automático del RCV (proveedor → cuenta, con tope) y su aplicación sobre la foto ya guardada
+router.get('/rcv/reglas',        verifyToken, requireFunc('ctb_libros_aux'), ctrl.rcvReglas);
+router.post('/rcv/reglas',       verifyToken, requireFunc('ctb_libros_aux'), ctrl.rcvReglaGuardar);
+router.delete('/rcv/reglas/:id', verifyToken, requireFunc('ctb_libros_aux'), ctrl.rcvReglaEliminar);
+router.post('/rcv/auto',         verifyToken, requireFunc('ctb_libros_aux'), ctrl.rcvAutoAplicar);
 
 // Bitácora de Cierres
 router.get('/bitacora-cierres',              verifyToken, requireFunc('ctb_bitacora', 'ctb_cierre_mes', 'ctb_estados', 'ctb_libros'), ctrl.bitacoraCierres);

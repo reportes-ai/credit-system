@@ -1547,7 +1547,7 @@ async function ingresarCompraAux(b, { origen = 'DIGITADO', req } = {}) {
     ];
     comp = await crearComprobanteDoc({
       fecha: fechaAsiento, glosa: `${esNC ? 'Nota de crédito compra' : 'Compra'} ${tipo_doc || '33'}-${num_doc} ${razon_social}`.slice(0, 250),
-      movimientos, origen: origen === 'RCV' ? 'COMPRA_RCV' : 'COMPRA_DIG',
+      movimientos, origen: (origen === 'RCV' || origen === 'RCV_AUTO') ? 'COMPRA_RCV' : 'COMPRA_DIG',
       origen_ref: `${rut}|${tipo_doc || '33'}|${num_doc}`, usuario: nombreDe(req?.user),
     });
   }
@@ -3464,6 +3464,127 @@ exports.rcvImportar = async (req, res) => {
     auditar({ req, accion: 'IMPORTAR', modulo: 'contabilidad', entidad: 'rcv_a_auxiliar',
       detalle: `RCV ${b.mes || ''} → auxiliar: ${okDocs.length} ingresados, ${errores.length} con problema${b.generar_asiento ? ' (con asiento)' : ''}${b.generar_odp ? `, ${odps.filter(o => !o.existente).length} ODP emitidas` : ''}` });
     ok(res, { ingresados: okDocs.length, total: okDocs.reduce((s, d) => s + d.total, 0), errores, docs: okDocs, odps });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── RCV → auxiliar AUTOMÁTICO por regla (Pato, 02-10-2026) ───────────────────
+   Hay proveedores cuyos documentos son siempre lo mismo y van siempre a la misma cuenta
+   (las comisiones del banco: decenas de facturas de $733 al mes). Para esos, una REGLA
+   que define el usuario —RUT, cuenta de gasto, tope por documento y, si quiere, una
+   contrapartida distinta de la cuenta por pagar— hace que pasen solos al auxiliar con su
+   asiento después de cada sincronización. Todo lo demás sigue esperando revisión humana.
+   - El tope protege: una factura del mismo proveedor por otro concepto (más grande) NO entra sola.
+   - Solo facturas (33/34): una nota de crédito siempre la mira una persona.
+   - Mismo motor que el ingreso manual (ingresarCompraAux): montos del SII, cuadratura al peso,
+     candado de mes y chequeo de duplicados. Queda con origen RCV_AUTO en el auxiliar. */
+require('../../../../shared/migrate').enFila('ctb-rcv-reglas-auto', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS ctb_rcv_reglas_auto (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    rut VARCHAR(20) NOT NULL UNIQUE,
+    nombre VARCHAR(200) NULL,
+    cuenta_gasto VARCHAR(20) NOT NULL,
+    cuenta_contra VARCHAR(20) NULL,              -- vacío = la cuenta por pagar configurada
+    tope_monto BIGINT NOT NULL DEFAULT 0,        -- total máximo por documento
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    creado_por VARCHAR(150) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL
+  )`);
+});
+/* Primera regla, pedida por Pato: las comisiones de Santander (hasta $5.000) a Gastos Bancarios. */
+require('../../../../shared/migrate').migrar('ctb-rcv-regla-santander-v1', async () => {
+  const [[c]] = await pool.query("SELECT codigo FROM ctb_cuentas WHERE codigo='4001040' AND activo=1 LIMIT 1");
+  if (!c) return;
+  await pool.query(
+    "INSERT IGNORE INTO ctb_rcv_reglas_auto (rut, nombre, cuenta_gasto, tope_monto, activo, creado_por) VALUES ('97036000-K','Santander - Chile','4001040',5000,1,'Migración (Pato 02-10-2026)')");
+});
+
+async function rcvAutoImportar(mes, { req } = {}) {
+  const out = { mes, ingresados: 0, total: 0, docs: [], errores: [] };
+  const [reglas] = await pool.query('SELECT * FROM ctb_rcv_reglas_auto WHERE activo=1');
+  if (!reglas.length) return out;
+  const porRut = new Map(reglas.map(r => [rutNorm(r.rut), r]));
+  const [sii] = await pool.query('SELECT * FROM ctb_rcv_compras WHERE mes=? AND tipo_dte IN (33,34)', [mes]);
+  const cand = sii.filter(d => { const r = porRut.get(rutNorm(d.rut_proveedor)); return r && Number(d.monto_total || 0) > 0 && Number(d.monto_total) <= Number(r.tope_monto); });
+  if (!cand.length) return out;
+  // Misma trampa que el ingreso manual: con folios mal importados en el mes no se puede detectar duplicados.
+  const [[fol]] = await pool.query('SELECT COUNT(*) n FROM ctb_compras_aux WHERE mes=? AND num_doc=tipo_doc', [mes]);
+  if (fol.n) { out.errores.push({ motivo: `El mes ${mes} tiene ${fol.n} documentos con el folio mal importado: no se ingresa nada automático` }); return out; }
+  const [aux] = await pool.query('SELECT rut, tipo_doc, num_doc FROM ctb_compras_aux WHERE num_doc IN (?)', [[...new Set(cand.map(d => String(d.folio)))]]);
+  const yaEsta = new Set(aux.map(a => `${rutNorm(a.rut)}|${a.tipo_doc}|${a.num_doc}`));
+  const cfg = await getConfigDig();
+  for (const d of cand) {
+    if (yaEsta.has(`${rutNorm(d.rut_proveedor)}|${d.tipo_dte}|${d.folio}`)) continue;
+    const regla = porRut.get(rutNorm(d.rut_proveedor));
+    try {
+      const [neto, exento, ivaRec, ivaNoRec, otrosSii, sinDer, totalSii] = ['monto_neto', 'monto_exento', 'iva_recuperable',
+        'iva_no_recuperable', 'otros_impuestos', 'imp_sin_derecho', 'monto_total'].map(k => Number(d[k] || 0));
+      const resto = totalSii - neto - exento - ivaRec - ivaNoRec;
+      const otros = resto === otrosSii ? otrosSii : resto === otrosSii + sinDer ? otrosSii + sinDer : null;
+      if (otros === null) throw new Error('No cuadra con el total del SII');
+      const r = await ingresarCompraAux({
+        tipo_doc: String(d.tipo_dte), num_doc: String(d.folio), rut: d.rut_proveedor, razon_social: d.razon_social || regla.nombre || d.rut_proveedor,
+        fecha_doc: isoDeBD(d.fecha_emision), periodo: mes,
+        neto, exento, iva: ivaRec, iva_no_rec: ivaNoRec, otros_impuestos: otros,
+        cuenta_gasto: regla.cuenta_gasto, generar_asiento: true,
+        cuenta_iva: cfg.cta_iva_credito, cuenta_cxp: regla.cuenta_contra || cfg.cta_cxp,
+      }, { origen: 'RCV_AUTO', req });
+      out.ingresados++; out.total += r.total;
+      out.docs.push({ num_doc: String(d.folio), rut: d.rut_proveedor, total: r.total, comprobante: r.comprobante?.numero || null, regla: regla.id });
+    } catch (e) { out.errores.push({ num_doc: String(d.folio), rut: d.rut_proveedor, motivo: e.message }); }
+  }
+  if (out.ingresados || out.errores.length)
+    auditar({ req, accion: 'IMPORTAR', modulo: 'contabilidad', entidad: 'rcv_auto', usuario: req ? undefined : { nombre: 'Sistema', apellido: '(regla RCV)' },
+      detalle: `RCV ${mes} → auxiliar por regla automática: ${out.ingresados} ingresados ($${out.total.toLocaleString('es-CL')}), ${out.errores.length} con problema` });
+  return out;
+}
+rcv.alSincronizar(mes => rcvAutoImportar(mes));
+
+exports.rcvReglas = async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT r.*, c.nombre cuenta_gasto_nombre,
+              (SELECT COUNT(*) FROM ctb_compras_aux a WHERE a.origen='RCV_AUTO' AND REPLACE(a.rut,'.','')=REPLACE(r.rut,'.','')) docs_auto
+         FROM ctb_rcv_reglas_auto r LEFT JOIN ctb_cuentas c ON c.codigo=r.cuenta_gasto ORDER BY r.nombre, r.rut`);
+    ok(res, rows);
+  } catch (e) { fail(res, e.message); }
+};
+exports.rcvReglaGuardar = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const rut = rutNorm(b.rut);
+    if (!/^\d{7,8}-[\dK]$/.test(rut)) return fail(res, 'RUT inválido (formato 12345678-9)', 400);
+    const tope = Math.round(Number(b.tope_monto) || 0);
+    if (tope <= 0) return fail(res, 'El tope por documento es obligatorio y mayor que cero', 400);
+    const ctas = [String(b.cuenta_gasto || ''), String(b.cuenta_contra || '')].filter(Boolean);
+    if (!b.cuenta_gasto) return fail(res, 'Cuenta de gasto obligatoria', 400);
+    const [ex] = await pool.query('SELECT codigo, imputable, activo FROM ctb_cuentas WHERE codigo IN (?)', [ctas]);
+    for (const c of ctas) { const x = ex.find(e => e.codigo === c); if (!x || !x.imputable || !x.activo) return fail(res, `La cuenta ${c} no existe, no es imputable o está desactivada`, 400); }
+    if (String(b.cuenta_gasto).startsWith('1101')) return fail(res, 'Una cuenta de caja o banco no puede ser la cuenta de gasto', 400);
+    const [[ya]] = await pool.query('SELECT id FROM ctb_rcv_reglas_auto WHERE rut=?', [rut]);
+    if (ya) await pool.query('UPDATE ctb_rcv_reglas_auto SET nombre=?, cuenta_gasto=?, cuenta_contra=?, tope_monto=?, activo=?, updated_at=NOW() WHERE id=?',
+      [String(b.nombre || '').slice(0, 200) || null, b.cuenta_gasto, b.cuenta_contra || null, tope, b.activo === false || b.activo === 0 ? 0 : 1, ya.id]);
+    else await pool.query('INSERT INTO ctb_rcv_reglas_auto (rut, nombre, cuenta_gasto, cuenta_contra, tope_monto, activo, creado_por) VALUES (?,?,?,?,?,?,?)',
+      [rut, String(b.nombre || '').slice(0, 200) || null, b.cuenta_gasto, b.cuenta_contra || null, tope, b.activo === false || b.activo === 0 ? 0 : 1, nombreDe(req.usuario)]);
+    auditar({ req, accion: ya ? 'EDITAR' : 'CREAR', modulo: 'contabilidad', entidad: 'rcv_regla_auto', entidad_id: ya?.id,
+      detalle: `Regla automática RCV ${rut} ${b.nombre || ''}: cuenta ${b.cuenta_gasto}${b.cuenta_contra ? ' contra ' + b.cuenta_contra : ''}, tope $${tope.toLocaleString('es-CL')}, ${b.activo === false || b.activo === 0 ? 'inactiva' : 'activa'}` });
+    ok(res, { rut });
+  } catch (e) { fail(res, e.message); }
+};
+exports.rcvReglaEliminar = async (req, res) => {
+  try {
+    const [[r]] = await pool.query('SELECT * FROM ctb_rcv_reglas_auto WHERE id=?', [parseInt(req.params.id, 10) || 0]);
+    if (!r) return fail(res, 'Regla no encontrada', 404);
+    await pool.query('DELETE FROM ctb_rcv_reglas_auto WHERE id=?', [r.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'contabilidad', entidad: 'rcv_regla_auto', entidad_id: r.id, detalle: `Eliminó la regla automática RCV ${r.rut} ${r.nombre || ''}` });
+    ok(res, { id: r.id });
+  } catch (e) { fail(res, e.message); }
+};
+/* POST /rcv/auto {mes} — aplica las reglas a la foto del SII que YA está guardada (no consulta al SII). */
+exports.rcvAutoAplicar = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(String(req.body?.mes || '')) ? req.body.mes : hoyISO().slice(0, 7);
+    ok(res, await rcvAutoImportar(mes, { req }));
   } catch (e) { fail(res, e.message); }
 };
 

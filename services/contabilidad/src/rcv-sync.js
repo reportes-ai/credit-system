@@ -170,6 +170,9 @@ async function consultarConCalma(mes, anio) {
   }
 }
 
+let _alSincronizar = null;
+const alSincronizar = fn => { _alSincronizar = fn; };
+
 /* Sincroniza UN período (reemplaza el mes completo: el SII es la fuente). */
 async function sincronizarMes(anio, mes) {
   const per = `${anio}-${String(mes).padStart(2, '0')}`;
@@ -197,10 +200,17 @@ async function sincronizarMes(anio, mes) {
          g(d, 'acuseRecibo') || null, otros, detOtros.length ? JSON.stringify(detOtros) : null,
          Number(g(d, 'impuestoSinDerechoCredito') || 0)]);
     }
-    await pool.query('INSERT INTO ctb_rcv_sync_log (mes, resultado, registros, iva_total) VALUES (?,?,?,?)',
-      [per, 'OK', det.length, iva]);
-    console.log(`[rcv] ${per}: ${det.length} docs, IVA recuperable $${iva.toLocaleString('es-CL')}`);
-    return { ok: true, mes: per, registros: det.length, iva_total: iva };
+    /* Reglas automáticas (Pato, 02-10-2026): con la foto del SII ya guardada, los documentos de
+       proveedores con regla (ej. comisiones del banco) pasan solos al auxiliar. Lo registra el
+       controlador con alSincronizar(); si falla no bota la sincronización. */
+    let auto = null;
+    if (_alSincronizar) { try { auto = await _alSincronizar(per); } catch (e) { console.error('[rcv auto]', per, e.message); } }
+    const resumenAuto = auto && auto.ingresados
+      ? `auto: ${auto.ingresados} docs por regla ($${Number(auto.total || 0).toLocaleString('es-CL')})` : null;
+    await pool.query('INSERT INTO ctb_rcv_sync_log (mes, resultado, registros, iva_total, detalle) VALUES (?,?,?,?,?)',
+      [per, 'OK', det.length, iva, resumenAuto]);
+    console.log(`[rcv] ${per}: ${det.length} docs, IVA recuperable $${iva.toLocaleString('es-CL')}${resumenAuto ? ' · ' + resumenAuto : ''}`);
+    return { ok: true, mes: per, registros: det.length, iva_total: iva, auto };
   } catch (e) {
     await pool.query('INSERT INTO ctb_rcv_sync_log (mes, resultado, detalle) VALUES (?,?,?)',
       [per, 'ERROR', String(e.message).slice(0, 500)]).catch(() => {});
@@ -283,4 +293,4 @@ async function cuota() {
   return { plan: CUOTA_MES, usadas, disponibles: Math.max(CUOTA_MES - usadas, 0) };
 }
 
-module.exports = { sincronizar, sincronizarMes, configurado, diagnosticoCert, cuota };
+module.exports = { sincronizar, sincronizarMes, configurado, diagnosticoCert, cuota, alSincronizar };
