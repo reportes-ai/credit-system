@@ -3498,6 +3498,14 @@ require('../../../../shared/migrate').migrar('ctb-rcv-regla-santander-v1', async
   await pool.query(
     "INSERT IGNORE INTO ctb_rcv_reglas_auto (rut, nombre, cuenta_gasto, tope_monto, activo, creado_por) VALUES ('97036000-K','Santander - Chile','4001040',5000,1,'Migración (Pato 02-10-2026)')");
 });
+/* Contrapartida de la regla de Santander: el banco (1101030), no la cuenta por pagar. Las comisiones
+   ya vienen descontadas de la cuenta corriente, así que contra "Facturas por pagar" cada una dejaba
+   un pasivo de $733 que nadie iba a pagar (Pato, 02-10-2026). Una vez; después manda la pantalla. */
+require('../../../../shared/migrate').migrar('ctb-rcv-regla-santander-contra-v1', async () => {
+  const [[c]] = await pool.query("SELECT codigo FROM ctb_cuentas WHERE codigo='1101030' AND activo=1 AND imputable=1 LIMIT 1");
+  if (!c) throw new Error('la cuenta 1101030 no existe o no es imputable');
+  await pool.query("UPDATE ctb_rcv_reglas_auto SET cuenta_contra='1101030', updated_at=NOW() WHERE rut='97036000-K' AND (cuenta_contra IS NULL OR cuenta_contra='')");
+});
 
 async function rcvAutoImportar(mes, { req } = {}) {
   const out = { mes, ingresados: 0, total: 0, docs: [], errores: [] };
