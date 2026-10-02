@@ -116,20 +116,23 @@ exports.mando = async (req, res) => {
       // Mes actual a la fecha
       pool.query(`SELECT COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto FROM creditos
         WHERE estado_credito='OTORGADO' AND fecha_otorgado BETWEEN DATE_FORMAT(CURDATE(),'%Y-%m-01') AND CURDATE()`),
-      // Mes anterior, mismos días (1..D)
+      // Mes anterior a MISMOS DÍAS PARA EL CIERRE (igual que el Dashboard → "Mismos días faltantes"):
+      // el corte es fin del mes anterior menos los días que le faltan al mes en curso. Antes cortaba
+      // en el mismo número de día y no cuadraba con el Dashboard cuando los meses tienen distinto largo
+      // (02-10-2026: Dashboard 1 — al 1-sep — vs. Cuadro de Mando 7 — al 2-sep).
       pool.query(`SELECT COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto FROM creditos
         WHERE estado_credito='OTORGADO'
           AND fecha_otorgado BETWEEN DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH),'%Y-%m-01')
-          AND DATE_SUB(CURDATE(), INTERVAL 1 MONTH)`),
+          AND DATE_SUB(LAST_DAY(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)), INTERVAL DATEDIFF(LAST_DAY(CURDATE()), CURDATE()) DAY)`),
       pool.query(`SELECT COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto FROM creditos
         WHERE estado_credito='OTORGADO'
           AND fecha_otorgado BETWEEN DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH),'%Y-%m-01')
           AND LAST_DAY(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))`),
-      // Mismo mes año anterior, mismos días y total
+      // Mismo mes año anterior, mismos días para el cierre (solo difiere en febrero bisiesto) y total
       pool.query(`SELECT COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto FROM creditos
         WHERE estado_credito='OTORGADO'
           AND fecha_otorgado BETWEEN DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 YEAR),'%Y-%m-01')
-          AND DATE_SUB(CURDATE(), INTERVAL 1 YEAR)`),
+          AND DATE_SUB(LAST_DAY(DATE_SUB(CURDATE(), INTERVAL 1 YEAR)), INTERVAL DATEDIFF(LAST_DAY(CURDATE()), CURDATE()) DAY)`),
       pool.query(`SELECT COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto FROM creditos
         WHERE estado_credito='OTORGADO'
           AND fecha_otorgado BETWEEN DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 YEAR),'%Y-%m-01')
