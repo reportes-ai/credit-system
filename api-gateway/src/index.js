@@ -337,6 +337,7 @@ app.use('/api/dealer-incorporacion', require('../../services/dealers-incorporaci
 app.use('/api/dealer-liquidez',      require('../../services/dealers-liquidez/src/routes/liquidez.routes'));
 app.use('/api/tickets',              require('../../services/tickets/src/routes/tickets.routes'));
 app.use('/api/whatsapp',             require('../../services/whatsapp/src/routes/whatsapp.routes'));
+app.use('/api/arana',                require('../../services/arana/src/routes/arana.routes'));
 app.use('/api/portal-cliente',       require('../../services/portal-cliente/src/routes/portal-cliente.routes'));
 app.use('/api/rrhh',                 require('../../services/rrhh/src/routes/rrhh.routes'));
 app.use('/api/contabilidad',         require('../../services/contabilidad/src/routes/contabilidad.routes'));
