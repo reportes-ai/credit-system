@@ -2472,6 +2472,22 @@ const CAMPOS_BLOQUEADOS = [
   { col: 'plazo',             lbl: 'Cuotas' },
 ];
 
+/* Correcciones que VUELVEN A APROBACIÓN (Pato, 02-10-2026). La aprobación se dio para unas condiciones
+   y dentro de una vigencia: si la corrección toca alguna de ellas, la carta nueva nace PENDIENTE y pasa
+   por el proceso completo, como una carta nueva. Cambiar la FECHA es revivir una carta vencida (caso
+   266493152DS-C1: aprobada el 25-09, vencida, corregida el 02-10 conservando la aprobación vieja).
+   Lo que NO está acá es corrección de forma y conserva la aprobación: ejecutivo y sus datos de contacto,
+   el nombre del cliente o del dealer mal escritos (cambiar su RUT sí es otra persona) y el vendedor.
+   Solo aplica mientras el crédito NO esté otorgado: corregir una carta ya otorgada sigue siendo la vía
+   deliberada y auditada de siempre, y no puede dejar un crédito otorgado con la carta pendiente. */
+const CAMPOS_REAPROBACION = [
+  'fecha', 'id_financiera', 'tipo', 'acreedor', 'rut_cliente',
+  'tipo_vehiculo', 'marca', 'modelo', 'anio', 'patente', 'prenda',
+  'precio_venta', 'pie', 'parque', 'rut_dealer',
+  'part_neto', 'part_iva', 'part_bruto',
+  'seg_desg', 'seg_rdh', 'seg_cesantia', 'seg_rep', 'gps_monto', 'gastos_monto',
+];
+
 const mismoNumero = (a, b) => {
   if (a == null && b == null) return true;
   if (a == null || b == null) return false;
@@ -2514,6 +2530,24 @@ async function opCartaLibre(op) {
   const { op: libre } = await siguienteOpSufijo(n, 'R');
   return libre;
 }
+
+/* Destrabar la carta 266493152DS-C1 (id 5070002; Pato, 02-10-2026): nació de corregir una carta vencida
+   cambiándole la fecha, heredó la aprobación del 25-09 y la marca de otorgada de una operación que se
+   había anulado el 28-09 — el crédito 26091256 está APROBADO y la carta no dejaba otorgarlo. Con la regla
+   nueva esa corrección vuelve a aprobación: queda PENDIENTE, sin marca de otorgada. Solo actúa si la
+   carta sigue APROBADA + otorgada y su crédito NO está otorgado. */
+require('../../../../shared/migrate').migrar('carta-266493152DS-C1-a-aprobacion-v1', async () => {
+  const [u] = await pool.query(
+    `UPDATE cartas_aprobacion ca JOIN creditos cr ON cr.id = ca.id_credito_creado
+        SET ca.status='PENDIENTE', ca.otorgado=0, ca.fecha_otorgado=NULL,
+            ca.aprobado_por=NULL, ca.aprobado_por_nombre=NULL, ca.aprobado_por_initials=NULL,
+            ca.fecha_aprobacion=NULL, ca.comentario_aprobacion=NULL
+      WHERE ca.id=5070002 AND ca.op_carta='266493152DS-C1' AND ca.status='APROBADA' AND ca.otorgado=1
+        AND UPPER(COALESCE(cr.estado_credito,'')) <> 'OTORGADO'`);
+  if (u.affectedRows)
+    auditar({ accion: 'CORREGIR', modulo: 'cartas', entidad: 'carta_aprobacion', entidad_id: 5070002, usuario: { nombre: 'Sistema', apellido: '(pedido por Patricio Escobar)' },
+      detalle: 'Carta 266493152DS-C1 vuelve a aprobación: se le cambió la fecha estando vencida y había heredado la aprobación del 25-09 y la marca de otorgada de una operación anulada (OP 26091256). Queda PENDIENTE, sin marca de otorgada.' });
+});
 
 /* POST /api/cartas/:id/corregir  { campos:{...}, motivo } */
 const corregirCarta = async (req, res) => {
@@ -2573,9 +2607,26 @@ const corregirCarta = async (req, res) => {
     const quien = req.usuario ? ([req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email) : 'Sistema';
     const { op: opNueva, n } = await siguienteOpCorreccion(orig.op_carta);
 
-    // Hereda la aprobación original (los montos no cambiaron) y el vínculo al crédito.
+    /* ¿El crédito está otorgado DE VERDAD? Manda la etapa del crédito, no la marca de la carta: una
+       operación anulada antes del 30-09-2026 dejó su carta viva con otorgado=1 y la corrección heredaba
+       esa marca — la carta nueva figuraba otorgada y no se podía otorgar (op 26091256). */
+    let creditoOtorgado = !!orig.otorgado;
+    if (orig.id_credito_creado) {
+      const [[cr]] = await pool.query('SELECT estado_credito FROM creditos WHERE id=? LIMIT 1', [orig.id_credito_creado]);
+      if (cr) creditoOtorgado = String(cr.estado_credito || '').toUpperCase() === 'OTORGADO';   // sin crédito enlazado manda la marca de la carta
+    }
+    const camposReaprob = creditoOtorgado ? [] : cambios.map(c => c.campo).filter(c => CAMPOS_REAPROBACION.includes(c));
+    const requiereAprobacion = camposReaprob.length > 0;
+
+    // Hereda la aprobación original (los montos no cambiaron) y el vínculo al crédito —
+    // salvo que la corrección toque condiciones o la fecha: entonces vuelve a aprobación.
     nueva.op_carta               = opNueva;
-    nueva.status                 = 'APROBADA';
+    nueva.status                 = requiereAprobacion ? 'PENDIENTE' : 'APROBADA';
+    if (requiereAprobacion) {
+      nueva.aprobado_por = null; nueva.aprobado_por_nombre = null; nueva.aprobado_por_initials = null;
+      nueva.fecha_aprobacion = null; nueva.comentario_aprobacion = null; nueva.revision_auto = null;
+    }
+    if (!creditoOtorgado) { nueva.otorgado = 0; nueva.fecha_otorgado = null; }
     nueva.corrige_a_id           = orig.id;
     nueva.corrige_a_op           = orig.op_carta;
     nueva.correccion_n           = n;
@@ -2658,13 +2709,14 @@ const corregirCarta = async (req, res) => {
     } catch (e) { console.error('[cartas corregir→dealer credito]', e.message); }
 
     auditar({ req, accion: 'CORREGIR', modulo: 'cartas', entidad: 'carta_aprobacion', entidad_id: idNueva,
-      detalle: `Corrigió la carta ${orig.op_carta} → ${opNueva} (${cambios.map(c => c.campo).join(', ')}). Motivo: ${String(motivo).trim()}`,
+      detalle: `Corrigió la carta ${orig.op_carta} → ${opNueva} (${cambios.map(c => c.campo).join(', ')}). Motivo: ${String(motivo).trim()}${requiereAprobacion ? ` — VUELVE A APROBACIÓN por cambiar ${camposReaprob.join(', ')}` : ''}`,
       rut: nueva.rut_cliente, meta: propDealer ? { dealer_propagado: propDealer } : undefined });
 
     res.json({ success: true, error: null, data: {
       id: idNueva, opCarta: opNueva, correccionN: n,
       reemplaza: { id, opCarta: orig.op_carta },
       cambios, qrAnulados, cartolaActualizada: cartola,
+      requiereAprobacion, camposReaprobacion: camposReaprob,
       creditoEnlazado: orig.numero_credito_creado || null,
     } });
   } catch (e) {

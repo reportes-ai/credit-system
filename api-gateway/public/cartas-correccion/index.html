@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — buscador de dealers en la ficha: escribe y elige, el RUT y el parque siguen al nombre · v1.1 — buscador por N° carta, N° operacion, ID financiera, RUT y nombre; sin tildes ni puntos, con columnas para ver por que calzo · v1.0 — Corrección Cartas de Aprobación: emite una carta nueva (-C1, -C2…), deja la anterior REEMPLAZADA y su QR/FES no vigente -->
+<!-- v1.3 — una corrección que cambia condiciones o la fecha deja la carta nueva PENDIENTE de aprobación (se avisa al emitir). v1.2 — buscador de dealers en la ficha: escribe y elige, el RUT y el parque siguen al nombre · v1.1 — buscador por N° carta, N° operacion, ID financiera, RUT y nombre; sin tildes ni puntos, con columnas para ver por que calzo · v1.0 — Corrección Cartas de Aprobación: emite una carta nueva (-C1, -C2…), deja la anterior REEMPLAZADA y su QR/FES no vigente -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -408,6 +408,8 @@ async function confirmar(){
           ${d.creditoEnlazado ? `La nueva sigue anexada al crédito <b>${E(d.creditoEnlazado)}</b>.` : ''}
           ${d.cartolaActualizada ? ` Se actualizó su comisión pendiente en la cartola.` : ''}
         </div>
+        ${d.requiereAprobacion ? `<div class="aviso warn" style="margin-top:10px"><b><i class="bi bi-hourglass-split me-1"></i>La carta nueva quedó PENDIENTE de aprobación.</b>
+          Cambiaste ${d.camposReaprobacion.map(c=>'<b>'+E((CAMPOS.find(x=>x.post===c)||{}).lbl||c)+'</b>').join(', ')}: eso toca las condiciones o la vigencia sobre las que se aprobó, así que pasa de nuevo por el proceso completo, como una carta nueva. No se puede otorgar hasta que la aprueben.</div>` : ''}
         <div class="sec-tit">Qué se corrigió</div>
         <table class="res"><thead><tr><th>Campo</th><th>Antes</th><th>Ahora</th></tr></thead><tbody>${
           d.cambios.map(c=>`<tr style="cursor:default"><td><b>${E((CAMPOS.find(x=>x.post===c.campo)||{}).lbl||c.campo)}</b></td>
